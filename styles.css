@@ -1,0 +1,136 @@
+
+
+body { font-family: 'Inter', sans-serif; }
+
+h1, h2, h3 {
+  font-family: 'Poppins', sans-serif;
+}
+
+/* BOTÓN VAN */
+.btn-truck { position: relative; overflow: hidden; }
+.btn-truck .text { transition: all .4s ease; }
+.btn-truck .truck { position: absolute; left: -50px; opacity: 0; }
+
+@keyframes drive {
+  0% { left: -50px; opacity: 0; }
+  50% { left: 50%; opacity: 1; transform: translateX(-50%); }
+  100% { left: 120%; opacity: 1; }
+}
+
+/* NAV PREMIUM */
+.nav-link {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 0%;
+  height: 2px;
+  background: #8cc63f;
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.nav-link:hover {
+  color: #0b2a6b;
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+/* LOGO */
+.logo-hover {
+  transition: all 0.3s ease;
+}
+
+.logo-hover:hover {
+  transform: scale(1.08);
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.2));
+}
+/* ANIMACIÓN AL AGREGAR */
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+
+.animate-pop {
+  animation: pop 0.4s ease;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ANIMACIÓN ESCRIBIENDO */
+.typing {
+  display: inline-block;
+  width: 30px;
+}
+
+.typing span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 1px;
+  background: #555;
+  border-radius: 50%;
+  animation: blink 1.4s infinite both;
+}
+
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0% { opacity: .2; }
+  20% { opacity: 1; }
+  100% { opacity: .2; }
+}
+/* ===== SCROLL PRO LIMPIO (SIN CENTRO FAKE) ===== */
+
+.scroll-pro {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.scroll-pro::-webkit-scrollbar {
+  display: none;
+}
+
+
+
+.scroll-item {
+  scroll-snap-align: start;
+  flex: 0 0 auto;
+  transition: transform .3s ease;
+}
+
+.scroll-item:hover {
+  transform: scale(1.05) translateY(-5px);
+}
+/* padding bonito sin romper layout */
+.scroll-padding {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
