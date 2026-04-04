@@ -134,3 +134,18 @@ h1, h2, h3 {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  :root {
+    --cocoen-separator-color: #ffffff; /* Color de la línea divisoria */
+    --cocoen-drag-background: #8cc63f; /* Color del círculo deslizante */
+  }
+  
+  /* Ajuste para que la imagen no se vea opaca al cargar */
+  .cocoen img {
+    display: block;
+    width: 100%;
+  }
+
+
+  
+  

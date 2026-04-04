@@ -51,7 +51,7 @@
     <a href="#productos" onclick="toggleMenu()">Productos</a>
     <a href="#nosotros" onclick="toggleMenu()">Nosotros</a>
 
-    <a href="https://wa.me/523315994255" target="_blank"
+    <a href="https://wa.me/5213310151875" target="_blank"
     class="mt-6 bg-[#8cc63f] text-white px-6 py-3 rounded-full shadow-lg">
     Reservar
     </a>
@@ -60,87 +60,84 @@
 
 </div>
 <!-- NAVBAR -->
+<!-- NAVBAR -->
+<!-- NAVBAR CORREGIDO -->
 <nav class="fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-50">
+  <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2 md:py-4 flex items-center justify-between">
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 md:py-4 flex items-center justify-between">
-
-    <!-- LOGO -->
-    <div class="flex items-center gap-2">
-      <img src="img/Perrito.png" alt="Logo Woof & Wash" loading="lazy" decoding="async" class="h-10 sm:h-12 md:h-10">
-      <span class="text-sm sm:text-lg font-extrabold text-[#0b2a6b]">
-        Woof<span class="text-[#8cc63f]">&</span>Wash
-      </span>
+    <!-- Logo -->
+    <div class="flex items-center shrink-0">
+      <a href="#inicio" class="flex items-center">
+        <img src="img/Perrito.png" alt="Logo Woof & Wash" 
+             class="h-8 sm:h-12 md:h-10 object-contain -ml-1 mr-[2px] md:mr-2">
+        <span class="text-[13px] sm:text-lg font-extrabold text-[#0b2a6b] flex items-center leading-none tracking-tighter sm:tracking-normal">
+          Woof<span class="text-[#8cc63f]">&</span>Wash
+        </span>
+        <img src="img/cochelogo.png" alt="Servicio adicional" 
+             class="h-7 sm:h-10 md:h-9 object-contain ml-[5px] md:ml-2">
+      </a>
     </div>
 
-    <!-- MENU DESKTOP -->
+    <!-- Links desktop -->
     <div class="hidden md:flex gap-8 text-sm font-medium text-gray-700">
-      <a href="#" class="nav-link">Inicio</a>
-      <a href="#clientes" class="nav-link">Clientes</a>
-      <a href="#servicios" class="nav-link">Servicios</a>
-      <a href="#productos" class="nav-link">Productos</a>
-      <a href="#nosotros" class="nav-link">Nosotros</a>
+      <a href="#inicio" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Inicio</a>
+      <a href="#clientes" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Clientes</a>
+      <a href="#servicios" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Servicios</a>
+      <a href="#productos" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Productos</a>
+      <a href="#nosotros" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Nosotros</a>
     </div>
 
-    <!-- DERECHA -->
-    <div class="flex items-center gap-3">
+    <!-- Botones -->
+    <div class="flex items-center gap-1 sm:gap-3 md:gap-4">
+      
+      <!-- Menu mobile -->
+      <button onclick="toggleMenu()" aria-label="Abrir menú" class="md:hidden text-[#0b2a6b] p-1"> 
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
 
-<!-- HAMBURGUESA MOBILE -->
-<button onclick="toggleMenu()" class="md:hidden text-[#0b2a6b]"> 
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" stroke="currentColor">
-    <path stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-  </svg>
-</button>
-      <!-- CARRITO -->
-<button id="cart-icon" onclick="toggleCarrito()" class="relative transition-transform duration-300">
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-[#0b2a6b]" fill="none" stroke="currentColor">
-    <path stroke-width="2" d="M3 3h2l1 2h13l-1.5 9h-11z"/>
-    <circle cx="9" cy="20" r="1.5"/>
-    <circle cx="17" cy="20" r="1.5"/>
-  </svg>
+      <!-- Carrito -->
+      <button id="cart-icon" onclick="toggleCarrito()" aria-label="Ver carrito" class="relative p-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-7 md:h-7 text-[#0b2a6b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l1 2h13l-1.5 9h-11z"/>
+          <circle cx="9" cy="20" r="1.5"/>
+          <circle cx="17" cy="20" r="1.5"/>
+        </svg>
+        <span id="contadorCarrito" class="absolute top-0 right-0 bg-[#8cc63f] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
+          0
+        </span>
+      </button>
 
-  <span id="contadorCarrito" class="absolute -top-2 -right-2 bg-[#8cc63f] text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-    0
-  </span>
-</button>
-      <a href="https://wa.me/523315994255" target="_blank"
-class="flex items-center justify-center md:justify-start 
-bg-[#8cc63f] text-white 
-w-12 h-12 md:w-auto md:h-auto 
-md:px-6 md:py-2 
-rounded-full overflow-hidden relative">
+      <!-- Reservar -->
+      <a href="https://wa.me/523315994255" target="_blank" class="relative flex items-center justify-center transition-all duration-300">
+        
+        <!-- Mobile -->
+        <span class="md:hidden flex flex-col items-center pl-1">
+          <span class="text-[7px] font-black text-[#8cc63f] uppercase tracking-tighter leading-none">Reservar</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f] -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </span>
 
-  <!-- MÓVIL -->
-  <span class="md:hidden flex flex-col items-center justify-center leading-none">
+        <!-- Desktop -->
+        <span class="hidden md:flex items-center gap-2 bg-[#8cc63f] text-white px-6 py-2 rounded-full btn-truck overflow-hidden relative">
+          <span class="text">Reservar</span>
+          <span class="truck text-white absolute">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
+              <circle cx="7" cy="17" r="2"/>
+              <circle cx="17" cy="17" r="2"/>
+            </svg>
+          </span>
+        </span>
+      </a>
+    </div>
 
-    <span class="text-[9px] font-semibold -mb-1">
-      Reservar
-    </span>
+  </div>
 
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" stroke="currentColor">
-      <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
-      <circle cx="7" cy="17" r="1.5"/>
-      <circle cx="17" cy="17" r="1.5"/>
-    </svg>
 
-  </span>
-
-  <!-- DESKTOP -->
-  <span class="hidden md:flex items-center gap-2 btn-truck">
-    <span class="text">Reservar</span>
-
-    <span class="truck text-white absolute">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" stroke="currentColor">
-        <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
-        <circle cx="7" cy="17" r="2"/>
-        <circle cx="17" cy="17" r="2"/>
-      </svg>
-    </span>
-  </span>
-
-</a>
-</div>
 </nav>
-
 <!-- HERO -->
 <section class="pt-12 md:pt-16 pb-8 md:pb-12 px-4 sm:px-6 text-center">
   
@@ -171,7 +168,8 @@ rounded-full overflow-hidden relative">
     </div>
   </div>
 
-  <a href="https://wa.me/523315994255" target="_blank"
+  <a href="https://wa.me/5213310151875" target="_blank"
+
     class="inline-flex items-center justify-center gap-2 bg-[#8cc63f] text-white px-8 py-4 rounded-full btn-truck shadow-lg hover:scale-105 transition w-full sm:w-auto text-lg">
     <span class="text">Agendar ahora</span>
     <span class="truck">
@@ -312,7 +310,10 @@ rounded-full overflow-hidden relative">
           <img src="img/Van.jpeg" alt="Van" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
           <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
             <p class="text-sm italic mb-3 leading-snug">Vamos hasta tu casa con todo el equipo necesario.</p>
-            <a href="https://wa.me/523315994255" target="_blank" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full text-center hover:scale-105 transition shadow-md">
+
+
+
+            <a href="https://wa.me/5213310151875" target="_blank" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full text-center hover:scale-105 transition shadow-md">
               Agendar ahora
             </a>
           </div>
@@ -496,7 +497,7 @@ rounded-full overflow-hidden relative">
 
   </div>
 </section>
-<script src="https://unpkg.com/cocoen/dist/cocoen.js"></script>
+
 
 
 <!-- NOSOTROS -->
@@ -752,7 +753,7 @@ Vaciar carrito
   </div>
 
   <!-- BOTÓN -->
-  <a href="https://wa.me/523315994255?text=Hola,%20quiero%20información%20y%20agendar%20un%20servicio"
+  <a href="https://wa.me/5213310151875?text=Hola,%20quiero%20información%20y%20agendar%20un%20servicio"
   target="_blank"
   class="bg-[#8cc63f] p-3 rounded-full shadow-xl hover:scale-110 transition">
 
