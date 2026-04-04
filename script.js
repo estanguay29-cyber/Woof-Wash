@@ -169,7 +169,7 @@ function actualizarWhatsApp() {
   mensaje += `%0A🕒 Horario preferido: __________`;
 
   document.getElementById("btnWhats").href =
-   "https://wa.me/5213310151875?text=" + encodeURIComponent(mensaje);
+   "https://wa.me/523315994255?text=" + encodeURIComponent(mensaje);
 }
 
 // INICIO
