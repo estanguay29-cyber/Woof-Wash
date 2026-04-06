@@ -156,21 +156,20 @@ contador.innerText = totalItems;
 }
 
 
-
 function actualizarWhatsApp() {
-  let mensaje = "🐶 *Woof & Wash - Pedido";
+  let mensaje = "🐶 *Woof & Wash - Pedido*\n\n";
 
   carrito.forEach(item => {
-    mensaje += `• ${item.nombre} x${item.cantidad} = $${item.precio * item.cantidad}`;
+    mensaje += `• ${item.nombre} x${item.cantidad} = $${item.precio * item.cantidad} MXN\n`;
   });
 
-  mensaje += `💰 *Total:* $${total} MXN`;
-  mensaje += `En este apartado agrega tu información para completar tu pedido:`;
-  mensaje += `📍 Dirección:`;
-  mensaje += `🕒 Horario preferido o si te lo llevamos en tu proxima cita:`;
-  mensaje += `Nombre de la persona que recibirá el pedido:`;
-  mensaje += `Metodo de pago (Efectivo, Tarjeta, Transferencia):`;
-  mensaje += `Una vez que envíes el mensaje, confirmaremos tu pedido. ¡Gracias por elegir Woof & Wash! 🐾`;
+  mensaje += `\n💰 *Total:* $${total} MXN\n\n`;
+  mensaje += `Por favor, completa la siguiente información para finalizar tu pedido:\n\n`;
+  mensaje += `📍 Dirección:\n`;
+  mensaje += `🕒 Horario preferido / Próxima cita:\n`;
+  mensaje += `👤 Nombre de quien recibirá el pedido:\n`;
+  mensaje += `💳 Método de pago (Efectivo, Tarjeta, Transferencia):\n\n`;
+  mensaje += `Una vez que envíes este mensaje, confirmaremos tu pedido. ¡Gracias por elegir Woof & Wash! 🐾`;
 
   document.getElementById("btnWhats").href =
    "https://wa.me/523315994255?text=" + encodeURIComponent(mensaje);
