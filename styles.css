@@ -1,5 +1,4 @@
 
-
 body { font-family: 'Inter', sans-serif; }
 
 h1, h2, h3 {
@@ -148,4 +147,20 @@ h1, h2, h3 {
 #sliderAutos::after {
   content: "";
   flex: 0 0 10px;
+}
+.paw {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  background-color: #facc15;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='6' cy='8' r='2'/><circle cx='10' cy='5' r='2'/><circle cx='14' cy='5' r='2'/><circle cx='18' cy='8' r='2'/><ellipse cx='12' cy='14' rx='4' ry='3'/></svg>") no-repeat center / contain;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='6' cy='8' r='2'/><circle cx='10' cy='5' r='2'/><circle cx='14' cy='5' r='2'/><circle cx='18' cy='8' r='2'/><ellipse cx='12' cy='14' rx='4' ry='3'/></svg>") no-repeat center / contain;
+}
+.star {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  background-color: #facc15; /* amarillo */
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/></svg>") no-repeat center / contain;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/></svg>") no-repeat center / contain;
 }
