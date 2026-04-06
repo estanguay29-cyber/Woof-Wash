@@ -63,15 +63,6 @@ h1, h2, h3 {
   animation: pop 0.4s ease;
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
 /* ANIMACIÓN ESCRIBIENDO */
 .typing {
   display: inline-block;
@@ -147,5 +138,14 @@ h1, h2, h3 {
   }
 
 
-  
-  
+  #sliderProductos::before,
+#sliderAutos::before {
+  content: "";
+  flex: 0 0 10px;
+}
+
+#sliderProductos::after,
+#sliderAutos::after {
+  content: "";
+  flex: 0 0 10px;
+}

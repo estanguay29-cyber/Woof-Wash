@@ -455,9 +455,97 @@ function cerrarZonas() {
       });
     }
   });
+function toggleBuscador() {
+  const contenedor = document.getElementById("contenedorBuscador");
+  const input = document.getElementById("buscadorProductos");
 
+  const abierto = contenedor.classList.contains("max-h-20");
 
-   
+  if (abierto) {
+    // CERRAR
+    contenedor.classList.remove("max-h-20");
+    contenedor.classList.add("max-h-0");
+
+    input.value = "";
+
+    // reset productos
+    const productos = document.querySelectorAll("#sliderProductos > div");
+    productos.forEach(p => p.style.display = "block");
+
+  } else {
+    // ABRIR
+    contenedor.classList.remove("max-h-0");
+    contenedor.classList.add("max-h-20");
+
+    setTimeout(() => input.focus(), 200);
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  const input = document.getElementById("buscadorProductos");
+
+  if (!input) return;
+
+  input.addEventListener("input", function () {
+    const filtro = this.value.toLowerCase();
+    const productos = document.querySelectorAll("#sliderProductos > div");
+
+    productos.forEach(producto => {
+      const nombre = producto.querySelector(".product-name")?.innerText.toLowerCase() || "";
+
+    if (nombre.includes(filtro)) {
+  producto.classList.remove("hidden");
+} else {
+  producto.classList.add("hidden");
+}
+    });
+  });
+});
+function toggleBuscadorAutos() {
+  const contenedor = document.getElementById("contenedorBuscadorAutos");
+  const input = document.getElementById("buscadorAutos");
+
+  const abierto = contenedor.classList.contains("max-h-20");
+
+  if (abierto) {
+    contenedor.classList.remove("max-h-20");
+    contenedor.classList.add("max-h-0");
+    input.value = "";
+
+    document.querySelectorAll("#sliderAutos > div")
+      .forEach(p => p.classList.remove("hidden"));
+
+  } else {
+    contenedor.classList.remove("max-h-0");
+    contenedor.classList.add("max-h-20");
+    setTimeout(() => input.focus(), 200);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const input = document.getElementById("buscadorAutos");
+
+  if (!input) return;
+
+  input.addEventListener("input", function () {
+    const filtro = this.value.toLowerCase();
+
+    document.querySelectorAll("#sliderAutos > div")
+      .forEach(producto => {
+        const nombre = producto.querySelector(".product-name")?.innerText.toLowerCase() || "";
+
+        producto.classList.toggle("hidden", !nombre.includes(filtro));
+      });
+  });
+});
+
+function scrollProductosAutos(dir) {
+  const slider = document.getElementById("sliderAutos");
+  slider.scrollBy({ left: dir * 300, behavior: "smooth" });
+}
+function toggleSubmenu() {
+  const submenu = document.getElementById("submenuMobile");
+  submenu.classList.toggle("hidden");
+}
    // Esto le dice a la librería: "Busca el div cocoen y conviértelo en un slider"
   
 

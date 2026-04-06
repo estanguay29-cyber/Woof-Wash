@@ -48,7 +48,18 @@
     <a href="#" onclick="toggleMenu()">Inicio</a>
     <a href="#clientes" onclick="toggleMenu()">Clientes</a>
     <a href="#servicios" onclick="toggleMenu()">Servicios</a>
-    <a href="#productos" onclick="toggleMenu()">Productos</a>
+    <div class="flex flex-col items-center gap-2">
+
+  <button onclick="toggleSubmenu()" class="font-semibold text-[#0b2a6b]">
+    Productos ▼
+  </button>
+
+  <div id="submenuMobile" class="hidden flex flex-col items-center gap-2 text-base">
+    <a href="#productosMascotas" onclick="toggleMenu()">🐶 Mascotas</a>
+    <a href="#productosAutos" onclick="toggleMenu()">🚗 Autos</a>
+  </div>
+
+</div>
     <a href="#nosotros" onclick="toggleMenu()">Nosotros</a>
 
     <a href="https://wa.me/523315994255" target="_blank"
@@ -83,7 +94,32 @@
       <a href="#inicio" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Inicio</a>
       <a href="#clientes" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Clientes</a>
       <a href="#servicios" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Servicios</a>
-      <a href="#productos" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Productos</a>
+      <div class="relative group">
+  
+  <!-- BOTÓN PRINCIPAL -->
+  <button class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition flex items-center gap-1">
+    Productos
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  <!-- SUBMENÚ -->
+  <div class="absolute left-0 mt-3 w-52 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+
+    <a href="#productosMascotas" 
+      class="block px-5 py-3 text-sm text-[#0b2a6b] hover:bg-[#8cc63f] hover:text-white transition rounded-t-xl">
+      🐶 Productos Mascotas
+    </a>
+
+    <a href="#productosAutos" 
+      class="block px-5 py-3 text-sm text-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white transition rounded-b-xl">
+      🚗 Productos Autos
+    </a>
+
+  </div>
+
+</div>
       <a href="#nosotros" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Nosotros</a>
     </div>
 
@@ -332,16 +368,51 @@
     </div>
   </div>
 </section>
-<!-- PRODUCTOS -->
-<section id="productos" class="py-9 md:py-13 bg-[#f9f4e2] scroll-mt-28 overflow-hidden text-[#0b2a6b]">
-  <div class="max-w-7xl mx-auto px-6">
+<!-- PRODUCTOS MASCOTAS-->
+ <section id="productosMascotas">
+<div class="flex items-center justify-center gap-2 whitespace-nowrap">
+
+  <!-- TÍTULO -->
+  <h2 class="text-2xl md:text-4xl font-extrabold text-[#0b2a6b] truncate">
+    Productos Mascotas
+  </h2>
+
+  <!-- BOTÓN LUPA -->
+<button onclick="toggleBuscador()" 
+  class="bg-white border border-gray-200 shadow-md p-2 rounded-full hover:scale-110 hover:shadow-xl transition-all duration-300 flex items-center justify-center hover:bg-[#0b2a6b] group">
+
+  <svg xmlns="http://www.w3.org/2000/svg" 
+    class="h-5 w-5 text-[#0b2a6b] group-hover:text-white transition" 
+    fill="none" 
+    viewBox="0 0 24 24" 
+    stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+      d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+  </svg>
+
+</button>
+
+</div>
+
+<!-- BUSCADOR (DEBAJO DEL TÍTULO) -->
+<div id="contenedorBuscador" 
+  class="w-full max-w-md mx-auto overflow-hidden transition-all duration-500 max-h-0 mt-3">
+
+  <input 
+    type="text" 
+    id="buscadorProductos"
+    placeholder="Buscar productos..."
+    class="w-full px-4 py-2 rounded-full border shadow-md focus:outline-none focus:ring-2 focus:ring-[#8cc63f]"
+  >
+
+</div>
+
+  
+
+<!-- LINEA VERDE -->
+<div class="w-16 h-1 bg-[#8cc63f] mx-auto rounded-full mb-4"></div>
     
-    <div class="text-center mb-6">
-      <h2 class="text-3xl md:text-4xl font-extrabold mb-3">Nuestros Productos</h2>
-      <div class="w-16 h-1 bg-[#8cc63f] mx-auto rounded-full"></div>
-    </div>
-    
-    <div class="relative group/slider">
+    <div class="relative group/slider px-4 md:px-0">
    <button onclick="scrollProductos(-1)" 
   class="absolute -left-2 md:-left-10 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur shadow-xl rounded-full p-2 md:p-3 z-30 hover:bg-[#0b2a6b] hover:text-white transition-all duration-300 border border-gray-100 flex items-center justify-center">
   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -349,7 +420,8 @@
   </svg>
 </button>
 
-      <div id="sliderProductos" class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar snap-x snap-mandatory">
+      <div id="sliderProductos" 
+class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar snap-x snap-mandatory px-4 md:px-2">
 
         <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
           <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">RECOMENDADO</div>
@@ -361,7 +433,7 @@
               Añadir al carrito
             </button>
           </div>
-          <div class="p-4 bg-white"><h3 class="font-bold text-sm">Shampoo Premium</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$129.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Shampoo Premium</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$129.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
         </div>
 
         <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
@@ -374,7 +446,7 @@
               Añadir al carrito
             </button>
           </div>
-          <div class="p-4 bg-white"><h3 class="font-bold text-sm">Perfume Galán</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$99.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Perfume Galán</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$99.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
         </div>
 
         <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
@@ -387,7 +459,7 @@
               Añadir al carrito
             </button>
           </div>
-          <div class="p-4 bg-white"><h3 class="font-bold text-sm">Cepillo Ergonómico</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$89.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Cepillo Ergonómico</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$89.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
         </div>
 
         <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
@@ -400,7 +472,7 @@
               Añadir al carrito
             </button>
           </div>
-          <div class="p-4 bg-white"><h3 class="font-bold text-sm">Cepillo Desenredante</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$119.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Cepillo Desenredante</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$119.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
         </div>
 
         <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
@@ -413,7 +485,7 @@
               Añadir al carrito
             </button>
           </div>
-          <div class="p-4 bg-white"><h3 class="font-bold text-sm">Toallas Húmedas</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$79.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Toallas Húmedas</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$79.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
         </div>
 
         <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
@@ -425,7 +497,7 @@
               Añadir al carrito
             </button>
           </div>
-          <div class="p-4 bg-white"><h3 class="font-bold text-sm">Cortauñas Pro</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$109.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Cortauñas Pro</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$109.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
         </div>
 
         <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
@@ -438,7 +510,7 @@
               Añadir al carrito
             </button>
           </div>
-          <div class="p-4 bg-white"><h3 class="font-bold text-sm">Collar Antipulgas</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$149.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Collar Antipulgas</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$149.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
         </div>
 
       </div>
@@ -452,54 +524,239 @@
     </div>
   </div>
 </section>
+<!-- PRODUCTOS AUTOS -->
+ <section id="productosAutos">
+<div class="flex items-center justify-center gap-2 whitespace-nowrap">
 
+  <!-- TÍTULO -->
+  <h2 class="text-2xl md:text-4xl font-extrabold text-[#0b2a6b] truncate">
+    Productos Autos
+  </h2>
 
-<!-- 3. SECCIÓN ANTES / DESPUÉS -->
-<!-- ========================= -->
-<section id="antes-despues" class="py-9 md:py-13 bg-[#fffae8] scroll-mt-20 overflow-hidden text-[#0b2a6b]">
-  <div class="max-w-7xl mx-auto px-6">
+  <!-- BOTÓN LUPA -->
+  <button onclick="toggleBuscadorAutos()" 
+    class="bg-white border border-gray-200 shadow-md p-2 rounded-full hover:scale-110 hover:shadow-xl transition-all duration-300 flex items-center justify-center hover:bg-[#0b2a6b] group">
+
+    <svg xmlns="http://www.w3.org/2000/svg" 
+      class="h-5 w-5 text-[#0b2a6b] group-hover:text-white transition" 
+      fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+        d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+    </svg>
+
+  </button>
+
+</div>
+
+<!-- BUSCADOR -->
+<div id="contenedorBuscadorAutos" 
+  class="w-full max-w-md mx-auto overflow-hidden transition-all duration-500 max-h-0 mt-3">
+
+  <input 
+    type="text" 
+    id="buscadorAutos"
+    placeholder="Buscar productos para auto..."
+    class="w-full px-4 py-2 rounded-full border shadow-md focus:outline-none focus:ring-2 focus:ring-[#8cc63f]"
+  >
+</div>
+
+<!-- LINEA -->
+<div class="w-16 h-1 bg-[#8cc63f] mx-auto rounded-full mb-4"></div>
+
+<div class="relative group/slider px-4 md:px-0">
+
+  <!-- BOTÓN IZQUIERDA -->
+  <button onclick="scrollProductosAutos(-1)" 
+    class="absolute -left-2 md:-left-10 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur shadow-xl rounded-full p-2 md:p-3 z-30 hover:bg-[#0b2a6b] hover:text-white transition-all duration-300 border border-gray-100 flex items-center justify-center">
     
-    <div class="text-center mb-12">
-      <h2 class="text-sm font-bold uppercase tracking-widest text-[#8cc63f] mb-2">Resultados Reales</h2>
-      <h5 class="text-4xl md:text-5xl font-extrabold mb-4 leading-tight">
-        La Magia de <span class="relative inline-block text-[#8cc63f] px-2">Woof & Wash 
-          <span class="absolute inset-0 bg-[#0b2a6b] rounded-md -z-10 rotate-1"></span>
-        </span>
-      </h5>
-      <div class="w-20 h-1.5 bg-[#8cc63f] mx-auto rounded-full mt-4"></div>
-    </div>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+  </button>
 
-    <div class="text-center mb-6 flex items-center justify-center gap-2 max-w-sm mx-auto bg-white/90 p-2 rounded-xl shadow-sm border border-gray-100">
-      <span class="animate-bounce text-[#8cc63f] font-bold text-sm">↔</span>
-      <p class="text-[10px] md:text-xs font-bold text-gray-700 uppercase tracking-tighter">Desliza para ver la transformación completa</p>
-    </div>
+  <!-- SLIDER -->
+  <div id="sliderAutos" 
+class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar snap-x snap-mandatory px-4 md:px-2">
 
-    <div class="relative max-w-sm mx-auto rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-white">
-      <div class="cocoen w-full h-auto">
-        <img src="img/Antes.jpeg" alt="Antes" loading="lazy" class="w-full h-auto object-contain">
-        <img src="img/Despues.jpeg" alt="Después" loading="lazy" class="w-full h-auto object-contain">
+    <!-- PRODUCTO 1 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full">RECOMENDADO</div>
+      <img src="img/Shampooauto.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Limpieza profunda sin dañar la pintura, deja brillo intenso.</p>
+        <button onclick="animarAlCarrito(this, 'Shampoo Automotriz', 149)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+          🛒 Añadir al carrito
+        </button>
       </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Shampoo Automotriz</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$149 MXN</p>
+      </div>
+    </div>
+
+    <!-- PRODUCTO 2 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <div class="absolute top-3 right-3 bg-[#e74c3c] text-white text-[10px] px-3 py-1 rounded-full">OFERTA</div>
+      <img src="img/ceraauto.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Protege y da brillo espejo a la carrocería.</p>
+        <button onclick="animarAlCarrito(this, 'Cera Líquida', 199)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md">
+          🛒 Añadir al carrito
+        </button>
+      </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Cera Líquida</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$199 MXN</p>
+      </div>
+    </div>
+
+    <!-- PRODUCTO 3 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <div class="absolute top-3 right-3 bg-[#0b2a6b] text-white text-[10px] px-3 py-1 rounded-full">NUEVO</div>
+      <img src="img/aromatizante.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Aroma duradero que mantiene tu auto fresco por días.</p>
+        <button onclick="animarAlCarrito(this, 'Aromatizante Premium', 89)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition">
+          🛒 Añadir al carrito
+        </button>
+      </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Aromatizante Premium</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$89 MXN</p>
+      </div>
+    </div>
+
+    <!-- PRODUCTO 4 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <img src="img/limpiadorderin.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Elimina grasa y suciedad difícil en rines.</p>
+        <button onclick="animarAlCarrito(this, 'Limpiador de Rines', 129)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition">
+          🛒 Añadir al carrito
+        </button>
+      </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Limpiador de Rines</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$129 MXN</p>
+      </div>
+    </div>
+<!-- LIMPIADOR DE VIDRIOS -->
+<div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+  <div class="absolute top-3 right-3 z-10 bg-[#0b2a6b] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">NUEVO</div>
+  
+  <img src="img/Limpiadordevidrio.jpeg" alt="Limpiador de Vidrios" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+  <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+    <p class="text-xs italic mb-4 leading-snug">
+      Deja tus vidrios cristalinos sin marcas ni residuos.
+    </p>
+
+    <button onclick="animarAlCarrito(this, 'Limpiador de Vidrios', 129)" 
+      class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
       
-      <div class="absolute top-3 left-3 z-30 bg-black/60 text-white text-[9px] font-bold px-3 py-1 rounded-full backdrop-blur-sm">ANTES</div>
-      <div class="absolute top-3 right-3 z-30 bg-[#8cc63f] text-white text-[9px] font-bold px-3 py-1 rounded-full shadow-lg">DESPUÉS</div>
-    </div>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
 
-    <div class="mt-8 grid grid-cols-2 gap-3 max-w-sm mx-auto">
-      <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-gray-200 text-center">
-        <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">El Reto</p>
-        <p class="text-sm md:text-lg font-black text-gray-500 italic">¿Un trapeador? 🧼</p>
-      </div>
-      <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-[#8cc63f] text-center">
-        <p class="text-[9px] font-bold text-[#8cc63f] uppercase mb-1">Resultado</p>
-        <p class="text-sm md:text-lg font-black text-[#0b2a6b] italic">¡Es Firulais! ✨</p>
-      </div>
-    </div>
-
+      Añadir al carrito
+    </button>
   </div>
+
+  <div class="p-4 bg-white">
+    <h3 class="product-name font-bold text-sm">Limpiador de Vidrios</h3>
+    <p class="text-[#0b2a6b] font-extrabold mt-1">
+      $129.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span>
+    </p>
+  </div>
+</div>
+
+<!-- RENOVADOR DE INTERIORES -->
+<div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+  <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">RECOMENDADO</div>
+  
+  <img src="img/Renovadorinteriores.jpeg" alt="Renovador de Interiores" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+  <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+    <p class="text-xs italic mb-4 leading-snug">
+      Devuelve el brillo y protege plásticos y vinil del interior.
+    </p>
+
+    <button onclick="animarAlCarrito(this, 'Renovador de Interiores', 139)" 
+      class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+
+      Añadir al carrito
+    </button>
+  </div>
+
+  <div class="p-4 bg-white">
+    <h3 class="product-name font-bold text-sm">Renovador de Interiores</h3>
+    <p class="text-[#0b2a6b] font-extrabold mt-1">
+      $139.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span>
+    </p>
+  </div>
+</div>
+
+<!-- FRANELAS DE MICROFIBRA -->
+<div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+  <div class="absolute top-3 right-3 z-10 bg-[#e74c3c] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">OFERTA</div>
+  
+  <img src="img/Franelas.jpeg" alt="Franelas de Microfibra" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+  <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+    <p class="text-xs italic mb-4 leading-snug">
+      Ultra absorbentes, no rayan y dejan acabado perfecto.
+    </p>
+
+    <button onclick="animarAlCarrito(this, 'Franelas de Microfibra', 150)" 
+      class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+
+      Añadir al carrito
+    </button>
+  </div>
+
+  <div class="p-4 bg-white">
+    <h3 class="product-name font-bold text-sm">Franelas de Microfibra</h3>
+    <p class="text-[#0b2a6b] font-extrabold mt-1">
+      $150.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span>
+    </p>
+  </div>
+</div>
+  </div>
+
+  <!-- BOTÓN DERECHA -->
+  <button onclick="scrollProductosAutos(1)" 
+    class="absolute -right-2 md:-right-10 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur shadow-xl rounded-full p-2 md:p-3 z-30 hover:bg-[#0b2a6b] hover:text-white transition-all duration-300 border border-gray-100 flex items-center justify-center">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+    </svg>
+  </button>
+
+</div>
 </section>
-
-
-
 <!-- NOSOTROS -->
 <section id="nosotros" class="py-9 md:py-13 bg-white">
   <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
@@ -565,12 +822,12 @@
     <div class="relative">
       <img src="img/Pomeraniapasto.jpeg" alt="Pomerania pasto" loading="lazy" decoding="async" class="rounded-3xl shadow-2xl">
 
-      <!-- DETALLE DECORATIVO -->
-      <div class="absolute -bottom-6 -left-6 bg-[#8cc63f] w-24 h-24 rounded-3xl opacity-20"></div>
     </div>
 
   </div>
 </section>
+
+<!-- PREGUNTAS FRECUENTES -->
 <section class="py-16 md:py-20 bg-[#f9f4e2]">
 <div class="max-w-4xl mx-auto px-6">
 
@@ -635,7 +892,7 @@ Preguntas frecuentes
           <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" stroke="currentColor">
             <path stroke-width="2" d="M3 5a2 2 0 012-2h2l2 5-2 2a11 11 0 005 5l2-2 5 2v2a2 2 0 01-2 2A16 16 0 013 5z"/>
           </svg>
-          <span>33 1015 1875</span>
+          <span>3315994255</span>
         </div>
 
         <div class="flex items-center gap-2">
@@ -680,7 +937,7 @@ Preguntas frecuentes
       <div class="flex md:justify-start justify-center gap-6 mb-4">
 
         <!-- FACEBOOK -->
-        <a href="https://www.facebook.com/" target="_blank" class="hover:scale-110 transition">
+        <a href="https://www.facebook.com/profile.php?id=61579560939219" target="_blank" class="hover:scale-110 transition">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
             <path d="M22 12.07C22 6.48 17.52 2 11.93 2S2 6.48 2 12.07c0 4.99 3.66 9.13 8.44 9.88v-6.99H7.9v-2.89h2.54V9.41c0-2.5 1.5-3.88 3.8-3.88 1.1 0 2.24.2 2.24.2v2.47h-1.26c-1.25 0-1.64.77-1.64 1.56v1.87h2.8l-.45 2.89h-2.35v6.99C18.34 21.2 22 17.06 22 12.07z"/>
           </svg>
