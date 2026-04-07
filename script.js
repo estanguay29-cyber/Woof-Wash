@@ -540,6 +540,7 @@ function toggleSubmenu() {
 }
 function moverDrag(e, tipo) {
   const container = e.currentTarget;
+  if (e.touches) e.preventDefault();
   const rect = container.getBoundingClientRect();
 
   let x;
