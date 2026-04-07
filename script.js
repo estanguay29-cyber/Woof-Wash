@@ -563,3 +563,4 @@ function moverDrag(e, tipo) {
   after.style.width = porcentaje + "%";
   linea.style.left = porcentaje + "%";
 }
+
