@@ -243,35 +243,37 @@ function toggleFAQ(btn) {
     icon.textContent = "−";
   }
 }
-document.querySelectorAll(".btn-truck").forEach(btn => {
-  btn.addEventListener("mouseenter", () => {
-    const text = btn.querySelector(".text");
-    const truck = btn.querySelector(".truck");
+const truckBtns = document.querySelectorAll(".btn-truck");
 
-    // Reset por si ya se había usado
-    text.style.transform = "translateX(0)";
-    text.style.opacity = "1";
-    truck.style.left = "-50px";
-    truck.style.opacity = "0";
+if (truckBtns.length > 0) {
+  truckBtns.forEach(btn => {
+    btn.addEventListener("mouseenter", () => {
+      const text = btn.querySelector(".text");
+      const truck = btn.querySelector(".truck");
 
-    // Forzar reflow (truco pro)
-    void truck.offsetWidth;
+      if (!text || !truck) return;
 
-    // Activar animación
-    text.style.transform = "translateX(-120%)";
-    text.style.opacity = "0";
-    truck.style.animation = "drive .8s ease forwards";
-
-    // 🔥 CUANDO TERMINA → reset
-    setTimeout(() => {
       text.style.transform = "translateX(0)";
       text.style.opacity = "1";
-      truck.style.animation = "none";
       truck.style.left = "-50px";
       truck.style.opacity = "0";
-    }, 800);
+
+      void truck.offsetWidth;
+
+      text.style.transform = "translateX(-120%)";
+      text.style.opacity = "0";
+      truck.style.animation = "drive .8s ease forwards";
+
+      setTimeout(() => {
+        text.style.transform = "translateX(0)";
+        text.style.opacity = "1";
+        truck.style.animation = "none";
+        truck.style.left = "-50px";
+        truck.style.opacity = "0";
+      }, 800);
+    });
   });
-});
+}
 
  // Función para el scroll de clientes
    function scrollClientes(direction) {
@@ -445,19 +447,6 @@ function cerrarZonas() {
   if (modal) modal.classList.add("opacity-0", "pointer-events-none");
 }
 
-
-
-  document.addEventListener('DOMContentLoaded', function(){
-    if (typeof Cocoen !== 'undefined') {
-      const cocoenElements = document.querySelectorAll('.cocoen');
-          Cocoen.parse(document.body);
-          cocoenElements.forEach(function(element) {
-        new Cocoen(element, {
-          startPos: 50 // Inicia exactamente a la mitad (50/50)
-        });
-      });
-    }
-  });
 function toggleBuscador() {
   const contenedor = document.getElementById("contenedorBuscador");
   const input = document.getElementById("buscadorProductos");
@@ -549,6 +538,27 @@ function toggleSubmenu() {
   const submenu = document.getElementById("submenuMobile");
   submenu.classList.toggle("hidden");
 }
-   // Esto le dice a la librería: "Busca el div cocoen y conviértelo en un slider"
-  
+function moverDrag(e, tipo) {
+  const container = e.currentTarget;
+  const rect = container.getBoundingClientRect();
 
+  let x;
+
+  if (e.touches) {
+    x = e.touches[0].clientX - rect.left;
+  } else {
+    x = e.clientX - rect.left;
+  }
+
+  let porcentaje = (x / rect.width) * 100;
+
+  // límites
+  if (porcentaje < 0) porcentaje = 0;
+  if (porcentaje > 100) porcentaje = 100;
+
+  const after = document.getElementById("after" + tipo);
+  const linea = document.getElementById("linea" + tipo);
+
+  after.style.width = porcentaje + "%";
+  linea.style.left = porcentaje + "%";
+}

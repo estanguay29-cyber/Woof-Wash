@@ -6,11 +6,10 @@
 <meta name="theme-color" content="#0b2a6b">
 <title>Woof & Wash</title>
 <meta name="description" content="Estética canina y lavado de autos a domicilio en Guadalajara. Servicio premium rápido y profesional.">
-<script src="https://unpkg.com/cocoen/dist/cocoen.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="styles.css">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="script.js" defer></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
 
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,10 +53,26 @@
     Productos ▼
   </button>
 
-  <div id="submenuMobile" class="hidden flex flex-col items-center gap-2 text-base">
-    <a href="#productosMascotas" onclick="toggleMenu()">🐶 Mascotas</a>
-    <a href="#productosAutos" onclick="toggleMenu()">🚗 Autos</a>
-  </div>
+ <div id="submenuMobile" class="hidden flex flex-col w-full bg-gray-50/50 rounded-xl mt-2 overflow-hidden">
+  
+  <a href="#productosMascotas" onclick="toggleMenu()" 
+    class="flex items-center gap-3 px-6 py-4 text-base text-[#0b2a6b] active:bg-[#8cc63f]/20 transition border-b border-white">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 12.8l-2.4 -2.4a2.828 2.828 0 1 0 -4 4l5.6 5.6a1.131 1.131 0 0 0 1.6 0l5.6 -5.6a2.828 2.828 0 1 0 -4 -4l-2.4 2.4z" />
+    </svg>
+    Mascotas
+
+  </a>
+
+  <a href="#productosAutos" onclick="toggleMenu()" 
+    class="flex items-center gap-3 px-6 py-4 text-base text-[#0b2a6b] active:bg-[#0b2a6b] active:text-white transition">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-active:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
+    </svg>
+    Autos
+  </a>
+
+</div>
 
 </div>
     <a href="#nosotros" onclick="toggleMenu()">Nosotros</a>
@@ -105,19 +120,25 @@
   </button>
 
   <!-- SUBMENÚ -->
-  <div class="absolute left-0 mt-3 w-52 bg-white rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+<div class="absolute left-0 mt-3 w-56 bg-white rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 border border-gray-100 overflow-hidden">
+  
+  <a href="#productosMascotas" 
+    class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#8cc63f]/10 hover:text-[#8cc63f] transition-all border-b border-gray-50 group/item">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 12.8l-2.4 -2.4a2.828 2.828 0 1 0 -4 4l5.6 5.6a1.131 1.131 0 0 0 1.6 0l5.6 -5.6a2.828 2.828 0 1 0 -4 -4l-2.4 2.4z" />
+    </svg>
+    <span class="font-semibold">Mascotas</span>
+  </a>
 
-    <a href="#productosMascotas" 
-      class="block px-5 py-3 text-sm text-[#0b2a6b] hover:bg-[#8cc63f] hover:text-white transition rounded-t-xl">
-      🐶 Productos Mascotas
-    </a>
+  <a href="#productosAutos" 
+    class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white transition-all group/item">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-hover/item:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
+    </svg>
+    <span class="font-semibold">Autos</span>
+  </a>
 
-    <a href="#productosAutos" 
-      class="block px-5 py-3 text-sm text-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white transition rounded-b-xl">
-      🚗 Productos Autos
-    </a>
-
-  </div>
+</div>
 
 </div>
       <a href="#nosotros" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Nosotros</a>
@@ -840,59 +861,99 @@ class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar sn
     <div class="grid md:grid-cols-2 gap-10 items-start">
 
       <!-- PERRO -->
-      <div>
-        <div class="relative max-w-sm mx-auto rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-white">
-          <div class="cocoen w-full h-auto">
-            <img src="img/Antes.jpeg" alt="Antes" loading="lazy" class="w-full h-auto object-contain">
-            <img src="img/Despues.jpeg" alt="Después" loading="lazy" class="w-full h-auto object-contain">
-          </div>
-          
-          <div class="absolute top-3 left-3 z-30 bg-black/60 text-white text-[9px] font-bold px-3 py-1 rounded-full backdrop-blur-sm">ANTES</div>
-          <div class="absolute top-3 right-3 z-30 bg-[#8cc63f] text-white text-[9px] font-bold px-3 py-1 rounded-full shadow-lg">DESPUÉS</div>
-        </div>
+<div>
 
-        <div class="mt-8 grid grid-cols-2 gap-3 max-w-sm mx-auto">
-          <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-gray-200 text-center">
-            <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">El Reto</p>
-            <p class="text-sm md:text-lg font-black text-gray-500 italic">¿Un trapeador? 🧼</p>
-          </div>
-          <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-[#8cc63f] text-center">
-            <p class="text-[9px] font-bold text-[#8cc63f] uppercase mb-1">Resultado</p>
-            <p class="text-sm md:text-lg font-black text-[#0b2a6b] italic">¡Es Firulais! ✨</p>
-          </div>
-        </div>
-      </div>
+  <!-- SLIDER -->
+  <div class="relative w-full aspect-[4/3] overflow-hidden rounded-[2rem]"
+    onmousemove="moverDrag(event, 'Perro')"
+    ontouchmove="moverDrag(event, 'Perro')">
 
-      <!-- COCHE -->
-      <div>
-        <div class="relative max-w-sm mx-auto rounded-[2rem] overflow-hidden shadow-2xl border-4 border-white bg-white">
-          <div class="cocoen w-full h-auto">
-            <img src="img/Antescamioneta.jpeg" alt="Antes Camioneta" loading="lazy" class="w-full h-auto object-contain">
-            <img src="img/Despuescamioneta.jpeg" alt="Después Camioneta" loading="lazy" class="w-full h-auto object-contain">
-          </div>
-          
-          <div class="absolute top-3 left-3 z-30 bg-black/60 text-white text-[9px] font-bold px-3 py-1 rounded-full backdrop-blur-sm">ANTES</div>
-          <div class="absolute top-3 right-3 z-30 bg-[#8cc63f] text-white text-[9px] font-bold px-3 py-1 rounded-full shadow-lg">DESPUÉS</div>
-        </div>
+    <!-- ANTES (fondo) -->
+    <img src="img/Antes.jpeg" class="w-full h-full object-cover">
 
-        <div class="mt-8 grid grid-cols-2 gap-3 max-w-sm mx-auto">
-          <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-gray-200 text-center">
-            <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">El Reto</p>
-            <p class="text-sm md:text-lg font-black text-gray-500 italic">¿Un basurero? 🚗🧼</p>
-          </div>
-          <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-[#8cc63f] text-center">
-            <p class="text-[9px] font-bold text-[#8cc63f] uppercase mb-1">Resultado</p>
-            <p class="text-sm md:text-lg font-black text-[#0b2a6b] italic">¡Como recién salida de agencia! ✨</p>
-          </div>
-        </div>
+    <!-- DESPUÉS -->
+    <div id="afterPerro" 
+      class="absolute top-0 left-0 h-full overflow-hidden"
+      style="width:50%;">
+      <img src="img/Despues.jpeg" class="w-full h-full object-cover">
+    </div>
+
+    <!-- LÍNEA -->
+    <div id="lineaPerro" 
+      class="absolute top-0 h-full flex items-center justify-center"
+      style="left:50%; transform: translateX(-50%);">
+
+      <div class="h-full w-[2px] bg-white shadow-lg"></div>
+
+      <div class="absolute w-6 h-6 bg-white rounded-full shadow-lg border flex items-center justify-center">
+        <div class="w-2 h-2 bg-[#0b2a6b] rounded-full"></div>
       </div>
 
     </div>
-
   </div>
-</section>
 
-<script src="https://unpkg.com/cocoen/dist/cocoen.js"></script>
+  <!-- TEXTO -->
+  <div class="mt-8 grid grid-cols-2 gap-3 max-w-sm mx-auto">
+    <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-gray-200 text-center">
+      <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">El Reto</p>
+      <p class="text-sm md:text-lg font-black text-gray-500 italic">¿Un trapeador? 🧼</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-[#8cc63f] text-center">
+      <p class="text-[9px] font-bold text-[#8cc63f] uppercase mb-1">Resultado</p>
+      <p class="text-sm md:text-lg font-black text-[#0b2a6b] italic">¡Es Firulais! ✨</p>
+    </div>
+  </div>
+
+</div>
+      <!-- COCHE -->
+<div>
+
+  <!-- SLIDER -->
+  <div class="relative w-full aspect-[4/3] overflow-hidden rounded-[2rem]"
+    onmousemove="moverDrag(event, 'Coche')"
+    ontouchmove="moverDrag(event, 'Coche')">
+
+    <!-- ANTES -->
+    <img src="img/Antescamioneta.jpeg" class="w-full h-full object-cover">
+
+    <!-- DESPUÉS -->
+    <div id="afterCoche" 
+      class="absolute top-0 left-0 h-full overflow-hidden"
+      style="width:50%;">
+      <img src="img/DespuesCamioneta.jpeg" class="w-full h-full object-cover">
+    </div>
+
+    <!-- LÍNEA -->
+    <div id="lineaCoche" 
+      class="absolute top-0 h-full flex items-center justify-center"
+      style="left:50%; transform: translateX(-50%);">
+
+      <div class="h-full w-[2px] bg-white shadow-lg"></div>
+
+      <div class="absolute w-6 h-6 bg-white rounded-full shadow-lg border flex items-center justify-center">
+        <div class="w-2 h-2 bg-[#0b2a6b] rounded-full"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TEXTO -->
+  <div class="mt-8 grid grid-cols-2 gap-3 max-w-sm mx-auto">
+    <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-gray-200 text-center">
+      <p class="text-[9px] font-bold text-gray-400 uppercase mb-1">El Reto</p>
+      <p class="text-sm md:text-lg font-black text-gray-500 italic">¿Un basurero? 🚗🧼</p>
+    </div>
+    <div class="bg-white p-4 rounded-2xl shadow-lg border-b-4 border-[#8cc63f] text-center">
+      <p class="text-[9px] font-bold text-[#8cc63f] uppercase mb-1">Resultado</p>
+      <p class="text-sm md:text-lg font-black text-[#0b2a6b] italic">¡Como recién salida de agencia! ✨</p>
+    </div>
+  </div>
+
+</div>
+
+    </div>
+  </div>  
+</section>
 <!-- NOSOTROS -->
 <section id="nosotros" class="py-9 md:py-13 bg-[#ffffff]">
   <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
@@ -1175,7 +1236,6 @@ Vaciar carrito
   </div>
 
 </div>
-<script src="script.js" defer></script>
 
 </body>
 

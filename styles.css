@@ -125,16 +125,6 @@ h1, h2, h3 {
     scrollbar-width: none;
   }
 
-  :root {
-    --cocoen-separator-color: #ffffff; /* Color de la línea divisoria */
-    --cocoen-drag-background: #8cc63f; /* Color del círculo deslizante */
-  }
-  
-  /* Ajuste para que la imagen no se vea opaca al cargar */
-  .cocoen img {
-    display: block;
-    width: 100%;
-  }
 
 
   #sliderProductos::before,
@@ -163,4 +153,18 @@ h1, h2, h3 {
   background-color: #facc15; /* amarillo */
   mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/></svg>") no-repeat center / contain;
   -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/></svg>") no-repeat center / contain;
+}
+
+
+
+/* Las variables de color que tenías al inicio */
+:root {
+  --cocoen-separator-color: #ffffff;
+  --cocoen-drag-background: #8cc63f;
+}
+
+
+.cocoen img {
+  display: block;
+  width: 100%;
 }
