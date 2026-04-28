@@ -110,7 +110,7 @@ function mostrarMensajeEliminarCuenta(texto, tipo = "error") {
   message.className = tipo === "ok" ? "text-sm text-green-600" : "text-sm text-red-500";
 }
 
-const API_URL = "https://TU-BACKEND-EN-RENDER.onrender.com";
+const API_URL = "https://woof-wash.onrender.com";
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
