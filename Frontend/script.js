@@ -1142,7 +1142,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const visitedZones = new Set();
     const points = [];
-    const zoneColumns = 8;
+    const zoneColumns = 9;
     const zoneRows = 7;
     const totalZones = zoneColumns * zoneRows;
     let lastParticleAt = 0;
@@ -1212,13 +1212,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!lastPoint || Math.hypot(lastPoint.x - x, lastPoint.y - y) >= minDistance) {
         points.push({ x, y });
         visitedZones.add(zoneKey);
-        crearCirculoMascara(xRatio, yRatio, 0.095);
+        crearCirculoMascara(xRatio, yRatio, 0.085);
         crearParticulas(x, y);
       }
 
       const progress = Math.round((visitedZones.size / totalZones) * 100);
       const visualProgress = Math.min(progress, 100);
-      const dirtyOpacity = Math.max(0, 1 - (visualProgress / 28));
+      const dirtyOpacity = Math.max(0, 1 - (visualProgress / 34));
 
       if (progressBar) {
         progressBar.style.width = `${visualProgress}%`;
@@ -1226,7 +1226,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       game.style.setProperty("--game-dirty-opacity", dirtyOpacity.toFixed(2));
 
-      if (progress >= 28) {
+      if (progress >= 34) {
         if (progressBar) {
           progressBar.style.width = "100%";
         }
@@ -1235,7 +1235,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      if (progress >= 10) {
+      if (progress >= 13) {
         message.textContent = config.progressMessage;
       }
     }
