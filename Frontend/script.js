@@ -1185,8 +1185,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    function obtenerPuntoEvento(event) {
+      if (event.touches && event.touches[0]) return event.touches[0];
+      if (event.changedTouches && event.changedTouches[0]) return event.changedTouches[0];
+      return event;
+    }
+
     function actualizarJuego(event) {
-      const point = event.touches ? event.touches[0] : event;
+      const point = obtenerPuntoEvento(event);
       if (!point) return;
 
       const rect = stage.getBoundingClientRect();
@@ -1231,14 +1237,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function activarJuego(event) {
-      game.classList.add("game-active");
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
+      game.classList.add("game-active", "is-active");
       actualizarJuego(event);
     }
 
-    stage.addEventListener("mousemove", actualizarJuego);
-    stage.addEventListener("mouseenter", activarJuego);
-    stage.addEventListener("touchstart", activarJuego, { passive: true });
-    stage.addEventListener("touchmove", actualizarJuego, { passive: true });
+    function actualizarConInteraccion(event) {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+
+      actualizarJuego(event);
+    }
+
+    if (window.PointerEvent) {
+      stage.addEventListener("pointerenter", activarJuego);
+      stage.addEventListener("pointerdown", activarJuego);
+      stage.addEventListener("pointermove", actualizarConInteraccion);
+    } else {
+      stage.addEventListener("mousemove", actualizarJuego);
+      stage.addEventListener("mouseenter", activarJuego);
+      stage.addEventListener("click", activarJuego);
+      stage.addEventListener("touchstart", activarJuego, { passive: false });
+      stage.addEventListener("touchmove", actualizarConInteraccion, { passive: false });
+    }
   }
 
   function iniciarJuegosInteractivos() {

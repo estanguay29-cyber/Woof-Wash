@@ -758,8 +758,10 @@ h1, h2, h3 {
 
 #experienciaInteractiva #groomGame:hover .game-tool,
 #experienciaInteractiva #groomGame.game-active .game-tool,
+#experienciaInteractiva #groomGame.is-active .game-tool,
 #experienciaInteractiva #carWashGame:hover .game-tool,
-#experienciaInteractiva #carWashGame.game-active .game-tool {
+#experienciaInteractiva #carWashGame.game-active .game-tool,
+#experienciaInteractiva #carWashGame.is-active .game-tool {
   transform: translate(-50%, -50%) rotate(8deg) scale(1.08);
 }
 
