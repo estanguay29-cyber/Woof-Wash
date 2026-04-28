@@ -1,0 +1,446 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro - Woof & Wash</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body class="min-h-screen bg-[radial-gradient(circle_at_top,_#fffdf7,_#fff5d1_45%,_#eef5ff_100%)] text-slate-800" style="font-family: 'Inter', sans-serif;">
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-0 left-0 h-56 w-56 rounded-full bg-[#8cc63f]/16 blur-3xl"></div>
+    <div class="absolute top-20 right-0 h-64 w-64 rounded-full bg-[#0b2a6b]/10 blur-3xl"></div>
+    <div class="absolute bottom-0 left-1/3 h-48 w-48 rounded-full bg-[#8cc63f]/10 blur-3xl"></div>
+  </div>
+
+  <main class="relative mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-5 py-10">
+    <section class="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/85 shadow-[0_30px_90px_rgba(11,42,107,0.16)] backdrop-blur xl:grid-cols-[1fr_1.08fr]">
+      <div class="hidden xl:flex flex-col justify-between bg-[linear-gradient(160deg,_#0b2a6b_0%,_#153f8d_58%,_#8cc63f_140%)] p-10 text-white">
+        <div>
+          <div class="group inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold tracking-[0.2em] uppercase transition hover:scale-105">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-[#8cc63f]/20 text-white transition group-hover:scale-110 group-hover:bg-[#8cc63f]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="6.5" cy="7.5" r="2.1"></circle>
+                <circle cx="10" cy="5.6" r="2.05"></circle>
+                <circle cx="14" cy="5.6" r="2.05"></circle>
+                <circle cx="17.5" cy="7.5" r="2.1"></circle>
+                <path d="M12 11.2c-2.7 0-5 2.05-5 4.55C7 18 8.7 19.4 10.9 19.4c.95 0 1.45-.28 2.1-.67.66.39 1.16.67 2.1.67 2.2 0 3.9-1.4 3.9-3.65 0-2.5-2.3-4.55-5-4.55-.86 0-1.48.19-2 .53-.52-.34-1.14-.53-2-.53z"></path>
+              </svg>
+            </span>
+            Crear cuenta
+          </div>
+
+          <h1 class="mt-10 max-w-md text-5xl font-extrabold leading-[1.05]" style="font-family: 'Poppins', sans-serif;">
+            Activa tu cuenta y sigue comprando sin problemas.
+          </h1>
+
+          <p class="mt-6 max-w-md text-base text-white/85 leading-relaxed">
+            Regístrate para guardar tu progreso, acceder a promociones y comprar más rápido cuando quieras volver.
+          </p>
+        </div>
+
+        <div class="grid gap-4 text-sm">
+          <div class="rounded-3xl bg-white/10 p-5 backdrop-blur">
+            <p class="text-white/70 uppercase tracking-[0.18em] text-xs">Al registarte</p>
+            <p class="mt-2 font-semibold">Recibirás beneficios exclusivos y acceso a promociones especiales.</p>
+          </div>
+          <div class="rounded-3xl bg-white/10 p-5 backdrop-blur">
+            <p class="text-white/70 uppercase tracking-[0.18em] text-xs">Compra rápida</p>
+            <p class="mt-2 font-semibold">Tu cuenta queda lista para usar carrito, ver tus pedidos y gestionar tu historial de compras.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6 sm:p-8 lg:p-10">
+        <div class="mx-auto w-full max-w-xl">
+          <div class="mb-8 text-center xl:text-left">
+            <div class="mx-auto xl:mx-0 flex h-20 w-20 items-center justify-center rounded-[1.7rem] bg-[linear-gradient(145deg,_#ffffff,_#eef5ff)] shadow-[0_14px_35px_rgba(11,42,107,0.14)]">
+              <img src="img/perritologo.png" alt="Woof & Wash" class="h-12 w-12 object-contain">
+            </div>
+
+            <h2 class="mt-5 text-4xl font-extrabold text-[#0b2a6b]" style="font-family: 'Poppins', sans-serif;">Crea tu cuenta</h2>
+            <p class="mt-3 text-sm text-slate-500">Completa tus datos para empezar a comprar con una experiencia más fluida.</p>
+          </div>
+
+          <form id="registroForm" class="space-y-4">
+            <div>
+              <label for="usuario" class="mb-2 block text-sm font-semibold text-[#0b2a6b]">Usuario</label>
+              <input type="text" id="usuario" placeholder="Tu usuario"
+                class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15"
+                required>
+              <p id="usuarioAyuda" class="mt-2 hidden rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700"></p>
+            </div>
+
+            <div>
+              <label for="email" class="mb-2 block text-sm font-semibold text-[#0b2a6b]">Correo electrónico</label>
+              <input type="email" id="email" placeholder="tu@correo.com"
+                class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label for="mesNacimiento" class="mb-2 block text-sm font-semibold text-[#0b2a6b]">Mes de nacimiento</label>
+                <select id="mesNacimiento"
+                  class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+                  <option value="">Selecciona un mes</option>
+                  <option value="01">Enero</option>
+                  <option value="02">Febrero</option>
+                  <option value="03">Marzo</option>
+                  <option value="04">Abril</option>
+                  <option value="05">Mayo</option>
+                  <option value="06">Junio</option>
+                  <option value="07">Julio</option>
+                  <option value="08">Agosto</option>
+                  <option value="09">Septiembre</option>
+                  <option value="10">Octubre</option>
+                  <option value="11">Noviembre</option>
+                  <option value="12">Diciembre</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="diaNacimiento" class="mb-2 block text-sm font-semibold text-[#0b2a6b]">Día de nacimiento</label>
+                <select id="diaNacimiento"
+                  class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm outline-none transition focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+                  <option value="">Selecciona un día</option>
+                </select>
+              </div>
+            </div>
+
+            <p class="-mt-1 text-xs text-slate-500">Esta informacion es solo para promociones y recordatorios especiales.</p>
+
+            <div>
+              <label for="password" class="mb-2 block text-sm font-semibold text-[#0b2a6b]">Contraseña</label>
+              <div class="relative">
+                <input type="password" id="password" placeholder="Crea una contraseña segura"
+                  class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-12 text-sm shadow-sm outline-none transition focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15"
+                  required
+                  minlength="8"
+                  maxlength="50"
+                  pattern="^(?=.*[A-Za-z])(?=.*\d).{8,50}$"
+                  title="La contraseña debe tener al menos 8 caracteres, incluyendo una letra y un número">
+
+                <button type="button"
+                  onclick="togglePassword('password', this)"
+                  class="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-[#0b2a6b] transition"
+                  aria-label="Mostrar u ocultar contrase&ntilde;a">
+                  <svg class="h-5 w-5 eye-open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+
+                  <svg class="h-5 w-5 eye-closed hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.27-2.943-9.543-7a9.956 9.956 0 012.042-3.368M6.223 6.223A9.953 9.953 0 0112 5c4.478 0 8.27 2.943 9.543 7a9.969 9.969 0 01-4.132 5.411M15 12a3 3 0 00-3-3m0 0a3 3 0 00-3 3m3-3v6m9 3L3 3"/>
+                  </svg>
+                </button>
+              </div>
+              <p class="mt-2 text-xs text-slate-500">Usa mínimo 8 caracteres, con al menos una letra y un número.</p>
+            </div>
+
+            <div>
+              <label for="confirmPassword" class="mb-2 block text-sm font-semibold text-[#0b2a6b]">Confirmar contraseña</label>
+              <div class="relative">
+                <input type="password" id="confirmPassword" placeholder="Repite tu contraseña"
+                  class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-12 text-sm shadow-sm outline-none transition focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15"
+                  required
+                  minlength="8"
+                  maxlength="50"
+                  pattern="^(?=.*[A-Za-z])(?=.*\d).{8,50}$"
+                  title="La contraseña debe tener al menos 8 caracteres, incluyendo una letra y un número">
+
+                <button type="button"
+                  onclick="togglePassword('confirmPassword', this)"
+                  class="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-[#0b2a6b] transition"
+                  aria-label="Mostrar u ocultar confirmación de contraseña">
+                  <svg class="h-5 w-5 eye-open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                  </svg>
+
+                  <svg class="h-5 w-5 eye-closed hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.27-2.943-9.543-7a9.956 9.956 0 012.042-3.368M6.223 6.223A9.953 9.953 0 0112 5c4.478 0 8.27 2.943 9.543 7a9.969 9.969 0 01-4.132 5.411M15 12a3 3 0 00-3-3m0 0a3 3 0 00-3 3m3-3v6m9 3L3 3"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-[#fbfcff] p-4 text-sm text-slate-600">
+              <label class="flex items-start gap-3">
+                <input type="checkbox" id="aceptaTerminos" class="mt-1 h-4 w-4 rounded border-slate-300 text-[#8cc63f] focus:ring-[#8cc63f]" required>
+                <span>
+                  He leído y acepto el
+                  <a href="privacidad.html" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#8cc63f] hover:underline">Aviso de Privacidad</a>
+                  y los
+                  <a href="terminos.html" target="_blank" rel="noopener noreferrer" class="font-semibold text-[#8cc63f] hover:underline">Términos y Condiciones</a>
+                  vigentes de Woof &amp; Wash.
+                </span>
+              </label>
+            </div>
+
+            <button type="submit"
+              class="w-full rounded-2xl bg-[linear-gradient(135deg,_#0b2a6b,_#123f89)] py-3 text-sm font-bold text-white shadow-[0_18px_30px_rgba(11,42,107,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_34px_rgba(11,42,107,0.28)]">
+              Crear cuenta
+            </button>
+          </form>
+
+          <p id="mensaje" class="text-center mt-4 text-sm font-semibold"></p>
+          <div id="sugerenciasBox" class="hidden mt-4 rounded-2xl border border-[#8cc63f]/20 bg-[#8cc63f]/8 p-4">
+            <p class="text-xs text-slate-500 mb-3 text-center">Prueba alguno de estos usuarios sugeridos:</p>
+            <div id="sugerenciasLista" class="flex flex-wrap gap-2 justify-center"></div>
+          </div>
+
+          <div id="accionesExito" class="hidden mt-4 space-y-3">
+            <button id="btnIrLogin" type="button"
+              class="w-full rounded-2xl bg-[#0b2a6b] py-3 text-sm font-bold text-white transition hover:bg-[#081f4d]">
+              Iniciar sesión ahora
+            </button>
+            <button id="btnVolverInicio" type="button"
+              class="w-full rounded-2xl border border-[#0b2a6b]/15 bg-white py-3 text-sm font-semibold text-[#0b2a6b] transition hover:border-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white">
+              Volver al inicio
+            </button>
+          </div>
+
+          <p class="mt-6 text-center text-sm text-gray-600">
+            &iquest;Ya tienes cuenta?
+            <a id="linkLogin" href="login.html" class="font-semibold text-[#8cc63f] hover:underline">Inicia sesión</a>
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+const form = document.getElementById("registroForm");
+const mensajeDiv = document.getElementById("mensaje");
+const linkLogin = document.getElementById("linkLogin");
+const usuarioInput = document.getElementById("usuario");
+const usuarioAyuda = document.getElementById("usuarioAyuda");
+const sugerenciasBox = document.getElementById("sugerenciasBox");
+const sugerenciasLista = document.getElementById("sugerenciasLista");
+const accionesExito = document.getElementById("accionesExito");
+const btnIrLogin = document.getElementById("btnIrLogin");
+const btnVolverInicio = document.getElementById("btnVolverInicio");
+const diaNacimiento = document.getElementById("diaNacimiento");
+const mesNacimiento = document.getElementById("mesNacimiento");
+
+const API_URL = "https://TU-BACKEND-EN-RENDER.onrender.com";
+
+function obtenerApiBase() {
+  const hostname = window.location.hostname;
+
+  const esLocal =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1";
+
+  if (esLocal) {
+    return "http://localhost:3000";
+  }
+
+  return API_URL;
+}
+
+function obtenerDestinoLogin() {
+  return "login.html";
+}
+
+function obtenerDestinoInicio() {
+  return localStorage.getItem("authRedirect") || "index.html";
+}
+
+function poblarDias() {
+  diaNacimiento.innerHTML = '<option value="">Selecciona un d\u00eda</option>';
+  for (let dia = 1; dia <= 31; dia += 1) {
+    const value = String(dia).padStart(2, "0");
+    diaNacimiento.innerHTML += `<option value="${value}">${dia}</option>`;
+  }
+}
+
+function ocultarSugerencias() {
+  sugerenciasBox.classList.add("hidden");
+  sugerenciasLista.innerHTML = "";
+}
+
+function mostrarSugerencias(sugerencias) {
+  if (!Array.isArray(sugerencias) || !sugerencias.length) {
+    ocultarSugerencias();
+    return;
+  }
+
+  sugerenciasLista.innerHTML = sugerencias.map((sugerencia) => `
+    <button type="button"
+      class="px-3 py-1.5 rounded-full bg-white text-[#0b2a6b] text-sm font-semibold shadow-sm hover:bg-[#8cc63f]/20 transition"
+      data-usuario="${sugerencia}">
+      ${sugerencia}
+    </button>
+  `).join("");
+
+  sugerenciasBox.classList.remove("hidden");
+
+  sugerenciasLista.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      usuarioInput.value = btn.dataset.usuario;
+      ocultarAvisoUsuario();
+      usuarioInput.focus();
+    });
+  });
+}
+
+function togglePassword(inputId, button) {
+  const input = document.getElementById(inputId);
+  const eyeOpen = button.querySelector(".eye-open");
+  const eyeClosed = button.querySelector(".eye-closed");
+
+  if (!input || !eyeOpen || !eyeClosed) return;
+
+  if (input.type === "password") {
+    input.type = "text";
+    eyeOpen.classList.add("hidden");
+    eyeClosed.classList.remove("hidden");
+  } else {
+    input.type = "password";
+    eyeOpen.classList.remove("hidden");
+    eyeClosed.classList.add("hidden");
+  }
+}
+
+function mostrarAvisoUsuario(texto) {
+  usuarioAyuda.textContent = texto;
+  usuarioAyuda.classList.remove("hidden");
+}
+
+function ocultarAvisoUsuario() {
+  usuarioAyuda.textContent = "";
+  usuarioAyuda.classList.add("hidden");
+}
+
+usuarioInput.addEventListener("input", () => {
+  const original = usuarioInput.value;
+  const limpio = original.replace(/\s+/g, "");
+
+  if (original !== limpio) {
+    usuarioInput.value = limpio;
+    mostrarAvisoUsuario("El usuario no puede llevar espacios. Los quitamos autom\u00e1ticamente.");
+    return;
+  }
+
+  if (limpio.length > 0) {
+    ocultarAvisoUsuario();
+  }
+});
+
+usuarioInput.addEventListener("blur", () => {
+  if (!usuarioInput.value.trim()) {
+    ocultarAvisoUsuario();
+  }
+});
+
+poblarDias();
+
+if (linkLogin) {
+  linkLogin.setAttribute("href", obtenerDestinoLogin());
+}
+
+if (btnIrLogin) {
+  btnIrLogin.addEventListener("click", () => {
+    window.location.href = obtenerDestinoLogin();
+  });
+}
+
+if (btnVolverInicio) {
+  btnVolverInicio.addEventListener("click", () => {
+    window.location.href = obtenerDestinoInicio();
+  });
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  accionesExito.classList.add("hidden");
+  ocultarSugerencias();
+
+  const usuario = document.getElementById("usuario").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const fechaNacimiento = mesNacimiento.value && diaNacimiento.value
+    ? `${mesNacimiento.value}-${diaNacimiento.value}`
+    : "";
+  const password = document.getElementById("password").value;
+  const confirmPassword = document.getElementById("confirmPassword").value;
+  const acepta = document.getElementById("aceptaTerminos");
+  const versionTerminos = "1.0";
+  const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,50}$/;
+
+  if (/\s/.test(usuario)) {
+    mostrarAvisoUsuario("El usuario no puede contener espacios.");
+    mensajeDiv.textContent = "Corrige tu usuario antes de continuar.";
+    mensajeDiv.className = "text-red-500 text-center mt-4 font-semibold";
+    return;
+  }
+
+  if (!fechaNacimiento) {
+    mensajeDiv.textContent = "Selecciona tu d\u00eda y mes de nacimiento.";
+    mensajeDiv.className = "text-red-500 text-center mt-4 font-semibold";
+    return;
+  }
+
+  if (!passwordRegex.test(password)) {
+    mensajeDiv.textContent = "La contrase\u00f1a debe tener m\u00ednimo 8 caracteres e incluir al menos una letra y un n\u00famero.";
+    mensajeDiv.className = "text-red-500 text-center mt-4 font-semibold";
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    mensajeDiv.textContent = "Las contrase\u00f1as no coinciden";
+    mensajeDiv.className = "text-red-500 text-center mt-4 font-semibold";
+    return;
+  }
+
+  if (!acepta.checked) {
+    mensajeDiv.textContent = "Debes aceptar el aviso de privacidad y los t\u00e9rminos.";
+    mensajeDiv.className = "text-red-500 text-center mt-4 font-semibold";
+    return;
+  }
+
+  try {
+    const res = await fetch(`${obtenerApiBase()}/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        usuario,
+        email,
+        fechaNacimiento,
+        password,
+        aceptaTerminos: acepta.checked,
+        versionTerminos
+      })
+    });
+
+    const data = await res.json().catch(() => ({
+      message: "No se pudo procesar la respuesta del servidor"
+    }));
+
+    if (res.ok) {
+      mensajeDiv.textContent = "Cuenta creada correctamente. Puedes iniciar sesi\u00f3n o volver al inicio.";
+      mensajeDiv.className = "text-green-600 text-center mt-4 font-semibold";
+      form.reset();
+      poblarDias();
+      ocultarAvisoUsuario();
+      accionesExito.classList.remove("hidden");
+      return;
+    }
+
+    mensajeDiv.textContent = data.message || "No se pudo crear la cuenta";
+    mensajeDiv.className = "text-red-500 text-center mt-4 font-semibold";
+    mostrarSugerencias(data.sugerencias);
+  } catch (err) {
+    mensajeDiv.textContent = "No se pudo conectar con el servidor en el puerto 3000";
+    mensajeDiv.className = "text-red-500 text-center mt-4 font-semibold";
+  }
+});
+</script>
+
+</body>
+</html>

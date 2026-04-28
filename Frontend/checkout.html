@@ -1,0 +1,287 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout - Woof & Wash</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(140,198,63,0.18),_transparent_34%),linear-gradient(180deg,_#fffdf4_0%,_#fff7db_100%)] text-slate-800">
+  <div class="relative overflow-hidden">
+    <div class="absolute inset-x-0 top-0 h-72 bg-[linear-gradient(135deg,_rgba(11,42,107,0.95),_rgba(22,74,178,0.88))]"></div>
+    <div class="absolute -left-10 top-16 h-32 w-32 rounded-full bg-white/10 blur-2xl"></div>
+    <div class="absolute right-0 top-10 h-40 w-40 rounded-full bg-[#8cc63f]/20 blur-3xl"></div>
+
+    <header class="relative z-10 border-b border-white/10">
+      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
+        <a href="index.html" class="inline-flex items-center gap-3">
+          <div class="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-[0_14px_30px_rgba(0,0,0,0.16)] backdrop-blur">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7.4 10.6C6.2 9.5 5.5 8 5.5 6.6c0-1.8 1.1-3.1 2.6-3.1 1.1 0 2.1.7 2.7 1.8.6-1.1 1.6-1.8 2.7-1.8 1.5 0 2.6 1.3 2.6 3.1 0 1.4-.7 2.9-1.9 4" />
+              <path d="M12 21c4.1 0 6.8-2.5 6.8-5.3 0-2.4-1.8-4.1-4.1-4.1-1.2 0-2.1.5-2.7 1.2-.6-.7-1.5-1.2-2.7-1.2-2.3 0-4.1 1.7-4.1 4.1C5.2 18.5 7.9 21 12 21Z" />
+            </svg>
+          </div>
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">Woof &amp; Wash</p>
+            <h1 class="text-lg font-black text-white sm:text-xl">Datos de entrega</h1>
+          </div>
+        </a>
+
+        <button onclick="logout()" class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/16">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Cerrar sesi&oacute;n
+        </button>
+      </div>
+    </header>
+
+    <main class="relative z-10 mx-auto max-w-6xl px-5 pb-16 pt-10 sm:px-8 lg:pt-14">
+      <div class="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+        <section class="overflow-hidden rounded-[32px] border border-white/75 bg-white/95 shadow-[0_24px_70px_rgba(11,42,107,0.16)] backdrop-blur">
+          <div class="border-b border-slate-200/70 px-6 py-6 sm:px-8">
+            <span class="inline-flex items-center gap-2 rounded-full border border-[#8cc63f]/25 bg-[#8cc63f]/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.28em] text-[#5c8d17]">
+              Entrega segura
+            </span>
+            <h2 class="mt-4 text-3xl font-black tracking-tight text-[#0b2a6b]">Datos de entrega</h2>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+              Completa tu informaci&oacute;n para preparar tu pedido y enviarte al pago de forma segura.
+            </p>
+          </div>
+
+          <form id="checkoutForm" class="space-y-5 px-6 py-6 sm:px-8 sm:py-8">
+            <div class="grid gap-5 sm:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-semibold text-slate-700">Nombre completo</span>
+                <input type="text" id="nombre" placeholder="Ingresa tu nombre completo" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+              </label>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-semibold text-slate-700">Tel&eacute;fono</span>
+                <input type="tel" id="telefono" placeholder="N&uacute;mero de contacto" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+              </label>
+            </div>
+
+            <label class="block">
+              <span class="mb-2 block text-sm font-semibold text-slate-700">Direcci&oacute;n</span>
+              <input type="text" id="direccion" placeholder="Calle, n&uacute;mero y colonia" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+            </label>
+
+            <div class="grid gap-5 sm:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-semibold text-slate-700">Ciudad</span>
+                <input type="text" id="ciudad" placeholder="Tu ciudad" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+              </label>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-semibold text-slate-700">C&oacute;digo postal</span>
+                <input type="text" id="cp" placeholder="C&oacute;digo postal" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15" required>
+              </label>
+            </div>
+
+            <label class="block">
+              <span class="mb-2 block text-sm font-semibold text-slate-700">Referencias</span>
+              <textarea id="referencias" placeholder="Puntos de referencia para facilitar la entrega (opcional)" rows="4" class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-800 shadow-[0_10px_30px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15"></textarea>
+            </label>
+
+            <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,_#0b2a6b,_#174ab2)] px-5 py-3.5 text-sm font-bold text-white shadow-[0_18px_40px_rgba(11,42,107,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_45px_rgba(11,42,107,0.28)]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+              Continuar al pago
+            </button>
+
+            <p id="mensaje" class="text-center text-sm font-semibold"></p>
+          </form>
+        </section>
+
+        <aside class="rounded-[32px] border border-white/70 bg-white/92 p-6 shadow-[0_20px_55px_rgba(11,42,107,0.12)] backdrop-blur sm:p-7 lg:sticky lg:top-8">
+          <div class="rounded-[28px] bg-[linear-gradient(160deg,_rgba(11,42,107,1),_rgba(23,74,178,0.96))] p-6 text-white shadow-[0_20px_50px_rgba(11,42,107,0.24)]">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.34em] text-white/80">Resumen</p>
+                <h3 class="mt-2 text-2xl font-black">Pago confiable</h3>
+              </div>
+              <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+            </div>
+
+            <div class="mt-6 space-y-4 text-sm text-white/90">
+              <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-4">
+                <p class="font-semibold text-white">Tu compra sigue este proceso</p>
+                <p class="mt-1 leading-6 text-white/85">Capturamos tus datos de entrega, te enviamos al pago y conservamos tu direcci&oacute;n para futuras compras.</p>
+              </div>
+              <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-3">
+                  <p class="text-xs uppercase tracking-[0.28em] text-white/75">Paso 1</p>
+                  <p class="mt-1 font-semibold text-white">Datos completos</p>
+                </div>
+                <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-3">
+                  <p class="text-xs uppercase tracking-[0.28em] text-white/75">Paso 2</p>
+                  <p class="mt-1 font-semibold text-white">Pago seguro</p>
+                </div>
+                <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-3">
+                  <p class="text-xs uppercase tracking-[0.28em] text-white/75">Paso 3</p>
+                  <p class="mt-1 font-semibold text-white">Entrega lista</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+            <h4 class="text-sm font-black uppercase tracking-[0.24em] text-[#0b2a6b]">Detalles</h4>
+            <ul class="mt-4 space-y-3 text-sm leading-6 text-slate-700">
+              <li class="flex gap-3">
+                <span class="mt-1 h-2.5 w-2.5 rounded-full bg-[#8cc63f]"></span>
+                Revisa que el tel&eacute;fono y la direcci&oacute;n est&eacute;n correctos para evitar demoras.
+              </li>
+              <li class="flex gap-3">
+                <span class="mt-1 h-2.5 w-2.5 rounded-full bg-[#0b2a6b]"></span>
+                Si ya compraste antes, tus datos se cargar&aacute;n autom&aacute;ticamente.
+              </li>
+              <li class="flex gap-3">
+                <span class="mt-1 h-2.5 w-2.5 rounded-full bg-[#f59e0b]"></span>
+                Al continuar, ser&aacute;s redirigido al proveedor de pago correspondiente.
+              </li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+<script>
+const token = localStorage.getItem("token");
+const PRODUCTOS_CATALOGO = Object.freeze({
+  "shampoo-premium": { id: "shampoo-premium", nombre: "Shampoo Premium" },
+  "perfume-galan": { id: "perfume-galan", nombre: "Perfume Gal\u00e1n" },
+  "cepillo-ergonomico": { id: "cepillo-ergonomico", nombre: "Cepillo Ergon\u00f3mico" },
+  "spray-desenredante": { id: "spray-desenredante", nombre: "Spray Desenredante" },
+  "toallas-humedas": { id: "toallas-humedas", nombre: "Toallas H\u00famedas" },
+  "cortaunas-pro": { id: "cortaunas-pro", nombre: "Cortau\u00f1as Pro" },
+  "collar-antipulgas": { id: "collar-antipulgas", nombre: "Collar Antipulgas" },
+  "shampoo-automotriz": { id: "shampoo-automotriz", nombre: "Shampoo Automotriz" },
+  "cera-liquida": { id: "cera-liquida", nombre: "Cera L\u00edquida" },
+  "aromatizante-premium": { id: "aromatizante-premium", nombre: "Aromatizante Premium" },
+  "limpiador-de-rines": { id: "limpiador-de-rines", nombre: "Limpiador de Rines" },
+  "limpiador-de-vidrios": { id: "limpiador-de-vidrios", nombre: "Limpiador de Vidrios" },
+  "renovador-de-interiores": { id: "renovador-de-interiores", nombre: "Renovador de Interiores" },
+  "franelas-de-microfibra": { id: "franelas-de-microfibra", nombre: "Franelas de Microfibra" }
+});
+const PRODUCTOS_POR_NOMBRE = Object.values(PRODUCTOS_CATALOGO).reduce((acc, producto) => {
+  acc[producto.nombre] = producto;
+  return acc;
+}, {});
+const carrito = (JSON.parse(localStorage.getItem("carrito")) || []).reduce((acc, item) => {
+  const producto = PRODUCTOS_CATALOGO[item?.id] || PRODUCTOS_POR_NOMBRE[item?.nombre];
+  const cantidad = Number(item?.cantidad);
+
+  if (producto && Number.isInteger(cantidad) && cantidad > 0) {
+    acc.push({
+      id: producto.id,
+      cantidad
+    });
+  }
+
+  return acc;
+}, []);
+const form = document.getElementById("checkoutForm");
+const mensaje = document.getElementById("mensaje");
+
+const API_URL = "https://TU-BACKEND-EN-RENDER.onrender.com";
+
+function obtenerApiBase() {
+  const hostname = window.location.hostname;
+
+  const esLocal =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1";
+
+  if (esLocal) {
+    return "http://localhost:3000";
+  }
+
+  return API_URL;
+}
+if (!token) {
+  localStorage.setItem("authRedirect", "checkout.html");
+  window.location.href = "login.html";
+}
+
+if (!carrito.length) {
+  window.location.href = "index.html";
+}
+
+function logout() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("usuario");
+  window.location.href = "login.html";
+}
+
+const direccionGuardada = JSON.parse(localStorage.getItem("direccion") || "null");
+
+if (direccionGuardada) {
+  document.getElementById("nombre").value = direccionGuardada.nombre || "";
+  document.getElementById("telefono").value = direccionGuardada.telefono || "";
+  document.getElementById("direccion").value = direccionGuardada.direccion || "";
+  document.getElementById("ciudad").value = direccionGuardada.ciudad || "";
+  document.getElementById("cp").value = direccionGuardada.cp || "";
+  document.getElementById("referencias").value = direccionGuardada.referencias || "";
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const datos = {
+    nombre: document.getElementById("nombre").value.trim(),
+    telefono: document.getElementById("telefono").value.trim(),
+    direccion: document.getElementById("direccion").value.trim(),
+    ciudad: document.getElementById("ciudad").value.trim(),
+    cp: document.getElementById("cp").value.trim(),
+    referencias: document.getElementById("referencias").value.trim()
+  };
+
+  localStorage.setItem("direccion", JSON.stringify(datos));
+
+  mensaje.textContent = "Redirigiendo al pago...";
+  mensaje.className = "text-center text-sm font-semibold text-emerald-600";
+
+  try {
+    const res = await fetch(`${obtenerApiBase()}/create-checkout-session`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        carrito,
+        datos
+      })
+    });
+
+    const data = await res.json().catch(() => ({
+      message: "No se pudo procesar la respuesta del servidor"
+    }));
+
+    if (res.ok && data.url) {
+      window.location.href = data.url;
+      return;
+    }
+
+    mensaje.textContent = data.message || "No se pudo iniciar el checkout";
+    mensaje.className = "text-center text-sm font-semibold text-red-500";
+  } catch (error) {
+    mensaje.textContent = "Error al conectar con el pago";
+    mensaje.className = "text-center text-sm font-semibold text-red-500";
+  }
+});
+</script>
+</body>
+</html>

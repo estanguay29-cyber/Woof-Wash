@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b2a6b">
+<title>Woof & Wash</title>
+<meta name="description" content="Estética canina y lavado de autos a domicilio en Guadalajara. Servicio premium rápido y profesional.">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="styles.css">
+<script src="script.js" defer></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+
+<body class="bg-[#fef9e7] text-[#0f172a] scroll-smooth">
+
+<!-- LOADER NUEVO -->
+<div id="loader" class="fixed inset-0 z-[9999] flex items-center justify-center bg-[#fffae8]/95 backdrop-blur-sm transition duration-700">
+  <div class="flex flex-col items-center">
+    
+    <div class="relative flex items-center justify-center">
+      <!-- halo suave -->
+      <div class="absolute h-24 w-24 rounded-full bg-[#8cc63f]/12 blur-2xl animate-pulse"></div>
+      
+      <!-- ciculo principal -->
+      <div class="relative flex h-20 w-20 items-center justify-center rounded-full border border-white/70 bg-white/80 shadow-[0_12px_40px_rgba(11,42,107,0.10)]">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-[#0b2a6b] loader-paw" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="6.5" cy="7.5" r="2.1"></circle>
+          <circle cx="10" cy="5.6" r="2.05"></circle>
+          <circle cx="14" cy="5.6" r="2.05"></circle>
+          <circle cx="17.5" cy="7.5" r="2.1"></circle>
+          <path d="M12 11.2c-2.7 0-5 2.05-5 4.55C7 18 8.7 19.4 10.9 19.4c.95 0 1.45-.28 2.1-.67.66.39 1.16.67 2.1.67 2.2 0 3.9-1.4 3.9-3.65 0-2.5-2.3-4.55-5-4.55-.86 0-1.48.19-2 .53-.52-.34-1.14-.53-2-.53z"></path>
+        </svg>
+      </div>
+    </div>
+
+    <p class="mt-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#0b2a6b]/80">
+      Woof & Wash
+    </p>
+    <p class="mt-2 text-sm text-slate-500">
+      Preparando tu experiencia
+    </p>
+
+    <!-- li­nea elegante -->
+    <div class="mt-4 h-[3px] w-32 overflow-hidden rounded-full bg-[#0b2a6b]/8">
+      <div class="loader-bar h-full w-1/2 rounded-full bg-gradient-to-r from-[#8cc63f] via-[#0b2a6b] to-[#8cc63f]"></div>
+    </div>
+  </div>
+</div>
+<!-- MENU MOBILE -->
+<div id="menuMobile" class="fixed top-0 left-0 w-full h-full bg-white z-40 transform -translate-x-full transition duration-500 md:hidden">
+
+  <div class="flex justify-between items-center p-5 border-b">
+    <span class="font-bold text-[#0b2a6b]">Menú</span>
+    <button onclick="toggleMenu()" class="text-2xl">✕</button>
+  </div>
+
+  <div class="flex flex-col items-center gap-6 mt-10 text-lg font-semibold text-[#0b2a6b]">
+
+    <a href="#" onclick="toggleMenu()">Inicio</a>
+    <a href="#clientes" onclick="toggleMenu()">Clientes</a>
+    <a href="#servicios" onclick="toggleMenu()">Servicios</a>
+    <div class="flex flex-col items-center gap-2">
+
+  <button onclick="toggleSubmenu()" class="font-semibold text-[#0b2a6b]">
+    Productos ▼
+  </button>
+
+ <div id="submenuMobile" class="hidden flex flex-col w-full bg-gray-50/50 rounded-xl mt-2 overflow-hidden">
+  
+  <a href="#productosMascotas" onclick="toggleMenu()" 
+    class="flex items-center gap-3 px-6 py-4 text-base text-[#0b2a6b] active:bg-[#8cc63f]/20 transition border-b border-white">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5.8 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+      <path d="M9.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+      <path d="M14.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+      <path d="M18.2 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+      <path d="M12 11.2c-2.9 0-5.2 2.15-5.2 4.8c0 2.05 1.4 3.3 3.35 3.3c.95 0 1.62-.29 1.97-.54c.35.25 1.02.54 1.97.54c1.95 0 3.35-1.25 3.35-3.3c0-2.65-2.3-4.8-5.2-4.8z" />
+    </svg>
+    Mascotas
+
+  </a>
+
+  <a href="#productosAutos" onclick="toggleMenu()" 
+    class="flex items-center gap-3 px-6 py-4 text-base text-[#0b2a6b] active:bg-[#0b2a6b] active:text-white transition">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-active:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
+    </svg>
+    Autos
+  </a>
+
+</div>
+
+</div>
+    <a href="#nosotros" onclick="toggleMenu()">Nosotros</a>
+
+    <a href="https://wa.me/523337276934" target="_blank"
+    class="mt-6 bg-[#8cc63f] text-white px-6 py-3 rounded-full shadow-lg">
+    Reservar
+    </a>
+
+  </div>
+
+</div>
+<!-- NAVBAR -->
+<!-- NAVBAR -->
+<!-- NAVBAR CORREGIDO -->
+<nav class="fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-50">
+  <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2 md:py-4 flex items-center justify-between">
+
+    <!-- Logo -->
+    <div class="flex items-center shrink-0">
+      <a href="#inicio" class="flex items-center">
+        <img src="img/perritologo.png" alt="Logo Woof & Wash" 
+             class="w-8 sm:w-9 md:w-10 h-auto object-contain ml-[5px] md:ml-2">
+        <span class="text-[13px] sm:text-lg font-extrabold text-[#0b2a6b] flex items-center leading-none tracking-tighter sm:tracking-normal">
+          Woof<span class="text-[#8cc63f]">&</span>Wash
+        </span>
+   <img src="img/cochelogo.png" alt="Servicio adicional" 
+     class="w-8 sm:w-9 md:w-10 h-auto object-contain ml-[5px] md:ml-2">
+      </a>
+    </div>
+
+    <!-- Links desktop -->
+    <div class="hidden md:flex gap-8 text-sm font-medium text-gray-700">
+      <a href="#inicio" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Inicio</a>
+      <a href="#clientes" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Clientes</a>
+      <a href="#servicios" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Servicios</a>
+      <div class="relative group">
+  
+  <!-- BOTN PRINCIPAL -->
+  <button class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition flex items-center gap-1">
+    Productos
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  <!-- SUBMENÚ -->
+<div class="absolute left-0 mt-3 w-56 bg-white rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 border border-gray-100 overflow-hidden">
+  
+  <a href="#productosMascotas" 
+    class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#8cc63f]/10 hover:text-[#8cc63f] transition-all border-b border-gray-50 group/item">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5.8 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+      <path d="M9.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+      <path d="M14.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+      <path d="M18.2 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+      <path d="M12 11.2c-2.9 0-5.2 2.15-5.2 4.8c0 2.05 1.4 3.3 3.35 3.3c.95 0 1.62-.29 1.97-.54c.35.25 1.02.54 1.97.54c1.95 0 3.35-1.25 3.35-3.3c0-2.65-2.3-4.8-5.2-4.8z" />
+    </svg>
+    <span class="font-semibold">Mascotas</span>
+  </a>
+
+  <a href="#productosAutos" 
+    class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white transition-all group/item">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-hover/item:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
+    </svg>
+    <span class="font-semibold">Autos</span>
+  </a>
+
+</div>
+
+</div>
+      <a href="#nosotros" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Nosotros</a>
+    </div>
+
+    <!-- Botones -->
+    <div class="flex items-center gap-1 sm:gap-3 md:gap-4">
+      
+      <!-- Menu mobile -->
+      <button onclick="toggleMenu()" aria-label="Abrir menú" class="md:hidden text-[#0b2a6b] p-1"> 
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+
+      <!-- Carrito -->
+      <button id="cart-icon" onclick="toggleCarrito()" aria-label="Ver carrito" class="relative p-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-7 md:h-7 text-[#0b2a6b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l1 2h13l-1.5 9h-11z"/>
+          <circle cx="9" cy="20" r="1.5"/>
+          <circle cx="17" cy="20" r="1.5"/>
+        </svg>
+        <span id="contadorCarrito" class="absolute top-0 right-0 bg-[#8cc63f] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
+          0
+        </span>
+      </button>
+
+      <!-- Reservar -->
+      <a href="https://wa.me/523337276934" target="_blank" class="relative flex items-center justify-center transition-all duration-300">
+        
+        <!-- Mobile -->
+        <span class="md:hidden flex flex-col items-center pl-1">
+          <span class="text-[7px] font-black text-[#8cc63f] uppercase tracking-tighter leading-none">Reservar</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f] -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+          </svg>
+        </span>
+
+        <!-- Desktop -->
+        <span class="hidden md:flex items-center gap-2 bg-[#8cc63f] text-white px-6 py-2 rounded-full btn-truck overflow-hidden relative">
+          <span class="text">Reservar</span>
+          <span class="truck text-white absolute">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
+              <circle cx="7" cy="17" r="2"/>
+              <circle cx="17" cy="17" r="2"/>
+            </svg>
+          </span>
+        </span>
+      </a>
+    </div>
+
+  </div>
+
+
+</nav>
+<!-- HERO -->
+<section class="pt-12 md:pt-16 pb-8 md:pb-12 px-4 sm:px-6 text-center">
+  
+ <img src="img/woofwashletras.png" alt="Logo Woof & Wash" 
+     class="mx-auto mb-1 md:mb-2 h-24 sm:h-32 md:h-44 lg:h-52 object-contain">
+
+  <h1 class="text-[clamp(2rem,5vw,3.5rem)] font-extrabold text-[#0b2a6b] mb-4 md:mb-6 leading-tight">
+    Cuidamos lo que te mueve <span class="text-[#8cc63f]">y lo que amas</span>
+  </h1>
+
+  <h2 class="text-[clamp(1.3rem,3vw,2rem)] font-extrabold text-[#0b2a6b] mb-8 md:mb-10 leading-tight">
+    Estética canina y lavado móvil <span class="text-[#8cc63f]">¡Hasta tu puerta!</span>
+  </h2>
+
+  <div class="max-w-7xl mx-auto flex justify-center mb-6 md:mb-12">
+    <div class="flex items-center gap-4 bg-white shadow-md rounded-full px-5 py-3 border border-gray-100">
+      <div class="bg-[#8cc63f]/15 p-2 rounded-full">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" fill="none" stroke="currentColor">
+          <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
+          <circle cx="7" cy="17" r="2"/>
+          <circle cx="17" cy="17" r="2"/>
+        </svg>
+      </div>
+      <p id="zonaHoy" class="text-sm md:text-base text-gray-700">Cargando zona...</p>
+      <button onclick="abrirZonas()" class="bg-[#0b2a6b] text-white text-xs md:text-sm px-4 py-1.5 rounded-full font-semibold hover:scale-105 transition">
+        Ver zonas
+      </button>
+    </div>
+  </div>
+
+  <a href="https://wa.me/523337276934" target="_blank"
+
+    class="inline-flex items-center justify-center gap-2 bg-[#8cc63f] text-white px-8 py-4 rounded-full btn-truck shadow-lg hover:scale-105 transition w-full sm:w-auto text-lg">
+    <span class="text">Agendar ahora</span>
+    <span class="truck">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" stroke="currentColor">
+        <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
+        <circle cx="7" cy="17" r="2"/>
+        <circle cx="17" cy="17" r="2"/>
+      </svg>
+    </span>
+  </a>
+
+</section>
+
+<!-- CLIENTES -->
+<section id="clientes" class="py-9 md:py-13 bg-[#fffae8] scroll-mt-28 overflow-hidden text-[#0b2a6b]">
+  <div class="max-w-7xl mx-auto px-6">
+    
+    <div class="text-center mb-6">
+      <h2 class="text-3xl md:text-4xl font-extrabold mb-3">Nuestros tan preciados clientes</h2>
+      <div class="w-16 h-1 bg-[#0b2a6b] mx-auto rounded-full"></div>
+    </div>
+    
+    <div class="relative group/slider">
+      <button onclick="scrollClientes(-1)" 
+        class="absolute -left-2 md:-left-10 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur shadow-xl rounded-full p-2 md:p-3 z-20 hover:bg-[#0b2a6b] hover:text-white transition-all duration-300 flex items-center justify-center border border-gray-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <div id="sliderClientes" 
+        class="flex gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar snap-x snap-mandatory">
+
+        <!-- PERRO 1 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/perroone.jpeg" alt="Rocky" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 text-yellow-400 mb-1 text-xs">
+              <span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“¡Servicio increíble! Salí feliz y oliendo delicioso!”</p>
+<span class="font-bold text-base uppercase tracking-wider text-white/90">— Rocky</span>
+          </div>
+        </div>
+
+        <!-- COCHE 1 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/cochefour.jpeg" alt="Auto 1 porsche" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 mb-1 text-xs">
+              <span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“Quedó como nuevo 🚗✨, súper brilloso y limpio”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— Porsche 911</span>
+          </div>
+        </div>
+
+        <!-- PERRO 2 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/perrotwo.jpeg" alt="Max" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 text-yellow-400 mb-1 text-xs">
+              <span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“Me dejaron oliendo increíble 🐾 ¡10/10!”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— Max</span>
+          </div>
+        </div>
+
+        <!-- COCHE 2 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/cocheone.jpeg" alt="Auto 2" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 mb-1 text-xs">
+              <span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“Interior impecable 🧼, huele increíble”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— BMW</span>
+          </div>
+        </div>
+
+        <!-- PERRO 3 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/perrothree.jpeg" alt="Luna" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 text-yellow-400 mb-1 text-xs">
+              <span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“Salí más hermosa que nunca ✨, volveré seguro”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— Luna</span>
+          </div>
+        </div>
+
+        <!-- COCHE 3 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/cochetwo.jpeg" alt="Auto 3" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 mb-1 text-xs">
+              <span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“Rápido, eficiente y quedó perfecto ⚡🚗”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— FORD</span>
+          </div>
+        </div>
+
+        <!-- PERRO 4 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/perrofour.jpeg" alt="Bruno" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex text-yellow-400 mb-1 text-xs">
+              <span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“Baño rápido y sin estrés 🛁, me encantó”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— Bruno</span>
+          </div>
+        </div>
+
+        <!-- COCHE 4 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/cochethree.jpeg" alt="Auto 4" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 mb-1 text-xs">
+              <span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“Servicio a domicilio top 🔥, súper práctico”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— MAZDA</span>
+          </div>
+        </div>
+
+        <!-- PERRO 5 -->
+        <div class="min-w-[75%] md:min-w-[48%] lg:min-w-[23.5%] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img loading="lazy" src="img/perrofive.png" alt="Nala" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <div class="flex gap-1 text-yellow-400 mb-1 text-xs">
+              <span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span><span class="paw"></span>
+            </div>
+            <p class="text-sm italic mb-1 leading-snug">“¡Vinieron hasta mi casa 🚐, súper cómodo!”</p>
+            <span class="font-bold text-base uppercase tracking-wider text-white/90">— Nala</span>
+          </div>
+        </div>
+
+      </div>
+
+      <button onclick="scrollClientes(1)" 
+        class="absolute -right-2 md:-right-10 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur shadow-xl rounded-full p-2 md:p-3 z-20 hover:bg-[#0b2a6b] hover:text-white transition-all duration-300 flex items-center justify-center border border-gray-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  </div>
+</section>
+<!-- SERVICIOS -->
+
+<section id="servicios" class="py-9 md:py-13 bg-[#fffae8] scroll-mt-28 overflow-hidden text-[#0b2a6b]">
+  <div class="max-w-7xl mx-auto px-6">
+    
+    <div class="text-center mb-6">
+      <h2 class="text-3xl md:text-4xl font-extrabold mb-3">Nuestros Servicios</h2>
+      <div class="w-16 h-1 bg-[#8cc63f] mx-auto rounded-full"></div>
+    </div>
+    
+    <div class="relative group/slider">
+      <button onclick="scrollServicios(-1)" 
+        class="absolute -left-2 md:-left-10 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur shadow-xl rounded-full p-2 md:p-3 z-20 hover:bg-[#0b2a6b] hover:text-white transition-all duration-300 flex items-center justify-center border border-gray-100 lg:hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <div id="sliderServicios" 
+        class="flex lg:grid lg:grid-cols-3 gap-6 overflow-x-auto lg:overflow-visible scroll-smooth pb-8 no-scrollbar snap-x snap-mandatory">
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-0 snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img src="img/Esteticacanina.jpeg" alt="Estética Canina" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-sm italic mb-3 leading-snug">Baño, corte, limpieza de oídos y uñas con productos premium.</p>
+            <a href="pdf/catalogomascotas.pdf" target="_blank" class="bg-white text-[#0b2a6b] text-xs font-bold py-2 rounded-full text-center hover:bg-[#8cc63f] hover:text-white transition-colors">
+              📄 Ver catálogo
+            </a>
+          </div>
+          <div class="absolute top-4 left-4 bg-[#0b2a6b] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg">Desde $199</div>
+          <div class="p-4 bg-white border-t border-gray-50"><h3 class="font-bold text-sm text-center">Estética Canina</h3></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-0 snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img src="img/Lavadodeautos.jpeg" alt="Lavado de Autos" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-sm italic mb-3 leading-snug">Lavado exterior e interior con productos de alta calidad.</p>
+            <a href="pdf/catalogolavado.pdf" target="_blank" class="bg-white text-[#0b2a6b] text-xs font-bold py-2 rounded-full text-center hover:bg-[#8cc63f] hover:text-white transition-colors">
+              📄 Ver catálogo
+            </a>
+          </div>
+          <div class="absolute top-4 left-4 bg-[#0b2a6b] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg">Desde $149</div>
+          <div class="p-4 bg-white border-t border-gray-50"><h3 class="font-bold text-sm text-center">Lavado de Autos</h3></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-0 snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white border border-gray-50">
+          <img src="img/Van.jpeg" alt="Van" class="w-full h-72 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-sm italic mb-3 leading-snug">Vamos hasta tu casa con todo el equipo necesario.</p>
+            <a href="https://wa.me/523337276934" target="_blank" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full text-center hover:scale-105 transition shadow-md">
+              Agendar ahora
+            </a>
+          </div>
+          <div class="absolute top-4 left-4 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg">GRATIS</div>
+          <div class="p-4 bg-white border-t border-gray-50"><h3 class="font-bold text-sm text-center">A domicilio</h3></div>
+        </div>
+
+      </div>
+
+      <button onclick="scrollServicios(1)" 
+        class="absolute -right-2 md:-right-10 top-1/2 -translate-y-1/2 bg-white/90 backdrop-blur shadow-xl rounded-full p-2 md:p-3 z-20 hover:bg-[#0b2a6b] hover:text-white transition-all duration-300 flex items-center justify-center border border-gray-100 lg:hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  </div>
+</section>
+<!-- PRODUCTOS MASCOTAS-->
+ <section id="productosMascotas" class="py-10 md:py-14 bg-[linear-gradient(180deg,_#fffdf6_0%,_#fff9e8_100%)] scroll-mt-24">
+<div class="max-w-7xl mx-auto px-4 sm:px-6">
+<div class="flex items-center justify-center gap-2 whitespace-nowrap">
+
+  <!-- TÍTULO -->
+  <h2 class="text-2xl md:text-4xl font-extrabold text-[#0b2a6b] truncate">
+    Productos Mascotas
+  </h2>
+
+  <!-- BOTÓN LUPA -->
+<button onclick="toggleBuscador()" 
+  class="bg-white border border-gray-200 shadow-md p-2 rounded-full hover:scale-110 hover:shadow-xl transition-all duration-300 flex items-center justify-center hover:bg-[#0b2a6b] group">
+
+  <svg xmlns="http://www.w3.org/2000/svg" 
+    class="h-5 w-5 text-[#0b2a6b] group-hover:text-white transition" 
+    fill="none" 
+    viewBox="0 0 24 24" 
+    stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+      d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+  </svg>
+
+</button>
+
+</div>
+
+<!-- BUSCADOR (DEBAJO DEL TÍTULO) -->
+<div id="contenedorBuscador" 
+  class="w-full max-w-md mx-auto overflow-hidden transition-all duration-500 max-h-0 mt-3">
+
+  <input 
+    type="text" 
+    id="buscadorProductos"
+    placeholder="Buscar productos..."
+    class="w-full px-4 py-2 rounded-full border shadow-md focus:outline-none focus:ring-2 focus:ring-[#8cc63f]"
+  >
+
+</div>
+
+  
+
+<!-- LINEA VERDE -->
+<div class="w-16 h-1 bg-[#8cc63f] mx-auto rounded-full mb-4"></div>
+    
+    <div class="relative group/slider px-4 md:px-0">
+   <button onclick="scrollProductos(-1)" 
+  class="product-slider-arrow absolute -left-1 sm:-left-2 md:-left-10 top-1/2 -translate-y-1/2 z-30">
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+  </svg>
+</button>
+
+      <div id="sliderProductos" 
+class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar snap-x snap-mandatory px-4 md:px-2">
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">RECOMENDADO</div>
+          <img src="img/shampoopremium.jpeg" alt="Shampoo" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-xs italic mb-4 leading-snug">Limpieza profunda con aroma duradero y fórmula suave para su piel.</p>
+            <button onclick="animarAlCarrito(this, 'Shampoo Premium', 129)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Añadir al carrito
+            </button>
+          </div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Shampoo Premium</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$129.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <div class="absolute top-3 right-3 z-10 bg-[#e74c3c] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">OFERTA</div>
+          <img src="img/perfumepremium.jpeg" alt="Perfume" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-xs italic mb-4 leading-snug">Fragancia premium que mantiene a tu mascota fresca por dí­as.</p>
+            <button onclick="animarAlCarrito(this, 'Perfume Galán', 99)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Añadir al carrito
+            </button>
+          </div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Perfume Galán</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$99.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <div class="absolute top-3 right-3 z-10 bg-[#0b2a6b] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">NUEVO</div>
+          <img src="img/Cepillopremium.jpeg" alt="Cepillo" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-xs italic mb-4 leading-snug">Ideal para desenredar y eliminar pelo muerto sin lastimar.</p>
+            <button onclick="animarAlCarrito(this, 'Cepillo Ergonómico', 89)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Añadir al carrito
+            </button>
+          </div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Cepillo Ergonómico</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$89.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">RECOMENDADO</div>
+          <img src="img/desenredante.jpeg" alt="Desenredante" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-xs italic mb-4 leading-snug">Facilita el cepillado diario y aporta brillo instantneo.</p>
+            <button onclick="animarAlCarrito(this, 'Cepillo Desenredante', 119)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Añadir al carrito
+            </button>
+          </div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Cepillo Desenredante</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$119.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <div class="absolute top-3 right-3 z-10 bg-[#e74c3c] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">OFERTA</div>
+          <img src="img/toallitas.jpeg" alt="Toallas" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-xs italic mb-4 leading-snug">Perfectas para limpiar patitas y cara despues del paseo.</p>
+            <button onclick="animarAlCarrito(this, 'Toallas Húmedas', 79)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Añadir al carrito
+            </button>
+          </div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Toallas Húmedas</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$79.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <img src="img/cortaunas.jpeg" alt="Cortauñas" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-xs italic mb-4 leading-snug">Diseño seguro con tope para evitar cortes excesivos.</p>
+            <button onclick="animarAlCarrito(this, 'Cortauñas Pro', 109)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Añadir al carrito
+            </button>
+          </div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Cortauñas Pro</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$109.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+        </div>
+
+        <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+          <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">RECOMENDADO</div>
+          <img src="img/collaranti.jpeg" alt="Collar" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+          <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+            <p class="text-xs italic mb-4 leading-snug">Protección repelente contra parásitos externos hasta por 3 meses.</p>
+            <button onclick="animarAlCarrito(this, 'Collar Antipulgas', 149)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+              Añadir al carrito
+            </button>
+          </div>
+          <div class="p-4 bg-white"><h3 class="product-name font-bold text-sm">Collar Antipulgas</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$149.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p></div>
+        </div>
+
+      </div>
+
+     <button onclick="scrollProductos(1)" 
+  class="product-slider-arrow absolute -right-1 sm:-right-2 md:-right-10 top-1/2 -translate-y-1/2 z-30">
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+  </svg>
+</button>
+    </div>
+  </div>
+</div>
+</section>
+<!-- PRODUCTOS AUTOS -->
+ <section id="productosAutos" class="py-10 md:py-14 bg-white scroll-mt-24">
+<div class="max-w-7xl mx-auto px-4 sm:px-6">
+<div class="flex items-center justify-center gap-2 whitespace-nowrap">
+
+  <!-- TÍTULO -->
+  <h2 class="text-2xl md:text-4xl font-extrabold text-[#0b2a6b] truncate">
+    Productos Autos
+  </h2>
+
+  <!-- BOTÓN LUPA -->
+  <button onclick="toggleBuscadorAutos()" 
+    class="bg-white border border-gray-200 shadow-md p-2 rounded-full hover:scale-110 hover:shadow-xl transition-all duration-300 flex items-center justify-center hover:bg-[#0b2a6b] group">
+
+    <svg xmlns="http://www.w3.org/2000/svg" 
+      class="h-5 w-5 text-[#0b2a6b] group-hover:text-white transition" 
+      fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+        d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+    </svg>
+
+  </button>
+
+</div>
+
+<!-- BUSCADOR -->
+<div id="contenedorBuscadorAutos" 
+  class="w-full max-w-md mx-auto overflow-hidden transition-all duration-500 max-h-0 mt-3">
+
+  <input 
+    type="text" 
+    id="buscadorAutos"
+    placeholder="Buscar productos para auto..."
+    class="w-full px-4 py-2 rounded-full border shadow-md focus:outline-none focus:ring-2 focus:ring-[#8cc63f]"
+  >
+</div>
+
+<!-- LINEA -->
+<div class="w-16 h-1 bg-[#8cc63f] mx-auto rounded-full mb-4"></div>
+
+<div class="relative group/slider px-4 md:px-0">
+
+    <!-- BOTÓN IZQUIERDA -->
+  <button onclick="scrollProductosAutos(-1)" 
+    class="product-slider-arrow absolute -left-1 sm:-left-2 md:-left-10 top-1/2 -translate-y-1/2 z-30">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+  </button>
+
+  <!-- SLIDER -->
+  <div id="sliderAutos" 
+class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar snap-x snap-mandatory px-4 md:px-2">
+
+    <!-- PRODUCTO 1 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full">RECOMENDADO</div>
+      <img src="img/Shampooauto.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Limpieza profunda sin dañar la pintura, deja brillo intenso.</p>
+        <button onclick="animarAlCarrito(this, 'Shampoo Automotriz', 149)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+          🛒 Añadir al carrito
+        </button>
+      </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Shampoo Automotriz</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$149 MXN</p>
+      </div>
+    </div>
+
+    <!-- PRODUCTO 2 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <div class="absolute top-3 right-3 bg-[#e74c3c] text-white text-[10px] px-3 py-1 rounded-full">OFERTA</div>
+      <img src="img/ceraauto.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Protege y da brillo espejo a la carrocería.</p>
+        <button onclick="animarAlCarrito(this, 'Cera Líquida', 199)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md">
+          🛒 Añadir al carrito
+        </button>
+      </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Cera Líquida</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$199 MXN</p>
+      </div>
+    </div>
+
+    <!-- PRODUCTO 3 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <div class="absolute top-3 right-3 bg-[#0b2a6b] text-white text-[10px] px-3 py-1 rounded-full">NUEVO</div>
+      <img src="img/aromatizante.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Aroma duradero que mantiene tu auto fresco por días.</p>
+        <button onclick="animarAlCarrito(this, 'Aromatizante Premium', 89)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition">
+          🛒 Añadir al carrito
+        </button>
+      </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Aromatizante Premium</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$89 MXN</p>
+      </div>
+    </div>
+
+    <!-- PRODUCTO 4 -->
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+      <img src="img/limpiadorderin.jpeg" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4">Elimina grasa y suciedad difícil en rines.</p>
+        <button onclick="animarAlCarrito(this, 'Limpiador de Rines', 129)" 
+          class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition">
+          🛒 Añadir al carrito
+        </button>
+      </div>
+
+      <div class="p-4">
+        <h3 class="product-name font-bold text-sm">Limpiador de Rines</h3>
+        <p class="text-[#0b2a6b] font-extrabold">$129 MXN</p>
+      </div>
+    </div>
+<!-- LIMPIADOR DE VIDRIOS -->
+<div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+  <div class="absolute top-3 right-3 z-10 bg-[#0b2a6b] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">NUEVO</div>
+  
+  <img src="img/Limpiadordevidrio.jpeg" alt="Limpiador de Vidrios" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+  <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+    <p class="text-xs italic mb-4 leading-snug">
+      Deja tus vidrios cristalinos sin marcas ni residuos.
+    </p>
+
+    <button onclick="animarAlCarrito(this, 'Limpiador de Vidrios', 129)" 
+      class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+
+      Añadir al carrito
+    </button>
+  </div>
+
+  <div class="p-4 bg-white">
+    <h3 class="product-name font-bold text-sm">Limpiador de Vidrios</h3>
+    <p class="text-[#0b2a6b] font-extrabold mt-1">
+      $129.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span>
+    </p>
+  </div>
+</div>
+
+<!-- RENOVADOR DE INTERIORES -->
+<div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+  <div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">RECOMENDADO</div>
+  
+  <img src="img/Renovadorinteriores.jpeg" alt="Renovador de Interiores" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+  <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+    <p class="text-xs italic mb-4 leading-snug">
+      Devuelve el brillo y protege plásticos y vinil del interior.
+    </p>
+
+    <button onclick="animarAlCarrito(this, 'Renovador de Interiores', 139)" 
+      class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+
+      Añadir al carrito
+    </button>
+  </div>
+
+  <div class="p-4 bg-white">
+    <h3 class="product-name font-bold text-sm">Renovador de Interiores</h3>
+    <p class="text-[#0b2a6b] font-extrabold mt-1">
+      $139.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span>
+    </p>
+  </div>
+</div>
+
+<!-- FRANELAS DE MICROFIBRA -->
+<div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white">
+  <div class="absolute top-3 right-3 z-10 bg-[#e74c3c] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">OFERTA</div>
+  
+  <img src="img/Franelas.jpeg" alt="Franelas de Microfibra" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+
+  <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+    <p class="text-xs italic mb-4 leading-snug">
+      Ultra absorbentes, no rayan y dejan acabado perfecto.
+    </p>
+
+    <button onclick="animarAlCarrito(this, 'Franelas de Microfibra', 150)" 
+      class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+
+      Añadir al carrito
+    </button>
+  </div>
+
+  <div class="p-4 bg-white">
+    <h3 class="product-name font-bold text-sm">Franelas de Microfibra</h3>
+    <p class="text-[#0b2a6b] font-extrabold mt-1">
+      $150.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span>
+    </p>
+  </div>
+</div>
+  </div>
+
+<!-- BOTON DERECHA -->
+  <button onclick="scrollProductosAutos(1)" 
+    class="product-slider-arrow absolute -right-1 sm:-right-2 md:-right-10 top-1/2 -translate-y-1/2 z-30">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+    </svg>
+  </button>
+</div>
+</div>
+</section>
+<!-- EXPERIENCIA INTERACTIVA -->
+<section id="experienciaInteractiva" class="py-16 md:py-20 bg-[#fffae8] scroll-mt-20 overflow-hidden text-[#0b2a6b]">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-10">
+      <h2 class="text-4xl md:text-5xl font-extrabold mb-4 leading-tight">
+        Juega y transforma
+      </h2>
+      <p class="text-slate-600 max-w-2xl mx-auto">
+        Juega un poquito y mira como es la magia de Woof & Wash.
+      </p>
+      <div class="w-20 h-1.5 bg-[#8cc63f] mx-auto rounded-full mt-4"></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-8 items-start">
+      <article class="interactive-game rounded-[2rem] bg-white/90 border border-[#0b2a6b]/10 p-6 md:p-8 shadow-[0_24px_70px_rgba(11,42,107,0.16)]">
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-[#8cc63f]">Reto interactivo</p>
+        <h3 class="mt-3 text-2xl md:text-3xl font-extrabold text-[#0b2a6b] leading-tight">
+          Estética canina
+        </h3>
+        <p id="groomGameMessage" class="game-message">
+  <span class="game-message-icon">✂️</span>
+  <span>Pasa las tijeras sobre el perrito 🐶</span>
+</p>
+
+        <div id="groomGame" class="relative mx-auto mt-7 w-full touch-none" aria-label="Mini juego de arreglo para perrito">
+          <div class="game-stage relative overflow-hidden rounded-[2rem] border border-white/75 bg-white shadow-[0_30px_90px_rgba(11,42,107,0.16)]" style="aspect-ratio: 1 / 1; cursor: none; background: radial-gradient(circle at center, rgba(140, 198, 63, 0.12), transparent 42%), linear-gradient(180deg, #fffdf7 0%, #eef5ff 100%);">
+            <img src="img/Limpio-removebg-preview.png" alt="Perrito limpio" class="game-clean-layer w-full h-full object-cover">
+            <svg class="game-mask" width="0" height="0" aria-hidden="true">
+              <defs>
+                <mask id="groomDirtyMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
+                  <rect width="1" height="1" fill="white"></rect>
+                  <g id="groomMaskHoles"></g>
+                </mask>
+              </defs>
+            </svg>
+            <div class="game-dirty-layer absolute inset-0">
+              <img src="img/Sucio-removebg-preview.png" alt="Perrito sucio" class="game-clean-layer w-full h-full object-cover">
+            </div>
+            <div class="game-particles absolute inset-0 overflow-hidden pointer-events-none"></div>
+            <div class="game-tool absolute flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#0b2a6b] shadow-[0_14px_30px_rgba(11,42,107,0.18)]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="6" cy="6" r="3"></circle>
+                <circle cx="6" cy="18" r="3"></circle>
+                <path d="M20 4 8.12 15.88"></path>
+                <path d="M14.47 14.48 20 20"></path>
+                <path d="M8.12 8.12 12 12"></path>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="interactive-game rounded-[2rem] bg-white/90 border border-[#0b2a6b]/10 p-6 md:p-8 shadow-[0_24px_70px_rgba(11,42,107,0.16)]">
+        <p class="text-xs font-black uppercase tracking-[0.24em] text-[#8cc63f]">Reto interactivo</p>
+        <h3 class="mt-3 text-2xl md:text-3xl font-extrabold text-[#0b2a6b] leading-tight">
+          Lavado de autos
+        </h3>
+        <p id="carWashGameMessage" class="game-message">
+  <span class="game-message-icon">🧽</span>
+  <span>Pasa la esponja sobre el auto 🚗</span>
+</p>
+
+        <div id="carWashGame" class="relative mx-auto mt-7 w-full touch-none" aria-label="Mini juego de lavado para auto">
+          <div class="game-stage relative overflow-hidden rounded-[2rem] border border-white/75 bg-white shadow-[0_30px_90px_rgba(11,42,107,0.16)]" style="aspect-ratio: 1 / 1; cursor: none; background: radial-gradient(circle at center, rgba(140, 198, 63, 0.12), transparent 42%), linear-gradient(180deg, #fffdf7 0%, #eef5ff 100%);">
+            <img src="img/Carlimpio-removebg-preview.png" alt="Auto limpio" class="game-clean-layer w-full h-full object-cover">
+            <svg class="game-mask" width="0" height="0" aria-hidden="true">
+              <defs>
+                <mask id="carWashDirtyMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
+                  <rect width="1" height="1" fill="white"></rect>
+                  <g id="carWashMaskHoles"></g>
+                </mask>
+              </defs>
+            </svg>
+            <div class="game-dirty-layer absolute inset-0">
+              <img src="img/CarSucio-removebg-preview.png" alt="Auto sucio" class="game-clean-layer w-full h-full object-cover">
+            </div>
+            <div class="game-particles absolute inset-0 overflow-hidden pointer-events-none"></div>
+            <div class="game-tool absolute flex h-12 w-12 items-center justify-center rounded-full bg-white text-2xl text-[#0b2a6b] shadow-[0_14px_30px_rgba(11,42,107,0.18)]">
+              &#129533;
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <div class="mt-10 text-center">
+      <a href="https://wa.me/523337276934" target="_blank" rel="noopener noreferrer"
+        class="inline-flex items-center justify-center rounded-2xl bg-[linear-gradient(135deg,_#0b2a6b,_#123f89)] px-6 py-3 text-sm font-bold text-white shadow-[0_18px_30px_rgba(11,42,107,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_34px_rgba(11,42,107,0.28)]">
+        Quiero mi experiencia Woof &amp; Wash
+      </a>
+    </div>
+  </div>
+</section>
+<!-- NOSOTROS -->
+<section id="nosotros" class="py-9 md:py-13 bg-[#ffffff]">
+  <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
+
+    <!-- TEXTO -->
+    <div>
+      <h2 class="text-4xl font-bold mb-6 text-[#0b2a6b]">
+        Experiencia premium a domicilio
+      </h2>
+
+      <p class="text-gray-600 mb-6 leading-relaxed">
+        En <span class="font-semibold text-[#0b2a6b]">Woof & Wash</span> llevamos comodidad, calidad y confianza directamente hasta tu hogar. 
+        Nuestro enfoque combina atención profesional, productos de alta gama y un servicio diseñado para cuidar tanto a tus mascotas como a tu vehículo.
+      </p>
+
+      <p class="text-gray-600 mb-6 leading-relaxed">
+        Sabemos que tu tiempo es valioso y que tus mascotas son parte de tu familia, por eso ofrecemos una experiencia segura, sin estrés y completamente personalizada.
+      </p>
+
+      <!-- BENEFICIOS -->
+      <div class="grid grid-cols-2 gap-4 mt-6 text-sm">
+
+        <div class="flex items-center gap-3">
+          <div class="bg-[#8cc63f] p-2 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" stroke="currentColor">
+              <path stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <span>Atención profesional</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="bg-[#8cc63f] p-2 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" stroke="currentColor">
+              <path stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <span>Productos premium</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="bg-[#8cc63f] p-2 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" stroke="currentColor">
+              <path stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <span>Servicio a domicilio</span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="bg-[#8cc63f] p-2 rounded-full">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" stroke="currentColor">
+              <path stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <span>Experiencia sin estres</span>
+        </div>
+
+      </div>
+    </div>
+    <div class="relative">
+      <img src="img/Pomeraniapasto.jpeg" alt="Pomerania pasto" loading="lazy" decoding="async" class="rounded-3xl shadow-2xl">
+    </div>
+  </div>
+</section>
+<!-- PREGUNTAS FRECUENTES -->
+<section class="faq-shell py-16 md:py-20 bg-[#f9f4e2]">
+<div class="max-w-5xl mx-auto px-6">
+
+<div class="text-center mb-10 md:mb-12">
+  <p class="faq-kicker">Respuestas rapidas</p>
+  <h2 class="text-3xl md:text-5xl font-black text-[#0b2a6b] leading-tight">
+    Preguntas frecuentes
+  </h2>
+  <p class="faq-intro">
+    Todo lo esencial para agendar con mas confianza, entender tiempos y saber como funciona la experiencia Woof &amp; Wash.
+  </p>
+</div>
+
+<div class="grid gap-4 md:grid-cols-[0.9fr_1.1fr] md:items-start">
+  <div class="faq-highlight">
+    <div class="faq-highlight-badge">FAQ</div>
+    <h3>Agenda con menos dudas y mas claridad</h3>
+    <p>Resolvimos las preguntas mas comunes...</p>
+    <div class="faq-highlight-points">
+      <div>
+        <strong>Tiempo claro</strong>
+        <span>Te damos una expectativa realista segun el servicio.</span>
+      </div>
+      <div>
+        <strong>Cobertura simple</strong>
+        <span>Sabes si llegamos a tu zona sin vueltas.</span>
+      </div>
+      <div>
+        <strong>Reserva facil</strong>
+        <span>Todo empieza por WhatsApp en pocos pasos.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="faq-item overflow-hidden scroll-smooth">
+      <button onclick="toggleFAQ(this)" class="faq-trigger w-full flex justify-between items-center text-left">
+        <span>
+          <small>Tiempo estimado</small>
+          <strong>¿Cuanto tarda el servicio?</strong>
+        </span>
+        <span class="faq-plus">+</span>
+      </button>
+      <div class="faq-content hidden">
+        Entre 40 y 90 minutos dependiendo el servicio, el tamaño y el nivel de detalle que necesite tu mascota o tu vehiculo.
+      </div>
+    </div>
+
+    <div class="faq-item overflow-hidden scroll-smooth">
+      <button onclick="toggleFAQ(this)" class="faq-trigger w-full flex justify-between items-center text-left">
+        <span>
+          <small>Cobertura</small>
+          <strong>¿Van a domicilio?</strong>
+        </span>
+        <span class="faq-plus">+</span>
+      </button>
+      <div class="faq-content hidden">
+        Si, cubrimos la Zona Metropolitana de Guadalajara sin costo extra dentro de nuestras rutas activas dependiendo el dia.
+      </div>
+    </div>
+
+    <div class="faq-item overflow-hidden scroll-smooth">
+      <button onclick="toggleFAQ(this)" class="faq-trigger w-full flex justify-between items-center text-left">
+        <span>
+          <small>Reserva</small>
+          <strong>¿Que necesito para agendar?</strong>
+        </span>
+        <span class="faq-plus">+</span>
+      </button>
+      <div class="faq-content hidden">
+        Solo mandanos WhatsApp con tu ubicacion, el servicio que te interesa y el horario aproximado que prefieres.
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+</section>
+<!-- FOOTER COMPLETO PRO -->
+<footer id="footer" class="footer-shell bg-[#0b2a6b] text-white py-20 md:py-24 mt-12">
+  <div class="max-w-7xl mx-auto px-6 grid md:grid-cols-3 gap-10 footer-card p-6 md:p-10">
+
+    <!-- INFO -->
+    <div>
+      <h3 class="text-xl font-semibold mb-4">Woof & Wash</h3>
+      <p class="text-sm text-white/80 mb-4">
+        Servicio profesional a domicilio en la Zona Metropolitana de Guadalajara.
+      </p>
+
+      <div class="space-y-2 text-sm">
+
+        <div class="flex items-center gap-2">
+          <!-- TEL -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" stroke="currentColor">
+            <path stroke-width="2" d="M3 5a2 2 0 012-2h2l2 5-2 2a11 11 0 005 5l2-2 5 2v2a2 2 0 01-2 2A16 16 0 013 5z"/>
+          </svg>
+          <span>33 3727 6934</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- UBICACION -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" stroke="currentColor">
+            <path stroke-width="2" d="M12 21s-6-5.33-6-10a6 6 0 1112 0c0 4.67-6 10-6 10z"/>
+            <circle cx="12" cy="11" r="2"/>
+          </svg>
+          <span>ZMG, Jalisco</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- HORARIO -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="9" stroke-width="2"/>
+            <path stroke-width="2" d="M12 7v5l3 3"/>
+          </svg>
+          <span>Lun - Sab: 9:00 AM - 7:00 PM</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MAPA -->
+    <div>
+      <h3 class="text-xl font-semibold mb-4">Ubicación</h3>
+      <div class="rounded-xl overflow-hidden scroll-smooth shadow-lg">
+        
+
+        <iframe 
+          src="https://www.google.com/maps?q=Guadalajara,Jalisco&output=embed"
+          width="100%" 
+          height="200" 
+          style="border:0;" 
+          loading="lazy">
+        </iframe>
+      </div>
+    </div>
+
+    <!-- REDES -->
+    <div class="text-center md:text-left">
+      <h3 class="text-xl font-semibold mb-4">Síguenos</h3>
+
+      <div class="flex md:justify-start justify-center gap-6 mb-4">
+
+        <!-- FACEBOOK -->
+        <a href="https://www.facebook.com/profile.php?id=61579560939219" target="_blank" class="hover:scale-110 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M22 12.07C22 6.48 17.52 2 11.93 2S2 6.48 2 12.07c0 4.99 3.66 9.13 8.44 9.88v-6.99H7.9v-2.89h2.54V9.41c0-2.5 1.5-3.88 3.8-3.88 1.1 0 2.24.2 2.24.2v2.47h-1.26c-1.25 0-1.64.77-1.64 1.56v1.87h2.8l-.45 2.89h-2.35v6.99C18.34 21.2 22 17.06 22 12.07z"/>
+          </svg>
+        </a>
+
+        <!-- INSTAGRAM -->
+        <a href="https://www.instagram.com/woofwash.gdl?igsh=MW9ocGpzcnd3cmVwZw==/" target="_blank" class="hover:scale-110 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M7.75 2h8.5A5.75 5.75 0 0122 7.75v8.5A5.75 5.75 0 0116.25 22h-8.5A5.75 5.75 0 012 16.25v-8.5A5.75 5.75 0 017.75 2zm0 2A3.75 3.75 0 004 7.75v8.5A3.75 3.75 0 007.75 20h8.5A3.75 3.75 0 0020 16.25v-8.5A3.75 3.75 0 0016.25 4h-8.5zm4.25 3.5A4.5 4.5 0 1112 17a4.5 4.5 0 010-9zm0 2A2.5 2.5 0 1014.5 12 2.5 2.5 0 0012 9.5zm4.75-2.25a1 1 0 11-2 0 1 1 0 012 0z"/>
+          </svg>
+        </a>
+
+      </div>
+
+      <p class="text-sm text-white/70">
+        © 2026 Woof & Wash - Todos los derechos reservados
+      </p>
+
+      
+    </div>
+
+  </div>
+</footer>
+<!-- OVERLAY FONDO -->
+<div id="overlayCarrito" 
+class="fixed inset-0 bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition duration-500 z-40"
+onclick="toggleCarrito()">
+</div>
+<!-- PANEL CARRITO -->
+<div id="carritoPanel" 
+class="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-[#fffdf7] shadow-[0_20px_60px_rgba(0,0,0,0.25)] transform translate-x-full transition duration-500 z-[60] flex flex-col rounded-l-[2rem] overflow-hidden">
+
+  <div class="bg-gradient-to-r from-[#0b2a6b] via-[#143f8f] to-[#8cc63f] px-6 pt-6 pb-5 text-white">
+    <div class="flex justify-between items-start gap-4">
+      <div>
+        <p class="text-xs uppercase tracking-[0.25em] text-white/75">Woof & Wash</p>
+        <h2 class="text-2xl font-extrabold leading-tight">Tu carrito</h2>
+        <p class="text-sm text-white/80 mt-1">Todo listo para completar tu compra.</p>
+      </div>
+      <button onclick="toggleCarrito()" aria-label="Cerrar carrito" class="cart-close-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+    <section class="cart-shell">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#8cc63f]">Cuenta</p>
+          <p id="nombreUsuario" class="font-semibold text-[#0b2a6b] text-sm sm:text-base mt-1"></p>
+        </div>
+
+        <div id="cuentaBox" class="relative hidden shrink-0">
+  <button
+    type="button"
+    onclick="toggleMenuCuenta()"
+    class="inline-flex items-center gap-2 rounded-2xl border border-[#0b2a6b]/10 bg-white px-4 py-2 shadow-md hover:shadow-lg hover:-translate-y-[1px] transition"
+  >
+    <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#8cc63f]/15 text-[#0b2a6b]">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </span>
+
+    <span id="menuCuentaUsuario" class="max-w-[110px] truncate text-sm font-semibold text-[#0b2a6b]">
+      Usuario
+    </span>
+
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-[#0b2a6b]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  <div
+    id="menuCuenta"
+    class="hidden absolute right-0 top-full mt-2 w-56 rounded-2xl border border-[#0b2a6b]/10 bg-white p-2 shadow-xl z-[9999]"
+  >
+    <button
+      type="button"
+      onclick="logout()"
+      class="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[#0f172a] font-semibold hover:bg-[#0b2a6b]/5 transition"
+    >
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#8cc63f]/15 text-[#0b2a6b]">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"/>
+        </svg>
+      </span>
+      Cerrar sesión
+    </button>
+
+    <button
+      type="button"
+      onclick="eliminarCuenta()"
+      class="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left font-semibold text-red-600 hover:bg-red-50 transition"
+    >
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-500">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/>
+        </svg>
+      </span>
+      Eliminar cuenta
+    </button>
+  </div>
+</div>      </div>
+
+      <div id="authButtons" class="hidden grid grid-cols-2 gap-3 pt-3">
+        <a id="btnLogin" href="login.html" class="auth-cta auth-cta-secondary">Iniciar sesión</a>
+        <a id="btnRegister" href="register.html" class="auth-cta auth-cta-primary">Crear cuenta</a>
+      </div>
+
+      <div id="eliminarCuentaPanel" class="hidden mt-4 rounded-2xl border border-red-100 bg-red-50/80 p-4 space-y-3">
+  <div class="flex items-start gap-3">
+    <span class="mt-0.5 rounded-full bg-white p-2 text-red-500 shadow-sm">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
+      </svg>
+    </span>
+
+    <div class="flex-1">
+      <p class="font-semibold text-[#0b2a6b]">Confirmación de eliminación</p>
+      <p class="text-sm text-slate-600">Ingresa el código de 6 dígitos enviado a tu correo.</p>
+    </div>
+  </div>
+
+  <input id="deleteAccountCode" type="text" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos" class="w-full rounded-xl border border-red-200 bg-white px-4 py-3 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-200">
+  <p id="deleteAccountMessage" class="text-sm"></p>
+
+  <div class="grid grid-cols-2 gap-3">
+    <button id="btnCancelarEliminarCuenta" type="button" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">Cancelar</button>
+    <button id="btnConfirmarEliminarCuenta" type="button" class="rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition hover:bg-red-600">Eliminar</button>
+  </div>
+</div>
+    </section>
+
+    <section class="cart-shell cart-shell-soft">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#8cc63f]">Resumen</p>
+          <p class="text-sm text-slate-500">Revisa y ajusta tus productos.</p>
+        </div>
+        <span id="contadorCarritoMini" class="cart-badge">0 arti­culos</span>
+      </div>
+
+      <div id="listaCarrito" class="space-y-4 text-sm"></div>
+    </section>
+
+    <section id="pedidosSection" class="cart-shell hidden">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#8cc63f]">Historial</p>
+          <p class="text-sm text-slate-500">Tus pedidos recientes.</p>
+        </div>
+        <button id="btnActualizarPedidos" type="button" class="rounded-full border border-[#0b2a6b]/15 px-3 py-1.5 text-xs font-semibold text-[#0b2a6b] transition hover:border-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white">
+          Actualizar
+        </button>
+      </div>
+      <div id="listaPedidos" class="space-y-3"></div>
+    </section>
+  </div>
+
+  <div class="border-t border-[#0b2a6b]/10 bg-white px-6 py-5">
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Total</p>
+        <p class="text-2xl font-extrabold text-[#0b2a6b]">$<span id="totalCarrito">0</span> MXN</p>
+      </div>
+      <button id="btnVaciar" type="button" onclick="vaciarCarrito()" class="hidden cart-clear-btn">
+        Vaciar carrito
+      </button>
+    </div>
+
+    <button id="btnWhats" type="button" class="hidden w-full rounded-2xl bg-[#8cc63f] px-5 py-3.5 text-center text-sm font-bold text-white shadow-[0_18px_35px_rgba(140,198,63,0.28)] transition hover:-translate-y-0.5 hover:bg-[#7bb631]">
+      Finalizar compra
+    </button>
+  </div>
+</div>
+
+<!-- PERRITO CHAT PRO DINAMICO -->
+<div id="chatPerrito" class="fixed bottom-5 right-5 z-30 flex flex-col items-end gap-2 opacity-0 translate-y-5 transition duration-500">
+
+  <div id="mensajePerrito" class="bg-white px-3 py-1.5 rounded-xl shadow text-xs text-gray-700 flex items-center gap-2 min-w-[150px]">
+    <span id="textoPerrito">...</span>
+    <button onclick="cerrarChat()" class="text-gray-400 hover:text-red-500 text-xs ml-2">&times;</button>
+  </div>
+
+  <a href="https://wa.me/523337276934?text=Hola,%20quiero%20información%20y%20agendar%20un%20servicio"
+     target="_blank"
+     class="bg-[#8cc63f] p-2 rounded-full shadow-xl hover:scale-110 transition">
+    <img src="img/woofyasistente.png" alt="Perrito Asistente" loading="lazy" decoding="async" class="w-8 h-8 rounded-full">
+  </a>
+
+</div>
+<!-- MODAL ZONAS -->
+<div id="modalZonas" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition duration-300 z-50">
+
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-[90%] max-w-md">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-[#0b2a6b]">Zonas por día</h3>
+      <button onclick="cerrarZonas()" class="text-gray-400 hover:text-red-500 text-xl">✕</button>
+    </div>
+
+    <!-- LISTA -->
+    <div id="listaZonas" class="space-y-3 text-sm"></div>
+
+<!-- BOTÓN RESERVAR -->
+<a href="https://wa.me/523337276934?text=Hola,%20quiero%20agendar%20un%20servicio"
+  target="_blank"
+  class="mt-5 block text-center bg-[#8cc63f] text-white py-3 rounded-full font-bold shadow-lg hover:scale-105 transition">
+  Reservar ahora
+</a>
+  </div>
+
+</div>
+
+</body>
+
+</html>
+
+
+
+

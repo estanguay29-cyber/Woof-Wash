@@ -1,0 +1,134 @@
+############################
+# 🔐 ENV / SECRETOS
+############################
+.env
+.env.*
+*.env
+**/.env
+Backend/.env
+Frontend/.env
+
+# Permitir ejemplos (sin secretos)
+!.env.example
+!Backend/.env.example
+!Frontend/.env.example
+
+############################
+# 📦 DEPENDENCIAS
+############################
+node_modules/
+jspm_packages/
+
+############################
+# 🧾 LOGS
+############################
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+############################
+# 🛠️ IDE / EDITORES
+############################
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-workspace
+*.sublime-project
+
+############################
+# 💻 SISTEMA OPERATIVO
+############################
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+############################
+# 🏗️ BUILD / CACHE
+############################
+dist/
+build/
+coverage/
+.cache/
+.next/
+out/
+.tmp/
+.temp/
+
+############################
+# 🚀 DEPLOY / HOSTING
+############################
+.vercel/
+.netlify/
+.now/
+
+############################
+# 🔐 SEGURIDAD / CERTS
+############################
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
+
+############################
+# 💳 STRIPE
+############################
+.stripe/
+stripe-debug.log
+
+############################
+# 🗄️ BASE DE DATOS / BACKUPS
+############################
+*.sqlite
+*.db
+*.db-shm
+*.db-wal
+*.bak
+dump/
+backups/
+
+############################
+# 📦 ARCHIVOS COMPRIMIDOS
+############################
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+
+############################
+# 📁 ARCHIVOS TEMPORALES
+############################
+tmp/
+temp/
+*.tmp
+
+############################
+# 📸 DEBUG / TESTS
+############################
+*.seed
+*.pid
+*.pid.lock
+
+############################
+# ⚙️ CONFIG LOCAL (NO SUBIR)
+############################
+config.local.js
+config.local.json
+
+############################
+# 🧪 TEST COVERAGE
+############################
+.nyc_output/
+
+############################
+# 🧠 OTROS
+############################
+*.swp
+*.swo
