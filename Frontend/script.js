@@ -1218,15 +1218,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const progress = Math.round((visitedZones.size / totalZones) * 100);
       const visualProgress = Math.min(progress, 100);
+      const dirtyOpacity = Math.max(0, 1 - (visualProgress / 42));
 
       if (progressBar) {
         progressBar.style.width = `${visualProgress}%`;
       }
 
+      game.style.setProperty("--game-dirty-opacity", dirtyOpacity.toFixed(2));
+
       if (progress >= 42) {
         if (progressBar) {
           progressBar.style.width = "100%";
         }
+        game.style.setProperty("--game-dirty-opacity", "0");
         message.textContent = config.finalMessage;
         return;
       }
@@ -1239,6 +1243,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function activarJuego(event) {
       if (event.cancelable) {
         event.preventDefault();
+      }
+
+      if (event.pointerId && stage.setPointerCapture) {
+        stage.setPointerCapture(event.pointerId);
       }
 
       game.classList.add("game-active", "is-active");

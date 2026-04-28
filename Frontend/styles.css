@@ -670,6 +670,7 @@ h1, h2, h3 {
 #experienciaInteractiva #carWashGame {
   --game-x: 50%;
   --game-y: 50%;
+  --game-dirty-opacity: 1;
 }
 
 #experienciaInteractiva {
@@ -734,6 +735,8 @@ h1, h2, h3 {
 #experienciaInteractiva .game-dirty-layer {
   filter: saturate(.92) contrast(1.02) drop-shadow(0 18px 28px rgba(11, 42, 107, .1));
   pointer-events: none;
+  opacity: var(--game-dirty-opacity);
+  transition: opacity .18s ease;
 }
 
 #experienciaInteractiva #groomGame .game-dirty-layer {
