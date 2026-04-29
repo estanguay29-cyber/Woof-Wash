@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "build:css": "tailwindcss -i ..\\Frontend\\tailwind.input.css -o ..\\Frontend\\tailwind.css --content \"..\\Frontend\\**\\*.html\" --content \"..\\Frontend\\**\\*.js\" --minify",
+    "build:css": "tailwindcss -c ..\\tailwind.config.js -i ..\\Frontend\\tailwind.input.css -o ..\\Frontend\\tailwind.css --minify",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

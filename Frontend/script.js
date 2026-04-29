@@ -951,11 +951,15 @@ function renderizarPedidos(pedidos) {
     return;
   }
 
-  listaPedidos.innerHTML = pedidos.map(pedido => `
-    <div class="bg-white rounded-xl p-3 border border-gray-100">
+  listaPedidos.innerHTML = pedidos.map(pedido => {
+    const estadoPedido = pedido.estado || pedido.status || "pagado";
+    const puedeCancelar = estadoPedido === "pendiente" || estadoPedido === "confirmado";
+
+    return `
+    <div class="bg-white rounded-xl p-3 border border-gray-100" data-order-id="${pedido._id}">
       <div class="flex justify-between items-center mb-1">
         <span class="font-semibold text-[#0b2a6b]">Pedido</span>
-        <span class="text-xs uppercase text-[#8cc63f] font-bold">${pedido.status || "pagado"}</span>
+        <span class="text-xs uppercase text-[#8cc63f] font-bold">${estadoPedido}</span>
       </div>
       <p class="text-xs text-gray-500 mb-2">${new Date(pedido.createdAt).toLocaleString("es-MX")}</p>
       <p class="font-semibold text-[#0b2a6b] mb-2">Total: $${((pedido.total || 0) / 100).toFixed(2)} MXN</p>
@@ -967,8 +971,336 @@ function renderizarPedidos(pedidos) {
           </div>
         `).join("") : ""}
       </div>
+      ${puedeCancelar ? `
+        <button type="button" onclick="cancelarPedido('${pedido._id}')" class="mt-3 rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:border-red-500 hover:bg-red-50">
+          Cancelar pedido
+        </button>
+      ` : ""}
     </div>
-  `).join("");
+  `;
+  }).join("");
+}
+
+async function cancelarPedido(orderId) {
+  abrirCancelarPedido(orderId);
+}
+
+let pedidosActuales = [];
+let pedidoSeleccionadoParaCancelar = null;
+
+function escaparHtmlCliente(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function obtenerEstadoPedido(pedido) {
+  if (pedido?.status === "cancelado") return "cancelado";
+  if (pedido?.status === "completado") return "completado";
+
+  const estado = pedido?.estado || pedido?.status || "";
+  return estado === "pagado" ? "confirmado" : estado;
+}
+
+function obtenerEstadoVisiblePedido(pedido) {
+  const estado = obtenerEstadoPedido(pedido);
+  const estados = {
+    pendiente: {
+      visible: "Pendiente",
+      explicacion: "Recibimos tu pedido y está pendiente de confirmación."
+    },
+    confirmado: {
+      visible: "Confirmado",
+      explicacion: "Tu pedido fue confirmado y está en proceso de preparación o programación."
+    },
+    cancelado_por_cliente: {
+      visible: "Cancelado",
+      explicacion: "Este pedido fue cancelado."
+    },
+    cancelado_por_admin: {
+      visible: "Cancelado",
+      explicacion: "Este pedido fue cancelado."
+    },
+    cancelado: {
+      visible: "Cancelado",
+      explicacion: "Este pedido fue cancelado."
+    },
+    completado: {
+      visible: "Completado",
+      explicacion: "Este pedido ya fue completado. Gracias por confiar en Woof & Wash."
+    }
+  };
+
+  return estados[estado] || {
+    visible: "En revisión",
+    explicacion: "Estamos revisando el estado de tu pedido."
+  };
+}
+
+function pedidoPuedeCancelarse(pedido) {
+  const estado = obtenerEstadoPedido(pedido);
+  return estado === "pendiente" || estado === "confirmado";
+}
+
+function formatearFechaPedido(fecha) {
+  return fecha ? new Date(fecha).toLocaleString("es-MX") : "No disponible";
+}
+
+function formatearDineroPedido(valorCentavos) {
+  return `$${((Number(valorCentavos) || 0) / 100).toFixed(2)} MXN`;
+}
+
+function obtenerPedidoPorId(orderId) {
+  return pedidosActuales.find(pedido => String(pedido._id) === String(orderId));
+}
+
+function mostrarMensajePedidos(texto, tipo = "ok") {
+  const listaPedidos = document.getElementById("listaPedidos");
+  if (!listaPedidos) return;
+
+  const mensaje = document.createElement("p");
+  mensaje.className = tipo === "ok" ? "mt-3 text-sm font-semibold text-green-600" : "mt-3 text-sm font-semibold text-red-500";
+  mensaje.textContent = texto;
+  listaPedidos.prepend(mensaje);
+
+  setTimeout(() => mensaje.remove(), 3500);
+}
+
+function asegurarModalPedidos() {
+  let modal = document.getElementById("modalPedidos");
+
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "modalPedidos";
+  modal.className = "fixed inset-0 z-[10000] hidden items-center justify-center bg-[#0b2a6b]/40 px-4 py-6 backdrop-blur-sm";
+  modal.innerHTML = `
+    <div class="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#0b2a6b]/10 bg-white p-5 shadow-[0_24px_70px_rgba(11,42,107,0.18)]">
+      <div class="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 id="modalPedidosTitulo" class="text-lg font-bold text-[#0b2a6b]"></h2>
+          <p id="modalPedidosSubtitulo" class="mt-1 text-sm text-slate-500"></p>
+        </div>
+        <button type="button" onclick="cerrarModalPedidos()" class="rounded-full border border-[#0b2a6b]/10 px-3 py-1 text-sm font-semibold text-[#0b2a6b] transition hover:bg-[#0b2a6b] hover:text-white">Cerrar</button>
+      </div>
+      <div id="modalPedidosContenido"></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function cerrarModalPedidos() {
+  const modal = document.getElementById("modalPedidos");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+  pedidoSeleccionadoParaCancelar = null;
+}
+
+function abrirModalPedidos(titulo, subtitulo, contenidoHtml) {
+  const modal = asegurarModalPedidos();
+  document.getElementById("modalPedidosTitulo").textContent = titulo;
+  document.getElementById("modalPedidosSubtitulo").textContent = subtitulo || "";
+  document.getElementById("modalPedidosContenido").innerHTML = contenidoHtml;
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+}
+
+function verDetallesPedido(orderId) {
+  const pedido = obtenerPedidoPorId(orderId);
+  if (!pedido) return;
+
+  const estadoInfo = obtenerEstadoVisiblePedido(pedido);
+  const direccion = pedido.direccion || {};
+  const cliente = pedido.cliente || {};
+  const productos = Array.isArray(pedido.carrito) ? pedido.carrito : [];
+  const referenciaPago = pedido.paymentIntentId || pedido.stripeSessionId || pedido.stripeCheckoutStatus || "No disponible";
+
+  abrirModalPedidos("Detalles del pedido", "Consulta el estado y contenido de tu pedido.", `
+    <div class="space-y-4 text-sm text-slate-700">
+      <div class="rounded-2xl border border-[#0b2a6b]/10 bg-[#f8fbff] p-4">
+        <p><strong>ID del pedido:</strong> ${escaparHtmlCliente(pedido._id || "No disponible")}</p>
+        <p><strong>Fecha:</strong> ${escaparHtmlCliente(formatearFechaPedido(pedido.createdAt))}</p>
+        <p><strong>Estado:</strong> ${escaparHtmlCliente(estadoInfo.visible)}</p>
+        <p class="mt-2 text-slate-600">${escaparHtmlCliente(estadoInfo.explicacion)}</p>
+      </div>
+      <div class="rounded-2xl border border-[#0b2a6b]/10 p-4">
+        <p><strong>Nombre:</strong> ${escaparHtmlCliente(direccion.nombre || cliente.usuario || "No disponible")}</p>
+        <p><strong>Correo:</strong> ${escaparHtmlCliente(cliente.email || "No disponible")}</p>
+        <p><strong>Teléfono:</strong> ${escaparHtmlCliente(direccion.telefono || "No disponible")}</p>
+        <p><strong>Dirección:</strong> ${escaparHtmlCliente(direccion.direccion || "No disponible")}</p>
+        ${direccion.ciudad || direccion.cp ? `<p><strong>Ciudad / CP:</strong> ${escaparHtmlCliente(`${direccion.ciudad || ""} ${direccion.cp || ""}`.trim())}</p>` : ""}
+      </div>
+      <div class="rounded-2xl border border-[#0b2a6b]/10 p-4">
+        <p class="mb-3 font-bold text-[#0b2a6b]">Productos o servicios</p>
+        <div class="space-y-3">
+          ${productos.length ? productos.map(item => {
+            const cantidad = Number(item.cantidad) || 0;
+            const precio = Number(item.precio) || 0;
+            const descripcion = item.descripcion || item.description || "Descripción no disponible para este pedido.";
+
+            return `
+              <div class="rounded-xl bg-[#f8fbff] p-3">
+                <div class="flex justify-between gap-3">
+                  <span class="font-semibold text-[#0b2a6b]">${escaparHtmlCliente(item.nombre || "Producto")}</span>
+                  <span class="font-semibold">${formatearDineroPedido(precio * cantidad)}</span>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">${escaparHtmlCliente(descripcion)}</p>
+                <p class="mt-2 text-xs text-slate-600">Cantidad: ${cantidad} | Precio unitario: ${formatearDineroPedido(precio)}</p>
+              </div>
+            `;
+          }).join("") : "<p class='text-slate-500'>No hay productos disponibles para este pedido.</p>"}
+        </div>
+      </div>
+      <div class="rounded-2xl border border-[#0b2a6b]/10 p-4">
+        <p><strong>Total:</strong> ${formatearDineroPedido(pedido.total)}</p>
+        <p><strong>Método o referencia de pago:</strong> ${escaparHtmlCliente(referenciaPago)}</p>
+        ${pedido.motivoCancelacion ? `<p><strong>Motivo de cancelación:</strong> ${escaparHtmlCliente(pedido.motivoCancelacion)}</p>` : ""}
+      </div>
+    </div>
+  `);
+}
+
+function abrirCancelarPedido(orderId) {
+  const pedido = obtenerPedidoPorId(orderId);
+  if (!pedido || !pedidoPuedeCancelarse(pedido)) return;
+
+  pedidoSeleccionadoParaCancelar = pedido;
+
+  abrirModalPedidos("Cancelar pedido", "Cuéntanos el motivo de la cancelación para poder ayudarte mejor.", `
+    <div class="space-y-4">
+      <textarea id="motivoCancelacionPedido" rows="4" maxlength="300" placeholder="Escribe el motivo de cancelación (opcional)" class="w-full rounded-2xl border border-[#0b2a6b]/15 px-4 py-3 text-sm outline-none transition focus:border-[#8cc63f] focus:ring-4 focus:ring-[#8cc63f]/15"></textarea>
+      <p id="mensajeCancelacionPedido" class="text-sm font-semibold"></p>
+      <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <button type="button" onclick="cerrarModalPedidos()" class="rounded-full border border-[#0b2a6b]/15 px-4 py-2 text-sm font-semibold text-[#0b2a6b] transition hover:bg-[#0b2a6b] hover:text-white">Volver</button>
+        <button id="btnConfirmarCancelacionPedido" type="button" onclick="confirmarCancelacionPedido()" class="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">Confirmar cancelación</button>
+      </div>
+    </div>
+  `);
+}
+
+function renderizarPedidos(pedidos) {
+  const listaPedidos = document.getElementById("listaPedidos");
+  if (!listaPedidos) return;
+
+  pedidosActuales = Array.isArray(pedidos) ? pedidos : [];
+
+  if (!pedidosActuales.length) {
+    listaPedidos.innerHTML = "<p class='text-gray-500'>AÃºn no tienes pedidos registrados.</p>";
+    return;
+  }
+
+  listaPedidos.innerHTML = pedidosActuales.map(pedido => {
+    const estadoInfo = obtenerEstadoVisiblePedido(pedido);
+    const puedeCancelar = pedidoPuedeCancelarse(pedido);
+
+    return `
+    <div class="bg-white rounded-xl p-3 border border-gray-100" data-order-id="${pedido._id}">
+      <div class="flex justify-between items-center mb-1">
+        <span class="font-semibold text-[#0b2a6b]">Pedido</span>
+        <span class="text-xs uppercase text-[#8cc63f] font-bold">${estadoInfo.visible}</span>
+      </div>
+      <p class="mb-2 text-xs text-slate-500">${estadoInfo.explicacion}</p>
+      <p class="text-xs text-gray-500 mb-2">${new Date(pedido.createdAt).toLocaleString("es-MX")}</p>
+      <p class="font-semibold text-[#0b2a6b] mb-2">Total: $${((pedido.total || 0) / 100).toFixed(2)} MXN</p>
+      <div class="space-y-1">
+        ${Array.isArray(pedido.carrito) ? pedido.carrito.map(item => `
+          <div class="flex justify-between text-xs text-gray-600">
+            <span>${escaparHtmlCliente(item.nombre)} x${Number(item.cantidad) || 0}</span>
+            <span>$${(((item.precio || 0) * (item.cantidad || 0)) / 100).toFixed(2)}</span>
+          </div>
+        `).join("") : ""}
+      </div>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" onclick="verDetallesPedido('${pedido._id}')" class="rounded-full border border-[#0b2a6b]/15 px-3 py-1.5 text-xs font-semibold text-[#0b2a6b] transition hover:border-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white">
+          Ver detalles
+        </button>
+        ${puedeCancelar ? `
+          <button type="button" onclick="abrirCancelarPedido('${pedido._id}')" class="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:border-red-500 hover:bg-red-50">
+            Cancelar pedido
+          </button>
+        ` : ""}
+      </div>
+    </div>
+  `;
+  }).join("");
+}
+
+async function confirmarCancelacionPedido() {
+  const token = obtenerTokenValido();
+  const pedido = pedidoSeleccionadoParaCancelar;
+  if (!token || !pedido) return;
+
+  const motivoInput = document.getElementById("motivoCancelacionPedido");
+  const mensaje = document.getElementById("mensajeCancelacionPedido");
+  const boton = document.getElementById("btnConfirmarCancelacionPedido");
+  const motivo = motivoInput ? motivoInput.value.trim() : "";
+
+  if (boton) {
+    boton.disabled = true;
+    boton.textContent = "Cancelando...";
+  }
+
+  if (mensaje) {
+    mensaje.textContent = "";
+    mensaje.className = "text-sm font-semibold";
+  }
+
+  try {
+    const res = await fetch(`${obtenerApiBase()}/orders/${pedido._id}/cancel`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + token
+      },
+      body: JSON.stringify({ motivoCancelacion: motivo })
+    });
+
+    const data = await res.json().catch(() => ({
+      message: "No se pudo procesar la respuesta del servidor"
+    }));
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        limpiarSesion();
+        actualizarCarrito();
+      }
+
+      if (mensaje) {
+        mensaje.textContent = data.message || "No se pudo cancelar el pedido.";
+        mensaje.className = "text-sm font-semibold text-red-500";
+      }
+      return;
+    }
+
+    pedidosActuales = pedidosActuales.map(item => (
+      String(item._id) === String(pedido._id)
+        ? { ...item, ...data.pedido, cliente: item.cliente }
+        : item
+    ));
+    cerrarModalPedidos();
+    renderizarPedidos(pedidosActuales);
+    mostrarMensajePedidos(data.message || "Pedido cancelado correctamente.");
+  } catch (error) {
+    if (mensaje) {
+      mensaje.textContent = "No se pudo conectar para cancelar el pedido.";
+      mensaje.className = "text-sm font-semibold text-red-500";
+    }
+  } finally {
+    if (boton) {
+      boton.disabled = false;
+      boton.textContent = "Confirmar cancelación";
+    }
+  }
+}
+
+function cancelarPedido(orderId) {
+  abrirCancelarPedido(orderId);
 }
 
 async function cargarPedidos() {

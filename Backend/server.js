@@ -22,7 +22,16 @@ if (missingEnvVars.length > 0) {
   throw new Error(`Faltan variables de entorno requeridas: ${missingEnvVars.join(", ")}`);
 }
 
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || null;
+const DEFAULT_FRONTEND_ORIGINS = [
+  "http://127.0.0.1:5500",
+  "http://localhost:5500",
+  "https://woofwash.com.mx",
+  "https://www.woofwash.com.mx"
+];
+const FRONTEND_ORIGINS = Array.from(new Set((process.env.FRONTEND_ORIGINS || process.env.FRONTEND_ORIGIN || DEFAULT_FRONTEND_ORIGINS.join(","))
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean)));
 const AUTH_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_LIMIT_MAX_ATTEMPTS = 8;
 const MAIL_CODE_TTL_MINUTES = 10;
@@ -236,6 +245,15 @@ function formatearMontoMXN(totalCentavos) {
   }).format((Number(totalCentavos) || 0) / 100);
 }
 
+function escaparHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function construirResumenPedido(carrito) {
   if (!Array.isArray(carrito) || !carrito.length) {
     return {
@@ -251,7 +269,7 @@ function construirResumenPedido(carrito) {
     const nombre = item?.nombre || "Producto";
 
     return {
-      html: `<li><strong>${nombre}</strong> x${cantidad} - ${formatearMontoMXN(subtotal)}</li>`,
+      html: `<li><strong>${escaparHtml(nombre)}</strong> x${cantidad} - ${formatearMontoMXN(subtotal)}</li>`,
       text: `- ${nombre} x${cantidad} - ${formatearMontoMXN(subtotal)}`
     };
   });
@@ -260,6 +278,42 @@ function construirResumenPedido(carrito) {
     html: lineas.map((item) => item.html).join(""),
     text: lineas.map((item) => item.text).join("\n")
   };
+}
+
+function construirDetalleProductosPedido(carrito) {
+  if (!Array.isArray(carrito) || !carrito.length) {
+    return {
+      html: "<li>Pedido sin productos disponibles</li>",
+      text: "- Pedido sin productos disponibles"
+    };
+  }
+
+  const lineas = carrito.map((item) => {
+    const cantidad = Number(item?.cantidad) || 0;
+    const precio = Number(item?.precio) || 0;
+    const subtotal = precio * cantidad;
+    const nombre = item?.nombre || "Producto";
+    const descripcion = item?.descripcion || item?.description || "Descripcion no disponible para este pedido.";
+
+    return {
+      html: `<li style="margin-bottom:10px">
+        <strong>${escaparHtml(nombre)}</strong><br>
+        <span>${escaparHtml(descripcion)}</span><br>
+        Cantidad: ${cantidad} | Precio unitario: ${formatearMontoMXN(precio)} | Subtotal: ${formatearMontoMXN(subtotal)}
+      </li>`,
+      text: `- ${nombre}\n  Descripcion: ${descripcion}\n  Cantidad: ${cantidad}\n  Precio unitario: ${formatearMontoMXN(precio)}\n  Subtotal: ${formatearMontoMXN(subtotal)}`
+    };
+  });
+
+  return {
+    html: lineas.map((item) => item.html).join(""),
+    text: lineas.map((item) => item.text).join("\n")
+  };
+}
+
+function obtenerEmailNegocio() {
+  const email = normalizarEmail(process.env.ADMIN_EMAIL || process.env.BUSINESS_EMAIL || process.env.SMTP_USER);
+  return validarEmail(email) ? email : null;
 }
 
 async function enviarCorreoConfirmacionPedido(email, pedido, usuario = "") {
@@ -292,6 +346,162 @@ async function enviarCorreoConfirmacionPedido(email, pedido, usuario = "") {
   });
 }
 
+async function enviarCorreoPedidoCreadoCliente(email, pedido, usuario = "") {
+  const resumen = construirResumenPedido(pedido?.carrito);
+  const direccion = pedido?.direccion || {};
+  const nombreCliente = usuario || direccion.nombre || "cliente";
+  const total = formatearMontoMXN(pedido?.total);
+
+  await enviarCorreo({
+    to: email,
+    subject: "Pedido recibido - Woof & Wash",
+    text: `Hola ${nombreCliente},\n\nRecibimos tu pedido.\n\nPedido: ${pedido?._id || "sin folio"}\nEstado: ${pedido?.estado || "pendiente"}\nTotal: ${total}\n\nProductos:\n${resumen.text}\n\nGracias por comprar en Woof & Wash.`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+      <h2 style="color:#0b2a6b;margin-bottom:8px">Recibimos tu pedido</h2>
+      <p>Hola ${escaparHtml(nombreCliente)}, tu pedido quedo registrado.</p>
+      <p><strong>Pedido:</strong> ${pedido?._id || "sin folio"}</p>
+      <p><strong>Estado:</strong> ${escaparHtml(pedido?.estado || "pendiente")}</p>
+      <p><strong>Total:</strong> ${total}</p>
+      <h3 style="color:#0b2a6b">Productos</h3>
+      <ul>${resumen.html}</ul>
+      <p style="margin-top:20px">Gracias por comprar en <strong>Woof &amp; Wash</strong>.</p>
+    </div>`
+  });
+}
+
+async function enviarCorreoAvisoPedidoNegocio(pedido, user) {
+  const emailNegocio = obtenerEmailNegocio();
+  if (!emailNegocio) return;
+
+  const resumen = construirResumenPedido(pedido?.carrito);
+  const direccion = pedido?.direccion || {};
+  const total = formatearMontoMXN(pedido?.total);
+
+  await enviarCorreo({
+    to: emailNegocio,
+    subject: "Nuevo pedido - Woof & Wash",
+    text: `Nuevo pedido registrado.\n\nPedido: ${pedido?._id || "sin folio"}\nCliente: ${user?.usuario || direccion.nombre || "Cliente"}\nCorreo: ${user?.email || "No disponible"}\nTotal: ${total}\n\nProductos:\n${resumen.text}\n\nEntrega:\n${direccion.nombre || ""}\n${direccion.telefono || ""}\n${direccion.direccion || ""}\n${direccion.ciudad || ""} ${direccion.cp || ""}`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+      <h2 style="color:#0b2a6b;margin-bottom:8px">Nuevo pedido registrado</h2>
+      <p><strong>Pedido:</strong> ${pedido?._id || "sin folio"}</p>
+      <p><strong>Cliente:</strong> ${escaparHtml(user?.usuario || direccion.nombre || "Cliente")}</p>
+      <p><strong>Correo:</strong> ${escaparHtml(user?.email || "No disponible")}</p>
+      <p><strong>Total:</strong> ${total}</p>
+      <h3 style="color:#0b2a6b">Productos</h3>
+      <ul>${resumen.html}</ul>
+      <h3 style="color:#0b2a6b">Entrega</h3>
+      <p style="margin:0">${escaparHtml(direccion.nombre)}</p>
+      <p style="margin:0">${escaparHtml(direccion.telefono)}</p>
+      <p style="margin:0">${escaparHtml(direccion.direccion)}</p>
+      <p style="margin:0">${escaparHtml(direccion.ciudad)} ${escaparHtml(direccion.cp)}</p>
+    </div>`
+  });
+}
+
+async function notificarPedidoCreado(pedido, user) {
+  if (!pedido || !user) return;
+
+  let huboCambios = false;
+
+  if (!pedido.orderEmailSentAt && validarEmail(user.email)) {
+    await enviarCorreoPedidoCreadoCliente(user.email, pedido, user.usuario);
+    pedido.orderEmailSentAt = new Date();
+    huboCambios = true;
+  }
+
+  if (!pedido.businessOrderEmailSentAt && obtenerEmailNegocio()) {
+    await enviarCorreoAvisoPedidoNegocio(pedido, user);
+    pedido.businessOrderEmailSentAt = new Date();
+    huboCambios = true;
+  }
+
+  if (huboCambios) {
+    await pedido.save();
+  }
+}
+
+async function enviarCorreoCancelacionCliente(email, pedido, usuario = "") {
+  const detalle = construirDetalleProductosPedido(pedido?.carrito);
+  const nombreCliente = usuario || pedido?.direccion?.nombre || "cliente";
+  const direccion = pedido?.direccion || {};
+  const total = formatearMontoMXN(pedido?.total);
+  const fechaPedido = pedido?.createdAt ? new Date(pedido.createdAt).toLocaleString("es-MX") : "No disponible";
+  const motivo = pedido?.motivoCancelacion || "Sin motivo especificado";
+
+  await enviarCorreo({
+    to: email,
+    subject: "Tu pedido en Woof & Wash fue cancelado",
+    text: `Hola ${nombreCliente},\n\nTu pedido fue cancelado.\n\nPedido: ${pedido?._id || "sin folio"}\nFecha: ${fechaPedido}\nEstado: Cancelado\nMotivo: ${motivo}\nCorreo: ${email}\nTelefono: ${direccion.telefono || "No disponible"}\nDireccion: ${direccion.direccion || "No disponible"}\nTotal: ${total}\n\nProductos:\n${detalle.text}`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+      <h2 style="color:#0b2a6b;margin-bottom:8px">Pedido cancelado</h2>
+      <p>Hola ${escaparHtml(nombreCliente)}, tu pedido fue cancelado.</p>
+      <p><strong>Pedido:</strong> ${pedido?._id || "sin folio"}</p>
+      <p><strong>Fecha:</strong> ${escaparHtml(fechaPedido)}</p>
+      <p><strong>Estado:</strong> Cancelado</p>
+      <p><strong>Motivo:</strong> ${escaparHtml(motivo)}</p>
+      <p><strong>Correo:</strong> ${escaparHtml(email)}</p>
+      <p><strong>Telefono:</strong> ${escaparHtml(direccion.telefono || "No disponible")}</p>
+      <p><strong>Direccion:</strong> ${escaparHtml(direccion.direccion || "No disponible")}</p>
+      <p><strong>Total:</strong> ${total}</p>
+      <h3 style="color:#0b2a6b">Productos o servicios</h3>
+      <ul>${detalle.html}</ul>
+    </div>`
+  });
+}
+
+async function enviarCorreoCancelacionNegocio(pedido, user) {
+  const emailNegocio = obtenerEmailNegocio();
+  if (!emailNegocio) return;
+
+  const detalle = construirDetalleProductosPedido(pedido?.carrito);
+  const direccion = pedido?.direccion || {};
+  const total = formatearMontoMXN(pedido?.total);
+  const fechaPedido = pedido?.createdAt ? new Date(pedido.createdAt).toLocaleString("es-MX") : "No disponible";
+  const motivo = pedido?.motivoCancelacion || "Sin motivo especificado";
+
+  await enviarCorreo({
+    to: emailNegocio,
+    subject: "Pedido cancelado - Woof & Wash",
+    text: `Un pedido fue cancelado.\n\nPedido: ${pedido?._id || "sin folio"}\nCliente: ${user?.usuario || direccion.nombre || "Cliente"}\nCorreo: ${user?.email || "No disponible"}\nTelefono: ${direccion.telefono || "No disponible"}\nDireccion: ${direccion.direccion || "No disponible"}\nFecha: ${fechaPedido}\nEstado: Cancelado\nMotivo: ${motivo}\nTotal: ${total}\n\nProductos:\n${detalle.text}`,
+    html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+      <h2 style="color:#0b2a6b;margin-bottom:8px">Pedido cancelado</h2>
+      <p><strong>Pedido:</strong> ${pedido?._id || "sin folio"}</p>
+      <p><strong>Cliente:</strong> ${escaparHtml(user?.usuario || direccion.nombre || "Cliente")}</p>
+      <p><strong>Correo:</strong> ${escaparHtml(user?.email || "No disponible")}</p>
+      <p><strong>Telefono:</strong> ${escaparHtml(direccion.telefono || "No disponible")}</p>
+      <p><strong>Direccion:</strong> ${escaparHtml(direccion.direccion || "No disponible")}</p>
+      <p><strong>Fecha:</strong> ${escaparHtml(fechaPedido)}</p>
+      <p><strong>Estado:</strong> Cancelado</p>
+      <p><strong>Motivo:</strong> ${escaparHtml(motivo)}</p>
+      <p><strong>Total:</strong> ${total}</p>
+      <h3 style="color:#0b2a6b">Productos o servicios</h3>
+      <ul>${detalle.html}</ul>
+    </div>`
+  });
+}
+
+async function notificarPedidoCancelado(pedido, user) {
+  if (!pedido || !user) return;
+
+  let huboCambios = false;
+
+  if (!pedido.cancellationEmailSentAt && validarEmail(user.email)) {
+    await enviarCorreoCancelacionCliente(user.email, pedido, user.usuario);
+    pedido.cancellationEmailSentAt = new Date();
+    huboCambios = true;
+  }
+
+  if (!pedido.businessCancellationEmailSentAt && obtenerEmailNegocio()) {
+    await enviarCorreoCancelacionNegocio(pedido, user);
+    pedido.businessCancellationEmailSentAt = new Date();
+    huboCambios = true;
+  }
+
+  if (huboCambios) {
+    await pedido.save();
+  }
+}
+
 async function notificarPedidoPagado(pedido) {
   if (!pedido || pedido.confirmationEmailSentAt) {
     return;
@@ -314,7 +524,7 @@ function validarFrontendBaseUrl(frontendBaseUrl) {
   try {
     const url = new URL(frontendBaseUrl);
     const isHttp = url.protocol === "http:" || url.protocol === "https:";
-    const sameOrigin = !FRONTEND_ORIGIN || url.origin === FRONTEND_ORIGIN;
+    const sameOrigin = FRONTEND_ORIGINS.length === 0 || FRONTEND_ORIGINS.includes(url.origin);
     return isHttp && sameOrigin ? `${url.origin}${url.pathname.replace(/\/$/, "")}` : null;
   } catch {
     return null;
@@ -322,14 +532,18 @@ function validarFrontendBaseUrl(frontendBaseUrl) {
 }
 
 function obtenerFrontendBaseSeguro(req) {
-  if (FRONTEND_ORIGIN) {
-    return FRONTEND_ORIGIN.replace(/\/$/, "");
-  }
-
   const origin = req.get("origin");
 
-  if (typeof origin === "string" && /^https?:\/\/[^/]+$/i.test(origin)) {
-    return origin.replace(/\/$/, "");
+  if (typeof origin === "string") {
+    const originLimpio = origin.replace(/\/$/, "");
+
+    if (/^https?:\/\/[^/]+$/i.test(originLimpio) && FRONTEND_ORIGINS.includes(originLimpio)) {
+      return originLimpio;
+    }
+  }
+
+  if (FRONTEND_ORIGINS.length > 0) {
+    return FRONTEND_ORIGINS[0];
   }
 
   return "http://127.0.0.1:3000";
@@ -445,17 +659,48 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(cors({
+const corsOptions = {
   origin(origin, callback) {
-    if (!origin || !FRONTEND_ORIGIN || origin === FRONTEND_ORIGIN) {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const originLimpio = origin.replace(/\/$/, "");
+
+    if (FRONTEND_ORIGINS.includes(originLimpio)) {
       return callback(null, true);
     }
 
     return callback(new Error("Origen no permitido por CORS"));
   },
-  methods: ["GET", "POST", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204
+};
+
+app.use((req, res, next) => {
+  if (req.method !== "OPTIONS") {
+    return next();
+  }
+
+  const origin = req.headers.origin;
+  const originLimpio = typeof origin === "string" ? origin.replace(/\/$/, "") : "";
+
+  if (!origin || FRONTEND_ORIGINS.includes(originLimpio)) {
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+    }
+
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    return res.sendStatus(204);
+  }
+
+  return res.status(403).send("Origen no permitido por CORS");
+});
+
+app.use(cors(corsOptions));
 
 app.use("/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "100kb" }));
@@ -790,6 +1035,7 @@ app.post("/create-checkout-session", auth, async (req, res) => {
       },
       total: carritoSeguro.total,
       status: "pendiente",
+      estado: "pendiente",
       stripeCheckoutStatus: "created"
     });
 
@@ -822,6 +1068,12 @@ app.post("/create-checkout-session", auth, async (req, res) => {
     nuevaOrden.stripeCheckoutStatus = "pending_payment";
     await nuevaOrden.save();
 
+    try {
+      await notificarPedidoCreado(nuevaOrden, user);
+    } catch (error) {
+      console.log("No se pudo enviar el correo de pedido creado:", error.message);
+    }
+
     res.json({ url: session.url });
   } catch (error) {
     console.log(error);
@@ -832,7 +1084,20 @@ app.post("/create-checkout-session", auth, async (req, res) => {
 app.get("/mis-pedidos", auth, async (req, res) => {
   try {
     const pedidos = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    res.json({ pedidos });
+    const user = await User.findById(req.user.id).select("email usuario");
+    const pedidosConCliente = pedidos.map((pedido) => {
+      const pedidoJson = pedido.toObject();
+
+      return {
+        ...pedidoJson,
+        cliente: user ? {
+          usuario: user.usuario || "",
+          email: user.email || ""
+        } : null
+      };
+    });
+
+    res.json({ pedidos: pedidosConCliente });
   } catch (error) {
     res.status(500).json({ message: "No se pudieron obtener los pedidos" });
   }
@@ -881,6 +1146,7 @@ app.post("/confirm-order", auth, async (req, res) => {
     pedido.paymentIntentId = session.payment_intent;
     pedido.stripeCheckoutStatus = session.status || "complete";
     pedido.status = "pagado";
+    pedido.estado = "confirmado";
     await pedido.save();
 
     try {
@@ -931,7 +1197,8 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       stripeSessionId: session.id,
       paymentIntentId: session.payment_intent,
       stripeCheckoutStatus: session.status || "complete",
-      status: "pagado"
+      status: "pagado",
+      estado: "confirmado"
     }, { new: true });
 
     if (pedido) {
@@ -961,6 +1228,68 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
 
 app.use(express.static(path.join(__dirname, "..", "Frontend")));
 
+app.patch("/orders/:id/cancel", auth, async (req, res) => {
+  try {
+    const orderId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ message: "El id del pedido no es valido" });
+    }
+
+    const pedido = await Order.findById(orderId);
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    if (String(pedido.userId) !== String(req.user.id)) {
+      return res.status(403).json({ message: "Este pedido no pertenece al usuario actual" });
+    }
+
+    const estadoActual = pedido.estado || pedido.status || "pendiente";
+
+    if (
+      estadoActual === "cancelado_por_cliente" ||
+      estadoActual === "cancelado_por_admin" ||
+      estadoActual === "cancelado" ||
+      estadoActual === "completado" ||
+      pedido.status === "cancelado" ||
+      pedido.status === "completado"
+    ) {
+      return res.status(400).json({ message: "Este pedido ya no se puede cancelar" });
+    }
+
+    const motivo = typeof req.body?.motivoCancelacion === "string"
+      ? req.body.motivoCancelacion.trim().slice(0, 300)
+      : "";
+
+    pedido.estado = "cancelado_por_cliente";
+    pedido.status = "cancelado";
+    pedido.canceladoEn = new Date();
+
+    if (motivo) {
+      pedido.motivoCancelacion = motivo;
+    }
+
+    await pedido.save();
+
+    const user = await User.findById(req.user.id).select("email usuario");
+
+    try {
+      await notificarPedidoCancelado(pedido, user);
+    } catch (error) {
+      console.log("No se pudo enviar el correo de cancelacion del pedido:", error.message);
+    }
+
+    res.json({
+      message: "Pedido cancelado correctamente.",
+      pedido
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo cancelar el pedido" });
+  }
+});
+
 // ============================
 // PEDIDOS
 // ============================
@@ -982,10 +1311,19 @@ app.post("/pedidos", auth, async (req, res) => {
       carrito: carritoSeguro.items,
       total: carritoSeguro.total,
       direccion,
-      status: "pendiente"
+      status: "pendiente",
+      estado: "pendiente"
     });
 
     await nuevaOrden.save();
+
+    const user = await User.findById(req.user.id).select("email usuario");
+
+    try {
+      await notificarPedidoCreado(nuevaOrden, user);
+    } catch (error) {
+      console.log("No se pudo enviar el correo de pedido creado:", error.message);
+    }
 
     res.json({ mensaje: "Pedido guardado correctamente" });
   } catch (error) {

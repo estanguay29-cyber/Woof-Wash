@@ -96,7 +96,6 @@ function obtenerApiBase() {
   return API_URL;
 }
 function irInicio() {
-  localStorage.setItem("abrirCarritoAlRegresar", "true");
   window.location.href = "index.html";
 }
 
@@ -104,6 +103,13 @@ function verPedidos() {
   localStorage.setItem("abrirCarritoAlRegresar", "true");
   localStorage.setItem("mostrarPedidosAlRegresar", "true");
   window.location.href = "index.html";
+}
+
+function limpiarCompraFinalizada() {
+  localStorage.removeItem("carrito");
+  localStorage.removeItem("direccion");
+  localStorage.removeItem("abrirCarritoAlRegresar");
+  localStorage.removeItem("mostrarPedidosAlRegresar");
 }
 
 async function confirmarPedido() {
@@ -130,8 +136,7 @@ async function confirmarPedido() {
     }));
 
     if (res.ok) {
-      localStorage.removeItem("carrito");
-      localStorage.removeItem("direccion");
+      limpiarCompraFinalizada();
       estadoPago.textContent = "Tu pedido quedó registrado correctamente.";
       return;
     }
