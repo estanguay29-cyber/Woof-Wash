@@ -642,6 +642,70 @@ function auth(req, res, next) {
   }
 }
 
+async function requireAdmin(req, res, next) {
+  try {
+    const user = await User.findById(req.user?.id).select("usuario email role");
+
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ message: "No tienes permisos para acceder al panel administrador." });
+    }
+
+    req.admin = user;
+    next();
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo validar el acceso administrador" });
+  }
+}
+
+function formatearProductoAdmin(item) {
+  const cantidad = Number(item?.cantidad) || 0;
+  const precio = Number(item?.precio) || 0;
+
+  return {
+    nombre: item?.nombre || "Producto",
+    descripcion: item?.descripcion || item?.description || null,
+    cantidad,
+    precio,
+    subtotal: precio * cantidad
+  };
+}
+
+async function construirPedidoAdmin(pedido, incluirDetalle = false) {
+  const pedidoObj = typeof pedido.toObject === "function" ? pedido.toObject() : pedido;
+  const user = pedidoObj.userId ? await User.findById(pedidoObj.userId).select("usuario email") : null;
+  const direccion = pedidoObj.direccion || {};
+  const estado = pedidoObj.estado || pedidoObj.status || "pendiente";
+  const base = {
+    id: pedidoObj._id,
+    fecha: pedidoObj.createdAt,
+    cliente: user?.usuario || direccion.nombre || "Cliente",
+    email: user?.email || "",
+    estado,
+    total: pedidoObj.total || 0,
+    canceladoEn: pedidoObj.canceladoEn || null,
+    motivoCancelacion: pedidoObj.motivoCancelacion || ""
+  };
+
+  if (!incluirDetalle) {
+    return base;
+  }
+
+  return {
+    ...base,
+    telefono: direccion.telefono || "",
+    direccion: {
+      nombre: direccion.nombre || "",
+      telefono: direccion.telefono || "",
+      direccion: direccion.direccion || "",
+      ciudad: direccion.ciudad || "",
+      cp: direccion.cp || "",
+      referencias: direccion.referencias || ""
+    },
+    productos: Array.isArray(pedidoObj.carrito) ? pedidoObj.carrito.map(formatearProductoAdmin) : [],
+    paymentIntent: pedidoObj.paymentIntentId || pedidoObj.stripeSessionId || pedidoObj.stripeCheckoutStatus || null
+  };
+}
+
 // ============================
 // MIDDLEWARES
 // ============================
@@ -1224,6 +1288,94 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   }
 
   res.json({ received: true });
+});
+
+app.get("/admin/me", auth, requireAdmin, (req, res) => {
+  res.json({
+    id: req.admin._id,
+    usuario: req.admin.usuario,
+    email: req.admin.email,
+    role: req.admin.role
+  });
+});
+
+app.get("/admin/orders", auth, requireAdmin, async (req, res) => {
+  try {
+    const pedidos = await Order.find({}).sort({ createdAt: -1 });
+    const pedidosSeguros = await Promise.all(pedidos.map((pedido) => construirPedidoAdmin(pedido)));
+    res.json({ pedidos: pedidosSeguros });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener los pedidos del administrador" });
+  }
+});
+
+app.get("/admin/orders/:id", auth, requireAdmin, async (req, res) => {
+  try {
+    const orderId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ message: "El id del pedido no es valido" });
+    }
+
+    const pedido = await Order.findById(orderId);
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    res.json({ pedido: await construirPedidoAdmin(pedido, true) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el detalle del pedido" });
+  }
+});
+
+app.patch("/admin/orders/:id/status", auth, requireAdmin, async (req, res) => {
+  try {
+    const orderId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+    const estado = typeof req.body?.estado === "string" ? req.body.estado.trim() : "";
+    const estadosPermitidos = ["pendiente", "confirmado", "cancelado_por_admin", "completado"];
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ message: "El id del pedido no es valido" });
+    }
+
+    if (!estado) {
+      return res.status(400).json({ message: "El estado es obligatorio" });
+    }
+
+    if (!estadosPermitidos.includes(estado)) {
+      return res.status(400).json({ message: "Estado no permitido" });
+    }
+
+    const pedido = await Order.findById(orderId);
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    pedido.estado = estado;
+
+    if (estado === "cancelado_por_admin") {
+      const motivo = typeof req.body?.motivoCancelacion === "string"
+        ? req.body.motivoCancelacion.trim().slice(0, 300)
+        : "";
+
+      if (motivo) {
+        pedido.motivoCancelacion = motivo;
+      }
+
+      pedido.canceladoEn = new Date();
+    }
+
+    await pedido.save();
+
+    res.json({
+      message: "Estado actualizado correctamente",
+      pedido: await construirPedidoAdmin(pedido, true)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar el estado del pedido" });
+  }
 });
 
 app.use(express.static(path.join(__dirname, "..", "Frontend")));

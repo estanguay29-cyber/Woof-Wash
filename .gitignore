@@ -7,6 +7,11 @@
 **/.env
 Backend/.env
 Frontend/.env
+*.env.backup
+*.env.bak
+*.env.local
+*.env.production
+*.env.development
 
 # Permitir ejemplos (sin secretos)
 !.env.example
@@ -81,6 +86,8 @@ out/
 ############################
 .stripe/
 stripe-debug.log
+stripe-webhook*.log
+stripe*.log
 
 ############################
 # 🗄️ BASE DE DATOS / BACKUPS
@@ -90,8 +97,14 @@ stripe-debug.log
 *.db-shm
 *.db-wal
 *.bak
+*.backup
+*.dump
+*.sql
+*.mongo
 dump/
+dumps/
 backups/
+db-dumps/
 
 ############################
 # 📦 ARCHIVOS COMPRIMIDOS

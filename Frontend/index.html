@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head>
 
-<body class="bg-[#fef9e7] text-[#0f172a] scroll-smooth">
+<body class="bg-[#fffae8] text-[#0f172a] scroll-smooth">
 
 <!-- LOADER NUEVO -->
 <div id="loader" class="fixed inset-0 z-[9999] flex items-center justify-center bg-[#fffae8]/95 backdrop-blur-sm transition duration-700">
@@ -52,158 +52,141 @@
   </div>
 </div>
 <!-- MENU MOBILE -->
-<div id="menuMobile" class="fixed top-0 left-0 w-full h-full bg-white z-40 transform -translate-x-full transition duration-500 md:hidden">
+<div id="menuMobile" class="mobile-menu-panel fixed top-0 left-0 w-full h-full z-[70] transform -translate-x-full transition duration-500 md:hidden">
 
-  <div class="flex justify-between items-center p-5 border-b">
-    <span class="font-bold text-[#0b2a6b]">Menú</span>
-    <button onclick="toggleMenu()" class="text-2xl">✕</button>
+  <div class="mobile-menu-header">
+    <div class="flex items-center gap-2">
+      <img src="img/perritologo.png" alt="Woof & Wash" decoding="async" class="h-9 w-auto object-contain">
+      <span class="font-extrabold text-[#0b2a6b]">Woof<span class="text-[#8cc63f]">&amp;</span>Wash</span>
+    </div>
+    <button onclick="toggleMenu()" aria-label="Cerrar menu" class="mobile-icon-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
   </div>
 
-  <div class="flex flex-col items-center gap-6 mt-10 text-lg font-semibold text-[#0b2a6b]">
-
-    <a href="#" onclick="toggleMenu()">Inicio</a>
+  <div class="mobile-menu-links">
+    <a href="#inicio" onclick="toggleMenu()">Inicio</a>
     <a href="#clientes" onclick="toggleMenu()">Clientes</a>
     <a href="#servicios" onclick="toggleMenu()">Servicios</a>
-    <div class="flex flex-col items-center gap-2">
 
-  <button onclick="toggleSubmenu()" class="font-semibold text-[#0b2a6b]">
-    Productos ▼
-  </button>
+    <div class="w-full">
+      <button onclick="toggleSubmenu()" class="mobile-menu-product-btn">
+        <span>Productos</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
 
- <div id="submenuMobile" class="hidden flex flex-col w-full bg-gray-50/50 rounded-xl mt-2 overflow-hidden">
-  
-  <a href="#productosMascotas" onclick="toggleMenu()" 
-    class="flex items-center gap-3 px-6 py-4 text-base text-[#0b2a6b] active:bg-[#8cc63f]/20 transition border-b border-white">
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M5.8 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
-      <path d="M9.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
-      <path d="M14.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
-      <path d="M18.2 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
-      <path d="M12 11.2c-2.9 0-5.2 2.15-5.2 4.8c0 2.05 1.4 3.3 3.35 3.3c.95 0 1.62-.29 1.97-.54c.35.25 1.02.54 1.97.54c1.95 0 3.35-1.25 3.35-3.3c0-2.65-2.3-4.8-5.2-4.8z" />
-    </svg>
-    Mascotas
+      <div id="submenuMobile" class="hidden flex flex-col w-full bg-white/75 rounded-[1.25rem] mt-2 overflow-hidden border border-[#0b2a6b]/8">
+        <a href="#productosMascotas" onclick="toggleMenu()" class="flex items-center gap-3 px-5 py-4 text-base text-[#0b2a6b] active:bg-[#8cc63f]/20 transition border-b border-[#0b2a6b]/5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5.8 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+            <path d="M9.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+            <path d="M14.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+            <path d="M18.2 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+            <path d="M12 11.2c-2.9 0-5.2 2.15-5.2 4.8c0 2.05 1.4 3.3 3.35 3.3c.95 0 1.62-.29 1.97-.54c.35.25 1.02.54 1.97.54c1.95 0 3.35-1.25 3.35-3.3c0-2.65-2.3-4.8-5.2-4.8z" />
+          </svg>
+          Productos Mascotas
+        </a>
 
-  </a>
+        <a href="#productosAutos" onclick="toggleMenu()" class="flex items-center gap-3 px-5 py-4 text-base text-[#0b2a6b] active:bg-[#0b2a6b] active:text-white transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-active:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
+          </svg>
+          Productos Autos
+        </a>
+      </div>
+    </div>
 
-  <a href="#productosAutos" onclick="toggleMenu()" 
-    class="flex items-center gap-3 px-6 py-4 text-base text-[#0b2a6b] active:bg-[#0b2a6b] active:text-white transition">
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-active:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
-    </svg>
-    Autos
-  </a>
-
-</div>
-
-</div>
     <a href="#nosotros" onclick="toggleMenu()">Nosotros</a>
 
-    <a href="https://wa.me/523337276934" target="_blank"
-    class="mt-6 bg-[#8cc63f] text-white px-6 py-3 rounded-full shadow-lg">
-    Reservar
+    <a href="https://wa.me/523337276934" target="_blank" class="mobile-menu-cta">
+      Reservar
     </a>
-
   </div>
 
 </div>
 <!-- NAVBAR -->
-<!-- NAVBAR -->
-<!-- NAVBAR CORREGIDO -->
-<nav class="fixed top-0 left-0 w-full bg-white/90 backdrop-blur-md shadow-sm z-50">
-  <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2 md:py-4 flex items-center justify-between">
+<nav class="site-header fixed top-0 left-0 w-full z-50">
+  <div class="site-header-inner max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between">
 
     <!-- Logo -->
     <div class="flex items-center shrink-0">
-      <a href="#inicio" class="flex items-center">
-        <img src="img/perritologo.png" alt="Logo Woof & Wash" decoding="async"
-             class="w-8 sm:w-9 md:w-10 h-auto object-contain ml-[5px] md:ml-2">
-        <span class="text-[13px] sm:text-lg font-extrabold text-[#0b2a6b] flex items-center leading-none tracking-tighter sm:tracking-normal">
-          Woof<span class="text-[#8cc63f]">&</span>Wash
+      <a href="#inicio" class="brand-lockup flex items-center">
+        <img src="img/perritologo.png" alt="Logo Woof & Wash" decoding="async" class="brand-icon h-auto object-contain">
+        <span class="brand-name text-[#0b2a6b] flex items-center leading-none">
+          Woof<span class="text-[#8cc63f]">&amp;</span>Wash
         </span>
-   <img src="img/cochelogo.png" alt="Servicio adicional" decoding="async"
-     class="w-8 sm:w-9 md:w-10 h-auto object-contain ml-[5px] md:ml-2">
+        <img src="img/cochelogo.png" alt="Servicio adicional" decoding="async" class="brand-icon h-auto object-contain">
       </a>
     </div>
 
     <!-- Links desktop -->
-    <div class="hidden md:flex gap-8 text-sm font-medium text-gray-700">
-      <a href="#inicio" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Inicio</a>
-      <a href="#clientes" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Clientes</a>
-      <a href="#servicios" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Servicios</a>
+    <div class="header-nav hidden md:flex items-center justify-center">
+      <a href="#inicio" class="nav-link text-[#0b2a6b] transition">Inicio</a>
+      <a href="#clientes" class="nav-link text-[#0b2a6b] transition">Clientes</a>
+      <a href="#servicios" class="nav-link text-[#0b2a6b] transition">Servicios</a>
       <div class="relative group">
-  
-  <!-- BOTN PRINCIPAL -->
-  <button class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition flex items-center gap-1">
-    Productos
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-    </svg>
-  </button>
+        <button class="nav-link text-[#0b2a6b] transition flex items-center gap-1">
+          Productos
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mt-[2px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
 
-  <!-- SUBMENÚ -->
-<div class="absolute left-0 mt-3 w-56 bg-white rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 border border-gray-100 overflow-hidden">
-  
-  <a href="#productosMascotas" 
-    class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#8cc63f]/10 hover:text-[#8cc63f] transition-all border-b border-gray-50 group/item">
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M5.8 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
-      <path d="M9.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
-      <path d="M14.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
-      <path d="M18.2 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
-      <path d="M12 11.2c-2.9 0-5.2 2.15-5.2 4.8c0 2.05 1.4 3.3 3.35 3.3c.95 0 1.62-.29 1.97-.54c.35.25 1.02.54 1.97.54c1.95 0 3.35-1.25 3.35-3.3c0-2.65-2.3-4.8-5.2-4.8z" />
-    </svg>
-    <span class="font-semibold">Mascotas</span>
-  </a>
+        <div class="product-dropdown absolute left-0 mt-4 w-60 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 overflow-hidden">
+          <a href="#productosMascotas" class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#8cc63f]/10 hover:text-[#5f921f] transition-all border-b border-[#0b2a6b]/5 group/item">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5.8 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+              <path d="M9.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+              <path d="M14.5 6.5a1.7 1.7 0 1 0 0-3.4a1.7 1.7 0 0 0 0 3.4" />
+              <path d="M18.2 9.1a1.9 1.9 0 1 0 0-3.8a1.9 1.9 0 0 0 0 3.8" />
+              <path d="M12 11.2c-2.9 0-5.2 2.15-5.2 4.8c0 2.05 1.4 3.3 3.35 3.3c.95 0 1.62-.29 1.97-.54c.35.25 1.02.54 1.97.54c1.95 0 3.35-1.25 3.35-3.3c0-2.65-2.3-4.8-5.2-4.8z" />
+            </svg>
+            <span class="font-semibold">Productos Mascotas</span>
+          </a>
 
-  <a href="#productosAutos" 
-    class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white transition-all group/item">
-    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-hover/item:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
-    </svg>
-    <span class="font-semibold">Autos</span>
-  </a>
-
-</div>
-
-</div>
-      <a href="#nosotros" class="nav-link text-[#0b2a6b] hover:text-[#8cc63f] transition">Nosotros</a>
+          <a href="#productosAutos" class="flex items-center gap-3 px-5 py-4 text-sm text-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white transition-all group/item">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#0b2a6b] group-hover/item:text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5" />
+            </svg>
+            <span class="font-semibold">Productos Autos</span>
+          </a>
+        </div>
+      </div>
+      <a href="#nosotros" class="nav-link text-[#0b2a6b] transition">Nosotros</a>
     </div>
 
     <!-- Botones -->
-    <div class="flex items-center gap-1 sm:gap-3 md:gap-4">
-      
-      <!-- Menu mobile -->
-      <button onclick="toggleMenu()" aria-label="Abrir menú" class="md:hidden text-[#0b2a6b] p-1"> 
+    <div class="header-actions flex items-center">
+      <button onclick="toggleMenu()" aria-label="Abrir menu" class="mobile-icon-btn md:hidden">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
       </button>
 
-      <!-- Carrito -->
-      <button id="cart-icon" onclick="toggleCarrito()" aria-label="Ver carrito" class="relative p-1">
+      <button id="cart-icon" onclick="toggleCarrito()" aria-label="Ver carrito" class="cart-header-btn relative">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-7 md:h-7 text-[#0b2a6b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l1 2h13l-1.5 9h-11z"/>
           <circle cx="9" cy="20" r="1.5"/>
           <circle cx="17" cy="20" r="1.5"/>
         </svg>
-        <span id="contadorCarrito" class="absolute top-0 right-0 bg-[#8cc63f] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
+        <span id="contadorCarrito" class="cart-counter absolute bg-[#8cc63f] text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
           0
         </span>
       </button>
 
-      <!-- Reservar -->
-      <a href="https://wa.me/523337276934" target="_blank" class="relative flex items-center justify-center transition-all duration-300">
-        
-        <!-- Mobile -->
-        <span class="md:hidden flex flex-col items-center pl-1">
-          <span class="text-[7px] font-black text-[#8cc63f] uppercase tracking-tighter leading-none">Reservar</span>
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f] -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <a href="https://wa.me/523337276934" target="_blank" class="reserve-link relative flex items-center justify-center transition-all duration-300">
+        <span class="md:hidden mobile-reserve-mini flex flex-col items-center">
+          <span class="text-[7px] font-black uppercase leading-none">Reservar</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
           </svg>
         </span>
 
-        <!-- Desktop -->
-        <span class="hidden md:flex items-center gap-2 bg-[#8cc63f] text-white px-6 py-2 rounded-full btn-truck overflow-hidden relative">
+        <span class="hidden md:flex items-center gap-2 header-cta btn-truck overflow-hidden relative">
           <span class="text">Reservar</span>
           <span class="truck text-white absolute">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -217,54 +200,82 @@
     </div>
 
   </div>
-
-
 </nav>
 <!-- HERO -->
-<section class="pt-12 md:pt-16 pb-8 md:pb-12 px-4 sm:px-6 text-center">
-  
- <img src="img/woofwashletras.png" alt="Logo Woof & Wash" decoding="async"
-     class="mx-auto mb-1 md:mb-2 h-24 sm:h-32 md:h-44 lg:h-52 object-contain">
+<section id="inicio" class="hero-section px-4 sm:px-6">
+  <div class="hero-grid max-w-7xl mx-auto">
+    <div class="hero-copy">
 
-  <h1 class="text-[clamp(2rem,5vw,3.5rem)] font-extrabold text-[#0b2a6b] mb-4 md:mb-6 leading-tight">
-    Cuidamos lo que te mueve <span class="text-[#8cc63f]">y lo que amas</span>
-  </h1>
+      <h1 class="hero-title font-extrabold text-[#0b2a6b]">
+        Cuidamos lo que <span class="hero-mobile-line"></span>te mueve <span class="hero-mobile-line"></span><span class="text-[#8cc63f]">y lo que amas</span>
+      </h1>
 
-  <h2 class="text-[clamp(1.3rem,3vw,2rem)] font-extrabold text-[#0b2a6b] mb-8 md:mb-10 leading-tight">
-    Estética canina y lavado móvil <span class="text-[#8cc63f]">¡Hasta tu puerta!</span>
-  </h2>
+      <h2 class="hero-subtitle font-extrabold text-[#0b2a6b]">
+        Estética canina y lavado móvil <span class="hero-mobile-line"></span><span class="text-[#8cc63f]">¡Hasta tu puerta!</span>
+      </h2>
 
-  <div class="max-w-7xl mx-auto flex justify-center mb-6 md:mb-12">
-    <div class="flex items-center gap-4 bg-white shadow-md rounded-full px-5 py-3 border border-gray-100">
-      <div class="bg-[#8cc63f]/15 p-2 rounded-full">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" fill="none" stroke="currentColor">
-          <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
-          <circle cx="7" cy="17" r="2"/>
-          <circle cx="17" cy="17" r="2"/>
-        </svg>
+      <div class="hero-zone-card hero-zone-card-floating">
+        <div class="hero-zone-status" aria-hidden="true"></div>
+        <div class="hero-zone-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#8cc63f]" fill="none" stroke="currentColor">
+            <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
+            <circle cx="7" cy="17" r="2"/>
+            <circle cx="17" cy="17" r="2"/>
+          </svg>
+        </div>
+        <div class="hero-zone-content">
+          <span class="hero-zone-label">Hoy jueves estamos en:</span>
+          <p id="zonaHoy" class="hero-zone-text text-sm md:text-base text-gray-700">Cargando zona...</p>
+        </div>
+        <button onclick="abrirZonas()" class="hero-zone-button">
+          Ver zonas
+        </button>
       </div>
-      <p id="zonaHoy" class="text-sm md:text-base text-gray-700">Cargando zona...</p>
-      <button onclick="abrirZonas()" class="bg-[#0b2a6b] text-white text-xs md:text-sm px-4 py-1.5 rounded-full font-semibold hover:scale-105 transition">
-        Ver zonas
-      </button>
+
+      <div class="hero-actions">
+        <a href="https://wa.me/523337276934" target="_blank" class="hero-primary-cta inline-flex items-center justify-center gap-2 btn-truck">
+          <span class="text">Agendar ahora</span>
+          <span class="truck">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" stroke="currentColor">
+              <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
+              <circle cx="7" cy="17" r="2"/>
+              <circle cx="17" cy="17" r="2"/>
+            </svg>
+          </span>
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-visual-card">
+        <div class="hero-visual-glow"></div>
+        <span class="hero-bubble hero-bubble-one"></span>
+        <span class="hero-foam-ring hero-foam-ring-one"></span>
+        <span class="hero-shine-line hero-shine-line-one"></span>
+
+        <div class="hero-brand-orbit">
+          <img src="img/Original.png" alt="" decoding="async" class="hero-main-logo">
+        </div>
+
+        <div class="hero-service-token hero-token-dog">
+          <img src="img/perritologo.png" alt="" decoding="async">
+          <span>Canino</span>
+        </div>
+        <div class="hero-service-token hero-token-car">
+          <img src="img/cochelogo.png" alt="" decoding="async">
+          <span>Auto</span>
+        </div>
+      </div>
+
+      <p class="hero-description hero-visual-caption">
+        No es solo tu mascota o tu auto, es tu familia.<br>
+        <span class="hero-description-strong">
+          En Woof & Wash, entendemos ese vínculo especial y lo cuidamos con cada servicio.
+        </span>
+      </p>
     </div>
   </div>
-
-  <a href="https://wa.me/523337276934" target="_blank"
-
-    class="inline-flex items-center justify-center gap-2 bg-[#8cc63f] text-white px-8 py-4 rounded-full btn-truck shadow-lg hover:scale-105 transition w-full sm:w-auto text-lg">
-    <span class="text">Agendar ahora</span>
-    <span class="truck">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" stroke="currentColor">
-        <path stroke-width="2" d="M3 13l1-5a2 2 0 012-2h9a2 2 0 012 2l1 5M5 13h14"/>
-        <circle cx="7" cy="17" r="2"/>
-        <circle cx="17" cy="17" r="2"/>
-      </svg>
-    </span>
-  </a>
-
 </section>
-
 <!-- CLIENTES -->
 <section id="clientes" class="py-9 md:py-13 bg-[#fffae8] scroll-mt-28 overflow-hidden text-[#0b2a6b]">
   <div class="max-w-7xl mx-auto px-6">
@@ -890,7 +901,7 @@ class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar sn
 
         <div id="groomGame" class="relative mx-auto mt-7 w-full touch-none" aria-label="Mini juego de arreglo para perrito">
           <div class="game-stage relative overflow-hidden rounded-[2rem] border border-white/75 bg-white shadow-[0_30px_90px_rgba(11,42,107,0.16)]" style="aspect-ratio: 1 / 1; cursor: none; background: radial-gradient(circle at center, rgba(140, 198, 63, 0.12), transparent 42%), linear-gradient(180deg, #fffdf7 0%, #eef5ff 100%);">
-            <img src="img/Limpio-removebg-preview.png" alt="Perrito limpio" decoding="async" class="game-clean-layer w-full h-full object-cover">
+            <img src="img/Goldenlimpio.png" alt="Perrito limpio" decoding="async" class="game-clean-layer w-full h-full object-cover">
             <svg class="game-mask" width="0" height="0" aria-hidden="true">
               <defs>
                 <mask id="groomDirtyMask" maskUnits="objectBoundingBox" maskContentUnits="objectBoundingBox">
@@ -900,7 +911,7 @@ class="flex flex-nowrap gap-4 overflow-x-auto scroll-smooth pb-8 no-scrollbar sn
               </defs>
             </svg>
             <div class="game-dirty-layer absolute inset-0">
-              <img src="img/sucioalimpiar.png" alt="Perrito sucio" decoding="async" class="game-clean-layer w-full h-full object-cover">
+              <img src="img/goldenmuysucio.png" alt="Perrito sucio" decoding="async" class="game-clean-layer w-full h-full object-cover">
             </div>
             <div class="game-particles absolute inset-0 overflow-hidden pointer-events-none"></div>
             <div class="game-tool absolute flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#0b2a6b] shadow-[0_14px_30px_rgba(11,42,107,0.18)]">
@@ -1363,23 +1374,26 @@ class="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-[#fffdf7] shadow-[0_20p
 
 </div>
 <!-- MODAL ZONAS -->
-<div id="modalZonas" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition duration-300 z-50">
+<div id="modalZonas" class="zones-modal fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition duration-300 z-50">
 
-  <div class="bg-white rounded-2xl shadow-2xl p-6 w-[90%] max-w-md">
+  <div class="zones-panel bg-white rounded-2xl shadow-2xl p-6 w-[90%] max-w-md">
 
     <!-- HEADER -->
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="text-lg font-bold text-[#0b2a6b]">Zonas por día</h3>
-      <button onclick="cerrarZonas()" class="text-gray-400 hover:text-red-500 text-xl">✕</button>
+    <div class="zones-header flex justify-between items-center mb-4">
+      <div>
+        <span class="zones-kicker">Cobertura semanal</span>
+        <h3 class="text-lg font-bold text-[#0b2a6b]">Zonas por día</h3>
+      </div>
+      <button onclick="cerrarZonas()" class="zones-close text-gray-400 hover:text-red-500 text-xl" aria-label="Cerrar zonas">&times;</button>
     </div>
 
     <!-- LISTA -->
-    <div id="listaZonas" class="space-y-3 text-sm"></div>
+    <div id="listaZonas" class="zones-list space-y-3 text-sm"></div>
 
 <!-- BOTÓN RESERVAR -->
 <a href="https://wa.me/523337276934?text=Hola,%20quiero%20agendar%20un%20servicio"
   target="_blank"
-  class="mt-5 block text-center bg-[#8cc63f] text-white py-3 rounded-full font-bold shadow-lg hover:scale-105 transition">
+  class="zones-reserve mt-5 block text-center bg-[#8cc63f] text-white py-3 rounded-full font-bold shadow-lg hover:scale-105 transition">
   Reservar ahora
 </a>
   </div>

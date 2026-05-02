@@ -39,6 +39,12 @@ const UserSchema = new mongoose.Schema({
     default: false
   },
 
+  role: {
+    type: String,
+    enum: ["cliente", "admin"],
+    default: "cliente"
+  },
+
   fechaAceptacionTerminos: {
     type: Date,
     default: null

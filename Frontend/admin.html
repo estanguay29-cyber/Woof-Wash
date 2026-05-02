@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel administrador - Woof & Wash</title>
+  <link rel="stylesheet" href="tailwind.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-page">
+  <main class="admin-shell">
+    <header class="admin-topbar">
+      <div class="admin-brand">
+        <div class="admin-logo-mark">W&W</div>
+        <div>
+          <p class="admin-kicker">Acceso privado</p>
+          <h1>Woof & Wash Admin</h1>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <button id="btnVolverSitio" type="button" class="admin-button admin-button-light">Volver al sitio</button>
+        <button id="btnAdminLogout" type="button" class="admin-button admin-button-dark">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <section id="adminAccessMessage" class="admin-access-message hidden"></section>
+    <section id="adminFeedback" class="admin-feedback hidden"></section>
+
+    <section id="adminPanel" class="admin-panel hidden">
+      <section class="admin-hero-grid">
+        <article class="admin-welcome-card">
+          <p class="admin-kicker">Panel de control</p>
+          <h2>Pedidos y actividad</h2>
+          <p>Consulta el estado de los pedidos, revisa detalles y filtra la operación diaria desde una vista limpia y segura.</p>
+          <div id="adminStatus" class="admin-status-pill">Validando permisos...</div>
+        </article>
+
+        <article class="admin-summary-card">
+          <p class="admin-kicker">Resumen rápido</p>
+          <h2>Operación Woof & Wash</h2>
+          <p>Los indicadores se actualizan con los pedidos cargados del backend protegido.</p>
+        </article>
+      </section>
+
+      <section class="admin-metrics-grid">
+        <article class="admin-metric-card">
+          <span>Pedidos totales</span>
+          <strong id="statTotal">0</strong>
+          <small>Total</small>
+        </article>
+        <article class="admin-metric-card">
+          <span>Confirmados</span>
+          <strong id="statConfirmados">0</strong>
+          <small class="is-success">Confirmados</small>
+        </article>
+        <article class="admin-metric-card">
+          <span>Pendientes</span>
+          <strong id="statPendientes">0</strong>
+          <small class="is-warning">Pendiente</small>
+        </article>
+        <article class="admin-metric-card">
+          <span>Cancelados</span>
+          <strong id="statCancelados">0</strong>
+          <small class="is-danger">Cancelado</small>
+        </article>
+      </section>
+
+      <section class="admin-secondary-metrics">
+        <article>
+          <span>Completados</span>
+          <strong id="statCompletados">0</strong>
+        </article>
+      </section>
+
+      <section class="admin-orders-card">
+        <div class="admin-orders-header">
+          <div>
+            <p class="admin-kicker">Listado</p>
+            <h2>Pedidos</h2>
+            <p>Vista administrativa protegida para revisar cada compra.</p>
+          </div>
+          <div class="admin-controls">
+            <label class="admin-search">
+              Buscar pedido
+              <input id="busquedaPedidos" type="search" autocomplete="off" placeholder="Cliente, email, folio o teléfono">
+            </label>
+            <label class="admin-filter">
+              Filtrar por estado
+              <select id="filtroEstado">
+                <option value="todos">Todos</option>
+                <option value="pendiente">Pendientes</option>
+                <option value="confirmado">Confirmados</option>
+                <option value="cancelado">Cancelados</option>
+                <option value="completado">Completados</option>
+              </select>
+            </label>
+            <div class="admin-filter-chips" aria-label="Filtros por estado">
+              <button type="button" class="admin-filter-chip is-active" data-estado="todos">Todos</button>
+              <button type="button" class="admin-filter-chip" data-estado="pendiente">Pendientes</button>
+              <button type="button" class="admin-filter-chip" data-estado="confirmado">Confirmados</button>
+              <button type="button" class="admin-filter-chip" data-estado="cancelado">Cancelados</button>
+              <button type="button" class="admin-filter-chip" data-estado="completado">Completados</button>
+            </div>
+          </div>
+        </div>
+        <div id="adminOrdersList" class="admin-orders-list"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="adminOrderModal" class="admin-modal hidden">
+    <div class="admin-modal-panel">
+      <div class="admin-modal-header">
+        <div>
+          <p class="admin-kicker">Pedido</p>
+          <h2>Detalle del pedido</h2>
+          <p>Información segura para administración.</p>
+        </div>
+        <button id="btnCerrarModalAdmin" type="button" class="admin-button admin-button-light">Cerrar</button>
+      </div>
+      <div id="adminOrderDetail"></div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
