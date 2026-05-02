@@ -644,10 +644,21 @@ function auth(req, res, next) {
 
 async function requireAdmin(req, res, next) {
   try {
-    const user = await User.findById(req.user?.id).select("usuario email role");
+    const adminId = typeof req.user?.id === "string" ? req.user.id : "";
+
+    console.log("ADMIN DEBUG ID:", adminId);
+
+    if (!mongoose.Types.ObjectId.isValid(adminId)) {
+      console.log("ADMIN DEBUG ROLE:", null);
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    const user = await User.findById(adminId).select("usuario email role");
+
+    console.log("ADMIN DEBUG ROLE:", user?.role || null);
 
     if (!user || user.role !== "admin") {
-      return res.status(403).json({ message: "No tienes permisos para acceder al panel administrador." });
+      return res.status(403).json({ message: "No autorizado" });
     }
 
     req.admin = user;
@@ -955,7 +966,7 @@ app.post("/login", authRateLimit, async (req, res) => {
 
     const token = jwt.sign(
       {
-        id: user._id,
+        id: user._id.toString(),
         usuario: user.usuario
       },
       process.env.JWT_SECRET,
