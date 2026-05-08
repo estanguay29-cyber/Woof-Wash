@@ -1456,6 +1456,7 @@ document.addEventListener("DOMContentLoaded", () => {
   restaurarCarritoDespuesDeAuth();
   validarAccesosAdmin();
   sincronizarVisibilidadChat();
+  configurarJuegoNosotros();
 
   const btnActualizarPedidos = document.getElementById("btnActualizarPedidos");
   const btnConfirmarEliminarCuenta = document.getElementById("btnConfirmarEliminarCuenta");
@@ -1516,6 +1517,162 @@ document.addEventListener("click", function (e) {
     menu.classList.add("hidden");
   }
 });
+
+function configurarJuegoNosotros() {
+  const playArea = document.getElementById("aboutPlayArea");
+  if (!playArea) return;
+
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const video = playArea.querySelector(".about-premium-video");
+  const ball = playArea.querySelector(".about-play-ball");
+  if (!video || !ball) return;
+  video.muted = true;
+  video.playsInline = true;
+  let interactionState = "idle";
+  let activePointerId = null;
+  let ballX = 50;
+  let ballY = 50;
+
+  function puedeInteractuar() {
+    return interactionState === "idle" || interactionState === "aiming";
+  }
+
+  function prepararVideo() {
+    video.pause();
+    video.currentTime = 0;
+  }
+
+  function reproducirVideo() {
+    interactionState = "playing";
+    playArea.classList.remove("is-aiming", "is-throwing");
+    playArea.classList.add("is-playing");
+    prepararVideo();
+
+    const playPromise = video.play();
+
+    if (playPromise?.catch) {
+      playPromise.catch(() => {
+        restaurarImagen();
+      });
+    }
+  }
+
+  function actualizarPelotaDesdePunto(clientX, clientY) {
+    const rect = playArea.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const x = Math.min(Math.max(clientX - rect.left, rect.width * 0.07), rect.width * 0.93);
+    const y = Math.min(Math.max(clientY - rect.top, rect.height * 0.1), rect.height * 0.9);
+    ballX = (x / rect.width) * 100;
+    ballY = (y / rect.height) * 100;
+    playArea.style.setProperty("--about-ball-x", `${ballX}%`);
+    playArea.style.setProperty("--about-ball-y", `${ballY}%`);
+  }
+
+  function mostrarPelota(event) {
+    if (!puedeInteractuar()) return;
+    actualizarPelotaDesdePunto(event.clientX, event.clientY);
+    interactionState = "aiming";
+    playArea.classList.add("is-aiming");
+  }
+
+  function lanzarPelota() {
+    if (interactionState !== "aiming") return;
+
+    interactionState = "throwing";
+    playArea.classList.remove("is-aiming");
+    playArea.classList.add("is-throwing");
+
+    if (reduceMotion || !ball.animate) {
+      playArea.style.setProperty("--about-ball-x", "50%");
+      playArea.style.setProperty("--about-ball-y", "50%");
+      window.setTimeout(reproducirVideo, reduceMotion ? 80 : 180);
+      return;
+    }
+
+    const animation = ball.animate([
+      {
+        left: `${ballX}%`,
+        top: `${ballY}%`,
+        opacity: 1,
+        transform: "translate(-50%, -50%) scale(1) rotate(0deg)"
+      },
+      {
+        left: "50%",
+        top: "50%",
+        opacity: 0,
+        transform: "translate(-50%, -50%) scale(0.58) rotate(220deg)"
+      }
+    ], {
+      duration: 360,
+      easing: "cubic-bezier(0.2, 0.72, 0.24, 1)",
+      fill: "forwards"
+    });
+
+    animation.onfinish = reproducirVideo;
+    animation.oncancel = restaurarImagen;
+  }
+
+  function restaurarImagen() {
+    interactionState = "idle";
+    activePointerId = null;
+    playArea.classList.remove("is-playing", "is-aiming", "is-throwing");
+    video.pause();
+    video.currentTime = 0;
+  }
+
+  playArea.addEventListener("pointerenter", (event) => {
+    if (event.pointerType !== "mouse" || interactionState !== "idle") return;
+    mostrarPelota(event);
+  });
+
+  playArea.addEventListener("pointermove", (event) => {
+    if (!puedeInteractuar()) return;
+    if (activePointerId !== null && event.pointerId !== activePointerId) return;
+    if (event.pointerType === "mouse" || activePointerId !== null) {
+      mostrarPelota(event);
+    }
+  });
+
+  playArea.addEventListener("pointerleave", () => {
+    if (activePointerId !== null || interactionState !== "aiming") return;
+    interactionState = "idle";
+    playArea.classList.remove("is-aiming");
+  });
+
+  playArea.addEventListener("pointerdown", (event) => {
+    if (interactionState !== "idle" && interactionState !== "aiming") return;
+    event.preventDefault();
+    activePointerId = event.pointerId;
+    playArea.setPointerCapture?.(event.pointerId);
+    mostrarPelota(event);
+  });
+
+  playArea.addEventListener("pointerup", (event) => {
+    if (activePointerId !== event.pointerId) return;
+    event.preventDefault();
+    playArea.releasePointerCapture?.(event.pointerId);
+    activePointerId = null;
+    lanzarPelota();
+  });
+
+  playArea.addEventListener("pointercancel", restaurarImagen);
+
+  playArea.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (interactionState !== "idle") return;
+    ballX = 50;
+    ballY = 62;
+    playArea.style.setProperty("--about-ball-x", `${ballX}%`);
+    playArea.style.setProperty("--about-ball-y", `${ballY}%`);
+    interactionState = "aiming";
+    playArea.classList.add("is-aiming");
+    window.setTimeout(lanzarPelota, reduceMotion ? 80 : 160);
+  });
+  video.addEventListener("ended", restaurarImagen);
+  video.addEventListener("error", restaurarImagen);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const experienciaInteractiva = document.getElementById("experienciaInteractiva");
