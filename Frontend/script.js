@@ -54,6 +54,8 @@ function normalizarCarritoLocal(items) {
 let carrito = normalizarCarritoLocal(JSON.parse(localStorage.getItem("carrito")) || []);
 localStorage.setItem("carrito", JSON.stringify(carrito));
 let total = 0;
+let adminValidado = false;
+let tokenAdminValidado = null;
 
 function guardarRetornoAuth() {
   localStorage.setItem("authRedirect", window.location.pathname + window.location.search + window.location.hash);
@@ -125,6 +127,57 @@ function obtenerApiBase() {
 
   return API_URL;
 }
+
+function renderizarAccesosAdmin(esAdmin) {
+  const adminAccountActions = document.getElementById("adminAccountActions");
+  if (!adminAccountActions) return;
+
+  adminAccountActions.classList.toggle("hidden", !esAdmin);
+}
+
+async function validarAccesosAdmin() {
+  const token = obtenerTokenValido();
+
+  if (!token) {
+    adminValidado = false;
+    tokenAdminValidado = null;
+    renderizarAccesosAdmin(false);
+    return false;
+  }
+
+  if (tokenAdminValidado === token) {
+    renderizarAccesosAdmin(adminValidado);
+    return adminValidado;
+  }
+
+  adminValidado = false;
+  tokenAdminValidado = token;
+  renderizarAccesosAdmin(false);
+
+  try {
+    const res = await fetch(`${obtenerApiBase()}/admin/me`, {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+
+    if (!res.ok) {
+      adminValidado = false;
+      renderizarAccesosAdmin(false);
+      return false;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    adminValidado = data?.role === "admin";
+    renderizarAccesosAdmin(adminValidado);
+    return adminValidado;
+  } catch {
+    adminValidado = false;
+    renderizarAccesosAdmin(false);
+    return false;
+  }
+}
+
 function obtenerFrontendBase() {
   const ruta = window.location.pathname.replace(/\/[^/]*$/, "");
   return `${window.location.origin}${ruta}`;
@@ -346,6 +399,12 @@ const menuCuentaUsuario = document.getElementById("menuCuentaUsuario");
 
   if (cuentaBox) {
   cuentaBox.classList.toggle("hidden", !token);
+}
+
+if (!token) {
+  adminValidado = false;
+  tokenAdminValidado = null;
+  renderizarAccesosAdmin(false);
 }
 
 if (menuCuentaUsuario && token) {
@@ -830,6 +889,9 @@ function logout() {
 
   ocultarPanelEliminarCuenta();
   limpiarSesion();
+  adminValidado = false;
+  tokenAdminValidado = null;
+  renderizarAccesosAdmin(false);
   localStorage.removeItem("direccion");
   actualizarCarrito();
   window.location.href = "index.html";
@@ -1392,6 +1454,7 @@ document.addEventListener("DOMContentLoaded", () => {
   actualizarCarrito();
   configurarEnlacesAuth();
   restaurarCarritoDespuesDeAuth();
+  validarAccesosAdmin();
   sincronizarVisibilidadChat();
 
   const btnActualizarPedidos = document.getElementById("btnActualizarPedidos");
@@ -1434,6 +1497,7 @@ function toggleMenuCuenta() {
   const menu = document.getElementById("menuCuenta");
   if (!menu) return;
   menu.classList.toggle("hidden");
+  validarAccesosAdmin();
 }
 
 function toggleEliminarCuentaPanel() {

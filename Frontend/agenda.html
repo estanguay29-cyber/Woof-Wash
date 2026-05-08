@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de agenda - Woof & Wash</title>
+  <link rel="stylesheet" href="tailwind.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-page agenda-page">
+  <main class="admin-shell agenda-shell">
+    <header class="admin-topbar agenda-topbar">
+      <div class="admin-brand">
+        <div class="admin-logo-mark">W&W</div>
+        <div>
+          <p class="admin-kicker">Woof & Wash</p>
+          <h1>Panel de agenda</h1>
+          <p class="agenda-topbar-subtitle">Gestión de citas y rutas</p>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <a href="index.html" class="admin-button admin-button-light">Volver al inicio</a>
+      </div>
+    </header>
+
+    <section id="agendaAccessMessage" class="admin-access-message">Validando permisos...</section>
+
+    <section id="agendaPanel" class="admin-panel agenda-panel hidden">
+      <section class="agenda-summary-grid" aria-label="Resumen de agenda">
+        <article class="agenda-summary-card">
+          <span>Total del día</span>
+          <strong id="statCitasDia">0</strong>
+          <small>Programadas</small>
+        </article>
+        <article class="agenda-summary-card">
+          <span>Pendientes</span>
+          <strong id="statPendientesDia">0</strong>
+          <small class="is-warning">Pendientes</small>
+        </article>
+        <article class="agenda-summary-card">
+          <span>Confirmadas</span>
+          <strong id="statConfirmadasDia">0</strong>
+          <small class="is-success">Confirmadas</small>
+        </article>
+        <article class="agenda-summary-card">
+          <span>Completadas</span>
+          <strong id="statCompletadasDia">0</strong>
+          <small class="is-success">Completadas</small>
+        </article>
+        <article class="agenda-summary-card">
+          <span>Canceladas/no asistió</span>
+          <strong id="statCanceladasDia">0</strong>
+          <small class="is-muted">Historial</small>
+        </article>
+        <article class="agenda-summary-card agenda-zone-card">
+          <span>Zona del día</span>
+          <strong id="statZonaDia">-</strong>
+          <small id="statDiaSemana">Ruta activa</small>
+        </article>
+      </section>
+
+      <section class="agenda-toolbar">
+        <div>
+          <p class="admin-kicker">Filtros</p>
+          <h2>Agenda diaria</h2>
+        </div>
+        <div class="agenda-filters">
+          <div class="agenda-date-controls" aria-label="Navegacion por fechas">
+            <button type="button" data-date-action="prev">Día anterior</button>
+            <button type="button" data-date-action="today">Hoy</button>
+            <button type="button" data-date-action="tomorrow">Mañana</button>
+            <button type="button" data-date-action="next">Día siguiente</button>
+            <label>
+              Fecha
+              <input id="filtroFecha" type="date">
+            </label>
+          </div>
+          <label class="agenda-search-label">
+            Buscar
+            <input id="agendaSearchInput" type="search" placeholder="Nombre, teléfono, servicio, zona o dirección">
+          </label>
+          <label class="agenda-zone-filter">
+            Zona
+            <select id="filtroZonaAgenda">
+              <option value="todas">Todas</option>
+              <option value="Zapopan">Zapopan</option>
+              <option value="Guadalajara">Guadalajara</option>
+              <option value="Tlaquepaque">Tlaquepaque</option>
+              <option value="Tonala">Tonala</option>
+              <option value="Zapopan Norte">Zapopan Norte</option>
+              <option value="Toda la ZMG">Toda la ZMG</option>
+            </select>
+          </label>
+        </div>
+        <div class="agenda-status-filters" aria-label="Filtros por estado">
+          <button type="button" class="is-active" data-status-filter="todos">Todas</button>
+          <button type="button" data-status-filter="pendiente">Pendientes</button>
+          <button type="button" data-status-filter="confirmada">Confirmadas</button>
+          <button type="button" data-status-filter="en_camino">En camino</button>
+          <button type="button" data-status-filter="completada">Completadas</button>
+          <button type="button" data-status-filter="cancelada">Canceladas</button>
+          <button type="button" data-status-filter="no_asistio">No asistió</button>
+        </div>
+      </section>
+
+      <section class="agenda-main-grid">
+        <article class="agenda-card agenda-list-card">
+          <div class="agenda-section-header">
+            <div>
+              <p class="admin-kicker">Citas</p>
+              <h2>Citas del día</h2>
+            </div>
+            <span id="agendaListCount" class="agenda-count-pill">0 citas</span>
+          </div>
+          <div id="agendaAppointmentsList" class="agenda-appointments-list"></div>
+        </article>
+
+        <article class="agenda-card agenda-form-card">
+          <div class="agenda-section-header">
+            <div>
+              <p class="admin-kicker">Nueva cita</p>
+              <h2>Registrar servicio</h2>
+            </div>
+          </div>
+
+          <div id="agendaDateNotice" class="agenda-date-notice"></div>
+          <div id="agendaAvailabilityNotice" class="agenda-date-notice hidden"></div>
+
+          <form id="agendaForm" class="agenda-form">
+            <label>
+              Nombre del cliente
+              <input id="clienteNombre" name="clienteNombre" type="text" autocomplete="name" required>
+            </label>
+            <label class="agenda-phone-field">
+              Teléfono
+              <div class="agenda-phone-input">
+                <select id="clienteTelefonoPais" name="clienteTelefonoPais" aria-label="País del teléfono">
+                  <option value="52" data-country="MX">🇲🇽 +52</option>
+                  <option value="1" data-country="US">🇺🇸 +1</option>
+                  <option value="1" data-country="CA">🇨🇦 +1</option>
+                </select>
+                <input id="clienteTelefono" name="clienteTelefono" type="tel" autocomplete="tel-national" inputmode="numeric" placeholder="3312345678" required>
+              </div>
+            </label>
+            <label>
+              Email opcional
+              <input id="clienteEmail" name="clienteEmail" type="email" autocomplete="email">
+            </label>
+            <label>
+              Tipo de servicio
+              <select id="tipoServicio" name="tipoServicio" required>
+                <option value="mascota">Mascota</option>
+                <option value="auto">Auto</option>
+              </select>
+            </label>
+            <label>
+              Tamaño o tipo
+              <select id="servicioCategoria" name="servicioCategoria" required></select>
+            </label>
+            <label class="agenda-field-full">
+              Paquete
+              <select id="servicioPaquete" name="servicioPaquete" required></select>
+            </label>
+            <label class="agenda-field-full">
+              &iquest;Qui&eacute;n atender&aacute; el servicio?
+              <input id="atendidoPor" name="atendidoPor" type="text" maxlength="80" autocomplete="off" placeholder="Nombre del colaborador">
+            </label>
+            <label>
+              Fecha
+              <input id="fechaCita" name="fechaCita" type="date" required>
+            </label>
+            <label>
+              Hora
+              <select id="horaCita" name="horaCita" required></select>
+            </label>
+            <label>
+              Zona
+              <select id="zonaCita" name="zonaCita" required>
+                <option value="Zapopan">Zapopan</option>
+                <option value="Guadalajara">Guadalajara</option>
+                <option value="Tlaquepaque">Tlaquepaque</option>
+                <option value="Tonala">Tonala</option>
+                <option value="Zapopan Norte">Zapopan Norte</option>
+                <option value="Toda la ZMG">Toda la ZMG</option>
+              </select>
+            </label>
+            <label class="agenda-field-full">
+              Dirección
+              <input id="direccionCita" name="direccionCita" type="text" autocomplete="street-address" required>
+            </label>
+            <label class="agenda-field-full">
+              Notas
+              <textarea id="notasCita" name="notasCita" rows="4"></textarea>
+            </label>
+            <button id="btnCrearCita" type="submit" class="admin-button admin-button-dark agenda-submit-btn">Crear cita</button>
+          </form>
+        </article>
+      </section>
+    </section>
+  </main>
+
+  <div id="agendaEditModal" class="agenda-edit-modal hidden" aria-hidden="true">
+    <div class="agenda-edit-panel" role="dialog" aria-modal="true" aria-labelledby="agendaEditTitle">
+      <div class="agenda-edit-header">
+        <div>
+          <p class="admin-kicker">Editar cita</p>
+          <h2 id="agendaEditTitle">Actualizar servicio</h2>
+        </div>
+        <button id="btnCerrarEditModal" type="button" class="agenda-icon-button" aria-label="Cerrar edición">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="agendaEditDateNotice" class="agenda-date-notice"></div>
+      <div id="agendaEditAvailabilityNotice" class="agenda-date-notice hidden"></div>
+
+      <form id="agendaEditForm" class="agenda-form agenda-edit-form">
+        <label>
+          Nombre
+          <input id="editClienteNombre" name="editClienteNombre" type="text" autocomplete="name" required>
+        </label>
+        <label class="agenda-phone-field">
+          Teléfono
+          <div class="agenda-phone-input">
+            <select id="editClienteTelefonoPais" name="editClienteTelefonoPais" aria-label="País del teléfono">
+              <option value="52" data-country="MX">🇲🇽 +52</option>
+              <option value="1" data-country="US">🇺🇸 +1</option>
+              <option value="1" data-country="CA">🇨🇦 +1</option>
+            </select>
+            <input id="editClienteTelefono" name="editClienteTelefono" type="tel" autocomplete="tel-national" inputmode="numeric" placeholder="3312345678" required>
+          </div>
+        </label>
+        <label>
+          Email opcional
+          <input id="editClienteEmail" name="editClienteEmail" type="email" autocomplete="email">
+        </label>
+        <label>
+          Servicio
+          <select id="editTipoServicio" name="editTipoServicio" required>
+            <option value="mascota">Mascota</option>
+            <option value="auto">Auto</option>
+          </select>
+        </label>
+        <label>
+          Tamaño o tipo
+          <select id="editServicioCategoria" name="editServicioCategoria" required></select>
+        </label>
+        <label class="agenda-field-full">
+          Paquete
+          <select id="editServicioPaquete" name="editServicioPaquete" required></select>
+        </label>
+        <label class="agenda-field-full">
+          &iquest;Qui&eacute;n atender&aacute; el servicio?
+          <input id="editAtendidoPor" name="editAtendidoPor" type="text" maxlength="80" autocomplete="off" placeholder="Nombre del colaborador">
+        </label>
+        <label>
+          Estado
+          <select id="editEstadoCita" name="editEstadoCita" required>
+            <option value="pendiente">Pendiente</option>
+            <option value="confirmada">Confirmada</option>
+            <option value="en_camino">En camino</option>
+            <option value="completada">Completada</option>
+            <option value="cancelada">Cancelada</option>
+            <option value="no_asistio">No asistió</option>
+          </select>
+        </label>
+        <p id="editServicioAnterior" class="agenda-date-notice agenda-field-full agenda-legacy-service hidden"></p>
+        <label>
+          Calificaci&oacute;n
+          <select id="editCalificacionServicio" name="editCalificacionServicio">
+            <option value="">Sin calificaci&oacute;n</option>
+            <option value="5">5/5 - Excelente</option>
+            <option value="4">4/5 - Bueno</option>
+            <option value="3">3/5 - Regular</option>
+            <option value="2">2/5 - Revisar</option>
+            <option value="1">1/5 - Revisar</option>
+          </select>
+        </label>
+        <label>
+          Fecha
+          <input id="editFechaCita" name="editFechaCita" type="date" required>
+        </label>
+        <label>
+          Hora
+          <select id="editHoraCita" name="editHoraCita" required></select>
+        </label>
+        <label>
+          Zona
+          <select id="editZonaCita" name="editZonaCita" required>
+            <option value="Zapopan">Zapopan</option>
+            <option value="Guadalajara">Guadalajara</option>
+            <option value="Tlaquepaque">Tlaquepaque</option>
+            <option value="Tonala">Tonala</option>
+            <option value="Zapopan Norte">Zapopan Norte</option>
+            <option value="Toda la ZMG">Toda la ZMG</option>
+          </select>
+        </label>
+        <label class="agenda-field-full">
+          Dirección
+          <input id="editDireccionCita" name="editDireccionCita" type="text" autocomplete="street-address" required>
+        </label>
+        <label class="agenda-field-full">
+          Notas
+          <textarea id="editNotasCita" name="editNotasCita" rows="4"></textarea>
+        </label>
+        <div class="agenda-edit-actions">
+          <button id="btnGuardarEdicionCita" type="submit" class="admin-button admin-button-dark">Guardar cambios</button>
+          <button id="btnCancelarEdicionCita" type="button" class="admin-button admin-button-light">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="agendaDetailModal" class="agenda-edit-modal hidden" aria-hidden="true">
+    <div class="agenda-edit-panel agenda-detail-panel" role="dialog" aria-modal="true" aria-labelledby="agendaDetailTitle">
+      <div class="agenda-edit-header">
+        <div>
+          <p class="admin-kicker">Detalle de cita</p>
+          <h2 id="agendaDetailTitle">Información completa</h2>
+        </div>
+        <button id="btnCerrarDetailModal" type="button" class="agenda-icon-button" aria-label="Cerrar detalle">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="agendaDetailContent" class="agenda-detail-content"></div>
+
+      <div class="agenda-detail-status">
+        <label for="agendaDetailEstado">Cambiar estado</label>
+        <select id="agendaDetailEstado"></select>
+      </div>
+
+      <div class="agenda-detail-rating">
+        <label for="agendaDetailCalificacion">Calificaci&oacute;n del formulario</label>
+        <div>
+          <select id="agendaDetailCalificacion"></select>
+          <button id="btnDetailGuardarCalificacion" type="button" class="admin-button admin-button-light">Guardar calificaci&oacute;n</button>
+        </div>
+      </div>
+
+      <p id="agendaDetailFeedback" class="agenda-copy-feedback hidden" aria-live="polite"></p>
+
+      <div class="agenda-detail-actions">
+        <button id="btnDetailEditar" type="button" class="admin-button admin-button-dark">Editar cita</button>
+        <a id="btnDetailWhatsApp" class="admin-button admin-button-light agenda-whatsapp-btn" href="#" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <button id="btnDetailCopiarTelefono" type="button" class="admin-button admin-button-light">Copiar teléfono</button>
+        <button id="btnDetailCopiarDireccion" type="button" class="admin-button admin-button-light">Copiar dirección</button>
+        <a id="btnDetailEncuesta" class="admin-button admin-button-light agenda-survey-btn hidden" href="#" target="_blank" rel="noopener noreferrer">Enviar encuesta</a>
+        <button id="btnDetailCopiarResumen" type="button" class="admin-button admin-button-light">Copiar resumen</button>
+        <button id="btnCerrarDetailModalFooter" type="button" class="admin-button admin-button-light">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="agendaRewardModal" class="agenda-edit-modal hidden" aria-hidden="true">
+    <div class="agenda-edit-panel agenda-reward-panel" role="dialog" aria-modal="true" aria-labelledby="agendaRewardTitle">
+      <div class="agenda-edit-header">
+        <div>
+          <p class="admin-kicker">Cliente frecuente</p>
+          <h2 id="agendaRewardTitle">Preparar correo</h2>
+        </div>
+        <button id="btnCerrarRewardModal" type="button" class="agenda-icon-button" aria-label="Cerrar correo sugerido">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <label class="agenda-reward-copy-label" for="agendaRewardText">Texto sugerido</label>
+      <textarea id="agendaRewardText" class="agenda-reward-text" rows="7" readonly></textarea>
+      <div class="agenda-edit-actions">
+        <button id="btnCopiarRewardText" type="button" class="admin-button admin-button-dark">Copiar texto</button>
+        <button id="btnCerrarRewardModalFooter" type="button" class="admin-button admin-button-light">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="agenda.js"></script>
+</body>
+</html>

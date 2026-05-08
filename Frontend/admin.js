@@ -466,7 +466,7 @@ async function iniciarAdmin() {
   if (!adminToken) {
     mostrarAccesoMensaje("Inicia sesión para acceder al panel administrador.");
     setTimeout(() => {
-      window.location.href = "login.html";
+      window.location.href = "index.html";
     }, 900);
     return;
   }
@@ -480,6 +480,9 @@ async function iniciarAdmin() {
   } catch (error) {
     if (error.status === 401 || error.status === 403) {
       mostrarAccesoMensaje("No tienes permisos para acceder al panel administrador.");
+      setTimeout(() => {
+        window.location.href = "index.html";
+      }, 900);
       return;
     }
 

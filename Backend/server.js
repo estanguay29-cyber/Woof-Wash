@@ -11,6 +11,7 @@ const nodemailer = require("nodemailer");
 
 const User = require("./User");
 const Order = require("./Order");
+const Appointment = require("./Appointment");
 
 const app = express();
 app.disable("x-powered-by");
@@ -646,16 +647,11 @@ async function requireAdmin(req, res, next) {
   try {
     const adminId = typeof req.user?.id === "string" ? req.user.id : "";
 
-    console.log("ADMIN DEBUG ID:", adminId);
-
     if (!mongoose.Types.ObjectId.isValid(adminId)) {
-      console.log("ADMIN DEBUG ROLE:", null);
       return res.status(403).json({ message: "No autorizado" });
     }
 
     const user = await User.findById(adminId).select("usuario email role");
-
-    console.log("ADMIN DEBUG ROLE:", user?.role || null);
 
     if (!user || user.role !== "admin") {
       return res.status(403).json({ message: "No autorizado" });
@@ -715,6 +711,680 @@ async function construirPedidoAdmin(pedido, incluirDetalle = false) {
     productos: Array.isArray(pedidoObj.carrito) ? pedidoObj.carrito.map(formatearProductoAdmin) : [],
     paymentIntent: pedidoObj.paymentIntentId || pedidoObj.stripeSessionId || pedidoObj.stripeCheckoutStatus || null
   };
+}
+
+const APPOINTMENT_STATUSES = Object.freeze([
+  "pendiente",
+  "confirmada",
+  "en_camino",
+  "completada",
+  "cancelada",
+  "no_asistio"
+]);
+
+const APPOINTMENT_ZONES = Object.freeze([
+  "Zapopan",
+  "Guadalajara",
+  "Tlaquepaque",
+  "Tonala",
+  "Zapopan Norte",
+  "Toda la ZMG"
+]);
+
+const APPOINTMENT_CREATE_FIELDS = Object.freeze([
+  "clienteNombre",
+  "clienteTelefono",
+  "clienteEmail",
+  "servicioTipo",
+  "servicioNombre",
+  "servicioKey",
+  "servicioCategoria",
+  "servicioPaquete",
+  "fecha",
+  "hora",
+  "zona",
+  "direccion",
+  "notas",
+  "atendidoPor",
+  "calificacionServicio",
+  "estado",
+  "origen"
+]);
+
+const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
+  "clienteNombre",
+  "clienteTelefono",
+  "clienteEmail",
+  "servicioTipo",
+  "servicioNombre",
+  "servicioKey",
+  "servicioCategoria",
+  "servicioPaquete",
+  "fecha",
+  "hora",
+  "zona",
+  "direccion",
+  "notas",
+  "atendidoPor",
+  "calificacionServicio",
+  "estado"
+]);
+
+const APPOINTMENT_SERVICE_CATALOG = Object.freeze({
+  mascota: {
+    categorias: ["Chico", "Mediano", "Grande"],
+    paquetes: ["B\u00e1sico", "Completo", "Premium SPA"],
+    nombres: {
+      Chico: "Mascota chico",
+      Mediano: "Mascota mediano",
+      Grande: "Mascota grande"
+    }
+  },
+  auto: {
+    categorias: ["Auto chico", "Auto mediano", "Camioneta/SUV", "Pick Up"],
+    paquetes: ["Lavado B\u00e1sico", "Completo", "Premium"],
+    nombres: {
+      "Auto chico": "Auto chico",
+      "Auto mediano": "Auto mediano",
+      "Camioneta/SUV": "Camioneta/SUV",
+      "Pick Up": "Pick Up"
+    }
+  }
+});
+
+const CONFIG_AGENDA = Object.freeze({
+  trasladoMinutos: 30,
+  intervaloHorariosMinutos: 30,
+  horariosOperacion: {
+    lunesViernes: { inicio: "09:00", fin: "18:00" },
+    sabado: { inicio: "09:00", fin: "16:00" },
+    domingo: null
+  },
+  duraciones: {
+    mascota: {
+      basico: 60,
+      completo: 90,
+      premium_spa: 120
+    },
+    auto: {
+      lavado_basico: 45,
+      completo: 60,
+      premium: 90
+    }
+  }
+});
+
+function normalizarTextoPlano(value, maxLength = 160) {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function validarCamposCitaPermitidos(body, camposPermitidos) {
+  const keys = Object.keys(body || {});
+  return keys.filter((campo) => !camposPermitidos.includes(campo));
+}
+
+function normalizarTelefonoAgenda(value) {
+  let digitos = String(value || "").replace(/\D/g, "").slice(0, 18);
+
+  if (digitos.startsWith("00")) {
+    digitos = digitos.slice(2);
+  }
+
+  if (digitos.length === 13 && digitos.startsWith("521")) {
+    return `52${digitos.slice(3)}`;
+  }
+
+  if (digitos.length === 10) {
+    return `52${digitos}`;
+  }
+
+  if (digitos.length === 12 && digitos.startsWith("52")) {
+    return digitos;
+  }
+
+  if (digitos.length === 11 && digitos.startsWith("1")) {
+    return digitos;
+  }
+
+  return "";
+}
+
+function construirRegexTelefonoAgenda(digitos) {
+  const limpio = String(digitos || "").replace(/\D/g, "");
+  if (!limpio) return null;
+  return new RegExp(limpio.split("").join("\\D*"));
+}
+
+function obtenerVariantesTelefonoAgenda(value) {
+  const telefono = normalizarTelefonoAgenda(value);
+  const digitosOriginales = String(value || "").replace(/\D/g, "");
+  const ultimos10 = telefono.length >= 10 ? telefono.slice(-10) : "";
+  const variantes = new Set([telefono, digitosOriginales].filter(Boolean));
+
+  if (ultimos10.length === 10) {
+    variantes.add(ultimos10);
+    variantes.add(`52${ultimos10}`);
+    variantes.add(`+52 ${ultimos10}`);
+    variantes.add(`52 ${ultimos10}`);
+  }
+
+  return {
+    telefono,
+    ultimos10,
+    variantes: [...variantes],
+    regexUltimos10: ultimos10.length === 10 ? construirRegexTelefonoAgenda(ultimos10) : null
+  };
+}
+
+function construirFiltroTelefonoAgenda(value) {
+  const telefonoInfo = obtenerVariantesTelefonoAgenda(value);
+  const condiciones = telefonoInfo.variantes.map((telefono) => ({ clienteTelefono: telefono }));
+
+  if (telefonoInfo.regexUltimos10) {
+    condiciones.push({ clienteTelefono: { $regex: telefonoInfo.regexUltimos10 } });
+  }
+
+  return {
+    telefono: telefonoInfo.telefono,
+    filtro: condiciones.length > 1 ? { $or: condiciones } : condiciones[0] || { clienteTelefono: "" }
+  };
+}
+
+function normalizarZonaAgenda(value) {
+  const zona = normalizarTextoPlano(value, 80);
+  if (zona === "Tonalá" || zona === "TonalÃ¡" || zona === "Tonala") return "Tonala";
+  return zona;
+}
+
+function normalizarServicioKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 180);
+}
+
+function normalizarOpcionCatalogo(value) {
+  return normalizarTextoPlano(value, 80)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function buscarOpcionCatalogo(opciones, value) {
+  const normalizado = normalizarOpcionCatalogo(value);
+  return opciones.find((opcion) => normalizarOpcionCatalogo(opcion) === normalizado) || "";
+}
+
+function construirServicioAgenda({ servicioTipo, servicioCategoria, servicioPaquete, servicioNombre }) {
+  const catalogo = APPOINTMENT_SERVICE_CATALOG[servicioTipo];
+
+  if (!catalogo) {
+    return { error: "servicioTipo no permitido" };
+  }
+
+  const categoria = buscarOpcionCatalogo(catalogo.categorias, servicioCategoria);
+  const paquete = buscarOpcionCatalogo(catalogo.paquetes, servicioPaquete);
+
+  if (!categoria) {
+    return { error: "servicioCategoria no permitida" };
+  }
+
+  if (!paquete) {
+    return { error: "servicioPaquete no permitido" };
+  }
+
+  const nombreBase = catalogo.nombres[categoria] || categoria;
+  const nombre = `${nombreBase} - ${paquete}`;
+
+  return {
+    servicioCategoria: categoria,
+    servicioPaquete: paquete,
+    servicioNombre: nombre,
+    servicioKey: normalizarServicioKey(nombre)
+  };
+}
+
+function validarFechaISOAgenda(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const fecha = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(fecha.getTime()) && value === fecha.toISOString().slice(0, 10);
+}
+
+function validarHoraAgenda(value) {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function horaAMinutos(hora) {
+  if (!validarHoraAgenda(hora)) return null;
+  const [horas, minutos] = hora.split(":").map(Number);
+  return horas * 60 + minutos;
+}
+
+function minutosAHora(totalMinutos) {
+  const horas = Math.floor(totalMinutos / 60);
+  const minutos = totalMinutos % 60;
+  return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}`;
+}
+
+function obtenerReglaZonaAgenda(fecha) {
+  if (!validarFechaISOAgenda(fecha)) {
+    return { dia: "", zona: "", esDescanso: false, permiteTodasLasZonas: false };
+  }
+
+  const fechaLocal = new Date(`${fecha}T00:00:00`);
+  const reglas = {
+    0: { dia: "Domingo", zona: "Descanso", esDescanso: true, permiteTodasLasZonas: false },
+    1: { dia: "Lunes", zona: "Zapopan", esDescanso: false, permiteTodasLasZonas: false },
+    2: { dia: "Martes", zona: "Guadalajara", esDescanso: false, permiteTodasLasZonas: false },
+    3: { dia: "Miercoles", zona: "Tlaquepaque", esDescanso: false, permiteTodasLasZonas: false },
+    4: { dia: "Jueves", zona: "Tonala", esDescanso: false, permiteTodasLasZonas: false },
+    5: { dia: "Viernes", zona: "Zapopan Norte", esDescanso: false, permiteTodasLasZonas: false },
+    6: { dia: "Sabado", zona: "Toda la ZMG", esDescanso: false, permiteTodasLasZonas: true }
+  };
+
+  return reglas[fechaLocal.getDay()];
+}
+
+function obtenerHorarioOperacionAgenda(fecha) {
+  if (!validarFechaISOAgenda(fecha)) return null;
+
+  const fechaLocal = new Date(`${fecha}T00:00:00`);
+  const dia = fechaLocal.getDay();
+
+  if (dia === 0) return CONFIG_AGENDA.horariosOperacion.domingo;
+  if (dia === 6) return CONFIG_AGENDA.horariosOperacion.sabado;
+  return CONFIG_AGENDA.horariosOperacion.lunesViernes;
+}
+
+function obtenerDuracionServicioAgenda(servicioTipo, servicioPaquete) {
+  const tipo = servicioTipo === "auto" ? "auto" : "mascota";
+  const paqueteKey = normalizarServicioKey(servicioPaquete);
+  return CONFIG_AGENDA.duraciones[tipo]?.[paqueteKey] || 60;
+}
+
+function calcularBloqueAgenda({ hora, servicioTipo, servicioPaquete }) {
+  const inicioBloque = horaAMinutos(hora);
+
+  if (inicioBloque === null) {
+    return null;
+  }
+
+  const duracionMinutos = obtenerDuracionServicioAgenda(servicioTipo, servicioPaquete);
+  const trasladoMinutos = CONFIG_AGENDA.trasladoMinutos;
+  const finBloque = inicioBloque + duracionMinutos + trasladoMinutos;
+
+  return {
+    duracionMinutos,
+    trasladoMinutos,
+    inicioBloque,
+    finBloque
+  };
+}
+
+function validarHorarioOperativoAgenda({ fecha, inicioBloque, finBloque }) {
+  const horario = obtenerHorarioOperacionAgenda(fecha);
+
+  if (!horario) {
+    return { ok: false, message: "Este dia no hay servicio disponible." };
+  }
+
+  const inicioOperacion = horaAMinutos(horario.inicio);
+  const finOperacion = horaAMinutos(horario.fin);
+
+  if (inicioBloque < inicioOperacion || finBloque > finOperacion) {
+    return { ok: false, message: "La cita no cabe dentro del horario operativo." };
+  }
+
+  return { ok: true, horario };
+}
+
+function obtenerBloqueCitaAgenda(cita) {
+  const inicioGuardado = Number(cita?.inicioBloque);
+  const finGuardado = Number(cita?.finBloque);
+  const duracionGuardada = Number(cita?.duracionMinutos);
+  const trasladoGuardado = Number(cita?.trasladoMinutos);
+
+  if (
+    Number.isFinite(inicioGuardado) &&
+    Number.isFinite(finGuardado) &&
+    finGuardado > inicioGuardado
+  ) {
+    return {
+      inicioBloque: inicioGuardado,
+      finBloque: finGuardado,
+      duracionMinutos: Number.isFinite(duracionGuardada) && duracionGuardada > 0 ? duracionGuardada : Math.max(0, finGuardado - inicioGuardado - CONFIG_AGENDA.trasladoMinutos),
+      trasladoMinutos: Number.isFinite(trasladoGuardado) && trasladoGuardado >= 0 ? trasladoGuardado : CONFIG_AGENDA.trasladoMinutos
+    };
+  }
+
+  return calcularBloqueAgenda({
+    hora: cita?.hora,
+    servicioTipo: cita?.servicioTipo,
+    servicioPaquete: cita?.servicioPaquete
+  });
+}
+
+function bloquesTraslapados(nuevoBloque, bloqueExistente) {
+  return nuevoBloque.inicioBloque < bloqueExistente.finBloque && nuevoBloque.finBloque > bloqueExistente.inicioBloque;
+}
+
+async function obtenerCitasOcupadasAgenda(fecha, excludeId = "") {
+  const filtro = {
+    fecha,
+    estado: { $nin: ["cancelada", "no_asistio"] }
+  };
+
+  if (excludeId) {
+    filtro._id = { $ne: excludeId };
+  }
+
+  const citas = await Appointment.find(filtro).sort({ hora: 1 });
+
+  return citas
+    .map((cita) => {
+      const bloque = obtenerBloqueCitaAgenda(cita);
+      if (!bloque) return null;
+
+      return {
+        id: cita._id,
+        clienteNombre: cita.clienteNombre,
+        servicioNombre: cita.servicioNombre,
+        hora: cita.hora,
+        inicioBloque: bloque.inicioBloque,
+        finBloque: bloque.finBloque,
+        inicio: minutosAHora(bloque.inicioBloque),
+        fin: minutosAHora(bloque.finBloque)
+      };
+    })
+    .filter(Boolean);
+}
+
+async function validarDisponibilidadAgenda(datos, excludeId = "") {
+  const bloque = calcularBloqueAgenda(datos);
+
+  if (!bloque) {
+    return { ok: false, status: 400, message: "hora no valida" };
+  }
+
+  const horarioValido = validarHorarioOperativoAgenda({
+    fecha: datos.fecha,
+    inicioBloque: bloque.inicioBloque,
+    finBloque: bloque.finBloque
+  });
+
+  if (!horarioValido.ok) {
+    return { ok: false, status: 400, message: horarioValido.message, bloque };
+  }
+
+  const citasOcupadas = await obtenerCitasOcupadasAgenda(datos.fecha, excludeId);
+  const traslape = citasOcupadas.find((cita) => bloquesTraslapados(bloque, cita));
+
+  if (traslape) {
+    return {
+      ok: false,
+      status: 409,
+      message: "Este horario ya no está disponible. Elige otro horario.",
+      bloque
+    };
+  }
+
+  return { ok: true, bloque, citasOcupadas, horario: horarioValido.horario };
+}
+
+async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaquete, excludeId = "" }) {
+  if (!validarFechaISOAgenda(fecha)) {
+    return { error: { status: 400, message: "fecha no valida" } };
+  }
+
+  if (!["mascota", "auto"].includes(servicioTipo)) {
+    return { error: { status: 400, message: "servicioTipo no permitido" } };
+  }
+
+  const catalogo = APPOINTMENT_SERVICE_CATALOG[servicioTipo];
+  const paquete = buscarOpcionCatalogo(catalogo.paquetes, servicioPaquete);
+
+  if (!paquete) {
+    return { error: { status: 400, message: "servicioPaquete no permitido" } };
+  }
+
+  const duracionMinutos = obtenerDuracionServicioAgenda(servicioTipo, paquete);
+  const trasladoMinutos = CONFIG_AGENDA.trasladoMinutos;
+  const bloqueTotalMinutos = duracionMinutos + trasladoMinutos;
+  const horario = obtenerHorarioOperacionAgenda(fecha);
+  const abierto = Boolean(horario);
+  const citasOcupadas = await obtenerCitasOcupadasAgenda(fecha, excludeId);
+
+  if (!abierto) {
+    return {
+      fecha,
+      abierto: false,
+      horarioInicio: null,
+      horarioFin: null,
+      duracionMinutos,
+      trasladoMinutos,
+      bloqueTotalMinutos,
+      horariosDisponibles: [],
+      citasOcupadas
+    };
+  }
+
+  const inicioOperacion = horaAMinutos(horario.inicio);
+  const finOperacion = horaAMinutos(horario.fin);
+  const horariosDisponibles = [];
+
+  for (
+    let inicio = inicioOperacion;
+    inicio + bloqueTotalMinutos <= finOperacion;
+    inicio += CONFIG_AGENDA.intervaloHorariosMinutos
+  ) {
+    const bloque = {
+      inicioBloque: inicio,
+      finBloque: inicio + bloqueTotalMinutos
+    };
+
+    if (!citasOcupadas.some((cita) => bloquesTraslapados(bloque, cita))) {
+      horariosDisponibles.push(minutosAHora(inicio));
+    }
+  }
+
+  return {
+    fecha,
+    abierto: true,
+    horarioInicio: horario.inicio,
+    horarioFin: horario.fin,
+    duracionMinutos,
+    trasladoMinutos,
+    bloqueTotalMinutos,
+    horariosDisponibles,
+    citasOcupadas
+  };
+}
+
+function zonaAgendaPermitida(fecha, zona) {
+  const regla = obtenerReglaZonaAgenda(fecha);
+  if (regla.esDescanso) return { ok: false, message: "No se pueden crear citas en domingo" };
+  if (!APPOINTMENT_ZONES.includes(zona)) return { ok: false, message: "Zona no permitida" };
+  if (regla.permiteTodasLasZonas) return { ok: true };
+  if (zona !== regla.zona) {
+    return { ok: false, message: `La zona para ${regla.dia} debe ser ${regla.zona}` };
+  }
+  return { ok: true };
+}
+
+function construirDatosCitaSeguro(body, { parcial = false } = {}) {
+  const datos = {};
+  const errores = [];
+
+  const camposTexto = [
+    ["clienteNombre", 120],
+    ["clienteTelefono", 30],
+    ["clienteEmail", 120],
+    ["servicioNombre", 160],
+    ["servicioKey", 180],
+    ["servicioCategoria", 80],
+    ["servicioPaquete", 80],
+    ["fecha", 10],
+    ["hora", 5],
+    ["zona", 80],
+    ["direccion", 240],
+    ["notas", 600],
+    ["atendidoPor", 80],
+    ["estado", 30],
+    ["origen", 20]
+  ];
+
+  for (const [campo, maxLength] of camposTexto) {
+    if (Object.prototype.hasOwnProperty.call(body || {}, campo)) {
+      datos[campo] = normalizarTextoPlano(body[campo], maxLength);
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "zona")) {
+    datos.zona = normalizarZonaAgenda(body.zona);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "servicioTipo")) {
+    datos.servicioTipo = normalizarTextoPlano(body.servicioTipo, 20);
+  }
+
+  const requeridos = [
+    "clienteNombre",
+    "clienteTelefono",
+    "servicioTipo",
+    "servicioCategoria",
+    "servicioPaquete",
+    "fecha",
+    "hora",
+    "zona",
+    "direccion"
+  ];
+
+  if (!parcial) {
+    for (const campo of requeridos) {
+      if (!datos[campo]) errores.push(`${campo} es obligatorio`);
+    }
+  } else {
+    for (const campo of requeridos) {
+      if (Object.prototype.hasOwnProperty.call(body || {}, campo) && !datos[campo]) {
+        errores.push(`${campo} no puede estar vacio`);
+      }
+    }
+  }
+
+  if (datos.clienteEmail && !validarEmail(datos.clienteEmail)) {
+    errores.push("clienteEmail no es valido");
+  }
+
+  if (datos.clienteTelefono) {
+    datos.clienteTelefono = normalizarTelefonoAgenda(datos.clienteTelefono);
+    if (!datos.clienteTelefono) {
+      errores.push("Ingresa un teléfono válido.");
+    }
+  }
+
+  if (datos.servicioTipo && !["mascota", "auto"].includes(datos.servicioTipo)) {
+    errores.push("servicioTipo no permitido");
+  }
+
+  if (datos.servicioTipo && (datos.servicioCategoria || datos.servicioPaquete)) {
+    const servicioSeguro = construirServicioAgenda(datos);
+
+    if (servicioSeguro.error) {
+      errores.push(servicioSeguro.error);
+    } else {
+      Object.assign(datos, servicioSeguro);
+    }
+  }
+
+  if (datos.estado && !APPOINTMENT_STATUSES.includes(datos.estado)) {
+    errores.push("estado no permitido");
+  }
+
+  if (datos.origen && !["admin", "web"].includes(datos.origen)) {
+    errores.push("origen no permitido");
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "calificacionServicio")) {
+    const valor = body.calificacionServicio;
+    if (valor === null || valor === undefined || valor === "") {
+      datos.calificacionServicio = null;
+    } else if (
+      (
+        (typeof valor === "number" && Number.isInteger(valor)) ||
+        (typeof valor === "string" && /^[1-5]$/.test(valor.trim()))
+      ) &&
+      Number(valor) >= 1 &&
+      Number(valor) <= 5
+    ) {
+      datos.calificacionServicio = Number(valor);
+    } else {
+      errores.push("calificacionServicio debe ser un entero del 1 al 5");
+    }
+  }
+
+  if (datos.fecha && !validarFechaISOAgenda(datos.fecha)) {
+    errores.push("fecha no valida");
+  }
+
+  if (datos.hora && !validarHoraAgenda(datos.hora)) {
+    errores.push("hora no valida");
+  }
+
+  if (datos.fecha && datos.zona) {
+    const validacionZona = zonaAgendaPermitida(datos.fecha, datos.zona);
+    if (!validacionZona.ok) errores.push(validacionZona.message);
+  }
+
+  if (datos.servicioNombre && !datos.servicioKey) {
+    datos.servicioKey = normalizarServicioKey(datos.servicioNombre);
+    if (!datos.servicioKey) errores.push("servicioNombre no es valido");
+  }
+
+  return { datos, errores };
+}
+
+function construirCitaAdmin(cita) {
+  const obj = typeof cita.toObject === "function" ? cita.toObject() : cita;
+  return {
+    id: obj._id,
+    clienteNombre: obj.clienteNombre || "",
+    clienteTelefono: obj.clienteTelefono || "",
+    clienteEmail: obj.clienteEmail || "",
+    servicioTipo: obj.servicioTipo || "",
+    servicioNombre: obj.servicioNombre || "",
+    servicioCategoria: obj.servicioCategoria || "",
+    servicioPaquete: obj.servicioPaquete || "",
+    servicioKey: obj.servicioKey || "",
+    fecha: obj.fecha || "",
+    hora: obj.hora || "",
+    duracionMinutos: obj.duracionMinutos || 0,
+    trasladoMinutos: obj.trasladoMinutos || 0,
+    inicioBloque: obj.inicioBloque || 0,
+    finBloque: obj.finBloque || 0,
+    zona: obj.zona || "",
+    direccion: obj.direccion || "",
+    notas: obj.notas || "",
+    atendidoPor: obj.atendidoPor || "",
+    calificacionServicio: Number.isInteger(obj.calificacionServicio) ? obj.calificacionServicio : null,
+    estado: obj.estado || "pendiente",
+    origen: obj.origen || "admin",
+    createdAt: obj.createdAt,
+    updatedAt: obj.updatedAt
+  };
+}
+
+function obtenerFechaLocalAgenda() {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  return formatter.format(now);
 }
 
 // ============================
@@ -1308,6 +1978,460 @@ app.get("/admin/me", auth, requireAdmin, (req, res) => {
     email: req.admin.email,
     role: req.admin.role
   });
+});
+
+app.get("/admin/appointments", auth, requireAdmin, async (req, res) => {
+  try {
+    const filtro = {};
+    const { fecha, desde, hasta, estado, clienteTelefono } = req.query;
+
+    if (fecha) {
+      if (!validarFechaISOAgenda(fecha)) {
+        return res.status(400).json({ message: "fecha no valida" });
+      }
+      filtro.fecha = fecha;
+    } else if (desde || hasta) {
+      filtro.fecha = {};
+
+      if (desde) {
+        if (!validarFechaISOAgenda(desde)) {
+          return res.status(400).json({ message: "desde no es valido" });
+        }
+        filtro.fecha.$gte = desde;
+      }
+
+      if (hasta) {
+        if (!validarFechaISOAgenda(hasta)) {
+          return res.status(400).json({ message: "hasta no es valido" });
+        }
+        filtro.fecha.$lte = hasta;
+      }
+    }
+
+    if (estado) {
+      const estadoLimpio = normalizarTextoPlano(estado, 30);
+      if (!APPOINTMENT_STATUSES.includes(estadoLimpio)) {
+        return res.status(400).json({ message: "estado no permitido" });
+      }
+      filtro.estado = estadoLimpio;
+    }
+
+    if (clienteTelefono) {
+      const filtroTelefono = construirFiltroTelefonoAgenda(clienteTelefono);
+      if (!filtroTelefono.telefono) {
+        return res.status(400).json({ message: "Ingresa un teléfono válido." });
+      }
+      Object.assign(filtro, filtroTelefono.filtro);
+    }
+
+    const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1, createdAt: -1 });
+    res.json({ citas: citas.map(construirCitaAdmin) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener las citas" });
+  }
+});
+
+app.get("/admin/appointments/stats", auth, requireAdmin, async (req, res) => {
+  try {
+    const hoy = obtenerFechaLocalAgenda();
+    const [citasHoy, citasPendientes, citasConfirmadas, citasCompletadas, citasCanceladas, servicios] = await Promise.all([
+      Appointment.countDocuments({ fecha: hoy }),
+      Appointment.countDocuments({ estado: "pendiente" }),
+      Appointment.countDocuments({ estado: "confirmada" }),
+      Appointment.countDocuments({ estado: "completada" }),
+      Appointment.countDocuments({ estado: "cancelada" }),
+      Appointment.aggregate([
+        { $match: { estado: "completada" } },
+        {
+          $group: {
+            _id: { clienteTelefono: "$clienteTelefono", servicioKey: "$servicioKey" },
+            cantidad: { $sum: 1 },
+            servicioNombre: { $last: "$servicioNombre" }
+          }
+        },
+        { $sort: { "_id.clienteTelefono": 1, cantidad: -1 } }
+      ])
+    ]);
+
+    res.json({
+      citasHoy,
+      citasPendientes,
+      citasConfirmadas,
+      citasCompletadas,
+      citasCanceladas,
+      ingresosEstimados: 0,
+      serviciosPorCliente: servicios.map((item) => ({
+        clienteTelefono: item._id.clienteTelefono,
+        servicioKey: item._id.servicioKey,
+        servicioNombre: item.servicioNombre,
+        cantidad: item.cantidad
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener las estadisticas de agenda" });
+  }
+});
+
+app.get("/admin/appointments/availability", auth, requireAdmin, async (req, res) => {
+  try {
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10);
+    const servicioTipo = normalizarTextoPlano(req.query?.servicioTipo, 20);
+    const servicioPaquete = normalizarTextoPlano(req.query?.servicioPaquete, 80);
+    const excludeId = normalizarTextoPlano(req.query?.excludeId, 40);
+
+    if (excludeId && !mongoose.Types.ObjectId.isValid(excludeId)) {
+      return res.status(400).json({ message: "excludeId no es valido" });
+    }
+
+    const disponibilidad = await construirDisponibilidadAgenda({
+      fecha,
+      servicioTipo,
+      servicioPaquete,
+      excludeId
+    });
+
+    if (disponibilidad.error) {
+      return res.status(disponibilidad.error.status).json({ message: disponibilidad.error.message });
+    }
+
+    res.json(disponibilidad);
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener la disponibilidad" });
+  }
+});
+
+app.get("/admin/appointments/customer-history", auth, requireAdmin, async (req, res) => {
+  try {
+    const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(req.query?.telefono);
+    const servicio = normalizarServicioKey(req.query?.servicio);
+
+    if (!telefono) {
+      return res.status(400).json({ message: "telefono es obligatorio" });
+    }
+
+    const filtro = { ...filtroTelefono };
+    if (servicio) {
+      filtro.servicioKey = servicio;
+    }
+
+    const citas = await Appointment.find(filtro)
+      .sort({ fecha: -1, hora: -1, createdAt: -1 });
+
+    const estadosCompletados = new Set(["completada", "completado"]);
+    const serviciosMap = new Map();
+
+    for (const cita of citas) {
+      const key = cita.servicioKey || normalizarServicioKey(cita.servicioNombre);
+      if (!key) continue;
+
+      const actual = serviciosMap.get(key) || {
+        servicioKey: key,
+        servicioNombre: cita.servicioNombre || key,
+        total: 0,
+        completados: 0,
+        cancelados: 0,
+        noAsistio: 0
+      };
+
+      actual.total += 1;
+      if (estadosCompletados.has(cita.estado)) actual.completados += 1;
+      if (cita.estado === "cancelada") actual.cancelados += 1;
+      if (cita.estado === "no_asistio") actual.noAsistio += 1;
+      serviciosMap.set(key, actual);
+    }
+
+    const serviciosPorTipo = [...serviciosMap.values()].sort((a, b) => b.completados - a.completados || b.total - a.total);
+    const totalCompletados = citas.filter((cita) => estadosCompletados.has(cita.estado)).length;
+    const totalCancelados = citas.filter((cita) => cita.estado === "cancelada").length;
+    const totalNoAsistio = citas.filter((cita) => cita.estado === "no_asistio").length;
+    const servicioElegible = serviciosPorTipo.find((item) => item.completados >= 8) || null;
+
+    res.json({
+      clienteTelefono: telefono,
+      totalServicios: citas.length,
+      totalCompletados,
+      totalCancelados,
+      totalNoAsistio,
+      serviciosPorTipo,
+      ultimasCitas: citas.slice(0, 10).map((cita) => ({
+        id: cita._id,
+        fecha: cita.fecha || "",
+        hora: cita.hora || "",
+        servicioNombre: cita.servicioNombre || "",
+        servicioKey: cita.servicioKey || "",
+        estado: cita.estado || "",
+        zona: cita.zona || ""
+      })),
+      posibleServicioGratis: Boolean(servicioElegible),
+      servicioElegible: servicioElegible?.servicioNombre || null,
+      cantidadElegible: servicioElegible?.completados || 0
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el historial del cliente" });
+  }
+});
+
+app.post("/admin/appointments", auth, requireAdmin, async (req, res) => {
+  try {
+    const camposNoPermitidos = validarCamposCitaPermitidos(req.body, APPOINTMENT_CREATE_FIELDS);
+    if (camposNoPermitidos.length) {
+      return res.status(400).json({ message: `Campo no permitido: ${camposNoPermitidos[0]}` });
+    }
+
+    const { datos, errores } = construirDatosCitaSeguro(req.body);
+
+    if (errores.length) {
+      return res.status(400).json({ message: errores[0], errors: errores });
+    }
+
+    if (Object.prototype.hasOwnProperty.call(datos, "calificacionServicio") && datos.calificacionServicio !== null && (datos.estado || "pendiente") !== "completada") {
+      return res.status(400).json({ message: "Solo puedes registrar calificacion en citas completadas" });
+    }
+
+    const disponibilidad = await validarDisponibilidadAgenda(datos);
+
+    if (!disponibilidad.ok) {
+      return res.status(disponibilidad.status).json({ message: disponibilidad.message });
+    }
+
+    const cita = new Appointment({
+      ...datos,
+      ...disponibilidad.bloque,
+      estado: datos.estado || "pendiente",
+      origen: datos.origen || "admin"
+    });
+
+    await cita.save();
+    res.status(201).json({ message: "Cita creada correctamente", cita: construirCitaAdmin(cita) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo crear la cita" });
+  }
+});
+
+app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
+  try {
+    const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+
+    if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
+      return res.status(400).json({ message: "El id de la cita no es valido" });
+    }
+
+    const cita = await Appointment.findById(appointmentId);
+
+    if (!cita) {
+      return res.status(404).json({ message: "Cita no encontrada" });
+    }
+
+    const body = { ...req.body };
+    const camposNoPermitidos = validarCamposCitaPermitidos(body, APPOINTMENT_UPDATE_FIELDS);
+    if (camposNoPermitidos.length) {
+      return res.status(400).json({ message: `Campo no permitido: ${camposNoPermitidos[0]}` });
+    }
+
+    const fechaFinal = Object.prototype.hasOwnProperty.call(body, "fecha") ? body.fecha : cita.fecha;
+    const zonaFinal = Object.prototype.hasOwnProperty.call(body, "zona") ? body.zona : cita.zona;
+    const editaServicio = ["servicioTipo", "servicioCategoria", "servicioPaquete", "servicioNombre", "servicioKey"].some((campo) => (
+      Object.prototype.hasOwnProperty.call(body, campo)
+    ));
+    const bodySeguro = {
+      ...body,
+      fecha: fechaFinal,
+      zona: zonaFinal
+    };
+
+    if (editaServicio) {
+      bodySeguro.servicioTipo = Object.prototype.hasOwnProperty.call(body, "servicioTipo") ? body.servicioTipo : cita.servicioTipo;
+      bodySeguro.servicioCategoria = Object.prototype.hasOwnProperty.call(body, "servicioCategoria") ? body.servicioCategoria : cita.servicioCategoria;
+      bodySeguro.servicioPaquete = Object.prototype.hasOwnProperty.call(body, "servicioPaquete") ? body.servicioPaquete : cita.servicioPaquete;
+    }
+
+    const { datos, errores } = construirDatosCitaSeguro(bodySeguro, { parcial: true });
+
+    if (errores.length) {
+      return res.status(400).json({ message: errores[0], errors: errores });
+    }
+
+    const estadoFinal = datos.estado || cita.estado;
+    if (Object.prototype.hasOwnProperty.call(datos, "calificacionServicio") && datos.calificacionServicio !== null && estadoFinal !== "completada") {
+      return res.status(400).json({ message: "Solo puedes registrar calificacion en citas completadas" });
+    }
+    if (Object.prototype.hasOwnProperty.call(datos, "estado") && estadoFinal !== "completada") {
+      datos.calificacionServicio = null;
+    }
+
+    const datosParaDisponibilidad = {
+      fecha: datos.fecha || cita.fecha,
+      hora: datos.hora || cita.hora,
+      servicioTipo: datos.servicioTipo || cita.servicioTipo,
+      servicioPaquete: datos.servicioPaquete || cita.servicioPaquete,
+      estado: estadoFinal
+    };
+
+    if (!["cancelada", "no_asistio"].includes(datosParaDisponibilidad.estado)) {
+      const disponibilidad = await validarDisponibilidadAgenda(datosParaDisponibilidad, appointmentId);
+
+      if (!disponibilidad.ok) {
+        return res.status(disponibilidad.status).json({ message: disponibilidad.message });
+      }
+
+      Object.assign(datos, disponibilidad.bloque);
+    }
+
+    const camposEditables = [
+      "clienteNombre",
+      "clienteTelefono",
+      "clienteEmail",
+      "servicioTipo",
+      "servicioNombre",
+      "servicioCategoria",
+      "servicioPaquete",
+      "servicioKey",
+      "fecha",
+      "hora",
+      "duracionMinutos",
+      "trasladoMinutos",
+      "inicioBloque",
+      "finBloque",
+      "zona",
+      "direccion",
+      "notas",
+      "atendidoPor",
+      "calificacionServicio",
+      "estado"
+    ];
+
+    for (const campo of camposEditables) {
+      if (Object.prototype.hasOwnProperty.call(datos, campo)) {
+        cita[campo] = datos[campo];
+      }
+    }
+
+    await cita.save();
+    res.json({ message: "Cita actualizada correctamente", cita: construirCitaAdmin(cita) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar la cita" });
+  }
+});
+
+app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res) => {
+  try {
+    const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+    const camposNoPermitidos = validarCamposCitaPermitidos(req.body, ["estado"]);
+    if (camposNoPermitidos.length) {
+      return res.status(400).json({ message: `Campo no permitido: ${camposNoPermitidos[0]}` });
+    }
+
+    const estado = normalizarTextoPlano(req.body?.estado, 30);
+
+    if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
+      return res.status(400).json({ message: "El id de la cita no es valido" });
+    }
+
+    if (!APPOINTMENT_STATUSES.includes(estado)) {
+      return res.status(400).json({ message: "estado no permitido" });
+    }
+
+    const cita = await Appointment.findById(appointmentId);
+
+    if (!cita) {
+      return res.status(404).json({ message: "Cita no encontrada" });
+    }
+
+    if (!["cancelada", "no_asistio"].includes(estado)) {
+      const disponibilidad = await validarDisponibilidadAgenda({
+        fecha: cita.fecha,
+        hora: cita.hora,
+        servicioTipo: cita.servicioTipo,
+        servicioPaquete: cita.servicioPaquete,
+        estado
+      }, appointmentId);
+
+      if (!disponibilidad.ok) {
+        return res.status(disponibilidad.status).json({ message: disponibilidad.message });
+      }
+
+      cita.duracionMinutos = disponibilidad.bloque.duracionMinutos;
+      cita.trasladoMinutos = disponibilidad.bloque.trasladoMinutos;
+      cita.inicioBloque = disponibilidad.bloque.inicioBloque;
+      cita.finBloque = disponibilidad.bloque.finBloque;
+    }
+
+    cita.estado = estado;
+    if (estado !== "completada") {
+      cita.calificacionServicio = null;
+    }
+    await cita.save();
+
+    res.json({ message: "Estado actualizado correctamente", cita: construirCitaAdmin(cita) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar el estado de la cita" });
+  }
+});
+
+app.delete("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
+  try {
+    const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+
+    if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
+      return res.status(400).json({ message: "El id de la cita no es valido" });
+    }
+
+    const cita = await Appointment.findById(appointmentId);
+
+    if (!cita) {
+      return res.status(404).json({ message: "Cita no encontrada" });
+    }
+
+    cita.estado = "cancelada";
+    await cita.save();
+
+    res.json({ message: "Cita cancelada correctamente", cita: construirCitaAdmin(cita) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo cancelar la cita" });
+  }
+});
+
+app.get("/admin/customers/:telefono/rewards", auth, requireAdmin, async (req, res) => {
+  try {
+    const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(req.params.telefono);
+
+    if (!telefono) {
+      return res.status(400).json({ message: "clienteTelefono es obligatorio" });
+    }
+
+    const servicios = await Appointment.aggregate([
+      { $match: { ...filtroTelefono, estado: "completada" } },
+      {
+        $group: {
+          _id: "$servicioKey",
+          cantidad: { $sum: 1 },
+          servicioNombre: { $last: "$servicioNombre" }
+        }
+      },
+      { $sort: { cantidad: -1, _id: 1 } }
+    ]);
+
+    const serviciosAgrupados = servicios.map((item) => ({
+      servicioKey: item._id,
+      servicioNombre: item.servicioNombre,
+      cantidad: item.cantidad
+    }));
+    const elegible = serviciosAgrupados.find((item) => item.cantidad >= 8);
+
+    res.json({
+      clienteTelefono: telefono,
+      totalServiciosIguales: serviciosAgrupados.reduce((acc, item) => {
+        acc[item.servicioKey] = item.cantidad;
+        return acc;
+      }, {}),
+      servicios: serviciosAgrupados,
+      rewardEligible: Boolean(elegible),
+      servicioElegible: elegible?.servicioNombre || elegible?.servicioKey || null,
+      cantidad: elegible?.cantidad || 0
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el resumen de recompensas" });
+  }
 });
 
 app.get("/admin/orders", auth, requireAdmin, async (req, res) => {
