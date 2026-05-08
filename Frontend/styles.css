@@ -4862,14 +4862,24 @@ body {
 }
 
 .agenda-date-controls {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, auto)) minmax(150px, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: end;
   padding: 10px;
   border: 1px solid rgba(11, 42, 107, 0.08);
   border-radius: 20px;
   background: #fffae8;
+}
+
+.agenda-date-controls button {
+  flex: 0 0 auto;
+}
+
+.agenda-date-controls label {
+  flex: 1 1 170px;
+  max-width: 220px;
+  margin-left: auto;
 }
 
 .agenda-date-controls label,
@@ -5790,12 +5800,15 @@ body {
   }
 
   .agenda-date-controls {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: 8px;
   }
 
   .agenda-date-controls label {
     grid-column: 1 / -1;
+    max-width: none;
+    margin-left: 0;
   }
 
   .agenda-status-filters {
