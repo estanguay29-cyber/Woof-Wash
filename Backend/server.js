@@ -12,6 +12,7 @@ const nodemailer = require("nodemailer");
 const User = require("./User");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
+const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
 
 const app = express();
 app.disable("x-powered-by");
@@ -36,6 +37,7 @@ const FRONTEND_ORIGINS = Array.from(new Set((process.env.FRONTEND_ORIGINS || pro
 const AUTH_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_LIMIT_MAX_ATTEMPTS = 8;
 const MAIL_CODE_TTL_MINUTES = 10;
+const META_DIARIA_EMPLEADOS_MXN = 2000;
 const authAttempts = new Map();
 let mailTransporterPromise = null;
 const PRODUCT_CATALOG = Object.freeze({
@@ -643,6 +645,10 @@ function auth(req, res, next) {
   }
 }
 
+function obtenerRolUsuario(user) {
+  return user?.role || "admin";
+}
+
 async function requireAdmin(req, res, next) {
   try {
     const adminId = typeof req.user?.id === "string" ? req.user.id : "";
@@ -653,7 +659,7 @@ async function requireAdmin(req, res, next) {
 
     const user = await User.findById(adminId).select("usuario email role");
 
-    if (!user || user.role !== "admin") {
+    if (!user || obtenerRolUsuario(user) !== "admin") {
       return res.status(403).json({ message: "No autorizado" });
     }
 
@@ -661,6 +667,29 @@ async function requireAdmin(req, res, next) {
     next();
   } catch (error) {
     res.status(500).json({ message: "No se pudo validar el acceso administrador" });
+  }
+}
+
+async function requireEmpleado(req, res, next) {
+  try {
+    const empleadoId = typeof req.user?.id === "string" ? req.user.id : "";
+
+    if (!mongoose.Types.ObjectId.isValid(empleadoId)) {
+      return res.status(401).json({ message: "Token inválido" });
+    }
+
+    const user = await User.findById(empleadoId).select("usuario email role");
+    const role = obtenerRolUsuario(user);
+
+    if (!user || !["empleado", "admin"].includes(role)) {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    req.empleado = user;
+    req.empleadoRole = role;
+    next();
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo validar el acceso de empleado" });
   }
 }
 
@@ -740,13 +769,27 @@ const APPOINTMENT_CREATE_FIELDS = Object.freeze([
   "servicioKey",
   "servicioCategoria",
   "servicioPaquete",
+  "serviciosDetalle",
+  "duracionEstimadaMinutos",
+  "duracionBloqueadaMinutos",
   "fecha",
   "hora",
   "zona",
   "direccion",
   "notas",
   "atendidoPor",
+  "empleadoAsignadoId",
+  "empleadoAsignadoNombre",
   "calificacionServicio",
+  "calificacionCliente",
+  "comentarioCliente",
+  "fechaCalificacion",
+  "inicioServicioAt",
+  "finServicioAt",
+  "puntualidadMinutos",
+  "estadoOperativo",
+  "rewardGratisAplicado",
+  "rewardTipo",
   "estado",
   "origen"
 ]);
@@ -760,13 +803,27 @@ const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
   "servicioKey",
   "servicioCategoria",
   "servicioPaquete",
+  "serviciosDetalle",
+  "duracionEstimadaMinutos",
+  "duracionBloqueadaMinutos",
   "fecha",
   "hora",
   "zona",
   "direccion",
   "notas",
   "atendidoPor",
+  "empleadoAsignadoId",
+  "empleadoAsignadoNombre",
   "calificacionServicio",
+  "calificacionCliente",
+  "comentarioCliente",
+  "fechaCalificacion",
+  "inicioServicioAt",
+  "finServicioAt",
+  "puntualidadMinutos",
+  "estadoOperativo",
+  "rewardGratisAplicado",
+  "rewardTipo",
   "estado"
 ]);
 
@@ -802,14 +859,15 @@ const CONFIG_AGENDA = Object.freeze({
   },
   duraciones: {
     mascota: {
-      basico: 60,
-      completo: 90,
-      premium_spa: 120
+      basico: 80,
+      completo: 110,
+      premium_spa: 140
     },
     auto: {
-      lavado_basico: 45,
-      completo: 60,
-      premium: 90
+      lavado_basico: 60,
+      basico: 60,
+      completo: 90,
+      premium: 120
     }
   }
 });
@@ -906,6 +964,203 @@ function normalizarServicioKey(value) {
     .slice(0, 180);
 }
 
+function obtenerTipoGeneralServicioAgenda(cita = {}) {
+  const tipo = normalizarTextoPlano(cita.servicioTipo, 20).toLowerCase();
+  if (tipo === "auto" || tipo === "mascota") return tipo;
+
+  const referencia = normalizarServicioKey([
+    cita.servicioNombre,
+    cita.servicioKey,
+    cita.servicioCategoria,
+    cita.servicioPaquete
+  ].filter(Boolean).join(" "));
+
+  if (referencia.includes("auto") || referencia.includes("lavado") || referencia.includes("camioneta") || referencia.includes("suv") || referencia.includes("pick_up")) {
+    return "auto";
+  }
+
+  return "mascota";
+}
+
+function crearProgresoRecompensasAgenda(citas = []) {
+  const resumen = {
+    mascota: {
+      servicioTipo: "mascota",
+      servicioNombre: "mascota",
+      cantidad: 0,
+      objetivo: 8,
+      rewardEligible: false
+    },
+    auto: {
+      servicioTipo: "auto",
+      servicioNombre: "auto",
+      cantidad: 0,
+      objetivo: 8,
+      rewardEligible: false
+    }
+  };
+
+  for (const cita of citas) {
+    const tipo = obtenerTipoGeneralServicioAgenda(cita);
+    if (!resumen[tipo]) continue;
+    resumen[tipo].cantidad += 1;
+  }
+
+  Object.values(resumen).forEach((item) => {
+    item.rewardEligible = item.cantidad >= item.objetivo;
+    item.restantes = Math.max(item.objetivo - item.cantidad, 0);
+  });
+
+  return resumen;
+}
+
+async function obtenerServiciosElegiblesRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
+  const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(clienteTelefono);
+  const tipo = servicioTipo === "auto" ? "auto" : servicioTipo === "mascota" ? "mascota" : "";
+
+  if (!telefono || !tipo) return [];
+
+  const filtro = {
+    ...filtroTelefono,
+    estado: "completada",
+    rewardGratisAplicado: { $ne: true },
+    rewardConsumido: { $ne: true }
+  };
+
+  if (excludeId && mongoose.Types.ObjectId.isValid(String(excludeId))) {
+    filtro._id = { $ne: new mongoose.Types.ObjectId(String(excludeId)) };
+  }
+
+  return Appointment.find(filtro)
+    .sort({ fecha: 1, hora: 1, createdAt: 1, _id: 1 })
+    .select("_id servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey")
+    .then((citas) => citas.filter((cita) => obtenerTipoGeneralServicioAgenda(cita) === tipo).slice(0, 8));
+}
+
+async function validarRecompensaDisponible({ clienteTelefono, servicioTipo, excludeId = "" }) {
+  const servicios = await obtenerServiciosElegiblesRecompensa({ clienteTelefono, servicioTipo, excludeId });
+  return {
+    disponible: servicios.length >= 8,
+    sourceIds: servicios.map((item) => item._id)
+  };
+}
+
+async function buscarCitaGratisActivaRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
+  const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(clienteTelefono);
+  const tipo = servicioTipo === "auto" ? "auto" : servicioTipo === "mascota" ? "mascota" : "";
+
+  if (!telefono || !tipo) return null;
+
+  const filtro = {
+    ...filtroTelefono,
+    rewardGratisAplicado: true,
+    rewardGrupoId: { $in: ["", null] },
+    estado: { $nin: ["cancelada", "no_asistio"] }
+  };
+
+  if (excludeId && mongoose.Types.ObjectId.isValid(String(excludeId))) {
+    filtro._id = { $ne: new mongoose.Types.ObjectId(String(excludeId)) };
+  }
+
+  const citasGratis = await Appointment.find(filtro)
+    .sort({ fecha: 1, hora: 1, createdAt: 1, _id: 1 })
+    .select("_id servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey");
+
+  return citasGratis.find((cita) => (cita.rewardTipo || obtenerTipoGeneralServicioAgenda(cita)) === tipo) || null;
+}
+
+async function validarAplicacionRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
+  const citaGratisActiva = await buscarCitaGratisActivaRecompensa({ clienteTelefono, servicioTipo, excludeId });
+
+  if (citaGratisActiva) {
+    return {
+      ok: false,
+      status: 409,
+      message: `Este cliente ya tiene una cita gratis de ${servicioTipo} pendiente de consumo.`
+    };
+  }
+
+  const recompensa = await validarRecompensaDisponible({ clienteTelefono, servicioTipo, excludeId });
+
+  if (!recompensa.disponible) {
+    return {
+      ok: false,
+      status: 409,
+      message: `Este cliente todavia no tiene 8 servicios de ${servicioTipo} disponibles.`
+    };
+  }
+
+  return { ok: true, sourceIds: recompensa.sourceIds };
+}
+
+async function completarEmpleadoAsignado(datos = {}) {
+  if (!Object.prototype.hasOwnProperty.call(datos, "empleadoAsignadoId")) {
+    return { ok: true };
+  }
+
+  if (!datos.empleadoAsignadoId) {
+    datos.empleadoAsignadoNombre = "";
+    return { ok: true };
+  }
+
+  const empleado = await User.findById(datos.empleadoAsignadoId).select("usuario role");
+  if (!empleado || obtenerRolUsuario(empleado) !== "empleado") {
+    return { ok: false, status: 400, message: "empleadoAsignadoId no corresponde a un empleado activo" };
+  }
+
+  datos.empleadoAsignadoNombre = empleado.usuario || "";
+  return { ok: true };
+}
+
+async function consumirRecompensaCita(cita) {
+  if (!cita?.rewardGratisAplicado || cita.rewardGrupoId) {
+    return { ok: true };
+  }
+
+  const tipo = cita.rewardTipo || obtenerTipoGeneralServicioAgenda(cita);
+  const elegibles = await validarRecompensaDisponible({
+    clienteTelefono: cita.clienteTelefono,
+    servicioTipo: tipo,
+    excludeId: cita._id
+  });
+
+  if (!elegibles.disponible) {
+    return { ok: false, status: 409, message: `Este cliente ya no tiene 8 servicios de ${tipo} disponibles para consumir.` };
+  }
+
+  const grupoId = `reward-${Date.now()}-${cita._id}`;
+  const resultado = await Appointment.updateMany(
+    {
+      _id: { $in: elegibles.sourceIds },
+      estado: "completada",
+      rewardGratisAplicado: { $ne: true },
+      rewardConsumido: { $ne: true }
+    },
+    {
+      $set: {
+        rewardConsumido: true,
+        rewardGrupoId: grupoId
+      }
+    }
+  );
+
+  if (resultado.modifiedCount !== 8) {
+    await Appointment.updateMany(
+      { rewardGrupoId: grupoId },
+      {
+        $set: { rewardConsumido: false },
+        $unset: { rewardGrupoId: "" }
+      }
+    );
+    return { ok: false, status: 409, message: "La recompensa ya fue consumida por otra operacion. Actualiza la agenda e intenta de nuevo." };
+  }
+
+  cita.rewardTipo = tipo;
+  cita.rewardGrupoId = grupoId;
+  cita.rewardSourceIds = elegibles.sourceIds;
+  return { ok: true };
+}
+
 function normalizarOpcionCatalogo(value) {
   return normalizarTextoPlano(value, 80)
     .normalize("NFD")
@@ -945,6 +1200,81 @@ function construirServicioAgenda({ servicioTipo, servicioCategoria, servicioPaqu
     servicioNombre: nombre,
     servicioKey: normalizarServicioKey(nombre)
   };
+}
+
+function normalizarServicioDetalleAgenda(servicio, index = 0) {
+  const tipo = normalizarTextoPlano(servicio?.tipo, 20).toLowerCase();
+  const categoriaInput = normalizarTextoPlano(servicio?.categoria, 80);
+  const paqueteInput = normalizarTextoPlano(servicio?.paquete, 80);
+
+  if (!["mascota", "auto"].includes(tipo)) {
+    return { error: `serviciosDetalle[${index}].tipo no permitido` };
+  }
+
+  const servicioSeguro = construirServicioAgenda({
+    servicioTipo: tipo,
+    servicioCategoria: categoriaInput,
+    servicioPaquete: paqueteInput
+  });
+
+  if (servicioSeguro.error) {
+    return { error: `serviciosDetalle[${index}]: ${servicioSeguro.error}` };
+  }
+
+  const duracionNumero = obtenerDuracionServicioAgenda(tipo, servicioSeguro.servicioPaquete);
+
+  return {
+    servicio: {
+      tipo,
+      categoria: servicioSeguro.servicioCategoria,
+      paquete: servicioSeguro.servicioPaquete,
+      nombre: servicioSeguro.servicioNombre,
+      key: servicioSeguro.servicioKey,
+      notas: normalizarTextoPlano(servicio?.notas, 300),
+      duracionMinutos: duracionNumero
+    }
+  };
+}
+
+function normalizarServiciosDetalleAgenda(value) {
+  if (!Array.isArray(value)) {
+    return { error: "serviciosDetalle debe ser un arreglo" };
+  }
+
+  if (value.length < 1 || value.length > 5) {
+    return { error: "serviciosDetalle debe tener entre 1 y 5 servicios" };
+  }
+
+  const servicios = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const normalizado = normalizarServicioDetalleAgenda(value[index], index);
+    if (normalizado.error) return { error: normalizado.error };
+    servicios.push(normalizado.servicio);
+  }
+
+  const tipo = servicios[0]?.tipo;
+  if (!servicios.every((servicio) => servicio.tipo === tipo)) {
+    return { error: "No se pueden mezclar servicios de mascota y auto en la misma cita" };
+  }
+
+  return { servicios };
+}
+
+function construirServiciosDetalleCompatibles(cita) {
+  const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
+  if (Array.isArray(obj?.serviciosDetalle) && obj.serviciosDetalle.length) {
+    return obj.serviciosDetalle.map((servicio) => ({
+      tipo: servicio.tipo || "",
+      categoria: servicio.categoria || "",
+      paquete: servicio.paquete || "",
+      nombre: servicio.nombre || "",
+      key: servicio.key || "",
+      notas: servicio.notas || "",
+      duracionMinutos: Number(servicio.duracionMinutos) || 0
+    }));
+  }
+
+  return [];
 }
 
 function validarFechaISOAgenda(value) {
@@ -1005,19 +1335,47 @@ function obtenerDuracionServicioAgenda(servicioTipo, servicioPaquete) {
   return CONFIG_AGENDA.duraciones[tipo]?.[paqueteKey] || 60;
 }
 
-function calcularBloqueAgenda({ hora, servicioTipo, servicioPaquete }) {
+function obtenerDuracionBloqueadaAgenda(value) {
+  const numero = Number(value);
+  return Number.isInteger(numero) && numero >= 30 && numero <= 720 ? numero : 0;
+}
+
+function calcularDuracionEstimadaAgenda(datos = {}) {
+  const servicios = Array.isArray(datos.serviciosDetalle) && datos.serviciosDetalle.length
+    ? datos.serviciosDetalle
+    : [{
+        tipo: datos.servicioTipo,
+        paquete: datos.servicioPaquete,
+        duracionMinutos: obtenerDuracionServicioAgenda(datos.servicioTipo, datos.servicioPaquete)
+      }];
+
+  const duracionServicios = servicios.reduce((total, servicio) => {
+    const duracion = Number(servicio?.duracionMinutos);
+    return total + (Number.isInteger(duracion) && duracion > 0
+      ? duracion
+      : obtenerDuracionServicioAgenda(servicio?.tipo || datos.servicioTipo, servicio?.paquete || datos.servicioPaquete));
+  }, 0);
+
+  return duracionServicios + CONFIG_AGENDA.trasladoMinutos;
+}
+
+function calcularBloqueAgenda({ hora, servicioTipo, servicioPaquete, duracionBloqueadaMinutos }) {
   const inicioBloque = horaAMinutos(hora);
 
   if (inicioBloque === null) {
     return null;
   }
 
-  const duracionMinutos = obtenerDuracionServicioAgenda(servicioTipo, servicioPaquete);
   const trasladoMinutos = CONFIG_AGENDA.trasladoMinutos;
-  const finBloque = inicioBloque + duracionMinutos + trasladoMinutos;
+  const duracionBloqueada = obtenerDuracionBloqueadaAgenda(duracionBloqueadaMinutos);
+  const duracionMinutos = duracionBloqueada
+    ? Math.max(0, duracionBloqueada - trasladoMinutos)
+    : obtenerDuracionServicioAgenda(servicioTipo, servicioPaquete);
+  const finBloque = inicioBloque + (duracionBloqueada || duracionMinutos + trasladoMinutos);
 
   return {
     duracionMinutos,
+    duracionBloqueadaMinutos: duracionBloqueada || duracionMinutos + trasladoMinutos,
     trasladoMinutos,
     inicioBloque,
     finBloque
@@ -1045,6 +1403,7 @@ function obtenerBloqueCitaAgenda(cita) {
   const inicioGuardado = Number(cita?.inicioBloque);
   const finGuardado = Number(cita?.finBloque);
   const duracionGuardada = Number(cita?.duracionMinutos);
+  const duracionBloqueadaGuardada = Number(cita?.duracionBloqueadaMinutos);
   const trasladoGuardado = Number(cita?.trasladoMinutos);
 
   if (
@@ -1056,6 +1415,7 @@ function obtenerBloqueCitaAgenda(cita) {
       inicioBloque: inicioGuardado,
       finBloque: finGuardado,
       duracionMinutos: Number.isFinite(duracionGuardada) && duracionGuardada > 0 ? duracionGuardada : Math.max(0, finGuardado - inicioGuardado - CONFIG_AGENDA.trasladoMinutos),
+      duracionBloqueadaMinutos: Number.isFinite(duracionBloqueadaGuardada) && duracionBloqueadaGuardada > 0 ? duracionBloqueadaGuardada : finGuardado - inicioGuardado,
       trasladoMinutos: Number.isFinite(trasladoGuardado) && trasladoGuardado >= 0 ? trasladoGuardado : CONFIG_AGENDA.trasladoMinutos
     };
   }
@@ -1063,7 +1423,8 @@ function obtenerBloqueCitaAgenda(cita) {
   return calcularBloqueAgenda({
     hora: cita?.hora,
     servicioTipo: cita?.servicioTipo,
-    servicioPaquete: cita?.servicioPaquete
+    servicioPaquete: cita?.servicioPaquete,
+    duracionBloqueadaMinutos: cita?.duracionBloqueadaMinutos
   });
 }
 
@@ -1134,7 +1495,7 @@ async function validarDisponibilidadAgenda(datos, excludeId = "") {
   return { ok: true, bloque, citasOcupadas, horario: horarioValido.horario };
 }
 
-async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaquete, excludeId = "" }) {
+async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaquete, duracionBloqueadaMinutos = 0, excludeId = "" }) {
   if (!validarFechaISOAgenda(fecha)) {
     return { error: { status: 400, message: "fecha no valida" } };
   }
@@ -1152,7 +1513,7 @@ async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaqu
 
   const duracionMinutos = obtenerDuracionServicioAgenda(servicioTipo, paquete);
   const trasladoMinutos = CONFIG_AGENDA.trasladoMinutos;
-  const bloqueTotalMinutos = duracionMinutos + trasladoMinutos;
+  const bloqueTotalMinutos = obtenerDuracionBloqueadaAgenda(duracionBloqueadaMinutos) || duracionMinutos + trasladoMinutos;
   const horario = obtenerHorarioOperacionAgenda(fecha);
   const abierto = Boolean(horario);
   const citasOcupadas = await obtenerCitasOcupadasAgenda(fecha, excludeId);
@@ -1164,6 +1525,7 @@ async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaqu
       horarioInicio: null,
       horarioFin: null,
       duracionMinutos,
+      duracionBloqueadaMinutos: bloqueTotalMinutos,
       trasladoMinutos,
       bloqueTotalMinutos,
       horariosDisponibles: [],
@@ -1196,6 +1558,7 @@ async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaqu
     horarioInicio: horario.inicio,
     horarioFin: horario.fin,
     duracionMinutos,
+    duracionBloqueadaMinutos: bloqueTotalMinutos,
     trasladoMinutos,
     bloqueTotalMinutos,
     horariosDisponibles,
@@ -1232,6 +1595,9 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     ["direccion", 240],
     ["notas", 600],
     ["atendidoPor", 80],
+    ["empleadoAsignadoNombre", 120],
+    ["comentarioCliente", 500],
+    ["estadoOperativo", 30],
     ["estado", 30],
     ["origen", 20]
   ];
@@ -1248,6 +1614,98 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
 
   if (Object.prototype.hasOwnProperty.call(body || {}, "servicioTipo")) {
     datos.servicioTipo = normalizarTextoPlano(body.servicioTipo, 20);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "rewardGratisAplicado")) {
+    datos.rewardGratisAplicado = body.rewardGratisAplicado === true || body.rewardGratisAplicado === "true";
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "rewardTipo")) {
+    datos.rewardTipo = normalizarTextoPlano(body.rewardTipo, 20).toLowerCase();
+  }
+
+  for (const campo of ["duracionEstimadaMinutos", "duracionBloqueadaMinutos"]) {
+    if (Object.prototype.hasOwnProperty.call(body || {}, campo)) {
+      const valor = Number(body[campo]);
+      if (!Number.isInteger(valor) || valor < 30 || valor > 720) {
+        errores.push(`${campo} debe ser un entero entre 30 y 720`);
+      } else {
+        datos[campo] = valor;
+      }
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "empleadoAsignadoId")) {
+    const empleadoId = normalizarTextoPlano(body.empleadoAsignadoId, 40);
+    if (!empleadoId) {
+      datos.empleadoAsignadoId = null;
+      datos.empleadoAsignadoNombre = "";
+    } else if (!mongoose.Types.ObjectId.isValid(empleadoId)) {
+      errores.push("empleadoAsignadoId no es valido");
+    } else {
+      datos.empleadoAsignadoId = new mongoose.Types.ObjectId(empleadoId);
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "calificacionCliente")) {
+    const valor = body.calificacionCliente === "" || body.calificacionCliente === null
+      ? null
+      : Number(body.calificacionCliente);
+    if (valor === null) {
+      datos.calificacionCliente = null;
+      datos.fechaCalificacion = null;
+    } else if (!Number.isInteger(valor) || valor < 1 || valor > 5) {
+      errores.push("calificacionCliente debe ser un entero del 1 al 5");
+    } else {
+      datos.calificacionCliente = valor;
+      datos.fechaCalificacion = new Date();
+    }
+  }
+
+  for (const campo of ["inicioServicioAt", "finServicioAt", "fechaCalificacion"]) {
+    if (Object.prototype.hasOwnProperty.call(body || {}, campo)) {
+      if (!body[campo]) {
+        datos[campo] = null;
+      } else {
+        const fecha = new Date(body[campo]);
+        if (Number.isNaN(fecha.getTime())) {
+          errores.push(`${campo} no es valido`);
+        } else {
+          datos[campo] = fecha;
+        }
+      }
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "puntualidadMinutos")) {
+    const valor = Number(body.puntualidadMinutos);
+    if (!Number.isInteger(valor) || valor < -720 || valor > 720) {
+      errores.push("puntualidadMinutos debe ser un entero entre -720 y 720");
+    } else {
+      datos.puntualidadMinutos = valor;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "serviciosDetalle")) {
+    const detalle = normalizarServiciosDetalleAgenda(body.serviciosDetalle);
+    if (detalle.error) {
+      errores.push(detalle.error);
+    } else {
+      datos.serviciosDetalle = detalle.servicios;
+      const principal = detalle.servicios[0];
+      datos.servicioTipo = principal.tipo;
+      datos.servicioCategoria = principal.categoria;
+      datos.servicioPaquete = principal.paquete;
+      datos.servicioNombre = principal.nombre;
+      datos.servicioKey = principal.key;
+    }
+  }
+
+  if (datos.servicioTipo && datos.servicioPaquete) {
+    datos.duracionEstimadaMinutos = calcularDuracionEstimadaAgenda(datos);
+    if (!Object.prototype.hasOwnProperty.call(datos, "duracionBloqueadaMinutos")) {
+      datos.duracionBloqueadaMinutos = datos.duracionEstimadaMinutos;
+    }
   }
 
   const requeridos = [
@@ -1289,6 +1747,10 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     errores.push("servicioTipo no permitido");
   }
 
+  if (datos.rewardTipo && !["mascota", "auto"].includes(datos.rewardTipo)) {
+    errores.push("rewardTipo no permitido");
+  }
+
   if (datos.servicioTipo && (datos.servicioCategoria || datos.servicioPaquete)) {
     const servicioSeguro = construirServicioAgenda(datos);
 
@@ -1301,6 +1763,10 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
 
   if (datos.estado && !APPOINTMENT_STATUSES.includes(datos.estado)) {
     errores.push("estado no permitido");
+  }
+
+  if (datos.estadoOperativo && !ESTADOS_OPERATIVOS_CITA.includes(datos.estadoOperativo)) {
+    errores.push("estadoOperativo no permitido");
   }
 
   if (datos.origen && !["admin", "web"].includes(datos.origen)) {
@@ -1358,9 +1824,12 @@ function construirCitaAdmin(cita) {
     servicioCategoria: obj.servicioCategoria || "",
     servicioPaquete: obj.servicioPaquete || "",
     servicioKey: obj.servicioKey || "",
+    serviciosDetalle: construirServiciosDetalleCompatibles(obj),
     fecha: obj.fecha || "",
     hora: obj.hora || "",
     duracionMinutos: obj.duracionMinutos || 0,
+    duracionEstimadaMinutos: obj.duracionEstimadaMinutos || 0,
+    duracionBloqueadaMinutos: obj.duracionBloqueadaMinutos || 0,
     trasladoMinutos: obj.trasladoMinutos || 0,
     inicioBloque: obj.inicioBloque || 0,
     finBloque: obj.finBloque || 0,
@@ -1368,11 +1837,85 @@ function construirCitaAdmin(cita) {
     direccion: obj.direccion || "",
     notas: obj.notas || "",
     atendidoPor: obj.atendidoPor || "",
+    empleadoAsignadoId: obj.empleadoAsignadoId ? String(obj.empleadoAsignadoId) : "",
+    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || "",
     calificacionServicio: Number.isInteger(obj.calificacionServicio) ? obj.calificacionServicio : null,
+    calificacionCliente: Number.isInteger(obj.calificacionCliente) ? obj.calificacionCliente : null,
+    comentarioCliente: obj.comentarioCliente || "",
+    fechaCalificacion: obj.fechaCalificacion || null,
+    inicioServicioAt: obj.inicioServicioAt || null,
+    finServicioAt: obj.finServicioAt || null,
+    puntualidadMinutos: Number.isInteger(obj.puntualidadMinutos) ? obj.puntualidadMinutos : null,
+    estadoOperativo: obj.estadoOperativo || "pendiente",
+    rewardGratisAplicado: Boolean(obj.rewardGratisAplicado),
+    rewardTipo: obj.rewardTipo || "",
+    rewardConsumido: Boolean(obj.rewardConsumido),
+    rewardGrupoId: obj.rewardGrupoId || "",
+    rewardSourceIds: Array.isArray(obj.rewardSourceIds) ? obj.rewardSourceIds.map((id) => String(id)) : [],
     estado: obj.estado || "pendiente",
     origen: obj.origen || "admin",
     createdAt: obj.createdAt,
     updatedAt: obj.updatedAt
+  };
+}
+
+function contarServiciosCita(obj = {}) {
+  return Array.isArray(obj.serviciosDetalle) && obj.serviciosDetalle.length
+    ? obj.serviciosDetalle.length
+    : 1;
+}
+
+function calcularMetricasEmpleado(citas = []) {
+  const completadas = citas.filter((cita) => cita.estado === "completada" || cita.estadoOperativo === "finalizada");
+  const calificaciones = citas
+    .map((cita) => Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio)
+    .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
+  const puntualidades = citas
+    .map((cita) => cita.puntualidadMinutos)
+    .filter((valor) => Number.isInteger(valor));
+  const puntuales = puntualidades.filter((valor) => valor <= 5).length;
+
+  return {
+    serviciosCompletados: completadas.reduce((total, cita) => total + contarServiciosCita(cita), 0),
+    citasCompletadas: completadas.length,
+    promedioCalificacion: calificaciones.length
+      ? Math.round((calificaciones.reduce((total, valor) => total + valor, 0) / calificaciones.length) * 10) / 10
+      : null,
+    puntualidadPorcentaje: puntualidades.length ? Math.round((puntuales / puntualidades.length) * 100) : null,
+    ingresosGeneradosAproximados: 0
+  };
+}
+
+function calcularPuntualidadCita(cita, inicio = new Date()) {
+  if (!cita?.fecha || !cita?.hora) return null;
+  const fechaProgramada = new Date(`${cita.fecha}T${cita.hora}:00`);
+  if (Number.isNaN(fechaProgramada.getTime()) || Number.isNaN(inicio.getTime())) return null;
+  return Math.round((inicio.getTime() - fechaProgramada.getTime()) / 60000);
+}
+
+function construirCitaEmpleado(cita) {
+  const base = construirCitaAdmin(cita);
+  return {
+    id: base.id,
+    clienteNombre: base.clienteNombre,
+    clienteTelefono: base.clienteTelefono,
+    servicioTipo: base.servicioTipo,
+    servicioNombre: base.servicioNombre,
+    serviciosDetalle: base.serviciosDetalle,
+    fecha: base.fecha,
+    hora: base.hora,
+    zona: base.zona,
+    direccion: base.direccion,
+    notas: base.notas,
+    empleadoAsignadoNombre: base.empleadoAsignadoNombre,
+    estado: base.estado,
+    estadoOperativo: base.estadoOperativo,
+    rewardGratisAplicado: base.rewardGratisAplicado,
+    calificacionCliente: base.calificacionCliente,
+    comentarioCliente: base.comentarioCliente,
+    inicioServicioAt: base.inicioServicioAt,
+    finServicioAt: base.finServicioAt,
+    puntualidadMinutos: base.puntualidadMinutos
   };
 }
 
@@ -1637,13 +2180,14 @@ app.post("/login", authRateLimit, async (req, res) => {
     const token = jwt.sign(
       {
         id: user._id.toString(),
-        usuario: user.usuario
+        usuario: user.usuario,
+        role: obtenerRolUsuario(user)
       },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    res.json({ success: true, token });
+    res.json({ success: true, token, role: obtenerRolUsuario(user) });
   } catch (error) {
     res.status(500).json({ message: "Error del servidor" });
   }
@@ -1976,8 +2520,129 @@ app.get("/admin/me", auth, requireAdmin, (req, res) => {
     id: req.admin._id,
     usuario: req.admin.usuario,
     email: req.admin.email,
-    role: req.admin.role
+    role: obtenerRolUsuario(req.admin)
   });
+});
+
+app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
+  try {
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const empleados = await User.find({ role: "empleado" })
+      .select("usuario email role")
+      .sort({ usuario: 1 });
+    const empleadoIds = empleados.map((empleado) => empleado._id);
+    const citas = empleadoIds.length
+      ? await Appointment.find({ empleadoAsignadoId: { $in: empleadoIds } }).sort({ fecha: 1, hora: 1 })
+      : [];
+    const citasDia = citas.filter((cita) => cita.fecha === fecha);
+    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+
+    res.json({
+      fecha,
+      metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
+      actualDiaMxn: actualDia,
+      progresoMetaPorcentaje: Math.min(Math.round((actualDia / META_DIARIA_EMPLEADOS_MXN) * 100), 100),
+      empleados: empleados.map((empleado) => {
+        const citasEmpleado = citas.filter((cita) => String(cita.empleadoAsignadoId || "") === String(empleado._id));
+        return {
+          id: String(empleado._id),
+          usuario: empleado.usuario || "",
+          email: empleado.email || "",
+          role: obtenerRolUsuario(empleado),
+          metricas: calcularMetricasEmpleado(citasEmpleado),
+          citasHoy: citasEmpleado.filter((cita) => cita.fecha === fecha).map(construirCitaEmpleado)
+        };
+      })
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener los empleados" });
+  }
+});
+
+app.get("/empleados/me", auth, requireEmpleado, (req, res) => {
+  res.json({
+    id: req.empleado._id,
+    usuario: req.empleado.usuario,
+    email: req.empleado.email,
+    role: req.empleadoRole
+  });
+});
+
+app.get("/empleados/appointments", auth, requireEmpleado, async (req, res) => {
+  try {
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const filtro = {
+      fecha,
+      empleadoAsignadoId: req.empleado._id,
+      estado: { $nin: ["cancelada", "no_asistio"] }
+    };
+    const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
+    const metricas = calcularMetricasEmpleado(await Appointment.find({ empleadoAsignadoId: req.empleado._id }));
+
+    res.json({
+      fecha,
+      empleado: {
+        id: String(req.empleado._id),
+        usuario: req.empleado.usuario || "",
+        email: req.empleado.email || "",
+        role: req.empleadoRole
+      },
+      metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
+      actualDiaMxn: 0,
+      progresoMetaPorcentaje: 0,
+      metricas,
+      citas: citas.map(construirCitaEmpleado)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener las citas del empleado" });
+  }
+});
+
+app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado, async (req, res) => {
+  try {
+    const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+    const estadoOperativo = normalizarTextoPlano(req.body?.estadoOperativo, 30);
+
+    if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
+      return res.status(400).json({ message: "El id de la cita no es valido" });
+    }
+
+    if (!["en_camino", "en_proceso", "finalizada"].includes(estadoOperativo)) {
+      return res.status(400).json({ message: "estadoOperativo no permitido" });
+    }
+
+    const cita = await Appointment.findOne({
+      _id: appointmentId,
+      empleadoAsignadoId: req.empleado._id
+    });
+
+    if (!cita) {
+      return res.status(404).json({ message: "Cita no encontrada para este empleado" });
+    }
+
+    const ahora = new Date();
+    cita.estadoOperativo = estadoOperativo;
+    if (estadoOperativo === "en_proceso" && !cita.inicioServicioAt) {
+      cita.inicioServicioAt = ahora;
+      cita.puntualidadMinutos = calcularPuntualidadCita(cita, ahora);
+    }
+    if (estadoOperativo === "finalizada" && !cita.finServicioAt) {
+      cita.finServicioAt = ahora;
+    }
+
+    await cita.save();
+    res.json({ message: "Estado operativo actualizado", cita: construirCitaEmpleado(cita) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar el estado operativo" });
+  }
 });
 
 app.get("/admin/appointments", auth, requireAdmin, async (req, res) => {
@@ -2005,6 +2670,10 @@ app.get("/admin/appointments", auth, requireAdmin, async (req, res) => {
           return res.status(400).json({ message: "hasta no es valido" });
         }
         filtro.fecha.$lte = hasta;
+      }
+
+      if (desde && hasta && desde > hasta) {
+        return res.status(400).json({ message: "desde no puede ser mayor que hasta" });
       }
     }
 
@@ -2077,16 +2746,28 @@ app.get("/admin/appointments/availability", auth, requireAdmin, async (req, res)
     const fecha = normalizarTextoPlano(req.query?.fecha, 10);
     const servicioTipo = normalizarTextoPlano(req.query?.servicioTipo, 20);
     const servicioPaquete = normalizarTextoPlano(req.query?.servicioPaquete, 80);
+    const duracionBloqueadaParam = req.query?.duracionBloqueadaMinutos;
+    const duracionBloqueadaMinutos = Number(duracionBloqueadaParam) || 0;
     const excludeId = normalizarTextoPlano(req.query?.excludeId, 40);
 
     if (excludeId && !mongoose.Types.ObjectId.isValid(excludeId)) {
       return res.status(400).json({ message: "excludeId no es valido" });
     }
 
+    if (
+      duracionBloqueadaParam !== undefined &&
+      duracionBloqueadaParam !== "" &&
+      duracionBloqueadaMinutos !== 0 &&
+      !obtenerDuracionBloqueadaAgenda(duracionBloqueadaMinutos)
+    ) {
+      return res.status(400).json({ message: "duracionBloqueadaMinutos debe ser un entero entre 30 y 720" });
+    }
+
     const disponibilidad = await construirDisponibilidadAgenda({
       fecha,
       servicioTipo,
       servicioPaquete,
+      duracionBloqueadaMinutos,
       excludeId
     });
 
@@ -2121,12 +2802,14 @@ app.get("/admin/appointments/customer-history", auth, requireAdmin, async (req, 
     const serviciosMap = new Map();
 
     for (const cita of citas) {
-      const key = cita.servicioKey || normalizarServicioKey(cita.servicioNombre);
+      const key = obtenerTipoGeneralServicioAgenda(cita);
       if (!key) continue;
 
       const actual = serviciosMap.get(key) || {
         servicioKey: key,
-        servicioNombre: cita.servicioNombre || key,
+        servicioTipo: key,
+        servicioNombre: key,
+        objetivo: 8,
         total: 0,
         completados: 0,
         cancelados: 0,
@@ -2144,7 +2827,13 @@ app.get("/admin/appointments/customer-history", auth, requireAdmin, async (req, 
     const totalCompletados = citas.filter((cita) => estadosCompletados.has(cita.estado)).length;
     const totalCancelados = citas.filter((cita) => cita.estado === "cancelada").length;
     const totalNoAsistio = citas.filter((cita) => cita.estado === "no_asistio").length;
-    const servicioElegible = serviciosPorTipo.find((item) => item.completados >= 8) || null;
+    const citasDisponiblesRecompensa = citas.filter((cita) => (
+      estadosCompletados.has(cita.estado) &&
+      cita.rewardGratisAplicado !== true &&
+      cita.rewardConsumido !== true
+    ));
+    const progresoRecompensas = crearProgresoRecompensasAgenda(citasDisponiblesRecompensa);
+    const servicioElegible = Object.values(progresoRecompensas).find((item) => item.rewardEligible) || null;
 
     res.json({
       clienteTelefono: telefono,
@@ -2153,21 +2842,58 @@ app.get("/admin/appointments/customer-history", auth, requireAdmin, async (req, 
       totalCancelados,
       totalNoAsistio,
       serviciosPorTipo,
+      progresoRecompensas,
       ultimasCitas: citas.slice(0, 10).map((cita) => ({
         id: cita._id,
         fecha: cita.fecha || "",
         hora: cita.hora || "",
         servicioNombre: cita.servicioNombre || "",
+        servicioTipo: obtenerTipoGeneralServicioAgenda(cita),
         servicioKey: cita.servicioKey || "",
+        serviciosDetalle: construirServiciosDetalleCompatibles(cita),
+        rewardGratisAplicado: Boolean(cita.rewardGratisAplicado),
+        rewardConsumido: Boolean(cita.rewardConsumido),
         estado: cita.estado || "",
         zona: cita.zona || ""
       })),
       posibleServicioGratis: Boolean(servicioElegible),
       servicioElegible: servicioElegible?.servicioNombre || null,
-      cantidadElegible: servicioElegible?.completados || 0
+      cantidadElegible: servicioElegible?.cantidad || 0
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo obtener el historial del cliente" });
+  }
+});
+
+app.get("/admin/customers/lookup", auth, requireAdmin, async (req, res) => {
+  try {
+    const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(req.query?.telefono);
+
+    if (!telefono) {
+      return res.status(400).json({ message: "telefono es obligatorio" });
+    }
+
+    const cita = await Appointment.findOne(filtroTelefono)
+      .sort({ fecha: -1, hora: -1, createdAt: -1 })
+      .select("clienteNombre clienteTelefono clienteEmail direccion zona notas");
+
+    if (!cita) {
+      return res.json({ found: false, cliente: null });
+    }
+
+    res.json({
+      found: true,
+      cliente: {
+        clienteNombre: cita.clienteNombre || "",
+        clienteTelefono: cita.clienteTelefono || telefono,
+        clienteEmail: cita.clienteEmail || "",
+        direccion: cita.direccion || "",
+        zona: cita.zona || "",
+        notas: cita.notas || ""
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo buscar el cliente" });
   }
 });
 
@@ -2184,8 +2910,38 @@ app.post("/admin/appointments", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: errores[0], errors: errores });
     }
 
+    const empleadoAsignado = await completarEmpleadoAsignado(datos);
+    if (!empleadoAsignado.ok) {
+      return res.status(empleadoAsignado.status).json({ message: empleadoAsignado.message });
+    }
+
     if (Object.prototype.hasOwnProperty.call(datos, "calificacionServicio") && datos.calificacionServicio !== null && (datos.estado || "pendiente") !== "completada") {
       return res.status(400).json({ message: "Solo puedes registrar calificacion en citas completadas" });
+    }
+
+    if (datos.rewardGratisAplicado) {
+      const rewardTipo = datos.rewardTipo || datos.servicioTipo;
+      if (rewardTipo !== datos.servicioTipo) {
+        return res.status(400).json({ message: "El tipo de recompensa debe coincidir con el tipo de servicio" });
+      }
+
+      const recompensa = await validarAplicacionRecompensa({
+        clienteTelefono: datos.clienteTelefono,
+        servicioTipo: rewardTipo
+      });
+
+      if (!recompensa.ok) {
+        return res.status(recompensa.status).json({ message: recompensa.message });
+      }
+
+      if (datos.estado === "completada") {
+        return res.status(400).json({ message: "Crea la cita gratis primero y completala despues para consumir la recompensa" });
+      }
+
+      datos.rewardTipo = rewardTipo;
+    } else {
+      datos.rewardGratisAplicado = false;
+      datos.rewardTipo = "";
     }
 
     const disponibilidad = await validarDisponibilidadAgenda(datos);
@@ -2200,6 +2956,13 @@ app.post("/admin/appointments", auth, requireAdmin, async (req, res) => {
       estado: datos.estado || "pendiente",
       origen: datos.origen || "admin"
     });
+
+    if (cita.estado === "completada" && cita.rewardGratisAplicado) {
+      const consumo = await consumirRecompensaCita(cita);
+      if (!consumo.ok) {
+        return res.status(consumo.status).json({ message: consumo.message });
+      }
+    }
 
     await cita.save();
     res.status(201).json({ message: "Cita creada correctamente", cita: construirCitaAdmin(cita) });
@@ -2251,6 +3014,11 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: errores[0], errors: errores });
     }
 
+    const empleadoAsignado = await completarEmpleadoAsignado(datos);
+    if (!empleadoAsignado.ok) {
+      return res.status(empleadoAsignado.status).json({ message: empleadoAsignado.message });
+    }
+
     const estadoFinal = datos.estado || cita.estado;
     if (Object.prototype.hasOwnProperty.call(datos, "calificacionServicio") && datos.calificacionServicio !== null && estadoFinal !== "completada") {
       return res.status(400).json({ message: "Solo puedes registrar calificacion en citas completadas" });
@@ -2259,11 +3027,65 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
       datos.calificacionServicio = null;
     }
 
+    const rewardAplicadoFinal = Object.prototype.hasOwnProperty.call(datos, "rewardGratisAplicado")
+      ? datos.rewardGratisAplicado
+      : Boolean(cita.rewardGratisAplicado);
+    const rewardTipoFinal = datos.rewardTipo || cita.rewardTipo || datos.servicioTipo || cita.servicioTipo;
+    const servicioTipoFinal = datos.servicioTipo || cita.servicioTipo;
+    const clienteTelefonoFinal = datos.clienteTelefono || cita.clienteTelefono;
+
+    if (cita.rewardGrupoId) {
+      const camposProtegidosRecompensa = [
+        "clienteTelefono",
+        "servicioTipo",
+        "servicioCategoria",
+        "servicioPaquete",
+        "servicioNombre",
+        "servicioKey",
+        "serviciosDetalle",
+        "rewardGratisAplicado",
+        "rewardTipo"
+      ];
+      const campoProtegido = camposProtegidosRecompensa.find((campo) => (
+        Object.prototype.hasOwnProperty.call(datos, campo) &&
+        JSON.stringify(datos[campo] ?? "") !== JSON.stringify(cita[campo] ?? "")
+      ));
+
+      if (campoProtegido) {
+        return res.status(400).json({ message: "No se puede cambiar cliente, servicio o recompensa de una cita gratis ya consumida" });
+      }
+    }
+
+    if (rewardAplicadoFinal) {
+      if (rewardTipoFinal !== servicioTipoFinal) {
+        return res.status(400).json({ message: "El tipo de recompensa debe coincidir con el tipo de servicio" });
+      }
+
+      if (!cita.rewardGrupoId) {
+        const recompensa = await validarAplicacionRecompensa({
+          clienteTelefono: clienteTelefonoFinal,
+          servicioTipo: rewardTipoFinal,
+          excludeId: appointmentId
+        });
+
+        if (!recompensa.ok) {
+          return res.status(recompensa.status).json({ message: recompensa.message });
+        }
+      }
+
+      datos.rewardGratisAplicado = true;
+      datos.rewardTipo = rewardTipoFinal;
+    } else if (Object.prototype.hasOwnProperty.call(datos, "rewardGratisAplicado") || Object.prototype.hasOwnProperty.call(datos, "rewardTipo")) {
+      datos.rewardGratisAplicado = false;
+      datos.rewardTipo = "";
+    }
+
     const datosParaDisponibilidad = {
       fecha: datos.fecha || cita.fecha,
       hora: datos.hora || cita.hora,
       servicioTipo: datos.servicioTipo || cita.servicioTipo,
       servicioPaquete: datos.servicioPaquete || cita.servicioPaquete,
+      duracionBloqueadaMinutos: datos.duracionBloqueadaMinutos || cita.duracionBloqueadaMinutos,
       estado: estadoFinal
     };
 
@@ -2286,9 +3108,12 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
       "servicioCategoria",
       "servicioPaquete",
       "servicioKey",
+      "serviciosDetalle",
       "fecha",
       "hora",
       "duracionMinutos",
+      "duracionEstimadaMinutos",
+      "duracionBloqueadaMinutos",
       "trasladoMinutos",
       "inicioBloque",
       "finBloque",
@@ -2296,13 +3121,31 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
       "direccion",
       "notas",
       "atendidoPor",
+      "empleadoAsignadoId",
+      "empleadoAsignadoNombre",
       "calificacionServicio",
+      "calificacionCliente",
+      "comentarioCliente",
+      "fechaCalificacion",
+      "inicioServicioAt",
+      "finServicioAt",
+      "puntualidadMinutos",
+      "estadoOperativo",
+      "rewardGratisAplicado",
+      "rewardTipo",
       "estado"
     ];
 
     for (const campo of camposEditables) {
       if (Object.prototype.hasOwnProperty.call(datos, campo)) {
         cita[campo] = datos[campo];
+      }
+    }
+
+    if (cita.estado === "completada" && cita.rewardGratisAplicado) {
+      const consumo = await consumirRecompensaCita(cita);
+      if (!consumo.ok) {
+        return res.status(consumo.status).json({ message: consumo.message });
       }
     }
 
@@ -2343,6 +3186,7 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res)
         hora: cita.hora,
         servicioTipo: cita.servicioTipo,
         servicioPaquete: cita.servicioPaquete,
+        duracionBloqueadaMinutos: cita.duracionBloqueadaMinutos,
         estado
       }, appointmentId);
 
@@ -2351,6 +3195,7 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res)
       }
 
       cita.duracionMinutos = disponibilidad.bloque.duracionMinutos;
+      cita.duracionBloqueadaMinutos = disponibilidad.bloque.duracionBloqueadaMinutos;
       cita.trasladoMinutos = disponibilidad.bloque.trasladoMinutos;
       cita.inicioBloque = disponibilidad.bloque.inicioBloque;
       cita.finBloque = disponibilidad.bloque.finBloque;
@@ -2359,6 +3204,12 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res)
     cita.estado = estado;
     if (estado !== "completada") {
       cita.calificacionServicio = null;
+    }
+    if (estado === "completada" && cita.rewardGratisAplicado) {
+      const consumo = await consumirRecompensaCita(cita);
+      if (!consumo.ok) {
+        return res.status(consumo.status).json({ message: consumo.message });
+      }
     }
     await cita.save();
 
@@ -2399,34 +3250,29 @@ app.get("/admin/customers/:telefono/rewards", auth, requireAdmin, async (req, re
       return res.status(400).json({ message: "clienteTelefono es obligatorio" });
     }
 
-    const servicios = await Appointment.aggregate([
-      { $match: { ...filtroTelefono, estado: "completada" } },
-      {
-        $group: {
-          _id: "$servicioKey",
-          cantidad: { $sum: 1 },
-          servicioNombre: { $last: "$servicioNombre" }
-        }
-      },
-      { $sort: { cantidad: -1, _id: 1 } }
-    ]);
-
-    const serviciosAgrupados = servicios.map((item) => ({
-      servicioKey: item._id,
-      servicioNombre: item.servicioNombre,
-      cantidad: item.cantidad
-    }));
+    const citasCompletadas = await Appointment.find({
+      ...filtroTelefono,
+      estado: "completada",
+      rewardGratisAplicado: { $ne: true },
+      rewardConsumido: { $ne: true }
+    })
+      .select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey");
+    const progresoRecompensas = crearProgresoRecompensasAgenda(citasCompletadas);
+    const serviciosAgrupados = Object.values(progresoRecompensas)
+      .sort((a, b) => b.cantidad - a.cantidad || a.servicioTipo.localeCompare(b.servicioTipo));
     const elegible = serviciosAgrupados.find((item) => item.cantidad >= 8);
 
     res.json({
       clienteTelefono: telefono,
       totalServiciosIguales: serviciosAgrupados.reduce((acc, item) => {
-        acc[item.servicioKey] = item.cantidad;
+        acc[item.servicioTipo] = item.cantidad;
         return acc;
       }, {}),
       servicios: serviciosAgrupados,
+      progresoRecompensas,
       rewardEligible: Boolean(elegible),
-      servicioElegible: elegible?.servicioNombre || elegible?.servicioKey || null,
+      servicioElegible: elegible?.servicioNombre || elegible?.servicioTipo || null,
+      servicioTipoElegible: elegible?.servicioTipo || null,
       cantidad: elegible?.cantidad || 0
     });
   } catch (error) {

@@ -59,6 +59,21 @@
         </article>
       </section>
 
+      <section class="agenda-card agenda-employee-overview">
+        <div class="agenda-section-header">
+          <div>
+            <p class="admin-kicker">Empleados</p>
+            <h2>Desempe&ntilde;o base</h2>
+          </div>
+          <div class="agenda-goal-pill">
+            <span>Meta diaria</span>
+            <strong id="employeeDailyGoal">$2000 MXN</strong>
+            <small id="employeeDailyProgress">0% de avance</small>
+          </div>
+        </div>
+        <div id="agendaEmployeeMetrics" class="agenda-employee-metrics"></div>
+      </section>
+
       <section class="agenda-toolbar">
         <div>
           <p class="admin-kicker">Filtros</p>
@@ -154,16 +169,44 @@
               </select>
             </label>
             <label>
+              <span id="serviciosCantidadLabel">Número de mascotas</span>
+              <select id="serviciosCantidad" name="serviciosCantidad" required>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </label>
+            <section id="serviciosDetalleContainer" class="agenda-services-builder agenda-field-full"></section>
+            <p id="serviciosDetalleNotice" class="agenda-services-builder-note agenda-field-full hidden">Por ahora la disponibilidad se calcula con el primer servicio. El cálculo avanzado de tiempos se hará en una fase posterior.</p>
+            <section class="agenda-duration-panel agenda-field-full">
+              <div>
+                <span>Tiempo estimado autom&aacute;tico</span>
+                <strong id="duracionEstimadaTexto">-</strong>
+              </div>
+              <label>
+                Tiempo bloqueado real
+                <input id="duracionBloqueadaMinutos" name="duracionBloqueadaMinutos" type="number" min="30" max="720" step="5" required>
+              </label>
+            </section>
+            <label class="agenda-primary-service-field hidden">
               Tamaño o tipo
               <select id="servicioCategoria" name="servicioCategoria" required></select>
             </label>
-            <label class="agenda-field-full">
+            <label class="agenda-primary-service-field hidden">
               Paquete
               <select id="servicioPaquete" name="servicioPaquete" required></select>
             </label>
             <label class="agenda-field-full">
               &iquest;Qui&eacute;n atender&aacute; el servicio?
               <input id="atendidoPor" name="atendidoPor" type="text" maxlength="80" autocomplete="off" placeholder="Nombre del colaborador">
+            </label>
+            <label class="agenda-field-full">
+              Empleado asignado
+              <select id="empleadoAsignadoId" name="empleadoAsignadoId">
+                <option value="">Sin asignar</option>
+              </select>
             </label>
             <label>
               Fecha
@@ -244,16 +287,44 @@
           </select>
         </label>
         <label>
+          <span id="editServiciosCantidadLabel">Número de mascotas</span>
+          <select id="editServiciosCantidad" name="editServiciosCantidad" required>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
+        <section id="editServiciosDetalleContainer" class="agenda-services-builder agenda-field-full"></section>
+        <p id="editServiciosDetalleNotice" class="agenda-services-builder-note agenda-field-full hidden">Por ahora la disponibilidad se calcula con el primer servicio. El cálculo avanzado de tiempos se hará en una fase posterior.</p>
+        <section class="agenda-duration-panel agenda-field-full">
+          <div>
+            <span>Tiempo estimado autom&aacute;tico</span>
+            <strong id="editDuracionEstimadaTexto">-</strong>
+          </div>
+          <label>
+            Tiempo bloqueado real
+            <input id="editDuracionBloqueadaMinutos" name="editDuracionBloqueadaMinutos" type="number" min="30" max="720" step="5" required>
+          </label>
+        </section>
+        <label class="agenda-primary-service-field hidden">
           Tamaño o tipo
           <select id="editServicioCategoria" name="editServicioCategoria" required></select>
         </label>
-        <label class="agenda-field-full">
+        <label class="agenda-primary-service-field hidden">
           Paquete
           <select id="editServicioPaquete" name="editServicioPaquete" required></select>
         </label>
         <label class="agenda-field-full">
           &iquest;Qui&eacute;n atender&aacute; el servicio?
           <input id="editAtendidoPor" name="editAtendidoPor" type="text" maxlength="80" autocomplete="off" placeholder="Nombre del colaborador">
+        </label>
+        <label class="agenda-field-full">
+          Empleado asignado
+          <select id="editEmpleadoAsignadoId" name="editEmpleadoAsignadoId">
+            <option value="">Sin asignar</option>
+          </select>
         </label>
         <label>
           Estado
@@ -277,6 +348,10 @@
             <option value="2">2/5 - Revisar</option>
             <option value="1">1/5 - Revisar</option>
           </select>
+        </label>
+        <label class="agenda-field-full">
+          Comentario del cliente
+          <textarea id="editComentarioCliente" name="editComentarioCliente" rows="3" maxlength="500"></textarea>
         </label>
         <label>
           Fecha

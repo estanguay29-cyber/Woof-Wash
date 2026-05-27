@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard empleado - Woof & Wash</title>
+  <link rel="stylesheet" href="../tailwind.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body class="employee-page">
+  <main class="employee-shell">
+    <header class="employee-topbar">
+      <div class="employee-brand">
+        <div class="employee-logo">W&W</div>
+        <div>
+          <p>Woof & Wash</p>
+          <h1>Dashboard empleado</h1>
+        </div>
+      </div>
+      <input id="employeeDate" type="date" aria-label="Fecha de agenda">
+    </header>
+
+    <section id="employeeAccessMessage" class="employee-access">Validando acceso...</section>
+
+    <section id="employeeDashboard" class="employee-dashboard hidden">
+      <section class="employee-hero">
+        <div>
+          <span>Hola</span>
+          <h2 id="employeeName">Empleado</h2>
+          <p id="employeeSubtitle">Agenda operativa del día</p>
+        </div>
+        <div class="employee-goal">
+          <span>Meta diaria</span>
+          <strong id="employeeGoal">$2000 MXN</strong>
+          <small id="employeeGoalProgress">0% de avance</small>
+        </div>
+      </section>
+
+      <section class="employee-metrics" aria-label="Métricas básicas">
+        <article>
+          <span>Promedio</span>
+          <strong id="metricRating">-</strong>
+          <small>Calificación</small>
+        </article>
+        <article>
+          <span>Servicios</span>
+          <strong id="metricServices">0</strong>
+          <small>Completados</small>
+        </article>
+        <article>
+          <span>Puntualidad</span>
+          <strong id="metricPunctuality">-</strong>
+          <small>Base preliminar</small>
+        </article>
+      </section>
+
+      <section class="employee-agenda">
+        <div class="employee-section-title">
+          <div>
+            <p>Agenda del día</p>
+            <h2>Próximas citas</h2>
+          </div>
+          <span id="employeeCount">0 citas</span>
+        </div>
+        <div id="employeeAppointments" class="employee-appointments"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

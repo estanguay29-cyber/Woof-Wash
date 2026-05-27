@@ -28,6 +28,30 @@ const AGENDA_ETIQUETAS_CALIFICACION = {
   1: "Revisar atencion"
 };
 
+const AGENDA_REWARD_TYPES = {
+  mascota: "mascota",
+  auto: "auto"
+};
+
+const AGENDA_SERVICIOS_MIN = 1;
+const AGENDA_SERVICIOS_MAX = 5;
+const AGENDA_TRASLADO_UNICO_MINUTOS = 30;
+const AGENDA_DURACION_BLOQUEADA_MIN = 30;
+const AGENDA_DURACION_BLOQUEADA_MAX = 720;
+const AGENDA_DURACIONES_SERVICIO = {
+  mascota: {
+    basico: 80,
+    completo: 110,
+    premium_spa: 140
+  },
+  auto: {
+    lavado_basico: 60,
+    basico: 60,
+    completo: 90,
+    premium: 120
+  }
+};
+
 const SERVICIOS_CATALOGO = {
   mascota: {
     categorias: [
@@ -73,6 +97,13 @@ let citaEnEdicionServicioLegacy = false;
 let servicioEdicionActualizado = false;
 let disponibilidadCrearActual = null;
 let disponibilidadEditarActual = null;
+let lookupClienteTimer = null;
+let lookupClienteRequestId = 0;
+let lookupClienteTelefono = "";
+let rewardClienteActual = null;
+let duracionBloqueadaManualCrear = false;
+let duracionBloqueadaManualEditar = false;
+let empleadosAgenda = [];
 
 function obtenerApiBaseAgenda() {
   const hostname = window.location.hostname;
@@ -237,6 +268,192 @@ function cargarTelefonoEnFormulario(value, prefijo = "") {
   }
 }
 
+function mostrarAvisoLookupCliente(mensaje = "", tipo = "info") {
+  const { customerLookupNotice } = obtenerElementosAgenda();
+  if (!customerLookupNotice) return;
+  customerLookupNotice.textContent = mensaje;
+  customerLookupNotice.className = mensaje ? `agenda-customer-lookup-notice is-${tipo}` : "agenda-customer-lookup-notice hidden";
+}
+
+function obtenerProgresoRecompensas(reward) {
+  const fuente = reward?.progresoRecompensas || {};
+  return Object.keys(AGENDA_REWARD_TYPES).map((tipo) => {
+    const item = fuente[tipo] || {};
+    const cantidad = Number(item.cantidad) || 0;
+    const objetivo = Number(item.objetivo) || 8;
+    return {
+      servicioTipo: tipo,
+      servicioNombre: AGENDA_REWARD_TYPES[tipo],
+      cantidad,
+      objetivo,
+      rewardEligible: Boolean(item.rewardEligible || cantidad >= objetivo)
+    };
+  });
+}
+
+function obtenerMensajesRecompensa(reward) {
+  const progreso = obtenerProgresoRecompensas(reward);
+  const elegibles = progreso.filter((item) => item.rewardEligible);
+
+  if (elegibles.length) {
+    return elegibles.map((item) => `\uD83C\uDF81 Este cliente ya tiene un servicio gratis de ${item.servicioNombre} disponible.`);
+  }
+
+  return progreso
+    .filter((item) => item.cantidad > 0)
+    .map((item) => `Lleva ${item.cantidad} de ${item.objetivo} servicios de ${item.servicioNombre}.`);
+}
+
+function obtenerResumenRecompensa(reward) {
+  return obtenerMensajesRecompensa(reward).join(" ");
+}
+
+function mostrarAvisoProgresoRecompensa(reward = null) {
+  const { rewardProgressNotice } = obtenerElementosAgenda();
+  if (!rewardProgressNotice) return;
+
+  const mensaje = obtenerResumenRecompensa(reward);
+  const esElegible = Boolean(reward?.rewardEligible);
+  rewardProgressNotice.textContent = mensaje;
+  rewardProgressNotice.className = mensaje
+    ? `agenda-reward-progress-notice ${esElegible ? "is-eligible" : "is-progress"}`
+    : "agenda-reward-progress-notice hidden";
+}
+
+function obtenerRecompensaElegibleParaTipo(reward, tipoServicio) {
+  return obtenerProgresoRecompensas(reward).find((item) => item.servicioTipo === tipoServicio && item.rewardEligible) || null;
+}
+
+function actualizarPanelAplicarRecompensa() {
+  const { tipoServicio, rewardApplyPanel, rewardApplyText, rewardGratisAplicado, btnUsarServicioGratis } = obtenerElementosAgenda();
+  const servicioTipo = tipoServicio?.value || "mascota";
+  const elegible = obtenerRecompensaElegibleParaTipo(rewardClienteActual, servicioTipo);
+
+  if (!rewardApplyPanel || !rewardGratisAplicado || !btnUsarServicioGratis) return;
+
+  rewardApplyPanel.classList.toggle("hidden", !elegible);
+  rewardGratisAplicado.disabled = !elegible;
+  btnUsarServicioGratis.disabled = !elegible;
+
+  if (!elegible) {
+    rewardGratisAplicado.checked = false;
+    rewardApplyPanel.classList.remove("is-active");
+    return;
+  }
+
+  if (rewardApplyText) {
+    rewardApplyText.textContent = `Disponible para servicio de ${elegible.servicioNombre}. Se consumira al completar la cita gratis.`;
+  }
+
+  rewardApplyPanel.classList.toggle("is-active", rewardGratisAplicado.checked);
+}
+
+function obtenerSnapshotAutollenadoCliente(form) {
+  return {
+    clienteNombre: form.elements.clienteNombre?.value || "",
+    clienteEmail: form.elements.clienteEmail?.value || "",
+    direccion: form.elements.direccionCita?.value || "",
+    zona: form.elements.zonaCita?.value || "",
+    notas: form.elements.notasCita?.value || ""
+  };
+}
+
+function setSiNoCambio(input, valor, valorInicial) {
+  if (!input || !valor) return false;
+  if (input.value && input.value !== valorInicial) return false;
+  input.value = valor;
+  return true;
+}
+
+function aplicarAutollenadoCliente(cliente, snapshot) {
+  const { form, zonaCita } = obtenerElementosAgenda();
+  if (!form || !cliente) return false;
+
+  let aplicado = false;
+  aplicado = setSiNoCambio(form.elements.clienteNombre, cliente.clienteNombre, snapshot.clienteNombre) || aplicado;
+  aplicado = setSiNoCambio(form.elements.clienteEmail, cliente.clienteEmail, snapshot.clienteEmail) || aplicado;
+  aplicado = setSiNoCambio(form.elements.direccionCita, cliente.direccion, snapshot.direccion) || aplicado;
+  aplicado = setSiNoCambio(form.elements.notasCita, cliente.notas, snapshot.notas) || aplicado;
+
+  const zona = normalizarZonaAgenda(cliente.zona);
+  if (zonaCita && !zonaCita.disabled && zona && (!zonaCita.value || zonaCita.value === snapshot.zona)) {
+    zonaCita.value = zona;
+    aplicado = true;
+  }
+
+  return aplicado;
+}
+
+async function buscarYAutollenarClientePorTelefono() {
+  const { form, clienteTelefonoPais, clienteTelefono } = obtenerElementosAgenda();
+  if (!form || !clienteTelefono) return;
+
+  const telefono = obtenerTelefonoNormalizado({
+    codigoPais: clienteTelefonoPais?.value || "52",
+    numero: clienteTelefono.value || ""
+  });
+  if (!telefono.valido) {
+    lookupClienteTelefono = "";
+    rewardClienteActual = null;
+    mostrarAvisoLookupCliente("");
+    mostrarAvisoProgresoRecompensa(null);
+    actualizarPanelAplicarRecompensa();
+    return;
+  }
+  clienteTelefono.setCustomValidity("");
+
+  if (telefono.normalizado === lookupClienteTelefono) return;
+
+  const requestId = ++lookupClienteRequestId;
+  const snapshot = obtenerSnapshotAutollenadoCliente(form);
+  lookupClienteTelefono = telefono.normalizado;
+
+  try {
+    const [lookupResult, rewardResult] = await Promise.allSettled([
+      agendaFetch(`/admin/customers/lookup?telefono=${encodeURIComponent(telefono.normalizado)}`),
+      agendaFetch(`/admin/customers/${encodeURIComponent(telefono.normalizado)}/rewards`)
+    ]);
+    if (requestId !== lookupClienteRequestId) return;
+
+    const telefonoActual = obtenerTelefonoNormalizado({
+      codigoPais: obtenerElementosAgenda().clienteTelefonoPais?.value || "52",
+      numero: obtenerElementosAgenda().clienteTelefono?.value || ""
+    });
+    if (telefonoActual.normalizado !== telefono.normalizado) return;
+
+    const rewardData = rewardResult.status === "fulfilled" ? rewardResult.value : null;
+    rewardClienteActual = rewardData;
+    mostrarAvisoProgresoRecompensa(rewardData);
+    actualizarPanelAplicarRecompensa();
+
+    if (lookupResult.status !== "fulfilled") return;
+    const data = lookupResult.value;
+
+    if (!data?.found || !data.cliente) {
+      mostrarAvisoLookupCliente("");
+      return;
+    }
+
+    cargarTelefonoEnFormulario(data.cliente.clienteTelefono || telefono.normalizado);
+    const aplicado = aplicarAutollenadoCliente(data.cliente, snapshot);
+    if (aplicado) {
+      mostrarAvisoLookupCliente("Datos del cliente encontrados y cargados. Puedes modificarlos si lo necesitas.", "success");
+    }
+  } catch {
+    if (requestId === lookupClienteRequestId) {
+      mostrarAvisoLookupCliente("");
+      mostrarAvisoProgresoRecompensa(null);
+      rewardClienteActual = null;
+      actualizarPanelAplicarRecompensa();
+    }
+  }
+}
+
+function programarLookupCliente() {
+  window.clearTimeout(lookupClienteTimer);
+  lookupClienteTimer = window.setTimeout(buscarYAutollenarClientePorTelefono, 450);
+}
+
 function buscarOpcionServicio(opciones, value) {
   const normalizado = normalizarServicioKey(value);
   return opciones.find((opcion) => normalizarServicioKey(opcion.value) === normalizado) || null;
@@ -258,6 +475,45 @@ function obtenerServicioSeleccionado(tipo, categoriaValue, paqueteValue) {
   };
 }
 
+function obtenerDuracionServicioFormulario(tipo, paquete) {
+  const servicioTipo = SERVICIOS_CATALOGO[tipo] ? tipo : "mascota";
+  const paqueteKey = normalizarServicioKey(paquete);
+  return AGENDA_DURACIONES_SERVICIO[servicioTipo]?.[paqueteKey] || 60;
+}
+
+function obtenerDuracionBloqueadaValida(value) {
+  const numero = Number(value);
+  if (!Number.isInteger(numero)) return 0;
+  if (numero < AGENDA_DURACION_BLOQUEADA_MIN || numero > AGENDA_DURACION_BLOQUEADA_MAX) return 0;
+  return numero;
+}
+
+function calcularDuracionEstimadaFormulario(prefijo = "") {
+  const servicios = obtenerServiciosDesdeBloques(prefijo);
+  const duracionServicios = servicios.reduce((total, servicio) => (
+    total + obtenerDuracionServicioFormulario(servicio.tipo, servicio.paquete)
+  ), 0);
+  return duracionServicios + AGENDA_TRASLADO_UNICO_MINUTOS;
+}
+
+function actualizarDuracionFormulario(prefijo = "", { forzarBloqueada = false } = {}) {
+  const esEdicion = prefijo === "edit";
+  const texto = document.getElementById(esEdicion ? "editDuracionEstimadaTexto" : "duracionEstimadaTexto");
+  const input = document.getElementById(esEdicion ? "editDuracionBloqueadaMinutos" : "duracionBloqueadaMinutos");
+  const manual = esEdicion ? duracionBloqueadaManualEditar : duracionBloqueadaManualCrear;
+  const estimada = calcularDuracionEstimadaFormulario(prefijo);
+
+  if (texto) {
+    texto.textContent = `${estimada} min aprox.`;
+  }
+
+  if (input && (forzarBloqueada || !manual || !input.value)) {
+    input.value = String(estimada);
+  }
+
+  return estimada;
+}
+
 function llenarSelectServicio(select, opciones, selectedValue = "") {
   if (!select) return;
 
@@ -267,6 +523,159 @@ function llenarSelectServicio(select, opciones, selectedValue = "") {
 
   const match = buscarOpcionServicio(opciones, selectedValue);
   select.value = match?.value || opciones[0]?.value || "";
+}
+
+function crearOpcionesServicioHtml(opciones, selectedValue = "") {
+  const match = buscarOpcionServicio(opciones, selectedValue);
+  const selected = match?.value || opciones[0]?.value || "";
+  return opciones
+    .map((opcion) => `<option value="${escapeHtml(opcion.value)}" ${opcion.value === selected ? "selected" : ""}>${escapeHtml(opcion.label)}</option>`)
+    .join("");
+}
+
+function obtenerConfigServiciosFormulario(prefijo = "") {
+  const esEdicion = prefijo === "edit";
+  return {
+    prefijo,
+    tipoSelect: document.getElementById(esEdicion ? "editTipoServicio" : "tipoServicio"),
+    cantidadSelect: document.getElementById(esEdicion ? "editServiciosCantidad" : "serviciosCantidad"),
+    cantidadLabel: document.getElementById(esEdicion ? "editServiciosCantidadLabel" : "serviciosCantidadLabel"),
+    container: document.getElementById(esEdicion ? "editServiciosDetalleContainer" : "serviciosDetalleContainer"),
+    notice: document.getElementById(esEdicion ? "editServiciosDetalleNotice" : "serviciosDetalleNotice"),
+    categoriaPrincipal: document.getElementById(esEdicion ? "editServicioCategoria" : "servicioCategoria"),
+    paquetePrincipal: document.getElementById(esEdicion ? "editServicioPaquete" : "servicioPaquete")
+  };
+}
+
+function obtenerCantidadServicios(value) {
+  const cantidad = Number(value);
+  if (!Number.isInteger(cantidad)) return AGENDA_SERVICIOS_MIN;
+  return Math.min(Math.max(cantidad, AGENDA_SERVICIOS_MIN), AGENDA_SERVICIOS_MAX);
+}
+
+function obtenerServiciosDesdeBloques(prefijo = "") {
+  const { container, tipoSelect } = obtenerConfigServiciosFormulario(prefijo);
+  const tipo = SERVICIOS_CATALOGO[tipoSelect?.value] ? tipoSelect.value : "mascota";
+  if (!container) return [];
+
+  return [...container.querySelectorAll("[data-service-block]")].map((bloque) => ({
+    tipo,
+    categoria: bloque.querySelector("[data-service-category]")?.value || "",
+    paquete: bloque.querySelector("[data-service-package]")?.value || "",
+    notas: bloque.querySelector("[data-service-notes]")?.value || ""
+  }));
+}
+
+function obtenerServicioFallbackFormulario(prefijo = "") {
+  const { tipoSelect, categoriaPrincipal, paquetePrincipal } = obtenerConfigServiciosFormulario(prefijo);
+  const tipo = SERVICIOS_CATALOGO[tipoSelect?.value] ? tipoSelect.value : "mascota";
+  return [{
+    tipo,
+    categoria: categoriaPrincipal?.value || "",
+    paquete: paquetePrincipal?.value || "",
+    notas: ""
+  }];
+}
+
+function actualizarEtiquetaCantidadServicios(prefijo = "") {
+  const { tipoSelect, cantidadLabel } = obtenerConfigServiciosFormulario(prefijo);
+  if (!cantidadLabel) return;
+  cantidadLabel.textContent = tipoSelect?.value === "auto" ? "Número de autos" : "Número de mascotas";
+}
+
+function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
+  const config = obtenerConfigServiciosFormulario(prefijo);
+  const { tipoSelect, cantidadSelect, container, notice } = config;
+  if (!tipoSelect || !cantidadSelect || !container) return;
+
+  const tipo = SERVICIOS_CATALOGO[tipoSelect.value] ? tipoSelect.value : "mascota";
+  const catalogo = SERVICIOS_CATALOGO[tipo];
+  const serviciosActuales = Array.isArray(serviciosIniciales)
+    ? serviciosIniciales
+    : (obtenerServiciosDesdeBloques(prefijo).length ? obtenerServiciosDesdeBloques(prefijo) : obtenerServicioFallbackFormulario(prefijo));
+  const cantidad = obtenerCantidadServicios(serviciosIniciales?.length || cantidadSelect.value);
+  cantidadSelect.value = String(cantidad);
+  actualizarEtiquetaCantidadServicios(prefijo);
+
+  container.innerHTML = Array.from({ length: cantidad }, (_, index) => {
+    const servicio = serviciosActuales[index] || serviciosActuales[0] || {};
+    const categoria = buscarOpcionServicio(catalogo.categorias, servicio.categoria)?.value || catalogo.categorias[0]?.value || "";
+    const paquete = buscarOpcionServicio(catalogo.paquetes, servicio.paquete)?.value || catalogo.paquetes[0]?.value || "";
+    const titulo = `${formatearServicio(tipo)} ${index + 1}`;
+
+    return `
+      <article class="agenda-service-block" data-service-block data-service-index="${index}">
+        <div class="agenda-service-block-header">
+          <strong>${escapeHtml(titulo)}</strong>
+        </div>
+        <label>
+          Tamaño o tipo
+          <select data-service-category required>
+            ${crearOpcionesServicioHtml(catalogo.categorias, categoria)}
+          </select>
+        </label>
+        <label>
+          Paquete
+          <select data-service-package required>
+            ${crearOpcionesServicioHtml(catalogo.paquetes, paquete)}
+          </select>
+        </label>
+        <label class="agenda-service-block-notes">
+          Notas opcionales
+          <textarea data-service-notes rows="2" maxlength="300">${escapeHtml(servicio.notas || "")}</textarea>
+        </label>
+      </article>
+    `;
+  }).join("");
+
+  if (notice) {
+    notice.classList.toggle("hidden", cantidad <= 1);
+  }
+
+  sincronizarServicioPrincipalDesdeBloques(prefijo);
+  actualizarDuracionFormulario(prefijo);
+}
+
+function sincronizarServicioPrincipalDesdeBloques(prefijo = "") {
+  const { tipoSelect, categoriaPrincipal, paquetePrincipal } = obtenerConfigServiciosFormulario(prefijo);
+  const primerServicio = obtenerServiciosDesdeBloques(prefijo)[0];
+  if (!tipoSelect || !categoriaPrincipal || !paquetePrincipal || !primerServicio) return null;
+
+  const tipo = SERVICIOS_CATALOGO[tipoSelect.value] ? tipoSelect.value : "mascota";
+  const servicio = obtenerServicioSeleccionado(tipo, primerServicio.categoria, primerServicio.paquete);
+  categoriaPrincipal.value = servicio.servicioCategoria;
+  paquetePrincipal.value = servicio.servicioPaquete;
+  return servicio;
+}
+
+function construirServiciosDetalleFormulario(prefijo = "") {
+  sincronizarServicioPrincipalDesdeBloques(prefijo);
+  const servicios = obtenerServiciosDesdeBloques(prefijo);
+  const cantidad = obtenerCantidadServicios(servicios.length);
+  const tipo = obtenerConfigServiciosFormulario(prefijo).tipoSelect?.value || "mascota";
+
+  if (servicios.length !== cantidad || cantidad < AGENDA_SERVICIOS_MIN || cantidad > AGENDA_SERVICIOS_MAX) {
+    throw new Error("Selecciona entre 1 y 5 servicios.");
+  }
+
+  return servicios.map((servicio, index) => {
+    if (servicio.tipo !== tipo) {
+      throw new Error("No se pueden mezclar mascotas y autos en la misma cita.");
+    }
+    if (!servicio.categoria || !servicio.paquete) {
+      throw new Error(`Completa categoría y paquete de ${formatearServicio(tipo)} ${index + 1}.`);
+    }
+
+    const normalizado = obtenerServicioSeleccionado(tipo, servicio.categoria, servicio.paquete);
+    return {
+      tipo: normalizado.servicioTipo,
+      categoria: normalizado.servicioCategoria,
+      paquete: normalizado.servicioPaquete,
+      nombre: normalizado.servicioNombre,
+      key: normalizado.servicioKey,
+      notas: String(servicio.notas || "").trim().slice(0, 300)
+    };
+  });
 }
 
 function actualizarCatalogoServicio({ tipoSelect, categoriaSelect, paqueteSelect, categoriaValue = "", paqueteValue = "" }) {
@@ -280,15 +689,16 @@ function actualizarCatalogoServicio({ tipoSelect, categoriaSelect, paqueteSelect
   llenarSelectServicio(paqueteSelect, catalogo.paquetes, paqueteValue);
 }
 
-function actualizarCatalogoFormulario() {
+function actualizarCatalogoFormulario(serviciosIniciales = null) {
   actualizarCatalogoServicio({
     tipoSelect: document.getElementById("tipoServicio"),
     categoriaSelect: document.getElementById("servicioCategoria"),
     paqueteSelect: document.getElementById("servicioPaquete")
   });
+  renderizarBloquesServicios("", serviciosIniciales);
 }
 
-function actualizarCatalogoEdicion(categoriaValue = "", paqueteValue = "") {
+function actualizarCatalogoEdicion(categoriaValue = "", paqueteValue = "", serviciosIniciales = null) {
   actualizarCatalogoServicio({
     tipoSelect: document.getElementById("editTipoServicio"),
     categoriaSelect: document.getElementById("editServicioCategoria"),
@@ -296,6 +706,7 @@ function actualizarCatalogoEdicion(categoriaValue = "", paqueteValue = "") {
     categoriaValue,
     paqueteValue
   });
+  renderizarBloquesServicios("edit", serviciosIniciales);
 }
 
 function mostrarAvisoDisponibilidad(notice, mensaje = "", tipo = "") {
@@ -327,6 +738,7 @@ async function cargarDisponibilidadFormulario({ modo = "crear", conservarHora = 
   const fechaInput = esEdicion ? document.getElementById("editFechaCita") : elementos.fechaCita;
   const tipoSelect = esEdicion ? elementos.editTipoServicio : elementos.tipoServicio;
   const paqueteSelect = esEdicion ? elementos.editServicioPaquete : elementos.servicioPaquete;
+  const duracionBloqueadaInput = esEdicion ? elementos.editDuracionBloqueada : elementos.duracionBloqueada;
   const horaSelect = esEdicion ? elementos.editHoraCita : elementos.horaCita;
   const notice = esEdicion ? elementos.editAvailabilityNotice : elementos.availabilityNotice;
   const submitButton = esEdicion ? elementos.editBtnGuardar : elementos.btnCrear;
@@ -336,6 +748,7 @@ async function cargarDisponibilidadFormulario({ modo = "crear", conservarHora = 
   const fecha = fechaInput.value;
   const servicioTipo = tipoSelect.value;
   const servicioPaquete = paqueteSelect.value;
+  const duracionBloqueadaMinutos = obtenerDuracionBloqueadaValida(duracionBloqueadaInput?.value);
 
   if (!fecha || !servicioTipo || !servicioPaquete) {
     llenarSelectHorarios(horaSelect, [], "");
@@ -343,10 +756,18 @@ async function cargarDisponibilidadFormulario({ modo = "crear", conservarHora = 
     return;
   }
 
+  if (duracionBloqueadaInput?.value && !duracionBloqueadaMinutos) {
+    llenarSelectHorarios(horaSelect, [], "");
+    submitButton.disabled = true;
+    mostrarAvisoDisponibilidad(notice, "Ingresa un tiempo bloqueado real entre 30 y 720 minutos.", "is-blocked");
+    return;
+  }
+
   const params = new URLSearchParams({
     fecha,
     servicioTipo,
-    servicioPaquete
+    servicioPaquete,
+    duracionBloqueadaMinutos: String(duracionBloqueadaMinutos)
   });
 
   if (esEdicion && citaEnEdicionId) {
@@ -357,8 +778,10 @@ async function cargarDisponibilidadFormulario({ modo = "crear", conservarHora = 
     const disponibilidad = await agendaFetch(`/admin/appointments/availability?${params.toString()}`);
     const horaObjetivo = conservarHora || horaSelect.value || "";
     const horaDisponible = llenarSelectHorarios(horaSelect, disponibilidad.horariosDisponibles, horaObjetivo);
+    const tiempoBloqueado = Number(disponibilidad.duracionBloqueadaMinutos || disponibilidad.bloqueTotalMinutos)
+      || (Number(disponibilidad.duracionMinutos) || 0) + (Number(disponibilidad.trasladoMinutos) || 0);
     const mensajeBase = disponibilidad.abierto
-      ? `Duración: ${disponibilidad.duracionMinutos} min + ${disponibilidad.trasladoMinutos} min traslado`
+      ? `Tiempo bloqueado: ${tiempoBloqueado} min (${disponibilidad.duracionMinutos} min + ${disponibilidad.trasladoMinutos} min traslado)`
       : "Este día no hay servicio disponible.";
 
     if (esEdicion) {
@@ -448,6 +871,9 @@ function protegerAgendaAdmin() {
 function obtenerElementosAgenda() {
   return {
     filtroFecha: document.getElementById("filtroFecha"),
+    filtroFechaDesde: document.getElementById("filtroFechaDesde"),
+    filtroFechaHasta: document.getElementById("filtroFechaHasta"),
+    rangeNotice: document.getElementById("agendaRangeNotice"),
     filtroZona: document.getElementById("filtroZonaAgenda"),
     buscador: document.getElementById("agendaSearchInput"),
     lista: document.getElementById("agendaAppointmentsList"),
@@ -456,6 +882,16 @@ function obtenerElementosAgenda() {
     tipoServicio: document.getElementById("tipoServicio"),
     clienteTelefonoPais: document.getElementById("clienteTelefonoPais"),
     clienteTelefono: document.getElementById("clienteTelefono"),
+    customerLookupNotice: document.getElementById("agendaCustomerLookupNotice"),
+    rewardProgressNotice: document.getElementById("agendaRewardProgressNotice"),
+    rewardApplyPanel: document.getElementById("agendaRewardApplyPanel"),
+    rewardApplyText: document.getElementById("agendaRewardApplyText"),
+    rewardGratisAplicado: document.getElementById("rewardGratisAplicado"),
+    btnUsarServicioGratis: document.getElementById("btnUsarServicioGratis"),
+    serviciosCantidad: document.getElementById("serviciosCantidad"),
+    serviciosDetalleContainer: document.getElementById("serviciosDetalleContainer"),
+    duracionBloqueada: document.getElementById("duracionBloqueadaMinutos"),
+    empleadoAsignadoId: document.getElementById("empleadoAsignadoId"),
     servicioCategoria: document.getElementById("servicioCategoria"),
     servicioPaquete: document.getElementById("servicioPaquete"),
     fechaCita: document.getElementById("fechaCita"),
@@ -466,9 +902,16 @@ function obtenerElementosAgenda() {
     btnCrear: document.getElementById("btnCrearCita"),
     modal: document.getElementById("agendaEditModal"),
     editForm: document.getElementById("agendaEditForm"),
+    editRewardApplyPanel: document.getElementById("agendaEditRewardApplyPanel"),
+    editRewardApplyText: document.getElementById("agendaEditRewardApplyText"),
+    editRewardGratisAplicado: document.getElementById("editRewardGratisAplicado"),
     editClienteTelefonoPais: document.getElementById("editClienteTelefonoPais"),
     editClienteTelefono: document.getElementById("editClienteTelefono"),
     editTipoServicio: document.getElementById("editTipoServicio"),
+    editServiciosCantidad: document.getElementById("editServiciosCantidad"),
+    editServiciosDetalleContainer: document.getElementById("editServiciosDetalleContainer"),
+    editDuracionBloqueada: document.getElementById("editDuracionBloqueadaMinutos"),
+    editEmpleadoAsignadoId: document.getElementById("editEmpleadoAsignadoId"),
     editServicioCategoria: document.getElementById("editServicioCategoria"),
     editServicioPaquete: document.getElementById("editServicioPaquete"),
     editHoraCita: document.getElementById("editHoraCita"),
@@ -498,6 +941,67 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function llenarSelectEmpleados(select, selectedValue = "") {
+  if (!select) return;
+  const opciones = [
+    `<option value="">Sin asignar</option>`,
+    ...empleadosAgenda.map((empleado) => (
+      `<option value="${escapeHtml(empleado.id)}">${escapeHtml(empleado.usuario || empleado.email || "Empleado")}</option>`
+    ))
+  ];
+  select.innerHTML = opciones.join("");
+  select.value = empleadosAgenda.some((empleado) => empleado.id === selectedValue) ? selectedValue : "";
+}
+
+function obtenerEmpleadoAgenda(id) {
+  return empleadosAgenda.find((empleado) => empleado.id === id) || null;
+}
+
+async function cargarEmpleadosAgenda() {
+  try {
+    const fecha = obtenerElementosAgenda().filtroFecha?.value || obtenerFechaLocalISO();
+    const data = await agendaFetch(`/admin/employees?fecha=${encodeURIComponent(fecha)}`);
+    empleadosAgenda = Array.isArray(data.empleados) ? data.empleados : [];
+    renderizarMetricasEmpleadosAgenda(data);
+  } catch {
+    empleadosAgenda = [];
+    renderizarMetricasEmpleadosAgenda(null);
+  }
+
+  const elementos = obtenerElementosAgenda();
+  llenarSelectEmpleados(elementos.empleadoAsignadoId, elementos.empleadoAsignadoId?.value || "");
+  llenarSelectEmpleados(elementos.editEmpleadoAsignadoId, elementos.editEmpleadoAsignadoId?.value || "");
+}
+
+function renderizarMetricasEmpleadosAgenda(data) {
+  const container = document.getElementById("agendaEmployeeMetrics");
+  const goal = document.getElementById("employeeDailyGoal");
+  const progress = document.getElementById("employeeDailyProgress");
+  if (!container) return;
+
+  if (goal) goal.textContent = `$${data?.metaDiariaMxn || 2000} MXN`;
+  if (progress) progress.textContent = `${data?.progresoMetaPorcentaje || 0}% de avance`;
+
+  const empleados = Array.isArray(data?.empleados) ? data.empleados : [];
+  if (!empleados.length) {
+    container.innerHTML = `<div class="agenda-employee-metric"><strong>Sin empleados</strong><small>Crea usuarios con rol empleado para ver métricas.</small></div>`;
+    return;
+  }
+
+  container.innerHTML = empleados.map((empleado) => {
+    const metricas = empleado.metricas || {};
+    const calificacion = metricas.promedioCalificacion ? `${metricas.promedioCalificacion}/5` : "-";
+    const puntualidad = Number.isInteger(metricas.puntualidadPorcentaje) ? `${metricas.puntualidadPorcentaje}%` : "-";
+    return `
+      <article class="agenda-employee-metric">
+        <span>${escapeHtml(empleado.usuario || "Empleado")}</span>
+        <strong>${escapeHtml(calificacion)}</strong>
+        <small>${escapeHtml(metricas.serviciosCompletados || 0)} servicios · ${escapeHtml(puntualidad)} puntualidad</small>
+      </article>
+    `;
+  }).join("");
 }
 
 function aplicarReglaZonaEnCampos({ fechaInput, zonaSelect, notice, submitButton }) {
@@ -554,6 +1058,7 @@ function actualizarZonaEdicion() {
 }
 
 function mapearCitaApi(cita) {
+  const serviciosDetalle = normalizarServiciosDetalleCita(cita);
   return {
     id: cita.id || cita._id,
     cliente: cita.clienteNombre || "",
@@ -564,7 +1069,10 @@ function mapearCitaApi(cita) {
     servicioCategoria: cita.servicioCategoria || "",
     servicioPaquete: cita.servicioPaquete || "",
     servicioKey: cita.servicioKey || "",
+    serviciosDetalle,
     duracionMinutos: Number(cita.duracionMinutos) || 0,
+    duracionEstimadaMinutos: Number(cita.duracionEstimadaMinutos) || 0,
+    duracionBloqueadaMinutos: Number(cita.duracionBloqueadaMinutos) || 0,
     trasladoMinutos: Number(cita.trasladoMinutos) || 0,
     inicioBloque: Number(cita.inicioBloque) || 0,
     finBloque: Number(cita.finBloque) || 0,
@@ -574,7 +1082,18 @@ function mapearCitaApi(cita) {
     direccion: cita.direccion || "",
     notas: cita.notas || "",
     atendidoPor: cita.atendidoPor || "",
+    empleadoAsignadoId: cita.empleadoAsignadoId || "",
+    empleadoAsignadoNombre: cita.empleadoAsignadoNombre || "",
+    estadoOperativo: cita.estadoOperativo || "pendiente",
+    calificacionCliente: Number(cita.calificacionCliente) || null,
+    comentarioCliente: cita.comentarioCliente || "",
+    puntualidadMinutos: Number.isInteger(cita.puntualidadMinutos) ? cita.puntualidadMinutos : null,
     calificacionServicio: normalizarCalificacionServicio(cita.calificacionServicio),
+    rewardGratisAplicado: Boolean(cita.rewardGratisAplicado),
+    rewardTipo: cita.rewardTipo || "",
+    rewardConsumido: Boolean(cita.rewardConsumido),
+    rewardGrupoId: cita.rewardGrupoId || "",
+    rewardSourceIds: Array.isArray(cita.rewardSourceIds) ? cita.rewardSourceIds : [],
     estado: cita.estado || "pendiente",
     createdAt: cita.createdAt || ""
   };
@@ -592,6 +1111,59 @@ function construirQueryCitas() {
   }
 
   return params.toString();
+}
+
+function limpiarAvisoRangoAgenda() {
+  const { rangeNotice } = obtenerElementosAgenda();
+  if (!rangeNotice) return;
+  rangeNotice.textContent = "";
+  rangeNotice.className = "agenda-range-notice hidden";
+}
+
+function mostrarAvisoRangoAgenda(mensaje, tipo = "info") {
+  const { rangeNotice } = obtenerElementosAgenda();
+  if (!rangeNotice) return;
+  rangeNotice.textContent = mensaje;
+  rangeNotice.className = `agenda-range-notice is-${tipo}`;
+}
+
+function limpiarCamposRangoAgenda() {
+  const { filtroFechaDesde, filtroFechaHasta } = obtenerElementosAgenda();
+  if (filtroFechaDesde) filtroFechaDesde.value = "";
+  if (filtroFechaHasta) filtroFechaHasta.value = "";
+  limpiarAvisoRangoAgenda();
+}
+
+function aplicarRangoFechasAgenda() {
+  const { filtroFecha, filtroFechaDesde, filtroFechaHasta, filtroZona, buscador } = obtenerElementosAgenda();
+  const desde = filtroFechaDesde?.value || "";
+  const hasta = filtroFechaHasta?.value || "";
+
+  if (!desde && !hasta) {
+    filtroRangoActual = null;
+    limpiarAvisoRangoAgenda();
+    return true;
+  }
+
+  if (!desde || !hasta) {
+    filtroRangoActual = null;
+    mostrarAvisoRangoAgenda("Selecciona fecha desde y fecha hasta para consultar un rango.", "warning");
+    return false;
+  }
+
+  if (desde > hasta) {
+    filtroRangoActual = null;
+    mostrarAvisoRangoAgenda("La fecha desde no puede ser mayor que la fecha hasta.", "error");
+    return false;
+  }
+
+  filtroRangoActual = { desde, hasta };
+  if (filtroFecha) filtroFecha.value = desde;
+  if (filtroZona) filtroZona.value = "todas";
+  if (buscador) buscador.value = "";
+  citaPendienteCancelacionId = null;
+  mostrarAvisoRangoAgenda(`Viendo citas del ${formatearFechaAgenda(desde)} al ${formatearFechaAgenda(hasta)}.`, "info");
+  return true;
 }
 
 async function cargarRewardsParaCitas(citas) {
@@ -618,6 +1190,7 @@ async function cargarCitasAgenda() {
     const data = await agendaFetch(`/admin/appointments?${construirQueryCitas()}`);
     citasAgenda = Array.isArray(data.citas) ? data.citas.map(mapearCitaApi) : [];
     await cargarRewardsParaCitas(citasAgenda);
+    await cargarEmpleadosAgenda();
   } catch (error) {
     citasAgenda = [];
     if (lista) {
@@ -649,7 +1222,9 @@ function obtenerCitasFiltradasLocal() {
         cita.cliente,
         cita.telefono,
         cita.detalle,
+        crearTextoServiciosDetalle(cita),
         cita.atendidoPor,
+        cita.empleadoAsignadoNombre,
         cita.zona,
         cita.direccion
       ].map(normalizarBusquedaAgenda).join(" ");
@@ -717,23 +1292,31 @@ function crearCardCita(cita) {
   const whatsappUrl = crearUrlWhatsApp(cita);
   const reward = rewardsPorTelefono[cita.telefono];
   const rewardEligible = Boolean(reward?.rewardEligible);
+  const rewardSummary = obtenerResumenRecompensa(reward);
+  const rewardCita = obtenerTextoRecompensaCita(cita);
   const calificacion = normalizarCalificacionServicio(cita.calificacionServicio);
   const etiquetaCalificacion = obtenerEtiquetaCalificacion(calificacion);
   const surveyUrl = crearUrlEncuestaWhatsApp(cita);
   const puedeEnviarEncuesta = cita.estado === "completada" && surveyUrl !== "#";
+  const resumenServicios = obtenerResumenServiciosCita(cita);
+  const listaServicios = crearListaServiciosDetalleHtml(cita);
+  const badgeServicios = crearBadgeServiciosCita(cita);
   const detalleBloque = cita.duracionMinutos
     ? `<p class="agenda-appointment-notes">Duración: ${escapeHtml(cita.duracionMinutos)} min + ${escapeHtml(cita.trasladoMinutos || 0)} min traslado</p>`
     : "";
 
   return `
-    <article class="agenda-appointment-card ${cita.estado === "cancelada" ? "is-cancelled" : ""}">
+    <article class="agenda-appointment-card ${cita.estado === "cancelada" ? "is-cancelled" : ""} ${cita.rewardGratisAplicado ? "is-reward-free" : ""}">
       <div class="agenda-appointment-main">
         <div class="agenda-appointment-title">
           <span class="agenda-status-badge is-${escapeHtml(cita.estado)}">${escapeHtml(AGENDA_ESTADOS[cita.estado] || cita.estado)}</span>
-          ${rewardEligible ? `<span class="agenda-reward-badge">Cliente frecuente: servicio gratis disponible</span>` : ""}
+          ${rewardCita ? `<span class="agenda-free-service-badge">${escapeHtml(rewardCita)}</span>` : ""}
+          ${badgeServicios}
+          ${rewardSummary ? `<span class="agenda-reward-badge ${rewardEligible ? "is-eligible" : "is-progress"}">${escapeHtml(rewardSummary)}</span>` : ""}
           ${calificacion ? `<span class="agenda-rating-badge">${escapeHtml(etiquetaCalificacion)}</span>` : ""}
           <h3>${escapeHtml(cita.cliente)}</h3>
-          <p>${escapeHtml(cita.detalle)}</p>
+          <p>${escapeHtml(resumenServicios)}</p>
+          ${listaServicios}
         </div>
         <div class="agenda-appointment-time">
           <strong>${escapeHtml(cita.hora)}</strong>
@@ -745,6 +1328,7 @@ function crearCardCita(cita) {
         <div><dt>Servicio</dt><dd>${escapeHtml(formatearServicio(cita.tipoServicio))}</dd></div>
         <div><dt>Zona</dt><dd>${escapeHtml(cita.zona)}</dd></div>
         <div><dt>Atiende</dt><dd>${escapeHtml(cita.atendidoPor || "Por asignar")}</dd></div>
+        <div><dt>Empleado</dt><dd>${escapeHtml(cita.empleadoAsignadoNombre || "Sin asignar")}</dd></div>
         <div><dt>Dirección</dt><dd>${escapeHtml(cita.direccion)}</dd></div>
       </dl>
       ${detalleBloque}
@@ -784,7 +1368,7 @@ function crearUrlWhatsApp(cita) {
   if (!telefono) return "#";
   const mensaje = [
     `Hola ${cita.cliente}, te contactamos de Woof & Wash para confirmar tu cita.`,
-    `Servicio: ${formatearServicio(cita.tipoServicio)} - ${cita.detalle}.`,
+    `Servicio: ${crearTextoServiciosDetalle(cita)}.`,
     cita.atendidoPor ? `Te atendera: ${cita.atendidoPor}.` : "",
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.`,
     `Zona: ${cita.zona}.`,
@@ -799,7 +1383,7 @@ function crearUrlWhatsAppDetalle(cita) {
   if (!telefono) return "#";
   const tipo = cita.tipoServicio === "auto" ? "lavado" : "estética";
   const atendido = cita.atendidoPor ? ` Te atendera ${cita.atendidoPor}.` : "";
-  const mensaje = `Hola, soy de Woof & Wash. Te escribimos sobre tu cita de ${tipo} programada para el ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.${atendido}`;
+  const mensaje = `Hola, soy de Woof & Wash. Te escribimos sobre tu cita de ${tipo} programada para el ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.${atendido}\nServicio: ${crearTextoServiciosDetalle(cita)}.`;
 
   return `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
 }
@@ -856,6 +1440,191 @@ function formatearServicio(servicio) {
   return etiquetas[servicio] || servicio;
 }
 
+function normalizarServiciosDetalleCita(cita) {
+  const servicios = Array.isArray(cita?.serviciosDetalle) ? cita.serviciosDetalle : [];
+  return servicios
+    .filter((servicio) => servicio && ["mascota", "auto"].includes(servicio.tipo))
+    .slice(0, 5)
+    .map((servicio) => ({
+      tipo: servicio.tipo || cita?.servicioTipo || "mascota",
+      categoria: servicio.categoria || "",
+      paquete: servicio.paquete || "",
+      nombre: servicio.nombre || "",
+      key: servicio.key || "",
+      notas: servicio.notas || "",
+      duracionMinutos: Number(servicio.duracionMinutos) || 0
+    }));
+}
+
+function obtenerServiciosVisualesCita(cita) {
+  if (Array.isArray(cita?.serviciosDetalle) && cita.serviciosDetalle.length) {
+    return cita.serviciosDetalle;
+  }
+
+  return [{
+    tipo: cita?.tipoServicio || "mascota",
+    categoria: cita?.servicioCategoria || "",
+    paquete: cita?.servicioPaquete || "",
+    nombre: cita?.detalle || "",
+    key: cita?.servicioKey || "",
+    notas: "",
+    duracionMinutos: Number(cita?.duracionMinutos) || 0
+  }];
+}
+
+function crearEtiquetaServicioDetalle(servicio, index = 0) {
+  const tipo = formatearServicio(servicio?.tipo || "servicio");
+  const numero = index + 1;
+  const categoria = servicio?.categoria || "";
+  const paquete = servicio?.paquete || "";
+  const nombre = servicio?.nombre || [categoria, paquete].filter(Boolean).join(" ");
+  const detalle = categoria || paquete
+    ? [categoria, paquete].filter(Boolean).join(" ")
+    : nombre || "Servicio";
+  return `${tipo} ${numero} - ${detalle}`;
+}
+
+function crearDetalleCortoServicio(servicio) {
+  const categoria = servicio?.categoria || "";
+  const paquete = servicio?.paquete || "";
+  const nombre = servicio?.nombre || "";
+  return [categoria, paquete].filter(Boolean).join(" ") || nombre || "Servicio";
+}
+
+function obtenerResumenServiciosCita(cita) {
+  const servicios = obtenerServiciosVisualesCita(cita);
+  if (servicios.length <= 1) return cita?.detalle || servicios[0]?.nombre || "Servicio";
+  const tipo = formatearServicio(servicios[0]?.tipo || cita?.tipoServicio || "servicio").toLowerCase();
+  return `${servicios.length} servicios de ${tipo}`;
+}
+
+function crearListaServiciosDetalleHtml(cita) {
+  const servicios = obtenerServiciosVisualesCita(cita);
+  if (servicios.length <= 1) return "";
+
+  return `
+    <ul class="agenda-services-detail-list">
+      ${servicios.map((servicio, index) => `
+        <li>
+          <span>${escapeHtml(`${formatearServicio(servicio.tipo)} ${index + 1}`)}</span>
+          <strong>${escapeHtml(crearDetalleCortoServicio(servicio))}</strong>
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function crearBadgeServiciosCita(cita) {
+  const servicios = obtenerServiciosVisualesCita(cita);
+  if (servicios.length <= 1) return "";
+  return `<span class="agenda-services-count-badge">${escapeHtml(obtenerResumenServiciosCita(cita))}</span>`;
+}
+
+function crearMiniCardsServiciosHtml(cita) {
+  const servicios = obtenerServiciosVisualesCita(cita);
+  if (servicios.length <= 1) return "";
+
+  return `
+    <section class="agenda-detail-services">
+      <div class="agenda-detail-services-header">
+        <span>Servicios incluidos</span>
+        <strong>${escapeHtml(obtenerResumenServiciosCita(cita))}</strong>
+      </div>
+      <div class="agenda-detail-services-grid">
+        ${servicios.map((servicio, index) => `
+          <article class="agenda-detail-service-card">
+            <span>${escapeHtml(`${formatearServicio(servicio.tipo)} ${index + 1}`)}</span>
+            <strong>${escapeHtml(crearDetalleCortoServicio(servicio))}</strong>
+            ${servicio.notas ? `<p>${escapeHtml(servicio.notas)}</p>` : ""}
+          </article>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function crearDetalleServiciosHistorialHtml(cita) {
+  const servicios = Array.isArray(cita?.serviciosDetalle) ? cita.serviciosDetalle : [];
+  if (servicios.length <= 1) return "";
+
+  return `
+    <small class="agenda-history-services-detail">
+      ${servicios.map((servicio, index) => `
+        <span>${escapeHtml(`${formatearServicio(servicio.tipo)} ${index + 1}: ${crearDetalleCortoServicio(servicio)}`)}</span>
+      `).join("")}
+    </small>
+  `;
+}
+
+function crearTextoServiciosDetalle(cita) {
+  const servicios = obtenerServiciosVisualesCita(cita);
+  if (servicios.length <= 1) return cita?.detalle || servicios[0]?.nombre || "-";
+  return [
+    obtenerResumenServiciosCita(cita),
+    ...servicios.map((servicio, index) => crearEtiquetaServicioDetalle(servicio, index))
+  ].join("\n");
+}
+
+function crearTextoServicioHistorial(cita) {
+  if (Array.isArray(cita?.serviciosDetalle) && cita.serviciosDetalle.length > 1) {
+    return [
+      obtenerResumenServiciosCita({
+        tipoServicio: cita.servicioTipo,
+        detalle: cita.servicioNombre,
+        serviciosDetalle: cita.serviciosDetalle
+      }),
+      ...cita.serviciosDetalle.map((servicio, index) => crearEtiquetaServicioDetalle(servicio, index))
+    ].join(" | ");
+  }
+
+  return cita?.servicioNombre || "Servicio";
+}
+
+function inferirServicioDesdeCita(cita) {
+  const tipo = SERVICIOS_CATALOGO[cita?.tipoServicio] ? cita.tipoServicio : "mascota";
+  const catalogo = SERVICIOS_CATALOGO[tipo];
+  const referencia = normalizarServicioKey([
+    cita?.detalle,
+    cita?.servicioKey,
+    cita?.servicioCategoria,
+    cita?.servicioPaquete
+  ].filter(Boolean).join(" "));
+  const categoria = buscarOpcionServicio(catalogo.categorias, cita?.servicioCategoria)
+    || catalogo.categorias.find((opcion) => referencia.includes(normalizarServicioKey(opcion.value)) || referencia.includes(normalizarServicioKey(opcion.nombre)))
+    || catalogo.categorias[0];
+  const paquete = buscarOpcionServicio(catalogo.paquetes, cita?.servicioPaquete)
+    || catalogo.paquetes.find((opcion) => referencia.includes(normalizarServicioKey(opcion.value)) || referencia.includes(normalizarServicioKey(opcion.nombre)))
+    || catalogo.paquetes[0];
+
+  return {
+    tipo,
+    categoria: categoria?.value || "",
+    paquete: paquete?.value || "",
+    notas: ""
+  };
+}
+
+function obtenerServiciosEdicionCita(cita) {
+  if (Array.isArray(cita?.serviciosDetalle) && cita.serviciosDetalle.length) {
+    return cita.serviciosDetalle.slice(0, AGENDA_SERVICIOS_MAX).map((servicio) => ({
+      tipo: servicio.tipo || cita.tipoServicio || "mascota",
+      categoria: servicio.categoria || "",
+      paquete: servicio.paquete || "",
+      notas: servicio.notas || ""
+    }));
+  }
+
+  return [inferirServicioDesdeCita(cita)];
+}
+
+function obtenerTextoRecompensaCita(cita) {
+  if (!cita?.rewardGratisAplicado) return "";
+  const tipo = cita.rewardTipo || cita.tipoServicio || "servicio";
+  return cita.rewardGrupoId
+    ? `🎁 Servicio gratis de ${tipo} consumido`
+    : `🎁 Servicio gratis de ${tipo} aplicado`;
+}
+
 function normalizarCalificacionServicio(value) {
   const numero = Number(value);
   return Number.isInteger(numero) && numero >= 1 && numero <= 5 ? numero : null;
@@ -900,6 +1669,7 @@ function construirPayloadFormulario(form, prefijo = "") {
         servicioPaquete: "editServicioPaquete",
         atendidoPor: "editAtendidoPor",
         calificacionServicio: "editCalificacionServicio",
+        comentarioCliente: "editComentarioCliente",
         fecha: "editFechaCita",
         hora: "editHoraCita",
         direccion: "editDireccionCita",
@@ -925,22 +1695,30 @@ function construirPayloadFormulario(form, prefijo = "") {
     throw new Error("Ingresa un teléfono válido.");
   }
 
-  const servicio = obtenerServicioSeleccionado(
-    get("servicioTipo"),
-    get("servicioCategoria"),
-    get("servicioPaquete")
-  );
+  const serviciosDetalle = construirServiciosDetalleFormulario(prefijo);
+  const servicioPrincipal = serviciosDetalle[0];
+  const duracionEstimadaMinutos = calcularDuracionEstimadaFormulario(prefijo);
+  const duracionBloqueadaInput = document.getElementById(`${prefijo ? "editDuracionBloqueadaMinutos" : "duracionBloqueadaMinutos"}`);
+  const duracionBloqueadaMinutos = obtenerDuracionBloqueadaValida(duracionBloqueadaInput?.value);
+
+  if (!duracionBloqueadaMinutos) {
+    throw new Error("Ingresa un tiempo bloqueado real entre 30 y 720 minutos.");
+  }
 
   const payload = {
     clienteNombre: get("clienteNombre"),
     clienteTelefono: telefono.normalizado,
     clienteEmail: get("clienteEmail"),
-    servicioTipo: servicio.servicioTipo,
-    servicioCategoria: servicio.servicioCategoria,
-    servicioPaquete: servicio.servicioPaquete,
-    servicioNombre: servicio.servicioNombre,
-    servicioKey: servicio.servicioKey,
+    servicioTipo: servicioPrincipal.tipo,
+    servicioCategoria: servicioPrincipal.categoria,
+    servicioPaquete: servicioPrincipal.paquete,
+    servicioNombre: servicioPrincipal.nombre,
+    servicioKey: servicioPrincipal.key,
+    serviciosDetalle,
+    duracionEstimadaMinutos,
+    duracionBloqueadaMinutos,
     atendidoPor: get("atendidoPor"),
+    empleadoAsignadoId: String(document.getElementById(`${prefijo ? "editEmpleadoAsignadoId" : "empleadoAsignadoId"}`)?.value || ""),
     fecha: get("fecha"),
     hora: get("hora"),
     zona: normalizarZonaAgenda(document.getElementById(`${prefijo ? "editZonaCita" : "zonaCita"}`)?.value),
@@ -948,16 +1726,32 @@ function construirPayloadFormulario(form, prefijo = "") {
     notas: get("notas")
   };
 
-  if (prefijo && citaEnEdicionServicioLegacy && !servicioEdicionActualizado) {
+  const citaEditadaActual = prefijo ? citasAgenda.find((item) => item.id === citaEnEdicionId) : null;
+  if (prefijo && citaEditadaActual?.rewardGrupoId && !servicioEdicionActualizado) {
     delete payload.servicioTipo;
     delete payload.servicioCategoria;
     delete payload.servicioPaquete;
     delete payload.servicioNombre;
     delete payload.servicioKey;
+    delete payload.serviciosDetalle;
   }
 
   if (prefijo) {
-    payload.calificacionServicio = normalizarCalificacionServicio(get("calificacionServicio"));
+    const calificacion = normalizarCalificacionServicio(get("calificacionServicio"));
+    payload.calificacionServicio = calificacion;
+    payload.calificacionCliente = calificacion;
+    payload.comentarioCliente = get("comentarioCliente");
+  }
+
+  const rewardCheckbox = document.getElementById(`${prefijo ? "editRewardGratisAplicado" : "rewardGratisAplicado"}`);
+  if (prefijo && rewardCheckbox?.disabled) {
+    // Recompensas ya consumidas no se modifican desde el modal de edición.
+  } else if (rewardCheckbox?.checked) {
+    payload.rewardGratisAplicado = true;
+    payload.rewardTipo = servicioPrincipal.tipo;
+  } else if (prefijo) {
+    payload.rewardGratisAplicado = false;
+    payload.rewardTipo = "";
   }
 
   return payload;
@@ -984,11 +1778,19 @@ async function crearCitaDesdeFormulario(event) {
     if (buscador) buscador.value = "";
     filtroEstadoActual = "todos";
     filtroRangoActual = null;
+    limpiarCamposRangoAgenda();
     citaPendienteCancelacionId = null;
+    lookupClienteTelefono = "";
+    rewardClienteActual = null;
+    mostrarAvisoLookupCliente("");
+    mostrarAvisoProgresoRecompensa(null);
+    actualizarPanelAplicarRecompensa();
     actualizarChipsEstadoAgenda();
     form.reset();
+    duracionBloqueadaManualCrear = false;
     fechaCita.value = payload.fecha;
     actualizarCatalogoFormulario();
+    llenarSelectEmpleados(document.getElementById("empleadoAsignadoId"));
     actualizarZonaFormulario();
     await actualizarDisponibilidadCrear();
     await cargarCitasAgenda();
@@ -1003,24 +1805,53 @@ async function crearCitaDesdeFormulario(event) {
 
 function abrirModalEdicion(id) {
   const cita = citasAgenda.find((item) => item.id === id);
-  const { modal, editForm } = obtenerElementosAgenda();
+  const { modal, editForm, editRewardApplyPanel, editRewardApplyText, editRewardGratisAplicado } = obtenerElementosAgenda();
   if (!cita || !modal || !editForm) return;
 
   citaEnEdicionId = id;
   citaEnEdicionServicioLegacy = !(cita.servicioCategoria && cita.servicioPaquete);
   servicioEdicionActualizado = false;
+  duracionBloqueadaManualEditar = false;
   editForm.elements.editClienteNombre.value = cita.cliente;
   cargarTelefonoEnFormulario(cita.telefono, "edit");
   editForm.elements.editClienteEmail.value = cita.email;
   editForm.elements.editTipoServicio.value = cita.tipoServicio;
-  actualizarCatalogoEdicion(cita.servicioCategoria, cita.servicioPaquete);
+  const serviciosEdicion = obtenerServiciosEdicionCita(cita);
+  if (serviciosEdicion.length && SERVICIOS_CATALOGO[serviciosEdicion[0].tipo]) {
+    editForm.elements.editTipoServicio.value = serviciosEdicion[0].tipo;
+  }
+  actualizarCatalogoEdicion(cita.servicioCategoria, cita.servicioPaquete, serviciosEdicion);
+  const duracionEstimadaEdicion = calcularDuracionEstimadaFormulario("edit");
+  const duracionBloqueadaGuardada = obtenerDuracionBloqueadaValida(cita.duracionBloqueadaMinutos);
+  const duracionBloqueadaInput = document.getElementById("editDuracionBloqueadaMinutos");
+  if (duracionBloqueadaInput && duracionBloqueadaGuardada) {
+    duracionBloqueadaInput.value = String(duracionBloqueadaGuardada);
+    duracionBloqueadaManualEditar = duracionBloqueadaGuardada !== duracionEstimadaEdicion;
+  }
   editForm.elements.editFechaCita.value = cita.fecha;
   editForm.elements.editZonaCita.value = cita.zona;
   editForm.elements.editDireccionCita.value = cita.direccion;
   editForm.elements.editNotasCita.value = cita.notas;
   editForm.elements.editAtendidoPor.value = cita.atendidoPor || "";
+  llenarSelectEmpleados(document.getElementById("editEmpleadoAsignadoId"), cita.empleadoAsignadoId || "");
   editForm.elements.editEstadoCita.value = cita.estado;
   editForm.elements.editCalificacionServicio.value = cita.calificacionServicio || "";
+  if (editForm.elements.editComentarioCliente) {
+    editForm.elements.editComentarioCliente.value = cita.comentarioCliente || "";
+  }
+  if (editRewardGratisAplicado) {
+    editRewardGratisAplicado.checked = Boolean(cita.rewardGratisAplicado);
+    editRewardGratisAplicado.disabled = Boolean(cita.rewardGrupoId);
+  }
+  if (editRewardApplyPanel) {
+    editRewardApplyPanel.classList.toggle("hidden", !cita.rewardGratisAplicado);
+    editRewardApplyPanel.classList.toggle("is-active", Boolean(cita.rewardGratisAplicado));
+  }
+  if (editRewardApplyText) {
+    editRewardApplyText.textContent = cita.rewardGrupoId
+      ? "La recompensa ya fue consumida al completar esta cita."
+      : "La recompensa se consumira cuando la cita quede completada.";
+  }
   actualizarCalificacionEdicion();
 
   const servicioAnterior = document.getElementById("editServicioAnterior");
@@ -1040,6 +1871,7 @@ function cerrarModalEdicion() {
   citaEnEdicionId = null;
   citaEnEdicionServicioLegacy = false;
   servicioEdicionActualizado = false;
+  duracionBloqueadaManualEditar = false;
   editForm?.reset();
   modal?.classList.add("hidden");
   document.body.classList.remove("agenda-modal-open");
@@ -1077,6 +1909,7 @@ async function guardarEdicionCita(event) {
     if (buscador) buscador.value = "";
     filtroEstadoActual = "todos";
     filtroRangoActual = null;
+    limpiarCamposRangoAgenda();
     citaPendienteCancelacionId = null;
     actualizarChipsEstadoAgenda();
     cerrarModalEdicion();
@@ -1127,23 +1960,34 @@ function renderizarDetalleCita(cita) {
   const traslado = cita.trasladoMinutos ? `${cita.trasladoMinutos} min` : "-";
   const calificacion = normalizarCalificacionServicio(cita.calificacionServicio);
   const etiquetaCalificacion = obtenerEtiquetaCalificacion(calificacion);
+  const rewardCita = obtenerTextoRecompensaCita(cita);
+  const resumenServicios = obtenerResumenServiciosCita(cita);
+  const textoServicios = crearTextoServiciosDetalle(cita);
+  const listaServicios = crearListaServiciosDetalleHtml(cita);
+  const miniCardsServicios = crearMiniCardsServiciosHtml(cita);
 
   detailContent.innerHTML = `
-    <div class="agenda-detail-hero">
+    <div class="agenda-detail-hero ${cita.rewardGratisAplicado ? "is-reward-free" : ""}">
       <span class="agenda-status-badge is-${escapeHtml(cita.estado)}">${escapeHtml(AGENDA_ESTADOS[cita.estado] || cita.estado)}</span>
+      ${rewardCita ? `<span class="agenda-free-service-badge">${escapeHtml(rewardCita)}</span>` : ""}
       ${calificacion ? `<span class="agenda-rating-badge">${escapeHtml(etiquetaCalificacion)}</span>` : ""}
       <h3>${escapeHtml(cita.cliente || "Cliente sin nombre")}</h3>
-      <p>${escapeHtml(cita.detalle || "Servicio sin detalle")}</p>
+      <p>${escapeHtml(resumenServicios || "Servicio sin detalle")}</p>
+      ${listaServicios}
     </div>
+    ${miniCardsServicios}
     <dl class="agenda-detail-grid">
       ${crearItemDetalleAgenda("Cliente", cita.cliente)}
       ${crearItemDetalleAgenda("Teléfono", cita.telefono)}
-      ${crearItemDetalleAgenda("Servicio", cita.detalle)}
+      ${crearItemDetalleAgenda("Servicio", textoServicios)}
+      ${crearItemDetalleAgenda("Recompensa", rewardCita || "No aplica")}
       ${crearItemDetalleAgenda("Fecha", formatearFechaAgenda(cita.fecha))}
       ${crearItemDetalleAgenda("Hora", cita.hora)}
       ${crearItemDetalleAgenda("Zona", cita.zona)}
       ${crearItemDetalleAgenda("Atendido por", cita.atendidoPor || "Por asignar")}
+      ${crearItemDetalleAgenda("Empleado asignado", cita.empleadoAsignadoNombre || "Sin asignar")}
       ${crearItemDetalleAgenda("Calificación", formatearEstrellasCalificacion(calificacion))}
+      ${crearItemDetalleAgenda("Comentario cliente", cita.comentarioCliente || "-")}
       ${crearItemDetalleAgenda("Dirección", cita.direccion)}
       ${crearItemDetalleAgenda("Estado actual", AGENDA_ESTADOS[cita.estado] || cita.estado)}
       ${crearItemDetalleAgenda("Duración estimada", duracion)}
@@ -1240,10 +2084,11 @@ function renderizarHistorialCliente(data) {
 
   const servicios = Array.isArray(data?.serviciosPorTipo) ? data.serviciosPorTipo : [];
   const ultimasCitas = Array.isArray(data?.ultimasCitas) ? data.ultimasCitas : [];
+  const mensajesRecompensa = obtenerMensajesRecompensa(data);
   const serviciosHtml = servicios.length
     ? servicios.map((servicio) => `
         <article class="agenda-history-service">
-          <strong>${escapeHtml(servicio.servicioNombre || servicio.servicioKey)}</strong>
+          <strong>${escapeHtml(servicio.servicioNombre || servicio.servicioTipo || servicio.servicioKey)}</strong>
           <span>${escapeHtml(servicio.completados || 0)} completados / ${escapeHtml(servicio.total || 0)} totales</span>
         </article>
       `).join("")
@@ -1251,9 +2096,10 @@ function renderizarHistorialCliente(data) {
 
   const citasHtml = ultimasCitas.length
     ? ultimasCitas.map((cita) => `
-        <li>
+        <li class="${cita.rewardGratisAplicado ? "is-reward-free" : ""} ${Array.isArray(cita.serviciosDetalle) && cita.serviciosDetalle.length > 1 ? "has-services-detail" : ""}">
           <span>${escapeHtml(formatearFechaAgenda(cita.fecha))} ${escapeHtml(cita.hora || "")}</span>
-          <strong>${escapeHtml(cita.servicioNombre || "Servicio")}</strong>
+          <strong>${cita.rewardGratisAplicado ? "🎁 " : ""}${escapeHtml(crearTextoServicioHistorial(cita))}</strong>
+          ${crearDetalleServiciosHistorialHtml(cita)}
           <em>${escapeHtml(AGENDA_ESTADOS[cita.estado] || cita.estado || "-")}</em>
         </li>
       `).join("")
@@ -1277,11 +2123,11 @@ function renderizarHistorialCliente(data) {
       <div class="agenda-history-services">
         ${serviciosHtml}
       </div>
-      ${data?.posibleServicioGratis ? `
-        <p class="agenda-history-alert">
-          Este cliente tiene ${escapeHtml(data.cantidadElegible || 0)} servicios completados de ${escapeHtml(data.servicioElegible || "un mismo servicio")}.
-        </p>
-      ` : `<p class="agenda-history-muted">Todavía no hay 8 servicios iguales completados.</p>`}
+      ${mensajesRecompensa.length ? `
+        <div class="agenda-history-alert ${data?.posibleServicioGratis ? "is-eligible" : "is-progress"}">
+          ${mensajesRecompensa.map((mensaje) => `<p>${escapeHtml(mensaje)}</p>`).join("")}
+        </div>
+      ` : `<p class="agenda-history-muted">Todavia no hay servicios completados para calcular recompensas.</p>`}
       <div class="agenda-history-latest">
         <h4>Últimas citas</h4>
         <ul>${citasHtml}</ul>
@@ -1390,7 +2236,7 @@ async function guardarCalificacionDesdeDetalle() {
   try {
     await agendaFetch(`/admin/appointments/${encodeURIComponent(cita.id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ calificacionServicio: calificacion })
+      body: JSON.stringify({ calificacionServicio: calificacion, calificacionCliente: calificacion })
     });
     await cargarCitasAgenda();
     const citaActualizada = citasAgenda.find((item) => item.id === cita.id);
@@ -1420,8 +2266,10 @@ function construirResumenCita(cita) {
   return [
     `Cliente: ${cita.cliente || "-"}`,
     `Telefono: ${cita.telefono || "-"}`,
-    `Servicio: ${cita.detalle || "-"}`,
+    `Servicio: ${crearTextoServiciosDetalle(cita)}`,
+    `Recompensa: ${obtenerTextoRecompensaCita(cita) || "No aplica"}`,
     `Atiende: ${cita.atendidoPor || "Por asignar"}`,
+    `Empleado: ${cita.empleadoAsignadoNombre || "Sin asignar"}`,
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora || "-"}`,
     `Zona: ${cita.zona || "-"}`,
     `Direccion: ${cita.direccion || "-"}`,
@@ -1433,7 +2281,7 @@ function construirResumenCita(cita) {
 
 function abrirModalReward(cita) {
   const reward = rewardsPorTelefono[cita.telefono];
-  const servicio = reward?.servicioElegible || cita.detalle;
+  const servicio = reward?.servicioTipoElegible || reward?.servicioElegible || cita.tipoServicio || cita.detalle;
   const texto = `Hola ${cita.cliente}, en Woof & Wash queremos agradecer tu preferencia. Ya acumulaste 8 servicios de ${servicio}, por lo que tienes un servicio gratis disponible. Puedes agendarlo cuando gustes.`;
   const { rewardModal, rewardText } = obtenerElementosAgenda();
 
@@ -1538,6 +2386,7 @@ function navegarFechaAgenda(accion) {
   if (filtroZona) filtroZona.value = "todas";
   if (buscador) buscador.value = "";
   filtroRangoActual = null;
+  limpiarCamposRangoAgenda();
   citaPendienteCancelacionId = null;
   cargarCitasAgenda();
 }
@@ -1556,6 +2405,7 @@ function aplicarFiltroRapido(tipo) {
   if (filtroZona) filtroZona.value = "todas";
   if (buscador) buscador.value = "";
   filtroRangoActual = null;
+  limpiarCamposRangoAgenda();
 
   if (tipo === "today") {
     if (filtroFecha) filtroFecha.value = obtenerFechaLocalISO(hoy);
@@ -1566,6 +2416,10 @@ function aplicarFiltroRapido(tipo) {
   } else if (tipo === "week") {
     filtroRangoActual = obtenerRangoSemana(hoy);
     if (filtroFecha) filtroFecha.value = obtenerFechaLocalISO(hoy);
+    const { filtroFechaDesde, filtroFechaHasta } = obtenerElementosAgenda();
+    if (filtroFechaDesde) filtroFechaDesde.value = filtroRangoActual.desde;
+    if (filtroFechaHasta) filtroFechaHasta.value = filtroRangoActual.hasta;
+    mostrarAvisoRangoAgenda(`Viendo citas del ${formatearFechaAgenda(filtroRangoActual.desde)} al ${formatearFechaAgenda(filtroRangoActual.hasta)}.`, "info");
     filtroEstadoActual = "todos";
   } else if (AGENDA_ESTADOS[tipo]) {
     filtroEstadoActual = tipo;
@@ -1582,11 +2436,19 @@ function configurarAgenda() {
 
   if (elementos.filtroFecha) elementos.filtroFecha.value = hoy;
   if (elementos.fechaCita) elementos.fechaCita.value = hoy;
+  limpiarAvisoRangoAgenda();
 
   elementos.filtroFecha?.addEventListener("change", () => {
     filtroRangoActual = null;
+    limpiarCamposRangoAgenda();
     citaPendienteCancelacionId = null;
     cargarCitasAgenda();
+  });
+  [elementos.filtroFechaDesde, elementos.filtroFechaHasta].forEach((input) => {
+    input?.addEventListener("change", () => {
+      if (!aplicarRangoFechasAgenda()) return;
+      cargarCitasAgenda();
+    });
   });
   elementos.buscador?.addEventListener("input", () => {
     citaPendienteCancelacionId = null;
@@ -1599,11 +2461,27 @@ function configurarAgenda() {
       input.setCustomValidity("");
     });
   });
+  elementos.clienteTelefono?.addEventListener("input", () => {
+    lookupClienteTelefono = "";
+    rewardClienteActual = null;
+    mostrarAvisoLookupCliente("");
+    mostrarAvisoProgresoRecompensa(null);
+    actualizarPanelAplicarRecompensa();
+    programarLookupCliente();
+  });
   [elementos.clienteTelefonoPais, elementos.editClienteTelefonoPais].forEach((select) => {
     select?.addEventListener("change", () => {
       const input = select.id === "editClienteTelefonoPais" ? elementos.editClienteTelefono : elementos.clienteTelefono;
       input?.setCustomValidity("");
     });
+  });
+  elementos.clienteTelefonoPais?.addEventListener("change", () => {
+    lookupClienteTelefono = "";
+    rewardClienteActual = null;
+    mostrarAvisoLookupCliente("");
+    mostrarAvisoProgresoRecompensa(null);
+    actualizarPanelAplicarRecompensa();
+    programarLookupCliente();
   });
   elementos.fechaCita?.addEventListener("change", () => {
     actualizarZonaFormulario();
@@ -1611,7 +2489,32 @@ function configurarAgenda() {
   });
   elementos.tipoServicio?.addEventListener("change", () => {
     actualizarCatalogoFormulario();
+    actualizarPanelAplicarRecompensa();
     actualizarDisponibilidadCrear();
+  });
+  elementos.serviciosCantidad?.addEventListener("change", () => {
+    renderizarBloquesServicios("");
+    actualizarDisponibilidadCrear();
+  });
+  elementos.serviciosDetalleContainer?.addEventListener("change", (event) => {
+    const bloque = event.target.closest("[data-service-block]");
+    if (!bloque) return;
+    sincronizarServicioPrincipalDesdeBloques("");
+    actualizarDuracionFormulario("");
+    actualizarDisponibilidadCrear();
+  });
+  elementos.duracionBloqueada?.addEventListener("input", () => {
+    duracionBloqueadaManualCrear = true;
+  });
+  elementos.duracionBloqueada?.addEventListener("change", actualizarDisponibilidadCrear);
+  elementos.rewardGratisAplicado?.addEventListener("change", actualizarPanelAplicarRecompensa);
+  elementos.btnUsarServicioGratis?.addEventListener("click", () => {
+    if (!elementos.rewardGratisAplicado || elementos.rewardGratisAplicado.disabled) return;
+    elementos.rewardGratisAplicado.checked = true;
+    actualizarPanelAplicarRecompensa();
+  });
+  elementos.editRewardGratisAplicado?.addEventListener("change", () => {
+    elementos.editRewardApplyPanel?.classList.toggle("is-active", elementos.editRewardGratisAplicado.checked);
   });
   elementos.servicioPaquete?.addEventListener("change", actualizarDisponibilidadCrear);
   elementos.editTipoServicio?.addEventListener("change", () => {
@@ -1619,6 +2522,26 @@ function configurarAgenda() {
     actualizarCatalogoEdicion();
     actualizarDisponibilidadEdicion();
   });
+  elementos.editServiciosCantidad?.addEventListener("change", () => {
+    servicioEdicionActualizado = true;
+    renderizarBloquesServicios("edit");
+    actualizarDisponibilidadEdicion();
+  });
+  elementos.editServiciosDetalleContainer?.addEventListener("change", (event) => {
+    const bloque = event.target.closest("[data-service-block]");
+    if (!bloque) return;
+    servicioEdicionActualizado = true;
+    sincronizarServicioPrincipalDesdeBloques("edit");
+    actualizarDuracionFormulario("edit");
+    actualizarDisponibilidadEdicion();
+  });
+  elementos.editServiciosDetalleContainer?.addEventListener("input", (event) => {
+    if (event.target.closest("[data-service-block]")) servicioEdicionActualizado = true;
+  });
+  elementos.editDuracionBloqueada?.addEventListener("input", () => {
+    duracionBloqueadaManualEditar = true;
+  });
+  elementos.editDuracionBloqueada?.addEventListener("change", () => actualizarDisponibilidadEdicion());
   elementos.editServicioCategoria?.addEventListener("change", () => {
     servicioEdicionActualizado = true;
   });
@@ -1690,6 +2613,7 @@ function configurarAgenda() {
   actualizarCatalogoFormulario();
   actualizarChipsEstadoAgenda();
   actualizarZonaFormulario();
+  cargarEmpleadosAgenda();
   actualizarDisponibilidadCrear();
   cargarCitasAgenda();
   cargarStatsAgenda();
