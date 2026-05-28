@@ -441,7 +441,9 @@ function cerrarModalEmpleado() {
   // reset saving state
   employeeModalState.saving = false;
   // clear visual errors
-  clearFieldErrors();
+  if (typeof clearFieldErrors === 'function') {
+    clearFieldErrors();
+  }
   employeeModalState = { mode: "view", empleado: null, originalActivo: true };
 }
 
@@ -490,7 +492,9 @@ function abrirModalEmpleado(mode = "view", empleadoId = "") {
   employeeModalState.empleado = null;
 
   // limpiar errores y estados visuales previos
-  clearFieldErrors();
+  if (typeof clearFieldErrors === 'function') {
+    clearFieldErrors();
+  }
 
   if (mode === "create") {
     title.textContent = "Crear empleado";
@@ -578,6 +582,25 @@ function setFieldError(fieldKey, message) {
     }
     const input = document.getElementById('emp_' + fieldKey);
     if (input) input.classList.add('invalid');
+  }
+}
+
+function clearFieldErrors() {
+  const form = getById('employeeForm');
+  if (!form) return;
+
+  form.querySelectorAll('.field-error').forEach((el) => {
+    el.classList.add('hidden');
+  });
+
+  form.querySelectorAll('input.invalid, textarea.invalid').forEach((el) => {
+    el.classList.remove('invalid');
+  });
+
+  const serverError = getById('employeeModalServerError');
+  if (serverError) {
+    serverError.classList.add('hidden');
+    serverError.textContent = '';
   }
 }
 
