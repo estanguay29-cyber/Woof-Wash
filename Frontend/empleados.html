@@ -33,8 +33,8 @@
       <section class="admin-hero-grid">
         <article class="admin-welcome-card">
           <p class="admin-kicker">Empleados</p>
-          <h2>Gestión integral</h2>
-          <p>Lista y administra empleados, revisa score semanal, bonos y progreso sin salir del panel.</p>
+          <h2>Woof & Wash Empleados</h2>
+          <p>Lista y administración de empleados, revisión de score semanal y bonos.</p>
           <div id="adminStatus" class="admin-status-pill">Cargando datos...</div>
         </article>
       </section>
@@ -46,7 +46,15 @@
             <h2>Gestión de empleados</h2>
           </div>
           <div class="admin-controls">
-            <button id="btnNuevoEmpleado" type="button" class="auth-cta auth-cta-primary">Nuevo empleado</button>
+            <button id="btnNuevoEmpleado" type="button" class="auth-cta auth-cta-primary small-icon-btn" aria-label="Nuevo empleado">
+              <span class="btn-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M5 12h14" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </span>
+              <span class="btn-text">Nuevo</span>
+            </button>
           </div>
         </div>
         <div id="adminEmployeesList" class="admin-employees-list"></div>

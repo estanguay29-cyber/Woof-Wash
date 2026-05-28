@@ -39,7 +39,7 @@
         <article class="admin-summary-card">
           <p class="admin-kicker">Resumen rápido</p>
           <h2>Operación Woof & Wash</h2>
-          <p>Los indicadores se actualizan con los pedidos cargados del backend protegido.</p>
+          <p>Resumen de las actividades principales del día.</p>
         </article>
       </section>
 
@@ -107,19 +107,7 @@
         <div id="adminOrdersList" class="admin-orders-list"></div>
       </section>
 
-      <section class="admin-employees-card">
-        <div class="admin-orders-header">
-          <div>
-            <p class="admin-kicker">Equipo</p>
-            <h2>Gestión de empleados</h2>
-            <p>Crear, editar y ver empleados sin recargar la página.</p>
-          </div>
-          <div class="admin-controls">
-            <button id="btnNuevoEmpleado" type="button" class="auth-cta auth-cta-primary">Nuevo empleado</button>
-          </div>
-        </div>
-        <div id="adminEmployeesList" class="admin-employees-list"></div>
-      </section>
+      <!-- Empleados gestion removida del panel (solo pedidos en admin) -->
     </section>
   </main>
 
@@ -137,83 +125,7 @@
     </div>
   </div>
 
-  <div id="adminEmployeeModal" class="admin-modal hidden">
-    <div class="admin-modal-panel" role="dialog" aria-modal="true" aria-labelledby="employeeModalTitle" tabindex="-1">
-      <div class="admin-modal-header">
-        <div>
-          <p class="admin-kicker" id="employeeModalKicker">Empleado</p>
-          <h2 id="employeeModalTitle">Gestión de empleado</h2>
-          <p id="employeeModalSubtitle">Crear, editar o ver empleado</p>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div id="employeeSuccess" class="employee-success hidden" aria-hidden="true">✔ Guardado</div>
-          <button id="btnCerrarModalEmpleado" type="button" class="admin-button admin-button-light">Cerrar</button>
-        </div>
-      </div>
-
-      <div id="employeeModalBody">
-        <div id="employeeModalServerError" class="admin-feedback admin-feedback-error hidden" role="alert" aria-live="assertive"></div>
-        <form id="employeeForm" class="admin-form">
-          <div class="admin-form-grid">
-            <label>Nombre
-              <input name="nombre" id="emp_nombre" type="text" />
-              <small class="field-error hidden" id="err_nombre">Requerido</small>
-            </label>
-
-            <label>Teléfono
-              <input name="telefono" id="emp_telefono" type="tel" />
-              <small class="field-error hidden" id="err_telefono">Requerido</small>
-            </label>
-
-            <label>Email
-              <input name="email" id="emp_email" type="email" />
-              <small class="field-error hidden" id="err_email">Email inválido</small>
-            </label>
-
-            <label>Especialidad
-              <input name="especialidad" id="emp_especialidad" type="text" />
-            </label>
-
-            <label>Sueldo base
-              <input name="sueldoBase" id="emp_sueldoBase" type="number" step="0.01" />
-            </label>
-
-            <label>Comisión %
-              <input name="comision" id="emp_comision" type="number" step="0.01" />
-            </label>
-
-            <label>Bono manual
-              <input name="bono" id="emp_bono" type="number" step="0.01" />
-            </label>
-
-            <label>Descuento administrativo
-              <input name="descuento" id="emp_descuento" type="number" step="0.01" />
-            </label>
-
-            <label>Activo
-              <input name="activo" id="emp_activo" type="checkbox" />
-            </label>
-
-            <label>Notas administrativas
-              <textarea name="notas" id="emp_notas" rows="3"></textarea>
-            </label>
-          </div>
-
-          <div class="admin-form-actions">
-            <button id="btnEmployeeSave" type="button" class="auth-cta auth-cta-primary">Guardar</button>
-            <button id="btnEmployeeCancel" type="button" class="admin-button admin-button-light">Cancelar</button>
-            <span id="employeeSavingStatus" class="admin-saving hidden">Guardando...</span>
-            <span id="employeeSpinner" class="employee-spinner hidden" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <circle cx="25" cy="25" r="20" stroke="#6ea82b" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="31.4 31.4">
-                </circle>
-              </svg>
-            </span>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+  <!-- Employee modal removed from admin (employee management moved to empleados.html) -->
 
   <script src="admin.js"></script>
 </body>

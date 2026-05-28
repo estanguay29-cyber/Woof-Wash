@@ -27,3 +27,20 @@
 .admin-employee-item {
   margin-bottom: 1rem;
 }
+
+/* Small icon button for Nuevo empleado */
+.small-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+}
+.small-icon-btn .btn-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.small-icon-btn .btn-text {
+  line-height: 1;
+}
