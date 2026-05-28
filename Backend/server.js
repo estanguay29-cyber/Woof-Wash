@@ -13,6 +13,7 @@ const User = require("./User");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
+const employeeService = require("./services/employeeService");
 
 const app = express();
 app.disable("x-powered-by");
@@ -38,6 +39,7 @@ const AUTH_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_LIMIT_MAX_ATTEMPTS = 8;
 const MAIL_CODE_TTL_MINUTES = 10;
 const META_DIARIA_EMPLEADOS_MXN = 2000;
+const META_SEMANAL_EMPLEADOS_MXN = META_DIARIA_EMPLEADOS_MXN * 5;
 const authAttempts = new Map();
 let mailTransporterPromise = null;
 const PRODUCT_CATALOG = Object.freeze({
@@ -1859,39 +1861,10 @@ function construirCitaAdmin(cita) {
   };
 }
 
-function contarServiciosCita(obj = {}) {
-  return Array.isArray(obj.serviciosDetalle) && obj.serviciosDetalle.length
-    ? obj.serviciosDetalle.length
-    : 1;
-}
+// Employee metric functions moved to Backend/services/employeeService.js
 
-function calcularMetricasEmpleado(citas = []) {
-  const completadas = citas.filter((cita) => cita.estado === "completada" || cita.estadoOperativo === "finalizada");
-  const calificaciones = citas
-    .map((cita) => Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio)
-    .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
-  const puntualidades = citas
-    .map((cita) => cita.puntualidadMinutos)
-    .filter((valor) => Number.isInteger(valor));
-  const puntuales = puntualidades.filter((valor) => valor <= 5).length;
-
-  return {
-    serviciosCompletados: completadas.reduce((total, cita) => total + contarServiciosCita(cita), 0),
-    citasCompletadas: completadas.length,
-    promedioCalificacion: calificaciones.length
-      ? Math.round((calificaciones.reduce((total, valor) => total + valor, 0) / calificaciones.length) * 10) / 10
-      : null,
-    puntualidadPorcentaje: puntualidades.length ? Math.round((puntuales / puntualidades.length) * 100) : null,
-    ingresosGeneradosAproximados: 0
-  };
-}
-
-function calcularPuntualidadCita(cita, inicio = new Date()) {
-  if (!cita?.fecha || !cita?.hora) return null;
-  const fechaProgramada = new Date(`${cita.fecha}T${cita.hora}:00`);
-  if (Number.isNaN(fechaProgramada.getTime()) || Number.isNaN(inicio.getTime())) return null;
-  return Math.round((inicio.getTime() - fechaProgramada.getTime()) / 60000);
-}
+// Metric and payment helpers moved to Backend/services/employeeService.js
+const { contarServiciosCita, calcularMetricasEmpleado, calcularPuntualidadCita, calcularBonosEmpleado, calcularComisiones, obtenerRangoSemana, calcularScoreSemanal, calcularBonoSemanal } = employeeService;
 
 function construirCitaEmpleado(cita) {
   const base = construirCitaAdmin(cita);
@@ -2531,35 +2504,308 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: "fecha no valida" });
     }
 
+    const semana = obtenerRangoSemana(fecha);
     const empleados = await User.find({ role: "empleado" })
       .select("usuario email role")
       .sort({ usuario: 1 });
+
     const empleadoIds = empleados.map((empleado) => empleado._id);
     const citas = empleadoIds.length
       ? await Appointment.find({ empleadoAsignadoId: { $in: empleadoIds } }).sort({ fecha: 1, hora: 1 })
       : [];
+
     const citasDia = citas.filter((cita) => cita.fecha === fecha);
+    const citasSemana = semana
+      ? citas.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
+      : [];
+
     const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
 
     res.json({
       fecha,
+      semanaInicio: semana?.inicio || null,
+      semanaFin: semana?.fin || null,
       metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
+      metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
       actualDiaMxn: actualDia,
+      actualSemanaMxn: actualSemana,
       progresoMetaPorcentaje: Math.min(Math.round((actualDia / META_DIARIA_EMPLEADOS_MXN) * 100), 100),
+      progresoMetaSemanalPorcentaje: Math.min(Math.round((actualSemana / META_SEMANAL_EMPLEADOS_MXN) * 100), 100),
       empleados: empleados.map((empleado) => {
         const citasEmpleado = citas.filter((cita) => String(cita.empleadoAsignadoId || "") === String(empleado._id));
+        const citasSemanaEmpleado = semana
+          ? citasEmpleado.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
+          : [];
+
+        const metricas = calcularMetricasEmpleado(citasEmpleado);
+        const metricasSemanal = calcularMetricasEmpleado(citasSemanaEmpleado);
+        const actualSemanaEmpleado = citasSemanaEmpleado.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+        const bonosSemana = calcularBonoSemanal(metricasSemanal, empleado, actualSemanaEmpleado, META_SEMANAL_EMPLEADOS_MXN);
+
         return {
           id: String(empleado._id),
           usuario: empleado.usuario || "",
           email: empleado.email || "",
           role: obtenerRolUsuario(empleado),
-          metricas: calcularMetricasEmpleado(citasEmpleado),
+          metricas,
+          metricasSemanal: {
+            ...metricasSemanal,
+            scoreSemanal: calcularScoreSemanal(metricasSemanal),
+            bonificacionPuntualidad: bonosSemana.bonoPuntualidad,
+            bonificacionResenas: bonosSemana.bonoResenas,
+            bonoMeta: bonosSemana.bonoMeta,
+            comisionesAproximadas: bonosSemana.comisionesAproximadas,
+            totalPagoAproximado: bonosSemana.totalPagoAproximado,
+            bonoSemanal: bonosSemana.bonoSemanal
+          },
           citasHoy: citasEmpleado.filter((cita) => cita.fecha === fecha).map(construirCitaEmpleado)
         };
       })
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudieron obtener los empleados" });
+  }
+});
+
+app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no válido" });
+    }
+
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const semana = obtenerRangoSemana(fecha);
+    const citas = await Appointment.find({ empleadoAsignadoId: empleado._id }).sort({ fecha: 1, hora: 1 });
+    const metricas = calcularMetricasEmpleado(citas);
+    const citasDia = citas.filter((cita) => cita.fecha === fecha);
+    const citasSemana = semana
+      ? citas.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
+      : [];
+    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+    const metricasSemanal = calcularMetricasEmpleado(citasSemana);
+    const reseñasPositivas = citas.filter((cita) => {
+      const valor = Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio;
+      return Number.isInteger(valor) && valor >= 4;
+    }).length;
+    const reseñasPositivasSemana = citasSemana.filter((cita) => {
+      const valor = Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio;
+      return Number.isInteger(valor) && valor >= 4;
+    }).length;
+    const cancelaciones = citas.filter((cita) => ["cancelada", "no_asistio"].includes(cita.estado)).length;
+    const cancelacionesSemana = citasSemana.filter((cita) => ["cancelada", "no_asistio"].includes(cita.estado)).length;
+    const bonos = calcularBonosEmpleado(metricas, empleado);
+    const bonosSemana = calcularBonoSemanal(metricasSemanal, empleado, actualSemana, META_SEMANAL_EMPLEADOS_MXN);
+
+    res.json({
+      id: String(empleado._id),
+      usuario: empleado.usuario || "",
+      nombreCompleto: empleado.nombreCompleto || empleado.usuario || "",
+      email: empleado.email || "",
+      telefono: empleado.telefono || "",
+      especialidad: empleado.especialidad || "",
+      fechaIngreso: empleado.fechaIngreso || "",
+      activo: Boolean(empleado.activo),
+      sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
+      comision: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
+      bonoManual: Number.isFinite(Number(empleado.bonoManual)) ? Number(empleado.bonoManual) : 0,
+      descuentoAdministrativo: Number.isFinite(Number(empleado.descuentoAdministrativo)) ? Number(empleado.descuentoAdministrativo) : 0,
+      notasAdministrativas: empleado.notasAdministrativas || "",
+      fecha,
+      semanaInicio: semana?.inicio || null,
+      semanaFin: semana?.fin || null,
+      metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
+      metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
+      actualDiaMxn: actualDia,
+      actualSemanaMxn: actualSemana,
+      progresoMetaPorcentaje: Math.min(Math.round((actualDia / META_DIARIA_EMPLEADOS_MXN) * 100), 100),
+      progresoMetaSemanalPorcentaje: Math.min(Math.round((actualSemana / META_SEMANAL_EMPLEADOS_MXN) * 100), 100),
+      metricas: {
+        ...metricas,
+        cancelaciones,
+        reseñasPositivas,
+        bonificacionPuntualidad: bonos.bonoPuntualidad,
+        bonificacionResenas: bonos.bonoResenas,
+        comisionesAproximadas: bonos.comisionesAproximadas,
+        totalPagoAproximado: bonos.totalPagoAproximado
+      },
+      metricasSemanal: {
+        ...metricasSemanal,
+        cancelaciones: cancelacionesSemana,
+        reseñasPositivas: reseñasPositivasSemana,
+        scoreSemanal: calcularScoreSemanal(metricasSemanal),
+        bonificacionPuntualidad: bonosSemana.bonoPuntualidad,
+        bonificacionResenas: bonosSemana.bonoResenas,
+        bonoMeta: bonosSemana.bonoMeta,
+        comisionesAproximadas: bonosSemana.comisionesAproximadas,
+        totalPagoAproximado: bonosSemana.totalPagoAproximado,
+        bonoSemanal: bonosSemana.bonoSemanal
+      },
+      citas: citas.map(construirCitaEmpleado)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el empleado" });
+  }
+});
+
+app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
+  try {
+    const {
+      nombreCompleto,
+      email,
+      telefono,
+      especialidad,
+      fechaIngreso,
+      sueldoBase,
+      comision,
+      bonoManual,
+      descuentoAdministrativo,
+      notasAdministrativas,
+      activo
+    } = req.body;
+
+    const nombre = String(nombreCompleto || "").trim();
+    const emailLimpio = normalizarEmail(email);
+    const telefonoLimpio = String(telefono || "").trim();
+    const especialidadLimpia = String(especialidad || "").trim();
+    const fechaIngresoLimpia = String(fechaIngreso || "").trim();
+    const sueldoBaseNum = Number(sueldoBase) || 0;
+    const comisionNum = Number(comision) || 0;
+    const bonoManualNum = Number(bonoManual) || 0;
+    const descuentoNum = Number(descuentoAdministrativo) || 0;
+    const notas = String(notasAdministrativas || "").trim();
+
+    if (!validarTextoSeguro(nombre, 120) || !validarTextoSeguro(emailLimpio, 120) || !validarEmail(emailLimpio)) {
+      return res.status(400).json({ message: "Revisa el nombre y el correo del empleado." });
+    }
+
+    if (telefonoLimpio && telefonoLimpio.length > 30) {
+      return res.status(400).json({ message: "El teléfono del empleado no es válido." });
+    }
+
+    if (!validarFechaISOAgenda(fechaIngresoLimpia)) {
+      return res.status(400).json({ message: "La fecha de ingreso no es válida." });
+    }
+
+    const existeEmail = await User.findOne({ email: emailLimpio });
+    if (existeEmail) {
+      return res.status(400).json({ message: "El correo ya está registrado." });
+    }
+
+    const usuario = await generarUsuarioUnicoDesdeNombre(nombre);
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10);
+    const nuevoEmpleado = new User({
+      usuario,
+      nombreCompleto: nombre,
+      email: emailLimpio,
+      fechaNacimiento: "01-01",
+      telefono: telefonoLimpio,
+      especialidad: especialidadLimpia,
+      fechaIngreso: fechaIngresoLimpia,
+      role: "empleado",
+      activo: activo !== false,
+      sueldoBase: sueldoBaseNum,
+      comision: comisionNum,
+      bonoManual: bonoManualNum,
+      descuentoAdministrativo: descuentoNum,
+      notasAdministrativas: notas,
+      password: passwordHash,
+      aceptaTerminos: true,
+      fechaAceptacionTerminos: new Date(),
+      versionTerminosAceptada: "1.0",
+      ipAceptacionTerminos: getClientIp(req)
+    });
+
+    await nuevoEmpleado.save();
+    res.json({ message: "Empleado creado correctamente" });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo crear el empleado" });
+  }
+});
+
+app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no válido" });
+    }
+
+    const empleado = await User.findById(id);
+    if (!empleado || obtenerRolUsuario(empleado) !== "empleado") {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
+    const {
+      nombreCompleto,
+      email,
+      telefono,
+      especialidad,
+      fechaIngreso,
+      sueldoBase,
+      comision,
+      bonoManual,
+      descuentoAdministrativo,
+      notasAdministrativas,
+      activo
+    } = req.body;
+
+    if (typeof nombreCompleto === "string" && validarTextoSeguro(nombreCompleto, 120)) {
+      empleado.nombreCompleto = nombreCompleto.trim();
+    }
+    if (typeof email === "string") {
+      const emailLimpio = normalizarEmail(email);
+      if (!validarEmail(emailLimpio)) {
+        return res.status(400).json({ message: "Correo no válido." });
+      }
+      if (emailLimpio !== empleado.email) {
+        const existeEmail = await User.findOne({ email: emailLimpio });
+        if (existeEmail) {
+          return res.status(400).json({ message: "El correo ya está registrado." });
+        }
+      }
+      empleado.email = emailLimpio;
+    }
+    if (typeof telefono === "string") {
+      empleado.telefono = telefono.trim().slice(0, 30);
+    }
+    if (typeof especialidad === "string") {
+      empleado.especialidad = especialidad.trim().slice(0, 120);
+    }
+    if (typeof fechaIngreso === "string" && fechaIngreso.trim()) {
+      if (!validarFechaISOAgenda(fechaIngreso.trim())) {
+        return res.status(400).json({ message: "La fecha de ingreso no es válida." });
+      }
+      empleado.fechaIngreso = fechaIngreso.trim();
+    }
+    if (typeof sueldoBase !== "undefined") {
+      empleado.sueldoBase = Number(sueldoBase) || 0;
+    }
+    if (typeof comision !== "undefined") {
+      empleado.comision = Number(comision) || 0;
+    }
+    if (typeof bonoManual !== "undefined") {
+      empleado.bonoManual = Number(bonoManual) || 0;
+    }
+    if (typeof descuentoAdministrativo !== "undefined") {
+      empleado.descuentoAdministrativo = Number(descuentoAdministrativo) || 0;
+    }
+    if (typeof notasAdministrativas === "string") {
+      empleado.notasAdministrativas = notasAdministrativas.trim().slice(0, 500);
+    }
+    if (typeof activo === "boolean") {
+      empleado.activo = activo;
+    }
+
+    await empleado.save();
+    res.json({ message: "Empleado actualizado correctamente" });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar el empleado" });
   }
 });
 
@@ -2648,31 +2894,33 @@ app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado,
 app.get("/admin/appointments", auth, requireAdmin, async (req, res) => {
   try {
     const filtro = {};
-    const { fecha, desde, hasta, estado, clienteTelefono } = req.query;
+    const { fecha, desde, hasta, startDate, endDate, estado, clienteTelefono } = req.query;
+    const fechaDesde = desde || startDate;
+    const fechaHasta = hasta || endDate;
 
     if (fecha) {
       if (!validarFechaISOAgenda(fecha)) {
         return res.status(400).json({ message: "fecha no valida" });
       }
       filtro.fecha = fecha;
-    } else if (desde || hasta) {
+    } else if (fechaDesde || fechaHasta) {
       filtro.fecha = {};
 
-      if (desde) {
-        if (!validarFechaISOAgenda(desde)) {
+      if (fechaDesde) {
+        if (!validarFechaISOAgenda(fechaDesde)) {
           return res.status(400).json({ message: "desde no es valido" });
         }
-        filtro.fecha.$gte = desde;
+        filtro.fecha.$gte = fechaDesde;
       }
 
-      if (hasta) {
-        if (!validarFechaISOAgenda(hasta)) {
+      if (fechaHasta) {
+        if (!validarFechaISOAgenda(fechaHasta)) {
           return res.status(400).json({ message: "hasta no es valido" });
         }
-        filtro.fecha.$lte = hasta;
+        filtro.fecha.$lte = fechaHasta;
       }
 
-      if (desde && hasta && desde > hasta) {
+      if (fechaDesde && fechaHasta && fechaDesde > fechaHasta) {
         return res.status(400).json({ message: "desde no puede ser mayor que hasta" });
       }
     }

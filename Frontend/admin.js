@@ -2,6 +2,10 @@ const API_URL = "https://woof-wash.onrender.com";
 
 let adminOrders = [];
 let adminToken = localStorage.getItem("token");
+let adminEmployees = [];
+let employeeModalState = { mode: "view", empleado: null, originalActivo: true };
+let _prevEmployeesJson = null;
+let adminEmployeesMeta = {};
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -308,6 +312,400 @@ async function cargarPedidosAdmin() {
   renderizarPedidosAdmin();
 }
 
+async function cargarEmpleados() {
+  try {
+    const data = await fetchAdmin("/admin/employees");
+    const newList = data.empleados || data.employees || [];
+    // store weekly meta if provided by backend
+    adminEmployeesMeta = {
+      semanaInicio: data.semanaInicio || null,
+      semanaFin: data.semanaFin || null,
+      metaSemanalMxn: data.metaSemanalMxn || null,
+      actualSemanaMxn: data.actualSemanaMxn || null,
+      progresoMetaSemanalPorcentaje: data.progresoMetaSemanalPorcentaje || null
+    };
+    const json = JSON.stringify(newList || []);
+    // evitar re-render si no hay cambios
+    if (json === _prevEmployeesJson) {
+      adminEmployees = newList;
+      return;
+    }
+    _prevEmployeesJson = json;
+    adminEmployees = newList;
+    renderizarEmpleadosAdmin();
+  } catch (error) {
+    // mostrar feedback pero no bloquear panel
+    console.warn("No se pudieron cargar empleados:", error.message || error);
+    adminEmployees = [];
+    renderizarEmpleadosAdmin();
+  }
+}
+
+function renderizarEmpleadosAdmin() {
+  const lista = document.getElementById("adminEmployeesList");
+  if (!lista) return;
+
+  if (!adminEmployees.length) {
+    lista.innerHTML = "<p class='admin-empty-state'>No hay empleados registrados.</p>";
+    return;
+  }
+
+  const semanaInicio = adminEmployeesMeta.semanaInicio;
+  const semanaFin = adminEmployeesMeta.semanaFin;
+  const metaSemanal = adminEmployeesMeta.metaSemanalMxn;
+  const actualSemana = adminEmployeesMeta.actualSemanaMxn;
+  const progresoSemana = adminEmployeesMeta.progresoMetaSemanalPorcentaje;
+
+  function formatMXN(value) {
+    if (typeof value === 'undefined' || value === null || Number.isNaN(Number(value))) return '-';
+    return formatoDinero(Number(value) * 100);
+  }
+
+  let topHtml = '';
+  if (semanaInicio || semanaFin || metaSemanal !== null) {
+    topHtml = `
+      <div class="admin-employees-week-summary">
+        <small>Semana</small>
+        <div title="Rango de inicio y fin de la semana actual">${escaparHtml(semanaInicio || '-') } → ${escaparHtml(semanaFin || '-')}</div>
+        <small>Meta semanal</small>
+        <div title="Meta de ingresos programada para la semana">${formatMXN(metaSemanal)}</div>
+        <small>Actual semanal</small>
+        <div title="Ingreso acumulado de la semana">${formatMXN(actualSemana)}</div>
+        <small>Progreso</small>
+        <div title="Porcentaje de avance sobre la meta semanal">${typeof progresoSemana === 'number' ? `${progresoSemana}%` : '-'}</div>
+      </div>
+    `;
+  }
+  lista.innerHTML = topHtml + adminEmployees.map((emp) => {
+    const activo = emp.activo === false ? false : true;
+    const semanal = emp.metricasSemanal || {};
+    return `
+      <article class="admin-employee-item">
+        <div class="admin-employee-main">
+          <h3 class="admin-employee-name">${escaparHtml(emp.nombre || emp.name || "Sin nombre")}</h3>
+          <p class="admin-employee-meta">${escaparHtml(emp.email || "-")} • ${escaparHtml(emp.telefono || "-")}</p>
+          <p class="admin-employee-sub">${escaparHtml(emp.especialidad || "-")}</p>
+          <p class="admin-employee-week" title="Score de desempeño semanal calculado por backend">Score: ${typeof semanal.scoreSemanal === 'number' ? escaparHtml(String(semanal.scoreSemanal)) : '-'}</p>
+          <p class="admin-employee-week" title="Monto total del bono semanal calculado por backend">Bono semanal: ${typeof semanal.bonoSemanal === 'number' ? formatMXN(semanal.bonoSemanal) : '-'}</p>
+        </div>
+        <div class="admin-employee-actions">
+          <span class="admin-badge ${activo ? "is-success" : "is-muted"}">${activo ? "Activo" : "Inactivo"}</span>
+          <div class="admin-employee-action-row">
+            <button type="button" onclick="abrirModalEmpleado('view','${escaparHtml(emp._id || emp.id || "") }')" class="admin-action-button">Ver</button>
+            <button type="button" onclick="abrirModalEmpleado('edit','${escaparHtml(emp._id || emp.id || "") }')" class="admin-action-button admin-action-primary">Editar</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function cerrarModalEmpleado() {
+  const modal = document.getElementById("adminEmployeeModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+  // restore focus
+  try {
+    if (employeeModalState.lastActiveElement && employeeModalState.lastActiveElement.focus) {
+      employeeModalState.lastActiveElement.focus();
+    }
+  } catch (e) {}
+  // detach listeners
+  if (employeeModalState._onKeyDown) document.removeEventListener('keydown', employeeModalState._onKeyDown);
+  if (employeeModalState._onClickOutside) {
+    const modalEl = document.getElementById("adminEmployeeModal");
+    modalEl?.removeEventListener('click', employeeModalState._onClickOutside);
+  }
+  // reset saving state
+  employeeModalState.saving = false;
+  // clear visual errors
+  clearFieldErrors();
+  employeeModalState = { mode: "view", empleado: null, originalActivo: true };
+}
+
+function abrirModalEmpleado(mode = "view", empleadoId = "") {
+  const modal = document.getElementById("adminEmployeeModal");
+  const title = document.getElementById("employeeModalTitle");
+  const kicker = document.getElementById("employeeModalKicker");
+  const subtitle = document.getElementById("employeeModalSubtitle");
+  const form = document.getElementById("employeeForm");
+
+  // save last focused element to restore focus when closing
+  employeeModalState.lastActiveElement = document.activeElement;
+
+  // remove any existing handlers to avoid duplicates
+  if (employeeModalState._onKeyDown) {
+    document.removeEventListener('keydown', employeeModalState._onKeyDown);
+    employeeModalState._onKeyDown = null;
+  }
+  if (employeeModalState._onClickOutside) {
+    const existingModal = document.getElementById('adminEmployeeModal');
+    existingModal?.removeEventListener('click', employeeModalState._onClickOutside);
+    employeeModalState._onClickOutside = null;
+  }
+
+  // attach ESC and outside-click handlers
+  employeeModalState._onKeyDown = function (e) {
+    if (e.key === 'Escape') {
+      cerrarModalEmpleado();
+    }
+  };
+  document.addEventListener('keydown', employeeModalState._onKeyDown);
+
+  employeeModalState._onClickOutside = function (e) {
+    if (e.target && e.target.id === 'adminEmployeeModal') {
+      cerrarModalEmpleado();
+    }
+  };
+  modal.addEventListener('click', employeeModalState._onClickOutside);
+
+  employeeModalState.mode = mode;
+  employeeModalState.empleado = null;
+
+  // limpiar errores y estados visuales previos
+  clearFieldErrors();
+
+  if (mode === "create") {
+    title.textContent = "Crear empleado";
+    kicker.textContent = "Nuevo";
+    subtitle.textContent = "Crea un nuevo empleado";
+    form.reset();
+    setFormReadonly(false);
+    employeeModalState.originalActivo = true;
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+    // focus first input for accessibility
+    setTimeout(() => document.getElementById('emp_nombre')?.focus(), 80);
+    return;
+  }
+
+  // buscar empleado en memoria
+  const empleado = adminEmployees.find((e) => String(e._id || e.id) === String(empleadoId));
+
+  if (!empleado) {
+    // intentar cargar desde API si no está en memoria
+    fetchAdmin(`/admin/employees/${empleadoId}`).then((data) => {
+      const emp = data.empleado || data.employee;
+      if (emp) {
+        employeeModalState.empleado = emp;
+        renderEmployeeToForm(emp, mode);
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      } else {
+        mostrarFeedback("No se encontró el empleado.", "error");
+      }
+    }).catch((err) => mostrarFeedback(err.message || "No se pudo cargar empleado.", "error"));
+    return;
+  }
+
+  employeeModalState.empleado = empleado;
+  renderEmployeeToForm(empleado, mode);
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+  setTimeout(() => document.getElementById('emp_nombre')?.focus(), 80);
+}
+
+function showSavingUI(enable) {
+  const modal = document.getElementById('adminEmployeeModal');
+  const spinner = document.getElementById('employeeSpinner');
+  const status = document.getElementById('employeeSavingStatus');
+  const saveBtn = document.getElementById('btnEmployeeSave');
+  const cancelBtn = document.getElementById('btnEmployeeCancel');
+  const inputs = Array.from(document.querySelectorAll('#employeeForm input, #employeeForm textarea, #employeeForm button'));
+
+  if (enable) {
+    employeeModalState.saving = true;
+    modal.classList.add('saving');
+    spinner.classList.remove('hidden');
+    status.classList.remove('hidden');
+    saveBtn.disabled = true;
+    cancelBtn.disabled = true;
+    inputs.forEach(i => { if (i.type !== 'button') i.disabled = true; });
+  } else {
+    employeeModalState.saving = false;
+    modal.classList.remove('saving');
+    spinner.classList.add('hidden');
+    status.classList.add('hidden');
+    saveBtn.disabled = false;
+    cancelBtn.disabled = false;
+    inputs.forEach(i => { if (i.type !== 'button') i.disabled = false; });
+  }
+}
+
+function setFieldError(fieldKey, message) {
+  const mapping = {
+    nombre: 'err_nombre',
+    telefono: 'err_telefono',
+    email: 'err_email'
+  };
+  const errId = mapping[fieldKey];
+  if (errId) {
+    const el = document.getElementById(errId);
+    if (el) {
+      el.textContent = message || 'Inválido';
+      el.classList.remove('hidden');
+    }
+    const input = document.getElementById('emp_' + fieldKey);
+    if (input) input.classList.add('invalid');
+  }
+}
+
+function renderEmployeeToForm(emp, mode) {
+  const form = document.getElementById("employeeForm");
+  document.getElementById("emp_nombre").value = emp.nombre || emp.name || "";
+  document.getElementById("emp_telefono").value = emp.telefono || emp.phone || "";
+  document.getElementById("emp_email").value = emp.email || "";
+  document.getElementById("emp_especialidad").value = emp.especialidad || emp.specialty || "";
+  document.getElementById("emp_sueldoBase").value = emp.sueldoBase ?? emp.sueldo ?? "";
+  document.getElementById("emp_comision").value = emp.comision ?? emp.commission ?? "";
+  document.getElementById("emp_bono").value = emp.bono ?? emp.bonus ?? "";
+  document.getElementById("emp_descuento").value = emp.descuento ?? emp.discount ?? "";
+  document.getElementById("emp_activo").checked = emp.activo === false ? false : true;
+  document.getElementById("emp_notas").value = emp.notas || emp.notes || "";
+
+  employeeModalState.originalActivo = emp.activo === false ? false : true;
+
+  if (mode === "view") {
+    setFormReadonly(true);
+    document.getElementById("employeeModalTitle").textContent = "Ver empleado";
+    document.getElementById("employeeModalKicker").textContent = "Detalle";
+    document.getElementById("employeeModalSubtitle").textContent = "Solo lectura";
+    document.getElementById("btnEmployeeSave").classList.add("hidden");
+  } else {
+    setFormReadonly(false);
+    document.getElementById("employeeModalTitle").textContent = "Editar empleado";
+    document.getElementById("employeeModalKicker").textContent = "Editar";
+    document.getElementById("employeeModalSubtitle").textContent = "Modifica datos del empleado";
+    document.getElementById("btnEmployeeSave").classList.remove("hidden");
+  }
+}
+
+function setFormReadonly(readonly) {
+  const inputs = Array.from(document.querySelectorAll("#employeeForm input, #employeeForm textarea"));
+  inputs.forEach((el) => {
+    if (el.type === "checkbox") {
+      el.disabled = readonly;
+    } else {
+      el.readOnly = readonly;
+      el.disabled = false;
+    }
+  });
+}
+
+function validateEmployeeForm() {
+  let ok = true;
+  const nombre = document.getElementById("emp_nombre");
+  const telefono = document.getElementById("emp_telefono");
+  const email = document.getElementById("emp_email");
+
+  if (!nombre.value.trim()) {
+    document.getElementById("err_nombre").classList.remove("hidden");
+    ok = false;
+  } else {
+    document.getElementById("err_nombre").classList.add("hidden");
+  }
+
+  if (!telefono.value.trim()) {
+    document.getElementById("err_telefono").classList.remove("hidden");
+    ok = false;
+  } else {
+    document.getElementById("err_telefono").classList.add("hidden");
+  }
+
+  const emailVal = email.value.trim();
+  if (emailVal && !/^\S+@\S+\.\S+$/.test(emailVal)) {
+    document.getElementById("err_email").classList.remove("hidden");
+    ok = false;
+  } else {
+    document.getElementById("err_email").classList.add("hidden");
+  }
+
+  return ok;
+}
+
+async function guardarEmpleado() {
+  if (!validateEmployeeForm()) return;
+
+  if (employeeModalState.saving) return; // evitar doble submit
+
+  const serverErr = document.getElementById('employeeModalServerError');
+  serverErr.classList.add('hidden');
+  serverErr.textContent = '';
+
+  const formData = {
+    nombre: document.getElementById("emp_nombre").value.trim(),
+    telefono: document.getElementById("emp_telefono").value.trim(),
+    email: document.getElementById("emp_email").value.trim(),
+    especialidad: document.getElementById("emp_especialidad").value.trim(),
+    sueldoBase: Number(document.getElementById("emp_sueldoBase").value) || 0,
+    comision: Number(document.getElementById("emp_comision").value) || 0,
+    bono: Number(document.getElementById("emp_bono").value) || 0,
+    descuento: Number(document.getElementById("emp_descuento").value) || 0,
+    activo: document.getElementById("emp_activo").checked,
+    notas: document.getElementById("emp_notas").value.trim()
+  };
+
+  // si estamos editando y se va a desactivar, pedir confirmación
+  if (employeeModalState.mode === "edit" && employeeModalState.originalActivo && !formData.activo) {
+    const confirmar = window.confirm("Estás a punto de desactivar a este empleado. ¿Confirmar?");
+    if (!confirmar) return;
+  }
+
+  try {
+    showSavingUI(true);
+
+    let data;
+    if (employeeModalState.mode === "create") {
+      data = await fetchAdmin("/admin/employees", {
+        method: "POST",
+        body: JSON.stringify(formData)
+      });
+    } else if (employeeModalState.mode === "edit") {
+      const id = employeeModalState.empleado?._id || employeeModalState.empleado?.id;
+      if (!id) throw new Error("No se pudo identificar el empleado para editar.");
+      data = await fetchAdmin(`/admin/employees/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(formData)
+      });
+    }
+
+    // mostrar indicador de éxito breve antes de cerrar
+    const successEl = document.getElementById('employeeSuccess');
+    if (successEl) {
+      successEl.classList.remove('hidden');
+    }
+
+    await cargarEmpleados();
+    mostrarFeedback(data.message || "Empleado guardado correctamente");
+
+    // esperar un momento para que el usuario vea el check
+    setTimeout(() => {
+      if (successEl) successEl.classList.add('hidden');
+      showSavingUI(false);
+      cerrarModalEmpleado();
+    }, 900);
+  } catch (error) {
+    // mantener datos del formulario y mostrar errores descriptivos
+    console.error('guardarEmpleado error', error);
+    showSavingUI(false);
+
+    const msg = error?.message || 'No se pudo guardar el empleado';
+    serverErr.textContent = msg;
+    serverErr.classList.remove('hidden');
+
+    // si error.errors contiene detalles por campo, mostrarlos
+    if (error?.errors && typeof error.errors === 'object') {
+      Object.keys(error.errors).forEach((k) => {
+        setFieldError(k, error.errors[k] || 'Inválido');
+      });
+    }
+
+    // fallback a mensaje global
+    mostrarFeedback(msg, 'error');
+  }
+}
+
 async function verDetalleAdmin(orderId) {
   try {
     const data = await fetchAdmin(`/admin/orders/${orderId}`);
@@ -381,6 +779,7 @@ async function verDetalleAdmin(orderId) {
           <div class="admin-detail-total">
             <span>Total general</span>
             <strong>${formatoDinero(pedido.total)}</strong>
+
           </div>
         </section>
 
@@ -505,6 +904,22 @@ document.addEventListener("DOMContentLoaded", () => {
     cerrarModalAdmin();
   });
 
+  document.getElementById("btnNuevoEmpleado")?.addEventListener("click", () => {
+    abrirModalEmpleado("create");
+  });
+
+  document.getElementById("btnCerrarModalEmpleado")?.addEventListener("click", () => {
+    cerrarModalEmpleado();
+  });
+
+  document.getElementById("btnEmployeeCancel")?.addEventListener("click", () => {
+    cerrarModalEmpleado();
+  });
+
+  document.getElementById("btnEmployeeSave")?.addEventListener("click", () => {
+    guardarEmpleado();
+  });
+
   document.getElementById("filtroEstado")?.addEventListener("change", renderizarPedidosAdmin);
   document.getElementById("busquedaPedidos")?.addEventListener("input", renderizarPedidosAdmin);
   document.querySelectorAll(".admin-filter-chip").forEach((chip) => {
@@ -516,4 +931,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
   iniciarAdmin();
+  // cargar empleados al iniciar panel
+  cargarEmpleados();
 });

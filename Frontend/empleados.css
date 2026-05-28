@@ -1,0 +1,29 @@
+.admin-topbar .admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.admin-button.is-active,
+.admin-button.admin-button-dark.is-active {
+  background-color: #1f2937;
+  color: #ffffff;
+}
+
+.admin-employees-week-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-employee-week {
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+  font-size: 0.94rem;
+}
+
+.admin-employee-item {
+  margin-bottom: 1rem;
+}

@@ -4688,6 +4688,65 @@ body {
   color: #ffffff;
 }
 
+/* Employee management styles - incremental, non-invasive */
+.empleado-card {
+  background: #ffffff;
+  border: 1px solid rgba(11,42,107,0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(10,20,40,0.04);
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.empleado-card:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(10,20,40,0.06); }
+.empleado-card .empleado-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.empleado-card .empleado-title strong { display:block; font-size: 1rem; color: #07285a; }
+.empleado-card .empleado-title small { display:block; font-size: 0.78rem; color: #6b7280; }
+.empleado-card .empleado-body { margin-top:10px; display:flex; flex-direction:column; gap:10px; }
+.empleado-row { display:flex; gap:12px; justify-content:space-between; align-items:center; }
+.empleado-row > div { flex:1; min-width:0; }
+.empleado-row small { display:block; color:#6b7280; font-size:0.72rem; }
+.empleado-value { font-weight:700; color:#0b2a6b; margin-top:4px; }
+.empleado-value.total { color:#0b6b3f; font-size:1.05rem; }
+
+.status-dot { width:12px; height:12px; border-radius:50%; display:inline-block; box-shadow:0 0 0 4px rgba(0,0,0,0.02); }
+.status-dot.good { background: #16a34a; box-shadow: 0 0 0 6px rgba(22,163,74,0.08); }
+.status-dot.medium { background: #f59e0b; box-shadow: 0 0 0 6px rgba(245,158,11,0.08); }
+.status-dot.bad { background: #ef4444; box-shadow: 0 0 0 6px rgba(239,68,68,0.08); }
+.empleado-card.is-good { border-color: rgba(16,185,129,0.12); }
+.empleado-card.is-medium { border-color: rgba(245,158,11,0.08); }
+.empleado-card.is-bad { border-color: rgba(239,68,68,0.06); }
+
+/* Skeleton / placeholder */
+.placeholder { opacity: 0.95; }
+.skeleton { background: linear-gradient(90deg, rgba(255,255,255,0), rgba(0,0,0,0.04), rgba(255,255,255,0)); border-radius:6px; display:inline-block; }
+.skeleton-title { width: 140px; height: 14px; background:#eef2ff; }
+.skeleton-chip { width: 48px; height: 14px; background:#eef2ff; border-radius:999px; }
+.skeleton-line { width:100%; height:10px; background:#f3f4f6; border-radius:6px; margin-top:8px; }
+.skeleton-line.short { width:60%; }
+@keyframes shimmer { 0% { background-position: -200px 0 } 100% { background-position: 200px 0 } }
+.skeleton { background: linear-gradient(90deg,#f3f4f6 25%, #eceff6 50%, #f3f4f6 75%); background-size: 400px 100%; animation: shimmer 1.2s linear infinite; }
+
+.empleado-empty { padding: 20px; text-align:center; color:#6b7280; background: #fafafa; border-radius:10px; }
+
+/* Responsive: two-column on tablet+, single column on small screens */
+@media (min-width: 800px) {
+  #empleadosAdminList { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .empleado-card { margin:0; }
+}
+@media (min-width: 1200px) {
+  #empleadosAdminList { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Badges and monetary emphasis */
+.empleado-card .empleado-header .badge { background: #eef2ff; color:#0b2a6b; padding:4px 8px; border-radius:999px; font-size:0.75rem; }
+.empleado-row.empleado-total { border-top:1px dashed rgba(11,42,107,0.06); padding-top:8px; }
+
+
+}
+
 .admin-empty-state {
   padding: 22px;
   border: 1px dashed rgba(11, 42, 107, 0.16);

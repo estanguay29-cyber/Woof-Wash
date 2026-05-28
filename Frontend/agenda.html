@@ -19,6 +19,8 @@
         </div>
       </div>
       <div class="admin-actions">
+        <a href="agenda.html" class="admin-button admin-button-dark">Agenda</a>
+        <a href="empleados.html" class="admin-button admin-button-light">Empleados</a>
         <a href="index.html" class="admin-button admin-button-light">Volver al inicio</a>
       </div>
     </header>
@@ -59,37 +61,23 @@
         </article>
       </section>
 
-      <section class="agenda-card agenda-employee-overview">
-        <div class="agenda-section-header">
-          <div>
-            <p class="admin-kicker">Empleados</p>
-            <h2>Desempe&ntilde;o base</h2>
-          </div>
-          <div class="agenda-goal-pill">
-            <span>Meta diaria</span>
-            <strong id="employeeDailyGoal">$2000 MXN</strong>
-            <small id="employeeDailyProgress">0% de avance</small>
-          </div>
-        </div>
-        <div id="agendaEmployeeMetrics" class="agenda-employee-metrics"></div>
-      </section>
-
       <section class="agenda-toolbar">
         <div>
           <p class="admin-kicker">Filtros</p>
           <h2>Agenda diaria</h2>
         </div>
         <div class="agenda-filters">
-          <div class="agenda-date-controls" aria-label="Navegacion por fechas">
-            <button type="button" data-date-action="prev">Día anterior</button>
-            <button type="button" data-date-action="today">Hoy</button>
-            <button type="button" data-date-action="tomorrow">Mañana</button>
-            <button type="button" data-date-action="next">Día siguiente</button>
-            <label>
-              Fecha
-              <input id="filtroFecha" type="date">
+          <div class="agenda-date-controls" aria-label="Filtro por rango de fechas">
+            <label class="agenda-single-date-label">
+              Fecha inicio
+              <input id="filtroFechaDesde" type="date">
+            </label>
+            <label class="agenda-single-date-label">
+              Fecha fin
+              <input id="filtroFechaHasta" type="date">
             </label>
           </div>
+          <div id="agendaRangeNotice" class="agenda-range-notice hidden" role="status" aria-live="polite"></div>
           <label class="agenda-search-label">
             Buscar
             <input id="agendaSearchInput" type="search" placeholder="Nombre, teléfono, servicio, zona o dirección">

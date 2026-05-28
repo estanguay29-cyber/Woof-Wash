@@ -135,11 +135,53 @@ async function agendaFetch(path, options = {}) {
   return data;
 }
 
+const AGENDA_RANGO_STORAGE_KEY = "agendaRangoFechas";
+
 function obtenerFechaLocalISO(fecha = new Date()) {
   const year = fecha.getFullYear();
   const month = String(fecha.getMonth() + 1).padStart(2, "0");
   const day = String(fecha.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function guardarRangoAgendaStorage(rango) {
+  try {
+    if (!rango || !rango.desde || !rango.hasta) {
+      localStorage.removeItem(AGENDA_RANGO_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(
+      AGENDA_RANGO_STORAGE_KEY,
+      JSON.stringify({ startDate: rango.desde, endDate: rango.hasta })
+    );
+  } catch (error) {
+    console.warn("No se pudo guardar el rango en storage", error);
+  }
+}
+
+function leerRangoAgendaStorage() {
+  try {
+    const raw = localStorage.getItem(AGENDA_RANGO_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.startDate || !parsed.endDate) return null;
+    if (parsed.startDate > parsed.endDate) {
+      localStorage.removeItem(AGENDA_RANGO_STORAGE_KEY);
+      return null;
+    }
+    return { desde: parsed.startDate, hasta: parsed.endDate };
+  } catch (error) {
+    console.warn("No se pudo leer el rango de storage", error);
+    return null;
+  }
+}
+
+function limpiarRangoAgendaStorage() {
+  try {
+    localStorage.removeItem(AGENDA_RANGO_STORAGE_KEY);
+  } catch (error) {
+    console.warn("No se pudo limpiar el rango en storage", error);
+  }
 }
 
 function crearFechaLocal(fecha) {
@@ -961,13 +1003,34 @@ function obtenerEmpleadoAgenda(id) {
 
 async function cargarEmpleadosAgenda() {
   try {
-    const fecha = obtenerElementosAgenda().filtroFecha?.value || obtenerFechaLocalISO();
-    const data = await agendaFetch(`/admin/employees?fecha=${encodeURIComponent(fecha)}`);
+    const elementos = obtenerElementosAgenda();
+    const fecha = elementos.filtroFecha?.value || obtenerFechaLocalISO();
+    const search = document.getElementById("empleadoSearchInput")?.value || "";
+    const estado = document.getElementById("empleadoEstadoFilter")?.value || "todos";
+
+    const listContainer = document.getElementById("empleadosAdminList");
+    if (listContainer) {
+      // show loading placeholders
+      listContainer.innerHTML = Array.from({ length: 3 }).map(() => `
+        <div class="empleado-card placeholder">
+          <div class="empleado-header"><div class="skeleton skeleton-title"></div><div class="skeleton skeleton-chip"></div></div>
+          <div class="empleado-body">
+            <div class="skeleton skeleton-line"></div>
+            <div class="skeleton skeleton-line short"></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    const qs = `fecha=${encodeURIComponent(fecha)}&search=${encodeURIComponent(search)}&estado=${encodeURIComponent(estado)}`;
+    const data = await agendaFetch(`/admin/employees?${qs}`);
     empleadosAgenda = Array.isArray(data.empleados) ? data.empleados : [];
     renderizarMetricasEmpleadosAgenda(data);
+    renderizarListaEmpleadosAgenda(data?.empleados || []);
   } catch {
     empleadosAgenda = [];
     renderizarMetricasEmpleadosAgenda(null);
+    renderizarListaEmpleadosAgenda([]);
   }
 
   const elementos = obtenerElementosAgenda();
@@ -1002,6 +1065,85 @@ function renderizarMetricasEmpleadosAgenda(data) {
       </article>
     `;
   }).join("");
+}
+
+function formatMonedaMXN(value) {
+  const n = Number(value) || 0;
+  return n.toLocaleString("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 });
+}
+
+function obtenerColorDesempeno(metricas = {}) {
+  const cal = typeof metricas.promedioCalificacion === "number" ? metricas.promedioCalificacion / 5 : null;
+  const pun = typeof metricas.puntualidadPorcentaje === "number" ? metricas.puntualidadPorcentaje / 100 : null;
+  const scoreParts = [];
+  if (cal !== null) scoreParts.push(cal);
+  if (pun !== null) scoreParts.push(pun);
+  const score = scoreParts.length ? (scoreParts.reduce((a, b) => a + b, 0) / scoreParts.length) : null;
+  if (score === null) return "neutral";
+  if (score >= 0.85) return "good";
+  if (score >= 0.65) return "medium";
+  return "bad";
+}
+
+function renderizarEmpleadoCard(empleado) {
+  const metricas = empleado.metricas || {};
+  const color = obtenerColorDesempeno(metricas);
+  const nombre = empleado.nombreCompleto || empleado.usuario || "Empleado";
+  const promedio = typeof metricas.promedioCalificacion === "number" ? `${metricas.promedioCalificacion}/5` : "-";
+  const puntualidad = typeof metricas.puntualidadPorcentaje === "number" ? `${metricas.puntualidadPorcentaje}%` : "-";
+  const citas = Number(metricas.citasCompletadas) || 0;
+  const ingresos = Number(metricas.ingresosGeneradosAproximados) || 0;
+  const comision = Number(empleado.comision) || 0;
+  const bonoPuntualidad = Number(metricas.bonificacionPuntualidad) || 0;
+  const bonoResenas = Number(metricas.bonificacionResenas) || 0;
+  const bonoManual = Number(empleado.bonoManual) || 0;
+  const descuento = Number(empleado.descuentoAdministrativo) || 0;
+  const comisionesAprox = Number(metricas.comisionesAproximadas) || 0;
+  const totalPago = Number(metricas.totalPagoAproximado) || 0;
+
+  return `
+    <article class="empleado-card is-${color}" data-id="${escapeHtml(empleado.id)}">
+      <header class="empleado-header">
+        <div class="empleado-title">
+          <strong>${escapeHtml(nombre)}</strong>
+          <small>${escapeHtml(empleado.usuario || empleado.email || "")}</small>
+        </div>
+        <div class="empleado-status">
+          <span class="status-dot ${color}"></span>
+        </div>
+      </header>
+      <div class="empleado-body">
+        <div class="empleado-row">
+          <div><small>Promedio</small><div class="empleado-value">${escapeHtml(promedio)}</div></div>
+          <div><small>Puntualidad</small><div class="empleado-value">${escapeHtml(puntualidad)}</div></div>
+          <div><small>Citas</small><div class="empleado-value">${escapeHtml(String(citas))}</div></div>
+        </div>
+        <div class="empleado-row">
+          <div><small>Ingresos aprox.</small><div class="empleado-value">${formatMonedaMXN(ingresos)}</div></div>
+          <div><small>Comisión</small><div class="empleado-value">${formatMonedaMXN(comisionesAprox)}</div></div>
+          <div><small>Bono puntualidad</small><div class="empleado-value">${formatMonedaMXN(bonoPuntualidad)}</div></div>
+        </div>
+        <div class="empleado-row">
+          <div><small>Bono reseñas</small><div class="empleado-value">${formatMonedaMXN(bonoResenas)}</div></div>
+          <div><small>Bono manual</small><div class="empleado-value">${formatMonedaMXN(bonoManual)}</div></div>
+          <div><small>Descuentos</small><div class="empleado-value">${formatMonedaMXN(descuento)}</div></div>
+        </div>
+        <div class="empleado-row empleado-total">
+          <div><small>Total pago aprox.</small><div class="empleado-value total">${formatMonedaMXN(totalPago)}</div></div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderizarListaEmpleadosAgenda(empleados) {
+  const container = document.getElementById("empleadosAdminList");
+  if (!container) return;
+  if (!Array.isArray(empleados) || empleados.length === 0) {
+    container.innerHTML = `<div class="empleado-empty">No se encontraron empleados.</div>`;
+    return;
+  }
+  container.innerHTML = empleados.map(renderizarEmpleadoCard).join("");
 }
 
 function aplicarReglaZonaEnCampos({ fechaInput, zonaSelect, notice, submitButton }) {
@@ -1100,16 +1242,12 @@ function mapearCitaApi(cita) {
 }
 
 function construirQueryCitas() {
-  const { filtroFecha } = obtenerElementosAgenda();
   const params = new URLSearchParams();
+  const hoy = obtenerFechaLocalISO();
+  const rango = filtroRangoActual || { desde: hoy, hasta: hoy };
 
-  if (filtroRangoActual) {
-    params.set("desde", filtroRangoActual.desde);
-    params.set("hasta", filtroRangoActual.hasta);
-  } else {
-    params.set("fecha", filtroFecha?.value || obtenerFechaLocalISO());
-  }
-
+  params.set("startDate", rango.desde);
+  params.set("endDate", rango.hasta);
   return params.toString();
 }
 
@@ -1132,33 +1270,37 @@ function limpiarCamposRangoAgenda() {
   if (filtroFechaDesde) filtroFechaDesde.value = "";
   if (filtroFechaHasta) filtroFechaHasta.value = "";
   limpiarAvisoRangoAgenda();
+  limpiarRangoAgendaStorage();
 }
 
 function aplicarRangoFechasAgenda() {
-  const { filtroFecha, filtroFechaDesde, filtroFechaHasta, filtroZona, buscador } = obtenerElementosAgenda();
+  const { filtroFechaDesde, filtroFechaHasta, filtroZona, buscador } = obtenerElementosAgenda();
   const desde = filtroFechaDesde?.value || "";
   const hasta = filtroFechaHasta?.value || "";
 
   if (!desde && !hasta) {
     filtroRangoActual = null;
     limpiarAvisoRangoAgenda();
+    limpiarRangoAgendaStorage();
     return true;
   }
 
   if (!desde || !hasta) {
     filtroRangoActual = null;
+    limpiarRangoAgendaStorage();
     mostrarAvisoRangoAgenda("Selecciona fecha desde y fecha hasta para consultar un rango.", "warning");
     return false;
   }
 
   if (desde > hasta) {
     filtroRangoActual = null;
+    limpiarRangoAgendaStorage();
     mostrarAvisoRangoAgenda("La fecha desde no puede ser mayor que la fecha hasta.", "error");
     return false;
   }
 
   filtroRangoActual = { desde, hasta };
-  if (filtroFecha) filtroFecha.value = desde;
+  guardarRangoAgendaStorage(filtroRangoActual);
   if (filtroZona) filtroZona.value = "todas";
   if (buscador) buscador.value = "";
   citaPendienteCancelacionId = null;
@@ -2365,32 +2507,6 @@ function actualizarChipsEstadoAgenda() {
   });
 }
 
-function navegarFechaAgenda(accion) {
-  const { filtroFecha, filtroZona, buscador } = obtenerElementosAgenda();
-  if (!filtroFecha) return;
-
-  const fechaBase = crearFechaLocal(filtroFecha.value) || new Date();
-  let fechaDestino = fechaBase;
-
-  if (accion === "today") {
-    fechaDestino = new Date();
-  } else if (accion === "tomorrow") {
-    fechaDestino = sumarDias(new Date(), 1);
-  } else if (accion === "prev") {
-    fechaDestino = sumarDias(fechaBase, -1);
-  } else if (accion === "next") {
-    fechaDestino = sumarDias(fechaBase, 1);
-  }
-
-  filtroFecha.value = obtenerFechaLocalISO(fechaDestino);
-  if (filtroZona) filtroZona.value = "todas";
-  if (buscador) buscador.value = "";
-  filtroRangoActual = null;
-  limpiarCamposRangoAgenda();
-  citaPendienteCancelacionId = null;
-  cargarCitasAgenda();
-}
-
 function aplicarFiltroEstadoAgenda(estado) {
   filtroEstadoActual = AGENDA_ESTADOS[estado] ? estado : "todos";
   citaPendienteCancelacionId = null;
@@ -2399,23 +2515,22 @@ function aplicarFiltroEstadoAgenda(estado) {
 }
 
 function aplicarFiltroRapido(tipo) {
-  const { filtroFecha, filtroZona, buscador } = obtenerElementosAgenda();
+  const { filtroZona, buscador } = obtenerElementosAgenda();
   const hoy = new Date();
 
   if (filtroZona) filtroZona.value = "todas";
   if (buscador) buscador.value = "";
-  filtroRangoActual = null;
   limpiarCamposRangoAgenda();
 
   if (tipo === "today") {
-    if (filtroFecha) filtroFecha.value = obtenerFechaLocalISO(hoy);
+    filtroRangoActual = { desde: obtenerFechaLocalISO(hoy), hasta: obtenerFechaLocalISO(hoy) };
     filtroEstadoActual = "todos";
   } else if (tipo === "tomorrow") {
-    if (filtroFecha) filtroFecha.value = obtenerFechaLocalISO(sumarDias(hoy, 1));
+    const manana = sumarDias(hoy, 1);
+    filtroRangoActual = { desde: obtenerFechaLocalISO(manana), hasta: obtenerFechaLocalISO(manana) };
     filtroEstadoActual = "todos";
   } else if (tipo === "week") {
     filtroRangoActual = obtenerRangoSemana(hoy);
-    if (filtroFecha) filtroFecha.value = obtenerFechaLocalISO(hoy);
     const { filtroFechaDesde, filtroFechaHasta } = obtenerElementosAgenda();
     if (filtroFechaDesde) filtroFechaDesde.value = filtroRangoActual.desde;
     if (filtroFechaHasta) filtroFechaHasta.value = filtroRangoActual.hasta;
@@ -2433,17 +2548,21 @@ function aplicarFiltroRapido(tipo) {
 function configurarAgenda() {
   const elementos = obtenerElementosAgenda();
   const hoy = obtenerFechaLocalISO();
+  const rangoGuardado = leerRangoAgendaStorage();
 
-  if (elementos.filtroFecha) elementos.filtroFecha.value = hoy;
+  if (rangoGuardado) {
+    filtroRangoActual = rangoGuardado;
+    if (elementos.filtroFechaDesde) elementos.filtroFechaDesde.value = rangoGuardado.desde;
+    if (elementos.filtroFechaHasta) elementos.filtroFechaHasta.value = rangoGuardado.hasta;
+    mostrarAvisoRangoAgenda(
+      `Último rango guardado: ${formatearFechaAgenda(rangoGuardado.desde)} a ${formatearFechaAgenda(rangoGuardado.hasta)}.`,
+      "info"
+    );
+  }
+
   if (elementos.fechaCita) elementos.fechaCita.value = hoy;
-  limpiarAvisoRangoAgenda();
+  if (!rangoGuardado) limpiarAvisoRangoAgenda();
 
-  elementos.filtroFecha?.addEventListener("change", () => {
-    filtroRangoActual = null;
-    limpiarCamposRangoAgenda();
-    citaPendienteCancelacionId = null;
-    cargarCitasAgenda();
-  });
   [elementos.filtroFechaDesde, elementos.filtroFechaHasta].forEach((input) => {
     input?.addEventListener("change", () => {
       if (!aplicarRangoFechasAgenda()) return;
@@ -2556,9 +2675,6 @@ function configurarAgenda() {
 
   document.querySelectorAll("[data-quick-filter]").forEach((button) => {
     button.addEventListener("click", () => aplicarFiltroRapido(button.dataset.quickFilter));
-  });
-  document.querySelectorAll("[data-date-action]").forEach((button) => {
-    button.addEventListener("click", () => navegarFechaAgenda(button.dataset.dateAction));
   });
   document.querySelectorAll("[data-status-filter]").forEach((button) => {
     button.addEventListener("click", () => aplicarFiltroEstadoAgenda(button.dataset.statusFilter));
