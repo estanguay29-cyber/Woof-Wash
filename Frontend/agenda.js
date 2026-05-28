@@ -93,6 +93,7 @@ let detalleEstadoActualizando = false;
 let citaPendienteCancelacionId = null;
 let filtroRangoActual = null;
 let filtroEstadoActual = "todos";
+let filtroDiaActual = null; // single-day view (YYYY-MM-DD)
 let citaEnEdicionServicioLegacy = false;
 let servicioEdicionActualizado = false;
 let disponibilidadCrearActual = null;
@@ -182,6 +183,65 @@ function limpiarRangoAgendaStorage() {
   } catch (error) {
     console.warn("No se pudo limpiar el rango en storage", error);
   }
+}
+
+function actualizarModoVisual() {
+  const elems = obtenerElementosAgenda();
+  const indicator = elems.agendaModeIndicator;
+  const btnHoy = elems.btnHoy;
+  const verDia = elems.filtroVerDia;
+  const desde = elems.filtroFechaDesde;
+  const hasta = elems.filtroFechaHasta;
+
+  if (!indicator) return;
+
+  if (filtroRangoActual && filtroRangoActual.desde && filtroRangoActual.hasta) {
+    indicator.innerHTML = `Modo: <strong>Rango</strong>`;
+    btnHoy?.classList.remove("is-active");
+    if (verDia) verDia.value = "";
+  } else if (filtroDiaActual) {
+    indicator.innerHTML = `Modo: <strong>Día específico</strong>`;
+    btnHoy?.classList.remove("is-active");
+    if (desde) { /* keep range inputs unchanged */ }
+    if (verDia) verDia.value = filtroDiaActual;
+  } else {
+    indicator.innerHTML = `Modo: <strong>Hoy</strong>`;
+    btnHoy?.classList.add("is-active");
+    if (verDia) verDia.value = "";
+  }
+}
+
+function setModoHoy() {
+  filtroRangoActual = null;
+  filtroDiaActual = null;
+  const hoy = obtenerFechaLocalISO();
+  const elems = obtenerElementosAgenda();
+  if (elems.filtroFechaDesde) elems.filtroFechaDesde.value = "";
+  if (elems.filtroFechaHasta) elems.filtroFechaHasta.value = "";
+  if (elems.filtroVerDia) elems.filtroVerDia.value = "";
+  actualizarModoVisual();
+}
+
+function setModoDia(dia) {
+  if (!dia) return;
+  filtroRangoActual = null;
+  filtroDiaActual = dia;
+  const elems = obtenerElementosAgenda();
+  if (elems.filtroFechaDesde) elems.filtroFechaDesde.value = "";
+  if (elems.filtroFechaHasta) elems.filtroFechaHasta.value = "";
+  if (elems.filtroVerDia) elems.filtroVerDia.value = dia;
+  actualizarModoVisual();
+}
+
+function setModoRango(desde, hasta) {
+  filtroRangoActual = { desde: desde || "", hasta: hasta || "" };
+  filtroDiaActual = null;
+  const elems = obtenerElementosAgenda();
+  if (elems.filtroVerDia) elems.filtroVerDia.value = "";
+  if (elems.filtroFechaDesde) elems.filtroFechaDesde.value = filtroRangoActual.desde;
+  if (elems.filtroFechaHasta) elems.filtroFechaHasta.value = filtroRangoActual.hasta;
+  guardarRangoAgendaStorage(filtroRangoActual);
+  actualizarModoVisual();
 }
 
 function crearFechaLocal(fecha) {
@@ -912,9 +972,11 @@ function protegerAgendaAdmin() {
 
 function obtenerElementosAgenda() {
   return {
-    filtroFecha: document.getElementById("filtroFecha"),
     filtroFechaDesde: document.getElementById("filtroFechaDesde"),
     filtroFechaHasta: document.getElementById("filtroFechaHasta"),
+    filtroVerDia: document.getElementById("filtroVerDia"),
+    btnHoy: document.getElementById("btnHoy"),
+    agendaModeIndicator: document.getElementById("agendaModeIndicator"),
     rangeNotice: document.getElementById("agendaRangeNotice"),
     filtroZona: document.getElementById("filtroZonaAgenda"),
     buscador: document.getElementById("agendaSearchInput"),
@@ -1004,7 +1066,7 @@ function obtenerEmpleadoAgenda(id) {
 async function cargarEmpleadosAgenda() {
   try {
     const elementos = obtenerElementosAgenda();
-    const fecha = elementos.filtroFecha?.value || obtenerFechaLocalISO();
+    const fecha = elementos.filtroFechaDesde?.value || obtenerFechaLocalISO();
     const search = document.getElementById("empleadoSearchInput")?.value || "";
     const estado = document.getElementById("empleadoEstadoFilter")?.value || "todos";
 
@@ -1244,10 +1306,16 @@ function mapearCitaApi(cita) {
 function construirQueryCitas() {
   const params = new URLSearchParams();
   const hoy = obtenerFechaLocalISO();
-  const rango = filtroRangoActual || { desde: hoy, hasta: hoy };
+  // Prioridad: rango > día específico > hoy
+  if (filtroRangoActual && filtroRangoActual.desde && filtroRangoActual.hasta) {
+    params.set("startDate", filtroRangoActual.desde);
+    params.set("endDate", filtroRangoActual.hasta);
+    return params.toString();
+  }
 
-  params.set("startDate", rango.desde);
-  params.set("endDate", rango.hasta);
+  const dia = filtroDiaActual || hoy;
+  params.set("startDate", dia);
+  params.set("endDate", dia);
   return params.toString();
 }
 
@@ -1282,6 +1350,7 @@ function aplicarRangoFechasAgenda() {
     filtroRangoActual = null;
     limpiarAvisoRangoAgenda();
     limpiarRangoAgendaStorage();
+    actualizarModoVisual();
     return true;
   }
 
@@ -1296,6 +1365,7 @@ function aplicarRangoFechasAgenda() {
     filtroRangoActual = null;
     limpiarRangoAgendaStorage();
     mostrarAvisoRangoAgenda("La fecha desde no puede ser mayor que la fecha hasta.", "error");
+    actualizarModoVisual();
     return false;
   }
 
@@ -1305,6 +1375,7 @@ function aplicarRangoFechasAgenda() {
   if (buscador) buscador.value = "";
   citaPendienteCancelacionId = null;
   mostrarAvisoRangoAgenda(`Viendo citas del ${formatearFechaAgenda(desde)} al ${formatearFechaAgenda(hasta)}.`, "info");
+  actualizarModoVisual();
   return true;
 }
 
@@ -1378,8 +1449,8 @@ function obtenerCitasFiltradasLocal() {
 }
 
 function renderizarResumenAgenda() {
-  const { filtroFecha } = obtenerElementosAgenda();
-  const fecha = filtroFecha?.value || obtenerFechaLocalISO();
+  const { filtroFechaDesde } = obtenerElementosAgenda();
+  const fecha = filtroFechaDesde?.value || obtenerFechaLocalISO();
   const regla = obtenerZonaPorFecha(fecha);
   const total = citasAgenda.length;
   const pendientes = citasAgenda.filter((cita) => cita.estado === "pendiente").length;
@@ -1902,7 +1973,7 @@ function construirPayloadFormulario(form, prefijo = "") {
 async function crearCitaDesdeFormulario(event) {
   event.preventDefault();
 
-  const { form, fechaCita, zonaCita, btnCrear, filtroFecha, filtroZona, buscador } = obtenerElementosAgenda();
+  const { form, fechaCita, zonaCita, btnCrear, filtroFechaDesde, filtroFechaHasta, filtroZona, buscador } = obtenerElementosAgenda();
   if (!form || !fechaCita || !zonaCita || btnCrear?.disabled) return;
   if (obtenerZonaPorFecha(fechaCita.value).esDescanso) return;
 
@@ -1915,7 +1986,8 @@ async function crearCitaDesdeFormulario(event) {
       body: JSON.stringify(payload)
     });
 
-    if (filtroFecha) filtroFecha.value = payload.fecha;
+    if (filtroFechaDesde) filtroFechaDesde.value = payload.fecha;
+    if (filtroFechaHasta) filtroFechaHasta.value = payload.fecha;
     if (filtroZona) filtroZona.value = "todas";
     if (buscador) buscador.value = "";
     filtroEstadoActual = "todos";
@@ -2030,7 +2102,7 @@ function actualizarCalificacionEdicion() {
 async function guardarEdicionCita(event) {
   event.preventDefault();
 
-  const { editForm, editBtnGuardar, filtroFecha, filtroZona, buscador } = obtenerElementosAgenda();
+  const { editForm, editBtnGuardar, filtroFechaDesde, filtroFechaHasta, filtroZona, buscador } = obtenerElementosAgenda();
   if (!editForm || !citaEnEdicionId || editBtnGuardar?.disabled) return;
 
   editBtnGuardar.disabled = true;
@@ -2046,7 +2118,8 @@ async function guardarEdicionCita(event) {
       body: JSON.stringify(payload)
     });
 
-    if (filtroFecha) filtroFecha.value = payload.fecha;
+    if (filtroFechaDesde) filtroFechaDesde.value = payload.fecha;
+    if (filtroFechaHasta) filtroFechaHasta.value = payload.fecha;
     if (filtroZona) filtroZona.value = "todas";
     if (buscador) buscador.value = "";
     filtroEstadoActual = "todos";
@@ -2558,16 +2631,40 @@ function configurarAgenda() {
       `Último rango guardado: ${formatearFechaAgenda(rangoGuardado.desde)} a ${formatearFechaAgenda(rangoGuardado.hasta)}.`,
       "info"
     );
+    // mantener modo rango si existe
+    setModoRango(rangoGuardado.desde, rangoGuardado.hasta);
   }
 
   if (elementos.fechaCita) elementos.fechaCita.value = hoy;
-  if (!rangoGuardado) limpiarAvisoRangoAgenda();
+  if (!rangoGuardado) {
+    limpiarAvisoRangoAgenda();
+    // por defecto al refrescar mostrar Hoy
+    setModoHoy();
+  }
 
   [elementos.filtroFechaDesde, elementos.filtroFechaHasta].forEach((input) => {
     input?.addEventListener("change", () => {
       if (!aplicarRangoFechasAgenda()) return;
       cargarCitasAgenda();
     });
+  });
+  // nuevo control: ver día y hoy
+  elementos.btnHoy?.addEventListener("click", () => {
+    setModoHoy();
+    // recargar citas y limpiar filtros visuales
+    limpiarCamposRangoAgenda();
+    const elems = obtenerElementosAgenda();
+    if (elems.filtroVerDia) elems.filtroVerDia.value = "";
+    cargarCitasAgenda();
+  });
+  elementos.filtroVerDia?.addEventListener("change", (ev) => {
+    const val = ev.target?.value || "";
+    if (!val) {
+      setModoHoy();
+    } else {
+      setModoDia(val);
+    }
+    cargarCitasAgenda();
   });
   elementos.buscador?.addEventListener("input", () => {
     citaPendienteCancelacionId = null;

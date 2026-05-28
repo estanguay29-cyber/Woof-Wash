@@ -14,6 +14,21 @@ function obtenerApiBase() {
     : API_URL;
 }
 
+function getById(id) {
+  return document.getElementById(id);
+}
+
+function setTextContent(id, text) {
+  const element = getById(id);
+  if (element) element.textContent = String(text ?? "");
+}
+
+function toggleHidden(id, hidden) {
+  const element = getById(id);
+  if (!element) return;
+  element.classList.toggle("hidden", hidden);
+}
+
 function escaparHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -247,11 +262,17 @@ function actualizarResumen() {
     completados: 0
   });
 
-  document.getElementById("statTotal").textContent = stats.total;
-  document.getElementById("statPendientes").textContent = stats.pendientes;
-  document.getElementById("statConfirmados").textContent = stats.confirmados;
-  document.getElementById("statCancelados").textContent = stats.cancelados;
-  document.getElementById("statCompletados").textContent = stats.completados;
+  const statTotal = document.getElementById("statTotal");
+  const statPendientes = document.getElementById("statPendientes");
+  const statConfirmados = document.getElementById("statConfirmados");
+  const statCancelados = document.getElementById("statCancelados");
+  const statCompletados = document.getElementById("statCompletados");
+
+  if (statTotal) statTotal.textContent = stats.total;
+  if (statPendientes) statPendientes.textContent = stats.pendientes;
+  if (statConfirmados) statConfirmados.textContent = stats.confirmados;
+  if (statCancelados) statCancelados.textContent = stats.cancelados;
+  if (statCompletados) statCompletados.textContent = stats.completados;
 }
 
 function renderizarPedidosAdmin() {
@@ -425,11 +446,16 @@ function cerrarModalEmpleado() {
 }
 
 function abrirModalEmpleado(mode = "view", empleadoId = "") {
-  const modal = document.getElementById("adminEmployeeModal");
-  const title = document.getElementById("employeeModalTitle");
-  const kicker = document.getElementById("employeeModalKicker");
-  const subtitle = document.getElementById("employeeModalSubtitle");
-  const form = document.getElementById("employeeForm");
+  const modal = getById("adminEmployeeModal");
+  const title = getById("employeeModalTitle");
+  const kicker = getById("employeeModalKicker");
+  const subtitle = getById("employeeModalSubtitle");
+  const form = getById("employeeForm");
+
+  if (!modal || !title || !kicker || !subtitle || !form) {
+    mostrarFeedback("No se pudo abrir el modal de empleado.", "error");
+    return;
+  }
 
   // save last focused element to restore focus when closing
   employeeModalState.lastActiveElement = document.activeElement;
@@ -507,12 +533,16 @@ function abrirModalEmpleado(mode = "view", empleadoId = "") {
 }
 
 function showSavingUI(enable) {
-  const modal = document.getElementById('adminEmployeeModal');
-  const spinner = document.getElementById('employeeSpinner');
-  const status = document.getElementById('employeeSavingStatus');
-  const saveBtn = document.getElementById('btnEmployeeSave');
-  const cancelBtn = document.getElementById('btnEmployeeCancel');
+  const modal = getById('adminEmployeeModal');
+  const spinner = getById('employeeSpinner');
+  const status = getById('employeeSavingStatus');
+  const saveBtn = getById('btnEmployeeSave');
+  const cancelBtn = getById('btnEmployeeCancel');
   const inputs = Array.from(document.querySelectorAll('#employeeForm input, #employeeForm textarea, #employeeForm button'));
+
+  if (!modal || !spinner || !status || !saveBtn || !cancelBtn) {
+    return;
+  }
 
   if (enable) {
     employeeModalState.saving = true;
@@ -521,7 +551,7 @@ function showSavingUI(enable) {
     status.classList.remove('hidden');
     saveBtn.disabled = true;
     cancelBtn.disabled = true;
-    inputs.forEach(i => { if (i.type !== 'button') i.disabled = true; });
+    inputs.forEach((i) => { if (i.type !== 'button') i.disabled = true; });
   } else {
     employeeModalState.saving = false;
     modal.classList.remove('saving');
@@ -529,7 +559,7 @@ function showSavingUI(enable) {
     status.classList.add('hidden');
     saveBtn.disabled = false;
     cancelBtn.disabled = false;
-    inputs.forEach(i => { if (i.type !== 'button') i.disabled = false; });
+    inputs.forEach((i) => { if (i.type !== 'button') i.disabled = false; });
   }
 }
 
@@ -552,32 +582,42 @@ function setFieldError(fieldKey, message) {
 }
 
 function renderEmployeeToForm(emp, mode) {
-  const form = document.getElementById("employeeForm");
-  document.getElementById("emp_nombre").value = emp.nombre || emp.name || "";
-  document.getElementById("emp_telefono").value = emp.telefono || emp.phone || "";
-  document.getElementById("emp_email").value = emp.email || "";
-  document.getElementById("emp_especialidad").value = emp.especialidad || emp.specialty || "";
-  document.getElementById("emp_sueldoBase").value = emp.sueldoBase ?? emp.sueldo ?? "";
-  document.getElementById("emp_comision").value = emp.comision ?? emp.commission ?? "";
-  document.getElementById("emp_bono").value = emp.bono ?? emp.bonus ?? "";
-  document.getElementById("emp_descuento").value = emp.descuento ?? emp.discount ?? "";
-  document.getElementById("emp_activo").checked = emp.activo === false ? false : true;
-  document.getElementById("emp_notas").value = emp.notas || emp.notes || "";
+  const nombreField = getById("emp_nombre");
+  const telefonoField = getById("emp_telefono");
+  const emailField = getById("emp_email");
+  const especialidadField = getById("emp_especialidad");
+  const sueldoField = getById("emp_sueldoBase");
+  const comisionField = getById("emp_comision");
+  const bonoField = getById("emp_bono");
+  const descuentoField = getById("emp_descuento");
+  const activoField = getById("emp_activo");
+  const notasField = getById("emp_notas");
+
+  if (nombreField) nombreField.value = emp.nombre || emp.name || "";
+  if (telefonoField) telefonoField.value = emp.telefono || emp.phone || "";
+  if (emailField) emailField.value = emp.email || "";
+  if (especialidadField) especialidadField.value = emp.especialidad || emp.specialty || "";
+  if (sueldoField) sueldoField.value = emp.sueldoBase ?? emp.sueldo ?? "";
+  if (comisionField) comisionField.value = emp.comision ?? emp.commission ?? "";
+  if (bonoField) bonoField.value = emp.bono ?? emp.bonus ?? "";
+  if (descuentoField) descuentoField.value = emp.descuento ?? emp.discount ?? "";
+  if (activoField) activoField.checked = emp.activo === false ? false : true;
+  if (notasField) notasField.value = emp.notas || emp.notes || "";
 
   employeeModalState.originalActivo = emp.activo === false ? false : true;
 
   if (mode === "view") {
     setFormReadonly(true);
-    document.getElementById("employeeModalTitle").textContent = "Ver empleado";
-    document.getElementById("employeeModalKicker").textContent = "Detalle";
-    document.getElementById("employeeModalSubtitle").textContent = "Solo lectura";
-    document.getElementById("btnEmployeeSave").classList.add("hidden");
+    setTextContent("employeeModalTitle", "Ver empleado");
+    setTextContent("employeeModalKicker", "Detalle");
+    setTextContent("employeeModalSubtitle", "Solo lectura");
+    getById("btnEmployeeSave")?.classList.add("hidden");
   } else {
     setFormReadonly(false);
-    document.getElementById("employeeModalTitle").textContent = "Editar empleado";
-    document.getElementById("employeeModalKicker").textContent = "Editar";
-    document.getElementById("employeeModalSubtitle").textContent = "Modifica datos del empleado";
-    document.getElementById("btnEmployeeSave").classList.remove("hidden");
+    setTextContent("employeeModalTitle", "Editar empleado");
+    setTextContent("employeeModalKicker", "Editar");
+    setTextContent("employeeModalSubtitle", "Modifica datos del empleado");
+    getById("btnEmployeeSave")?.classList.remove("hidden");
   }
 }
 
@@ -595,30 +635,33 @@ function setFormReadonly(readonly) {
 
 function validateEmployeeForm() {
   let ok = true;
-  const nombre = document.getElementById("emp_nombre");
-  const telefono = document.getElementById("emp_telefono");
-  const email = document.getElementById("emp_email");
+  const nombre = getById("emp_nombre");
+  const telefono = getById("emp_telefono");
+  const email = getById("emp_email");
+  const errNombre = getById("err_nombre");
+  const errTelefono = getById("err_telefono");
+  const errEmail = getById("err_email");
 
-  if (!nombre.value.trim()) {
-    document.getElementById("err_nombre").classList.remove("hidden");
+  if (!nombre?.value.trim()) {
+    errNombre?.classList.remove("hidden");
     ok = false;
   } else {
-    document.getElementById("err_nombre").classList.add("hidden");
+    errNombre?.classList.add("hidden");
   }
 
-  if (!telefono.value.trim()) {
-    document.getElementById("err_telefono").classList.remove("hidden");
+  if (!telefono?.value.trim()) {
+    errTelefono?.classList.remove("hidden");
     ok = false;
   } else {
-    document.getElementById("err_telefono").classList.add("hidden");
+    errTelefono?.classList.add("hidden");
   }
 
-  const emailVal = email.value.trim();
+  const emailVal = email?.value.trim() || "";
   if (emailVal && !/^\S+@\S+\.\S+$/.test(emailVal)) {
-    document.getElementById("err_email").classList.remove("hidden");
+    errEmail?.classList.remove("hidden");
     ok = false;
   } else {
-    document.getElementById("err_email").classList.add("hidden");
+    errEmail?.classList.add("hidden");
   }
 
   return ok;
@@ -629,21 +672,32 @@ async function guardarEmpleado() {
 
   if (employeeModalState.saving) return; // evitar doble submit
 
-  const serverErr = document.getElementById('employeeModalServerError');
-  serverErr.classList.add('hidden');
-  serverErr.textContent = '';
+  const serverErr = getById('employeeModalServerError');
+  serverErr?.classList.add('hidden');
+  if (serverErr) serverErr.textContent = '';
+
+  const nombreInput = getById("emp_nombre");
+  const telefonoInput = getById("emp_telefono");
+  const emailInput = getById("emp_email");
+  const especialidadInput = getById("emp_especialidad");
+  const sueldoInput = getById("emp_sueldoBase");
+  const comisionInput = getById("emp_comision");
+  const bonoInput = getById("emp_bono");
+  const descuentoInput = getById("emp_descuento");
+  const activoInput = getById("emp_activo");
+  const notasInput = getById("emp_notas");
 
   const formData = {
-    nombre: document.getElementById("emp_nombre").value.trim(),
-    telefono: document.getElementById("emp_telefono").value.trim(),
-    email: document.getElementById("emp_email").value.trim(),
-    especialidad: document.getElementById("emp_especialidad").value.trim(),
-    sueldoBase: Number(document.getElementById("emp_sueldoBase").value) || 0,
-    comision: Number(document.getElementById("emp_comision").value) || 0,
-    bono: Number(document.getElementById("emp_bono").value) || 0,
-    descuento: Number(document.getElementById("emp_descuento").value) || 0,
-    activo: document.getElementById("emp_activo").checked,
-    notas: document.getElementById("emp_notas").value.trim()
+    nombre: nombreInput?.value.trim() || "",
+    telefono: telefonoInput?.value.trim() || "",
+    email: emailInput?.value.trim() || "",
+    especialidad: especialidadInput?.value.trim() || "",
+    sueldoBase: Number(sueldoInput?.value) || 0,
+    comision: Number(comisionInput?.value) || 0,
+    bono: Number(bonoInput?.value) || 0,
+    descuento: Number(descuentoInput?.value) || 0,
+    activo: activoInput?.checked || false,
+    notas: notasInput?.value.trim() || ""
   };
 
   // si estamos editando y se va a desactivar, pedir confirmación
@@ -710,17 +764,21 @@ async function verDetalleAdmin(orderId) {
   try {
     const data = await fetchAdmin(`/admin/orders/${orderId}`);
     const pedido = data.pedido;
-    const modal = document.getElementById("adminOrderModal");
-    const detalle = document.getElementById("adminOrderDetail");
+    const modal = getById("adminOrderModal");
+    const detalle = getById("adminOrderDetail");
 
     if (!pedido) {
-      detalle.innerHTML = `
-        <div class="admin-empty-state">
-          No se pudo cargar el pedido.
-        </div>
-      `;
-      modal.classList.remove("hidden");
-      modal.classList.add("flex");
+      if (detalle) {
+        detalle.innerHTML = `
+          <div class="admin-empty-state">
+            No se pudo cargar el pedido.
+          </div>
+        `;
+      }
+      if (modal) {
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      }
       return;
     }
 
@@ -872,9 +930,12 @@ async function iniciarAdmin() {
 
   try {
     const admin = await fetchAdmin("/admin/me");
-    document.getElementById("adminPanel").classList.remove("hidden");
-    document.getElementById("adminAccessMessage").classList.add("hidden");
-    status.textContent = `Sesión admin activa: ${admin.usuario}`;
+    const adminPanel = getById("adminPanel");
+    const adminAccessMessage = getById("adminAccessMessage");
+
+    if (adminPanel) adminPanel.classList.remove("hidden");
+    if (adminAccessMessage) adminAccessMessage.classList.add("hidden");
+    if (status) status.textContent = `Sesión admin activa: ${admin.usuario}`;
     await cargarPedidosAdmin();
   } catch (error) {
     if (error.status === 401 || error.status === 403) {

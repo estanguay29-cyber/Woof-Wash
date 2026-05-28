@@ -67,6 +67,14 @@
           <h2>Agenda diaria</h2>
         </div>
         <div class="agenda-filters">
+          <div class="agenda-mode-controls">
+            <button id="btnHoy" type="button" class="admin-button admin-button-light">Hoy</button>
+            <label class="agenda-single-date-label">
+              Ver día
+              <input id="filtroVerDia" type="date">
+            </label>
+            <div id="agendaModeIndicator" class="agenda-mode-indicator">Modo: <strong>Hoy</strong></div>
+          </div>
           <div class="agenda-date-controls" aria-label="Filtro por rango de fechas">
             <label class="agenda-single-date-label">
               Fecha inicio
