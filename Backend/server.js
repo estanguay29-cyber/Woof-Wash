@@ -2552,6 +2552,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
           puesto: empleado.puesto || "",
           especialidad: empleado.puesto || "",
           activo: Boolean(empleado.activo),
+          comisionPorcentaje: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
           fechaIngreso: empleado.fechaIngreso || "",
           role: "empleado",
           metricas,
@@ -2626,6 +2627,7 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       activo: Boolean(empleado.activo),
       sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
       comision: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
+      comisionPorcentaje: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
       bonoManual: Number.isFinite(Number(empleado.bonoManual)) ? Number(empleado.bonoManual) : 0,
       descuentoAdministrativo: Number.isFinite(Number(empleado.descuentoAdministrativo)) ? Number(empleado.descuentoAdministrativo) : 0,
       notasAdministrativas: empleado.notas || "",
@@ -2672,9 +2674,11 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
       email,
       telefono,
       especialidad,
+      puesto,
       fechaIngreso,
       sueldoBase,
       comision,
+      comisionPorcentaje,
       bonoManual,
       descuentoAdministrativo,
       notasAdministrativas,
@@ -2684,10 +2688,10 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
     const nombre = String(nombreCompleto || "").trim();
     const emailLimpio = normalizarEmail(email);
     const telefonoLimpio = String(telefono || "").trim();
-    const especialidadLimpia = String(especialidad || "").trim();
+    const puestoLimpio = String(puesto || especialidad || "").trim();
     const fechaIngresoLimpia = String(fechaIngreso || "").trim();
     const sueldoBaseNum = Number(sueldoBase) || 0;
-    const comisionNum = Number(comision) || 0;
+    const comisionNum = Number(comision ?? comisionPorcentaje) || 0;
     const bonoManualNum = Number(bonoManual) || 0;
     const descuentoNum = Number(descuentoAdministrativo) || 0;
     const notas = String(notasAdministrativas || "").trim();
@@ -2717,7 +2721,7 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
       nombreCompleto: nombre,
       email: emailLimpio,
       telefono: telefonoLimpio,
-      puesto: especialidadLimpia,
+      puesto: puestoLimpio,
       fechaIngreso: fechaIngresoLimpia,
       activo: activo !== false,
       sueldoBase: sueldoBaseNum,
@@ -2755,6 +2759,7 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       fechaIngreso,
       sueldoBase,
       comision,
+      comisionPorcentaje,
       bonoManual,
       descuentoAdministrativo,
       notasAdministrativas,
@@ -2799,8 +2804,8 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
     if (typeof sueldoBase !== "undefined") {
       empleado.sueldoBase = Number(sueldoBase) || 0;
     }
-    if (typeof comision !== "undefined") {
-      empleado.comision = Number(comision) || 0;
+    if (typeof comision !== "undefined" || typeof comisionPorcentaje !== "undefined") {
+      empleado.comision = Number(comision ?? comisionPorcentaje) || 0;
     }
     if (typeof bonoManual !== "undefined") {
       empleado.bonoManual = Number(bonoManual) || 0;

@@ -54,9 +54,6 @@ export function renderEmployeeTable() {
         <td class="admin-employee-actions-cell">
           <button type="button" class="admin-action-button" data-action="view" data-id="${escapeHtml(String(empleado.id || empleado._id || ""))}">Ver</button>
           <button type="button" class="admin-action-button admin-action-primary" data-action="edit" data-id="${escapeHtml(String(empleado.id || empleado._id || ""))}">Editar</button>
-          <button type="button" class="admin-action-button admin-action-light" data-action="toggle" data-id="${escapeHtml(String(empleado.id || empleado._id || ""))}" data-activo="${activo}">
-            ${activo ? "Desactivar" : "Activar"}
-          </button>
         </td>
       </tr>
     `;

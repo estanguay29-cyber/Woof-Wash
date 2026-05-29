@@ -1,6 +1,6 @@
 import { state, resetModalState, setEmployees } from "./empleados.state.js";
 import { getById, setTextContent } from "./empleados.utils.js";
-import { loadEmployeeById, createEmployee, updateEmployee, loadEmployeeList } from "./empleados.api.js";
+import { loadEmployeeById, createEmployee, updateEmployee, loadEmployeeList, setEmployeeActive } from "./empleados.api.js";
 import { renderEmployeeStats, renderEmployeeTable, showFeedback, showSavingUI, setFormReadonly, resetFieldErrors, setFieldError } from "./empleados.ui.js";
 
 function getEmployeeFormValues() {
@@ -10,7 +10,7 @@ function getEmployeeFormValues() {
   const puestoInput = getById("emp_puesto");
   const fechaInput = getById("emp_fechaIngreso");
   const sueldoInput = getById("emp_sueldoBase");
-  const comisionInput = getById("emp_comision");
+  const comisionInput = getById("emp_comisionPorcentaje");
   const bonoInput = getById("emp_bono");
   const descuentoInput = getById("emp_descuento");
   const activoInput = getById("emp_activo");
@@ -23,7 +23,7 @@ function getEmployeeFormValues() {
     puesto: puestoInput?.value.trim() || "",
     fechaIngreso: fechaInput?.value.trim() || "",
     sueldoBase: Number(sueldoInput?.value) || 0,
-    comision: Number(comisionInput?.value) || 0,
+    comisionPorcentaje: Number(comisionInput?.value) || 0,
     bonoManual: Number(bonoInput?.value) || 0,
     descuentoAdministrativo: Number(descuentoInput?.value) || 0,
     activo: activoInput?.checked || false,
@@ -38,7 +38,7 @@ function setFormValues(values = {}) {
   const puestoInput = getById("emp_puesto");
   const fechaInput = getById("emp_fechaIngreso");
   const sueldoInput = getById("emp_sueldoBase");
-  const comisionInput = getById("emp_comision");
+  const comisionInput = getById("emp_comisionPorcentaje");
   const bonoInput = getById("emp_bono");
   const descuentoInput = getById("emp_descuento");
   const activoInput = getById("emp_activo");
@@ -50,7 +50,7 @@ function setFormValues(values = {}) {
   if (puestoInput) puestoInput.value = values.puesto || values.especialidad || "";
   if (fechaInput) fechaInput.value = values.fechaIngreso || "";
   if (sueldoInput) sueldoInput.value = values.sueldoBase ?? 0;
-  if (comisionInput) comisionInput.value = values.comision ?? 0;
+  if (comisionInput) comisionInput.value = values.comisionPorcentaje ?? values.comision ?? 0;
   if (bonoInput) bonoInput.value = values.bonoManual ?? values.bono ?? 0;
   if (descuentoInput) descuentoInput.value = values.descuentoAdministrativo ?? values.descuento ?? 0;
   if (activoInput) activoInput.checked = values.activo !== false;
@@ -86,6 +86,7 @@ function renderEmployeeModal(employee, mode) {
   if (employee) {
     setFormValues(employee);
     state.modal.originalActivo = employee.activo !== false;
+    renderAdminActionSection(employee, mode);
   } else if (mode === "create") {
     getById("employeeForm")?.reset();
     getById("emp_activo").checked = true;
@@ -185,6 +186,57 @@ export async function openEmployeeModal(mode = "view", empleadoId = "") {
   }
 }
 
+function renderAdminActionSection(employee, mode) {
+  const section = getById("adminActionsSection");
+  const statusLabel = getById("adminStatusCurrent");
+  const toggleBtn = getById("btnEmployeeToggleActive");
+
+  if (!section || !statusLabel || !toggleBtn) return;
+
+  if (mode !== "edit") {
+    section.classList.add("hidden");
+    return;
+  }
+
+  const activo = employee?.activo !== false;
+  section.classList.remove("hidden");
+  statusLabel.textContent = activo ? "Activo" : "Inactivo";
+  toggleBtn.textContent = activo ? "Dar de baja empleado" : "Reactivar empleado";
+  toggleBtn.classList.toggle("admin-action-danger", activo);
+  toggleBtn.classList.toggle("admin-action-primary", !activo);
+  toggleBtn.onclick = handleEmployeeStatusToggle;
+}
+
+async function handleEmployeeStatusToggle() {
+  const employee = state.modal.empleado;
+  if (!employee) return;
+
+  const activoActual = employee.activo !== false;
+  const confirmText = activoActual
+    ? "¿Deseas dar de baja a este empleado?\n\nEl empleado dejará de aparecer en listas activas, pero conservará historial, citas asignadas, métricas e información administrativa."
+    : "¿Deseas reactivar a este empleado?";
+
+  const confirmed = window.confirm(confirmText);
+  if (!confirmed) return;
+
+  try {
+    showSavingUI(true);
+    const id = String(employee.id || employee._id || "");
+    await setEmployeeActive(id, !activoActual);
+    const updatedEmployee = await loadEmployeeById(id);
+    state.modal.empleado = updatedEmployee;
+    setEmployees(await loadEmployeeList());
+    renderEmployeeStats();
+    renderEmployeeTable();
+    renderEmployeeModal(updatedEmployee, state.modal.mode);
+    showFeedback(activoActual ? "Empleado dado de baja correctamente" : "Empleado reactivado correctamente");
+  } catch (error) {
+    showFeedback(error.message || "No se pudo actualizar el estado del empleado", "error");
+  } finally {
+    showSavingUI(false);
+  }
+}
+
 function validateEmployeeForm() {
   let valid = true;
   resetFieldErrors();
@@ -249,7 +301,7 @@ export async function saveEmployee() {
     puesto: payload.puesto,
     fechaIngreso: payload.fechaIngreso,
     sueldoBase: payload.sueldoBase,
-    comision: payload.comision,
+    comisionPorcentaje: payload.comisionPorcentaje,
     bonoManual: payload.bonoManual,
     descuentoAdministrativo: payload.descuentoAdministrativo,
     notasAdministrativas: payload.notasAdministrativas,

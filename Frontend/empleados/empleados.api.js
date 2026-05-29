@@ -63,8 +63,12 @@ export async function updateEmployee(id, payload) {
   });
 }
 
+export async function setEmployeeActive(id, activo) {
+  return updateEmployee(id, { activo });
+}
+
 export async function toggleEmployeeActive(id, activo) {
-  return updateEmployee(id, { activo: !activo });
+  return setEmployeeActive(id, !activo);
 }
 
 export async function loadAdminProfile() {

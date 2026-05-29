@@ -1,5 +1,5 @@
 import { state, setEmployees, setFilter, setSearch, setToken } from "./empleados.state.js";
-import { loadAdminProfile, loadEmployeeList, toggleEmployeeActive as apiToggleEmployeeActive } from "./empleados.api.js";
+import { loadAdminProfile, loadEmployeeList } from "./empleados.api.js";
 import { renderEmployeeStats, renderEmployeeTable, renderFilterChips, renderSearchValue, showAccessMessage, showFeedback } from "./empleados.ui.js";
 import { openEmployeeModal, closeEmployeeModal, saveEmployee } from "./empleados.modal.js";
 import { getById, setTextContent } from "./empleados.utils.js";
@@ -30,26 +30,6 @@ function handleEmployeeTableClick(event) {
   if (action === "edit") {
     openEmployeeModal("edit", empleadoId);
     return;
-  }
-  if (action === "toggle") {
-    toggleEmployeeActive(empleadoId, isActivo);
-    return;
-  }
-}
-
-async function toggleEmployeeActive(id, activo) {
-  try {
-    const confirmed = window.confirm(`¿Deseas ${activo ? "desactivar" : "activar"} este empleado?`);
-    if (!confirmed) return;
-
-    await apiToggleEmployeeActive(id, activo);
-    const employees = await loadEmployeeList();
-    setEmployees(employees);
-    renderEmployeeStats();
-    renderEmployeeTable();
-    showFeedback(`Empleado ${activo ? "desactivado" : "activado"} correctamente`);
-  } catch (error) {
-    showFeedback(error.message || "No se pudo actualizar el estado del empleado", "error");
   }
 }
 

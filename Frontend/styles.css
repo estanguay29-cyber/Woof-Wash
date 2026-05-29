@@ -4790,6 +4790,29 @@ body {
   border-bottom: 1px solid rgba(11, 42, 107, 0.1);
 }
 
+.admin-modal-section {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(11, 42, 107, 0.08);
+}
+
+.admin-modal-section h3 {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0b2a6b;
+}
+
+.admin-admin-actions {
+  gap: 0.85rem;
+}
+
+.admin-admin-status {
+  margin: 0;
+  color: #334155;
+  font-weight: 600;
+}
+
 .admin-detail-grid {
   display: grid;
   gap: 14px;
