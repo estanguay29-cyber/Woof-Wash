@@ -195,7 +195,7 @@ const AppointmentSchema = new mongoose.Schema(
     },
     empleadoAsignadoId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: "Employee",
       default: null
     },
     empleadoAsignadoNombre: {

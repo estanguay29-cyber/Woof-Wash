@@ -6,6 +6,8 @@ let adminEmployees = [];
 let employeeModalState = { mode: "view", empleado: null, originalActivo: true };
 let _prevEmployeesJson = null;
 let adminEmployeesMeta = {};
+let employeeSearchTerm = "";
+let employeeFilter = "todos";
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -94,6 +96,47 @@ function textoBusquedaPedido(pedido) {
     pedido?._id,
     pedido?.telefono
   ].map(textoNormalizado).join(" ");
+}
+
+function textoBusquedaEmpleado(empleado) {
+  return [
+    empleado?.nombre || empleado?.usuario,
+    empleado?.email,
+    empleado?.telefono,
+    empleado?.rol || empleado?.role
+  ].map(textoNormalizado).join(" ");
+}
+
+function empleadoCoincideConFiltro(empleado, filtro) {
+  if (filtro === "todos") return true;
+  const role = String(empleado?.rol || empleado?.role || "").toLowerCase();
+  const activo = empleado?.activo !== false;
+
+  if (filtro === "activos") return activo;
+  if (filtro === "inactivos") return !activo;
+  if (filtro === "admins") return role === "admin";
+  if (filtro === "empleados") return role === "empleado";
+  return true;
+}
+
+function obtenerEmpleadosFiltrados() {
+  const filtro = employeeFilter || "todos";
+  const busqueda = textoNormalizado(document.getElementById("busquedaEmpleados")?.value || "");
+
+  actualizarEmpleadoFiltroActivo(filtro);
+
+  return adminEmployees.filter((empleado) => (
+    empleadoCoincideConFiltro(empleado, filtro) &&
+    textoBusquedaEmpleado(empleado).includes(busqueda)
+  ));
+}
+
+function actualizarEmpleadoFiltroActivo(filtro) {
+  document.querySelectorAll(".admin-employee-filter-chip").forEach((chip) => {
+    const activo = chip.dataset.filter === filtro;
+    chip.classList.toggle("is-active", activo);
+    chip.setAttribute("aria-pressed", activo ? "true" : "false");
+  });
 }
 
 function pedidoCoincideConFiltro(pedido, filtro) {
@@ -337,7 +380,7 @@ async function cargarEmpleados() {
   try {
     const data = await fetchAdmin("/admin/employees");
     const newList = data.empleados || data.employees || [];
-    // store weekly meta if provided by backend
+
     adminEmployeesMeta = {
       semanaInicio: data.semanaInicio || null,
       semanaFin: data.semanaFin || null,
@@ -345,80 +388,174 @@ async function cargarEmpleados() {
       actualSemanaMxn: data.actualSemanaMxn || null,
       progresoMetaSemanalPorcentaje: data.progresoMetaSemanalPorcentaje || null
     };
+
     const json = JSON.stringify(newList || []);
-    // evitar re-render si no hay cambios
-    if (json === _prevEmployeesJson) {
-      adminEmployees = newList;
+    if (json === _prevEmployeesJson && adminEmployees.length) {
+      // sólo re-renderizar cuando la lista cambie
+      renderizarEmpleadosAdmin();
       return;
     }
+
     _prevEmployeesJson = json;
-    adminEmployees = newList;
+    adminEmployees = await cargarEmpleadosConDetalles(newList);
     renderizarEmpleadosAdmin();
   } catch (error) {
-    // mostrar feedback pero no bloquear panel
     console.warn("No se pudieron cargar empleados:", error.message || error);
     adminEmployees = [];
     renderizarEmpleadosAdmin();
   }
 }
 
+async function cargarEmpleadosConDetalles(empleadosList) {
+  const detalles = await Promise.allSettled(
+    (empleadosList || []).map(async (empleado) => {
+      const empleadoId = String(empleado.id || empleado._id || "").trim();
+      if (!empleadoId) {
+        return {
+          ...empleado,
+          nombre: empleado.usuario || "",
+          rol: empleado.role || "empleado",
+          activo: empleado.activo !== false,
+          fechaRegistro: empleado.fechaIngreso || ""
+        };
+      }
+
+      try {
+        const data = await fetchAdmin(`/admin/employees/${empleadoId}`);
+        return {
+          ...empleado,
+          ...data,
+          id: data.id || empleado.id || empleado._id || empleadoId,
+          nombre: data.nombreCompleto || data.nombre || empleado.usuario || "",
+          rol: data.role || empleado.role || "empleado",
+          activo: typeof data.activo === "boolean" ? data.activo : empleado.activo !== false,
+          fechaRegistro: data.fechaIngreso || data.fechaRegistro || ""
+        };
+      } catch (error) {
+        return {
+          ...empleado,
+          id: empleadoId,
+          nombre: empleado.usuario || "",
+          rol: empleado.role || "empleado",
+          activo: empleado.activo !== false,
+          fechaRegistro: empleado.fechaIngreso || ""
+        };
+      }
+    })
+  );
+
+  return detalles
+    .filter((item) => item.status === "fulfilled" && item.value)
+    .map((item) => item.value);
+}
+
 function renderizarEmpleadosAdmin() {
   const lista = document.getElementById("adminEmployeesList");
+  const estadoVacio = document.getElementById("adminEmployeesEmpty");
+  const statTotal = document.getElementById("employeeStatTotal");
+  const statActivos = document.getElementById("employeeStatActivos");
+  const statInactivos = document.getElementById("employeeStatInactivos");
+  const statAdmins = document.getElementById("employeeStatAdmins");
+  const statEmpleados = document.getElementById("employeeStatEmpleados");
+
   if (!lista) return;
 
+  const totales = adminEmployees.reduce((acc, empleado) => {
+    const activo = empleado.activo !== false;
+    const role = String(empleado.rol || empleado.role || "").toLowerCase();
+
+    acc.total += 1;
+    if (activo) acc.activos += 1;
+    if (!activo) acc.inactivos += 1;
+    if (role === "admin") acc.admins += 1;
+    if (role === "empleado") acc.empleados += 1;
+    return acc;
+  }, {
+    total: 0,
+    activos: 0,
+    inactivos: 0,
+    admins: 0,
+    empleados: 0
+  });
+
+  if (statTotal) statTotal.textContent = String(totales.total);
+  if (statActivos) statActivos.textContent = String(totales.activos);
+  if (statInactivos) statInactivos.textContent = String(totales.inactivos);
+  if (statAdmins) statAdmins.textContent = String(totales.admins);
+  if (statEmpleados) statEmpleados.textContent = String(totales.empleados);
+
+  const empleados = obtenerEmpleadosFiltrados();
+
   if (!adminEmployees.length) {
-    lista.innerHTML = "<p class='admin-empty-state'>No hay empleados registrados.</p>";
+    lista.innerHTML = "";
+    if (estadoVacio) {
+      estadoVacio.classList.remove("hidden");
+      estadoVacio.textContent = "No hay empleados registrados. Usa el botón 'Nuevo' para crear uno.";
+    }
     return;
   }
 
-  const semanaInicio = adminEmployeesMeta.semanaInicio;
-  const semanaFin = adminEmployeesMeta.semanaFin;
-  const metaSemanal = adminEmployeesMeta.metaSemanalMxn;
-  const actualSemana = adminEmployeesMeta.actualSemanaMxn;
-  const progresoSemana = adminEmployeesMeta.progresoMetaSemanalPorcentaje;
-
-  function formatMXN(value) {
-    if (typeof value === 'undefined' || value === null || Number.isNaN(Number(value))) return '-';
-    return formatoDinero(Number(value) * 100);
+  if (estadoVacio) {
+    estadoVacio.classList.add("hidden");
   }
 
-  let topHtml = '';
-  if (semanaInicio || semanaFin || metaSemanal !== null) {
-    topHtml = `
-      <div class="admin-employees-week-summary">
-        <small>Semana</small>
-        <div title="Rango de inicio y fin de la semana actual">${escaparHtml(semanaInicio || '-') } → ${escaparHtml(semanaFin || '-')}</div>
-        <small>Meta semanal</small>
-        <div title="Meta de ingresos programada para la semana">${formatMXN(metaSemanal)}</div>
-        <small>Actual semanal</small>
-        <div title="Ingreso acumulado de la semana">${formatMXN(actualSemana)}</div>
-        <small>Progreso</small>
-        <div title="Porcentaje de avance sobre la meta semanal">${typeof progresoSemana === 'number' ? `${progresoSemana}%` : '-'}</div>
-      </div>
+  if (!empleados.length) {
+    lista.innerHTML = `
+      <tr>
+        <td colspan="7" class="admin-empty-state">No encontramos empleados con esos filtros o búsqueda.</td>
+      </tr>
     `;
+    return;
   }
-  lista.innerHTML = topHtml + adminEmployees.map((emp) => {
-    const activo = emp.activo === false ? false : true;
-    const semanal = emp.metricasSemanal || {};
+
+  lista.innerHTML = empleados.map((emp) => {
+    const activo = emp.activo !== false;
+    const role = String(emp.rol || emp.role || "empleado").toLowerCase();
+    const estadoTexto = activo ? "Activo" : "Inactivo";
+    const fechaRegistro = emp.fechaRegistro || emp.fechaIngreso || "";
+    const fechaVisible = formatoFecha(fechaRegistro);
+    const roleBadge = role === "admin" ? "admin-badge-admin" : "admin-badge-empleado";
+    const estadoBadge = activo ? "admin-badge-success" : "admin-badge-muted";
+
     return `
-      <article class="admin-employee-item">
-        <div class="admin-employee-main">
-          <h3 class="admin-employee-name">${escaparHtml(emp.nombre || emp.name || "Sin nombre")}</h3>
-          <p class="admin-employee-meta">${escaparHtml(emp.email || "-")} • ${escaparHtml(emp.telefono || "-")}</p>
-          <p class="admin-employee-sub">${escaparHtml(emp.especialidad || "-")}</p>
-          <p class="admin-employee-week" title="Score de desempeño semanal calculado por backend">Score: ${typeof semanal.scoreSemanal === 'number' ? escaparHtml(String(semanal.scoreSemanal)) : '-'}</p>
-          <p class="admin-employee-week" title="Monto total del bono semanal calculado por backend">Bono semanal: ${typeof semanal.bonoSemanal === 'number' ? formatMXN(semanal.bonoSemanal) : '-'}</p>
-        </div>
-        <div class="admin-employee-actions">
-          <span class="admin-badge ${activo ? "is-success" : "is-muted"}">${activo ? "Activo" : "Inactivo"}</span>
-          <div class="admin-employee-action-row">
-            <button type="button" onclick="abrirModalEmpleado('view','${escaparHtml(emp._id || emp.id || "") }')" class="admin-action-button">Ver</button>
-            <button type="button" onclick="abrirModalEmpleado('edit','${escaparHtml(emp._id || emp.id || "") }')" class="admin-action-button admin-action-primary">Editar</button>
-          </div>
-        </div>
-      </article>
+      <tr>
+        <td>${escaparHtml(emp.nombre || emp.usuario || "Sin nombre")}</td>
+        <td>${escaparHtml(emp.telefono || "-")}</td>
+        <td>${escaparHtml(emp.email || "-")}</td>
+        <td><span class="admin-badge ${roleBadge}">${escaparHtml(role === "admin" ? "Administrador" : "Empleado")}</span></td>
+        <td><span class="admin-badge ${estadoBadge}">${escaparHtml(estadoTexto)}</span></td>
+        <td>${escaparHtml(fechaVisible)}</td>
+        <td class="admin-employee-actions-cell">
+          <button type="button" class="admin-action-button" onclick="abrirModalEmpleado('view','${escaparHtml(emp._id || emp.id || "") }')">Ver</button>
+          <button type="button" class="admin-action-button admin-action-primary" onclick="abrirModalEmpleado('edit','${escaparHtml(emp._id || emp.id || "") }')">Editar</button>
+          <button type="button" class="admin-action-button admin-action-light" onclick="toggleEmpleado('${escaparHtml(emp._id || emp.id || "") }', ${activo})">
+            ${activo ? "Desactivar" : "Activar"}
+          </button>
+        </td>
+      </tr>
     `;
   }).join("");
+}
+
+function toggleEmpleado(id, activo) {
+  if (!id) {
+    mostrarFeedback("No se pudo identificar al empleado.", "error");
+    return;
+  }
+
+  const accion = activo ? "desactivar" : "activar";
+  const confirmacion = window.confirm(`¿Deseas ${accion} este empleado?`);
+  if (!confirmacion) return;
+
+  fetchAdmin(`/admin/employees/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ activo: !activo })
+  }).then((data) => {
+    mostrarFeedback(data.message || `Empleado ${activo ? "desactivado" : "activado"} correctamente`);
+    return cargarEmpleados();
+  }).catch((error) => {
+    mostrarFeedback(error.message || "No se pudo actualizar el estado del empleado", "error");
+  });
 }
 
 function cerrarModalEmpleado() {
@@ -502,6 +639,12 @@ function abrirModalEmpleado(mode = "view", empleadoId = "") {
     subtitle.textContent = "Crea un nuevo empleado";
     form.reset();
     setFormReadonly(false);
+    const rolSelect = getById("emp_rol");
+    const fechaRegistroInput = getById("emp_fechaRegistro");
+    const activoCheckbox = getById("emp_activo");
+    if (rolSelect) rolSelect.value = "empleado";
+    if (fechaRegistroInput) fechaRegistroInput.value = new Date().toISOString().slice(0, 10);
+    if (activoCheckbox) activoCheckbox.checked = true;
     employeeModalState.originalActivo = true;
     modal.classList.remove("hidden");
     modal.classList.add("flex");
@@ -571,7 +714,9 @@ function setFieldError(fieldKey, message) {
   const mapping = {
     nombre: 'err_nombre',
     telefono: 'err_telefono',
-    email: 'err_email'
+    email: 'err_email',
+    rol: 'err_rol',
+    fechaRegistro: 'err_fechaRegistro'
   };
   const errId = mapping[fieldKey];
   if (errId) {
@@ -593,7 +738,7 @@ function clearFieldErrors() {
     el.classList.add('hidden');
   });
 
-  form.querySelectorAll('input.invalid, textarea.invalid').forEach((el) => {
+  form.querySelectorAll('input.invalid, textarea.invalid, select.invalid').forEach((el) => {
     el.classList.remove('invalid');
   });
 
@@ -608,6 +753,8 @@ function renderEmployeeToForm(emp, mode) {
   const nombreField = getById("emp_nombre");
   const telefonoField = getById("emp_telefono");
   const emailField = getById("emp_email");
+  const rolField = getById("emp_rol");
+  const fechaRegistroField = getById("emp_fechaRegistro");
   const especialidadField = getById("emp_especialidad");
   const sueldoField = getById("emp_sueldoBase");
   const comisionField = getById("emp_comision");
@@ -616,16 +763,18 @@ function renderEmployeeToForm(emp, mode) {
   const activoField = getById("emp_activo");
   const notasField = getById("emp_notas");
 
-  if (nombreField) nombreField.value = emp.nombre || emp.name || "";
+  if (nombreField) nombreField.value = emp.nombre || emp.nombreCompleto || emp.usuario || "";
   if (telefonoField) telefonoField.value = emp.telefono || emp.phone || "";
   if (emailField) emailField.value = emp.email || "";
+  if (rolField) rolField.value = emp.rol || emp.role || "empleado";
+  if (fechaRegistroField) fechaRegistroField.value = emp.fechaRegistro || emp.fechaIngreso || "";
   if (especialidadField) especialidadField.value = emp.especialidad || emp.specialty || "";
   if (sueldoField) sueldoField.value = emp.sueldoBase ?? emp.sueldo ?? "";
   if (comisionField) comisionField.value = emp.comision ?? emp.commission ?? "";
   if (bonoField) bonoField.value = emp.bono ?? emp.bonus ?? "";
   if (descuentoField) descuentoField.value = emp.descuento ?? emp.discount ?? "";
   if (activoField) activoField.checked = emp.activo === false ? false : true;
-  if (notasField) notasField.value = emp.notas || emp.notes || "";
+  if (notasField) notasField.value = emp.notas || emp.notes || emp.notasAdministrativas || "";
 
   employeeModalState.originalActivo = emp.activo === false ? false : true;
 
@@ -645,13 +794,18 @@ function renderEmployeeToForm(emp, mode) {
 }
 
 function setFormReadonly(readonly) {
-  const inputs = Array.from(document.querySelectorAll("#employeeForm input, #employeeForm textarea"));
-  inputs.forEach((el) => {
-    if (el.type === "checkbox") {
-      el.disabled = readonly;
+  const controls = Array.from(document.querySelectorAll("#employeeForm input, #employeeForm textarea, #employeeForm select"));
+  controls.forEach((el) => {
+    if (readonly) {
+      el.disabled = true;
+      if (el.tagName === "INPUT" && el.type !== "checkbox") {
+        el.readOnly = true;
+      }
     } else {
-      el.readOnly = readonly;
       el.disabled = false;
+      if (el.tagName === "INPUT" && el.type !== "checkbox") {
+        el.readOnly = false;
+      }
     }
   });
 }
@@ -661,30 +815,47 @@ function validateEmployeeForm() {
   const nombre = getById("emp_nombre");
   const telefono = getById("emp_telefono");
   const email = getById("emp_email");
-  const errNombre = getById("err_nombre");
-  const errTelefono = getById("err_telefono");
-  const errEmail = getById("err_email");
+  const rol = getById("emp_rol");
+  const fechaRegistro = getById("emp_fechaRegistro");
+
+  clearFieldErrors();
 
   if (!nombre?.value.trim()) {
-    errNombre?.classList.remove("hidden");
+    setFieldError("nombre", "Nombre requerido");
     ok = false;
-  } else {
-    errNombre?.classList.add("hidden");
   }
 
   if (!telefono?.value.trim()) {
-    errTelefono?.classList.remove("hidden");
+    setFieldError("telefono", "Teléfono requerido");
     ok = false;
-  } else {
-    errTelefono?.classList.add("hidden");
   }
 
   const emailVal = email?.value.trim() || "";
-  if (emailVal && !/^\S+@\S+\.\S+$/.test(emailVal)) {
-    errEmail?.classList.remove("hidden");
+  if (!emailVal || !/^\S+@\S+\.\S+$/.test(emailVal)) {
+    setFieldError("email", "Email inválido");
     ok = false;
   } else {
-    errEmail?.classList.add("hidden");
+    const comparacionEmail = textoNormalizado(emailVal);
+    const editarId = String(employeeModalState.empleado?.id || employeeModalState.empleado?._id || "");
+    const duplicado = adminEmployees.some((empleado) => {
+      const empleadoId = String(empleado.id || empleado._id || "");
+      return empleadoId !== editarId && textoNormalizado(empleado.email || "") === comparacionEmail;
+    });
+
+    if (duplicado) {
+      setFieldError("email", "Este email ya está en uso");
+      ok = false;
+    }
+  }
+
+  if (!rol?.value.trim()) {
+    setFieldError("rol", "Rol requerido");
+    ok = false;
+  }
+
+  if (!fechaRegistro?.value.trim()) {
+    setFieldError("fechaRegistro", "Fecha requerida");
+    ok = false;
   }
 
   return ok;
@@ -702,6 +873,8 @@ async function guardarEmpleado() {
   const nombreInput = getById("emp_nombre");
   const telefonoInput = getById("emp_telefono");
   const emailInput = getById("emp_email");
+  const rolInput = getById("emp_rol");
+  const fechaRegistroInput = getById("emp_fechaRegistro");
   const especialidadInput = getById("emp_especialidad");
   const sueldoInput = getById("emp_sueldoBase");
   const comisionInput = getById("emp_comision");
@@ -710,17 +883,22 @@ async function guardarEmpleado() {
   const activoInput = getById("emp_activo");
   const notasInput = getById("emp_notas");
 
+  const fechaRegistroValue = fechaRegistroInput?.value.trim();
+  const roleValue = rolInput?.value.trim() || "empleado";
+
   const formData = {
-    nombre: nombreInput?.value.trim() || "",
+    nombreCompleto: nombreInput?.value.trim() || "",
     telefono: telefonoInput?.value.trim() || "",
     email: emailInput?.value.trim() || "",
+    role: roleValue,
+    fechaIngreso: fechaRegistroValue || new Date().toISOString().slice(0, 10),
     especialidad: especialidadInput?.value.trim() || "",
     sueldoBase: Number(sueldoInput?.value) || 0,
     comision: Number(comisionInput?.value) || 0,
-    bono: Number(bonoInput?.value) || 0,
-    descuento: Number(descuentoInput?.value) || 0,
+    bonoManual: Number(bonoInput?.value) || 0,
+    descuentoAdministrativo: Number(descuentoInput?.value) || 0,
     activo: activoInput?.checked || false,
-    notas: notasInput?.value.trim() || ""
+    notasAdministrativas: notasInput?.value.trim() || ""
   };
 
   // si estamos editando y se va a desactivar, pedir confirmación
@@ -1006,14 +1184,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("filtroEstado")?.addEventListener("change", renderizarPedidosAdmin);
   document.getElementById("busquedaPedidos")?.addEventListener("input", renderizarPedidosAdmin);
-  document.querySelectorAll(".admin-filter-chip").forEach((chip) => {
+  document.querySelectorAll(".admin-employee-filter-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
-      const filtro = chip.dataset.estado || "todos";
-      const select = document.getElementById("filtroEstado");
-      if (select) select.value = filtro;
-      renderizarPedidosAdmin();
+      const filtro = chip.dataset.filter || "todos";
+      employeeFilter = filtro;
+      renderizarEmpleadosAdmin();
     });
   });
+
+  document.getElementById("busquedaEmpleados")?.addEventListener("input", () => {
+    renderizarEmpleadosAdmin();
+  });
+
   iniciarAdmin();
   // cargar empleados al iniciar panel
   cargarEmpleados();

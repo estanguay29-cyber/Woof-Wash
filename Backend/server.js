@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
 const User = require("./User");
+const Employee = require("./Employee");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
@@ -1105,12 +1106,12 @@ async function completarEmpleadoAsignado(datos = {}) {
     return { ok: true };
   }
 
-  const empleado = await User.findById(datos.empleadoAsignadoId).select("usuario role");
-  if (!empleado || obtenerRolUsuario(empleado) !== "empleado") {
-    return { ok: false, status: 400, message: "empleadoAsignadoId no corresponde a un empleado activo" };
+  const empleado = await Employee.findById(datos.empleadoAsignadoId).select("nombreCompleto");
+  if (!empleado) {
+    return { ok: false, status: 400, message: "empleadoAsignadoId no corresponde a un empleado operativo" };
   }
 
-  datos.empleadoAsignadoNombre = empleado.usuario || "";
+  datos.empleadoAsignadoNombre = empleado.nombreCompleto || "";
   return { ok: true };
 }
 
@@ -2505,9 +2506,9 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
     }
 
     const semana = obtenerRangoSemana(fecha);
-    const empleados = await User.find({ role: "empleado" })
-      .select("usuario email role")
-      .sort({ usuario: 1 });
+    const empleados = await Employee.find()
+      .select("nombreCompleto email telefono puesto activo fechaIngreso sueldoBase comision bonoManual descuentoAdministrativo notas")
+      .sort({ nombreCompleto: 1 });
 
     const empleadoIds = empleados.map((empleado) => empleado._id);
     const citas = empleadoIds.length
@@ -2545,9 +2546,14 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
 
         return {
           id: String(empleado._id),
-          usuario: empleado.usuario || "",
+          nombreCompleto: empleado.nombreCompleto || "",
           email: empleado.email || "",
-          role: obtenerRolUsuario(empleado),
+          telefono: empleado.telefono || "",
+          puesto: empleado.puesto || "",
+          especialidad: empleado.puesto || "",
+          activo: Boolean(empleado.activo),
+          fechaIngreso: empleado.fechaIngreso || "",
+          role: "empleado",
           metricas,
           metricasSemanal: {
             ...metricasSemanal,
@@ -2575,6 +2581,11 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: "Id de empleado no válido" });
     }
 
+    const empleado = await Employee.findById(id);
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
     const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
     if (!validarFechaISOAgenda(fecha)) {
       return res.status(400).json({ message: "fecha no valida" });
@@ -2590,11 +2601,11 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
     const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
     const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
     const metricasSemanal = calcularMetricasEmpleado(citasSemana);
-    const reseñasPositivas = citas.filter((cita) => {
+    const resenasPositivas = citas.filter((cita) => {
       const valor = Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio;
       return Number.isInteger(valor) && valor >= 4;
     }).length;
-    const reseñasPositivasSemana = citasSemana.filter((cita) => {
+    const resenasPositivasSemana = citasSemana.filter((cita) => {
       const valor = Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio;
       return Number.isInteger(valor) && valor >= 4;
     }).length;
@@ -2605,23 +2616,23 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
 
     res.json({
       id: String(empleado._id),
-      usuario: empleado.usuario || "",
-      nombreCompleto: empleado.nombreCompleto || empleado.usuario || "",
+      nombreCompleto: empleado.nombreCompleto || "",
       email: empleado.email || "",
       telefono: empleado.telefono || "",
-      especialidad: empleado.especialidad || "",
+      puesto: empleado.puesto || "",
+      especialidad: empleado.puesto || "",
+      role: "empleado",
       fechaIngreso: empleado.fechaIngreso || "",
       activo: Boolean(empleado.activo),
       sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
       comision: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
       bonoManual: Number.isFinite(Number(empleado.bonoManual)) ? Number(empleado.bonoManual) : 0,
       descuentoAdministrativo: Number.isFinite(Number(empleado.descuentoAdministrativo)) ? Number(empleado.descuentoAdministrativo) : 0,
-      notasAdministrativas: empleado.notasAdministrativas || "",
+      notasAdministrativas: empleado.notas || "",
       fecha,
       semanaInicio: semana?.inicio || null,
       semanaFin: semana?.fin || null,
       metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
-      metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
       actualDiaMxn: actualDia,
       actualSemanaMxn: actualSemana,
       progresoMetaPorcentaje: Math.min(Math.round((actualDia / META_DIARIA_EMPLEADOS_MXN) * 100), 100),
@@ -2629,7 +2640,7 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       metricas: {
         ...metricas,
         cancelaciones,
-        reseñasPositivas,
+        reseñasPositivas: resenasPositivas,
         bonificacionPuntualidad: bonos.bonoPuntualidad,
         bonificacionResenas: bonos.bonoResenas,
         comisionesAproximadas: bonos.comisionesAproximadas,
@@ -2638,7 +2649,7 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       metricasSemanal: {
         ...metricasSemanal,
         cancelaciones: cancelacionesSemana,
-        reseñasPositivas: reseñasPositivasSemana,
+        reseñasPositivas: resenasPositivasSemana,
         scoreSemanal: calcularScoreSemanal(metricasSemanal),
         bonificacionPuntualidad: bonosSemana.bonoPuntualidad,
         bonificacionResenas: bonosSemana.bonoResenas,
@@ -2693,33 +2704,27 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: "La fecha de ingreso no es válida." });
     }
 
-    const existeEmail = await User.findOne({ email: emailLimpio });
-    if (existeEmail) {
+    const [emailEnUsuarios, emailEnEmpleados] = await Promise.all([
+      User.findOne({ email: emailLimpio }).select("_id"),
+      Employee.findOne({ email: emailLimpio }).select("_id")
+    ]);
+
+    if (emailEnUsuarios || emailEnEmpleados) {
       return res.status(400).json({ message: "El correo ya está registrado." });
     }
 
-    const usuario = await generarUsuarioUnicoDesdeNombre(nombre);
-    const passwordHash = await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10);
-    const nuevoEmpleado = new User({
-      usuario,
+    const nuevoEmpleado = new Employee({
       nombreCompleto: nombre,
       email: emailLimpio,
-      fechaNacimiento: "01-01",
       telefono: telefonoLimpio,
-      especialidad: especialidadLimpia,
+      puesto: especialidadLimpia,
       fechaIngreso: fechaIngresoLimpia,
-      role: "empleado",
       activo: activo !== false,
       sueldoBase: sueldoBaseNum,
       comision: comisionNum,
       bonoManual: bonoManualNum,
       descuentoAdministrativo: descuentoNum,
-      notasAdministrativas: notas,
-      password: passwordHash,
-      aceptaTerminos: true,
-      fechaAceptacionTerminos: new Date(),
-      versionTerminosAceptada: "1.0",
-      ipAceptacionTerminos: getClientIp(req)
+      notas: notas
     });
 
     await nuevoEmpleado.save();
@@ -2736,8 +2741,8 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: "Id de empleado no válido" });
     }
 
-    const empleado = await User.findById(id);
-    if (!empleado || obtenerRolUsuario(empleado) !== "empleado") {
+    const empleado = await Employee.findById(id);
+    if (!empleado) {
       return res.status(404).json({ message: "Empleado no encontrado" });
     }
 
@@ -2746,12 +2751,14 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       email,
       telefono,
       especialidad,
+      puesto,
       fechaIngreso,
       sueldoBase,
       comision,
       bonoManual,
       descuentoAdministrativo,
       notasAdministrativas,
+      notas,
       activo
     } = req.body;
 
@@ -2764,8 +2771,11 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
         return res.status(400).json({ message: "Correo no válido." });
       }
       if (emailLimpio !== empleado.email) {
-        const existeEmail = await User.findOne({ email: emailLimpio });
-        if (existeEmail) {
+        const [emailEnUsuarios, emailEnEmpleados] = await Promise.all([
+          User.findOne({ email: emailLimpio }).select("_id"),
+          Employee.findOne({ email: emailLimpio }).select("_id")
+        ]);
+        if (emailEnUsuarios || (emailEnEmpleados && String(emailEnEmpleados._id) !== String(empleado._id))) {
           return res.status(400).json({ message: "El correo ya está registrado." });
         }
       }
@@ -2774,8 +2784,11 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
     if (typeof telefono === "string") {
       empleado.telefono = telefono.trim().slice(0, 30);
     }
-    if (typeof especialidad === "string") {
-      empleado.especialidad = especialidad.trim().slice(0, 120);
+    if (typeof puesto === "string") {
+      empleado.puesto = puesto.trim().slice(0, 120);
+    }
+    if (typeof especialidad === "string" && !puesto) {
+      empleado.puesto = especialidad.trim().slice(0, 120);
     }
     if (typeof fechaIngreso === "string" && fechaIngreso.trim()) {
       if (!validarFechaISOAgenda(fechaIngreso.trim())) {
@@ -2796,7 +2809,10 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       empleado.descuentoAdministrativo = Number(descuentoAdministrativo) || 0;
     }
     if (typeof notasAdministrativas === "string") {
-      empleado.notasAdministrativas = notasAdministrativas.trim().slice(0, 500);
+      empleado.notas = notasAdministrativas.trim().slice(0, 500);
+    }
+    if (typeof notas === "string") {
+      empleado.notas = notas.trim().slice(0, 500);
     }
     if (typeof activo === "boolean") {
       empleado.activo = activo;
