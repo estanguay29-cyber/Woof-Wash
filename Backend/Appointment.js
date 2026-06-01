@@ -238,6 +238,16 @@ const AppointmentSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+    totalCobrado: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    ingresoAproximadoMxn: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
     inicioServicioAt: {
       type: Date,
       default: null

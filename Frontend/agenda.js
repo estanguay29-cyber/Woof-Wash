@@ -1954,6 +1954,10 @@ function construirPayloadFormulario(form, prefijo = "") {
     payload.calificacionServicio = calificacion;
     payload.calificacionCliente = calificacion;
     payload.comentarioCliente = get("comentarioCliente");
+    const totalCobradoValue = get("totalCobrado");
+    if (totalCobradoValue !== "") {
+      payload.totalCobrado = Number(totalCobradoValue);
+    }
   }
 
   const rewardCheckbox = document.getElementById(`${prefijo ? "editRewardGratisAplicado" : "rewardGratisAplicado"}`);
@@ -2049,6 +2053,10 @@ function abrirModalEdicion(id) {
   editForm.elements.editAtendidoPor.value = cita.atendidoPor || "";
   llenarSelectEmpleados(document.getElementById("editEmpleadoAsignadoId"), cita.empleadoAsignadoId || "");
   editForm.elements.editEstadoCita.value = cita.estado;
+  const editTotalCobrado = document.getElementById("editTotalCobrado");
+  if (editTotalCobrado) {
+    editTotalCobrado.value = Number.isFinite(cita.totalCobrado) ? String(cita.totalCobrado) : "";
+  }
   editForm.elements.editCalificacionServicio.value = cita.calificacionServicio || "";
   if (editForm.elements.editComentarioCliente) {
     editForm.elements.editComentarioCliente.value = cita.comentarioCliente || "";
@@ -2097,6 +2105,16 @@ function actualizarCalificacionEdicion() {
   if (!calificacion) return;
   calificacion.disabled = estado !== "completada";
   if (estado !== "completada") calificacion.value = "";
+  actualizarTotalCobradoEdicion();
+}
+
+function actualizarTotalCobradoEdicion() {
+  const estado = document.getElementById("editEstadoCita")?.value || "";
+  const wrapper = document.getElementById("editTotalCobradoWrapper");
+  const input = document.getElementById("editTotalCobrado");
+  if (!wrapper || !input) return;
+  wrapper.classList.toggle("hidden", estado !== "completada");
+  input.required = estado === "completada";
 }
 
 async function guardarEdicionCita(event) {
@@ -2141,10 +2159,14 @@ async function guardarEdicionCita(event) {
   }
 }
 
-async function cambiarEstadoCita(id, estado) {
+async function cambiarEstadoCita(id, estado, totalCobrado = null) {
+  const body = { estado };
+  if (Number.isFinite(totalCobrado)) {
+    body.totalCobrado = totalCobrado;
+  }
   await agendaFetch(`/admin/appointments/${encodeURIComponent(id)}/status`, {
     method: "PATCH",
-    body: JSON.stringify({ estado })
+    body: JSON.stringify(body)
   });
   await cargarCitasAgenda();
   await cargarStatsAgenda();
@@ -2205,6 +2227,7 @@ function renderizarDetalleCita(cita) {
       ${crearItemDetalleAgenda("Comentario cliente", cita.comentarioCliente || "-")}
       ${crearItemDetalleAgenda("Dirección", cita.direccion)}
       ${crearItemDetalleAgenda("Estado actual", AGENDA_ESTADOS[cita.estado] || cita.estado)}
+      ${crearItemDetalleAgenda("Total cobrado", Number.isFinite(cita.totalCobrado) ? `$${cita.totalCobrado.toFixed(2)}` : "-")}
       ${crearItemDetalleAgenda("Duración estimada", duracion)}
       ${crearItemDetalleAgenda("Traslado estimado", traslado)}
       ${crearItemDetalleAgenda("Fecha de creación", formatearFechaHoraAgenda(cita.createdAt))}
@@ -2221,6 +2244,13 @@ function renderizarDetalleCita(cita) {
     detailCalificacion.innerHTML = crearOpcionesCalificacion(calificacion);
     detailCalificacion.value = calificacion || "";
     detailCalificacion.disabled = cita.estado !== "completada";
+  }
+  const detailTotalCobrado = document.getElementById("agendaDetailTotalCobrado");
+  const detailTotalCobradoWrapper = document.getElementById("agendaDetailTotalCobradoWrapper");
+  if (detailTotalCobrado && detailTotalCobradoWrapper) {
+    detailTotalCobrado.value = Number.isFinite(cita.totalCobrado) ? String(cita.totalCobrado) : "";
+    detailTotalCobradoWrapper.classList.toggle("hidden", cita.estado !== "completada");
+    detailTotalCobrado.required = cita.estado === "completada";
   }
   if (detailGuardarCalificacion) {
     detailGuardarCalificacion.disabled = cita.estado !== "completada";
@@ -2413,12 +2443,27 @@ async function copiarTextoAgenda(texto, etiqueta) {
 
 async function cambiarEstadoDesdeDetalle(estado) {
   if (!citaEnDetalleId || detalleEstadoActualizando) return;
+  const detailTotalCobrado = document.getElementById("agendaDetailTotalCobrado");
+  let totalCobrado = null;
+  if (estado === "completada") {
+    actualizarDetalleTotalCobrado();
+    if (!detailTotalCobrado || !detailTotalCobrado.value.trim()) {
+      alert("Ingresa el total cobrado antes de completar la cita.");
+      return;
+    }
+    totalCobrado = Number(detailTotalCobrado.value);
+    if (!Number.isFinite(totalCobrado) || totalCobrado < 0) {
+      alert("Total cobrado debe ser un número positivo.");
+      return;
+    }
+  }
+
   const { detailEstado } = obtenerElementosAgenda();
   detalleEstadoActualizando = true;
   if (detailEstado) detailEstado.disabled = true;
 
   try {
-    await cambiarEstadoCita(citaEnDetalleId, estado);
+    await cambiarEstadoCita(citaEnDetalleId, estado, totalCobrado);
     const citaActualizada = citasAgenda.find((item) => item.id === citaEnDetalleId);
     if (citaActualizada) {
       renderizarDetalleCita(citaActualizada);
@@ -2434,6 +2479,15 @@ async function cambiarEstadoDesdeDetalle(estado) {
     const elementosActuales = obtenerElementosAgenda();
     if (elementosActuales.detailEstado) elementosActuales.detailEstado.disabled = false;
   }
+}
+
+function actualizarDetalleTotalCobrado() {
+  const estado = document.getElementById("agendaDetailEstado")?.value || "";
+  const wrapper = document.getElementById("agendaDetailTotalCobradoWrapper");
+  const input = document.getElementById("agendaDetailTotalCobrado");
+  if (!wrapper || !input) return;
+  wrapper.classList.toggle("hidden", estado !== "completada");
+  input.required = estado === "completada";
 }
 
 async function guardarCalificacionDesdeDetalle() {
@@ -2524,6 +2578,28 @@ async function manejarAccionesLista(event) {
 
   if (action === "estado") {
     if (event.type !== "change") return;
+
+    if (target.value === "completada") {
+      const totalCobradoInput = window.prompt("Ingresa el total cobrado para completar la cita:", "");
+      if (totalCobradoInput === null) {
+        target.value = cita.estado;
+        return;
+      }
+      const totalCobradoValue = Number(totalCobradoInput.trim());
+      if (!Number.isFinite(totalCobradoValue) || totalCobradoValue < 0) {
+        alert("Total cobrado debe ser un número positivo.");
+        target.value = cita.estado;
+        return;
+      }
+      try {
+        await cambiarEstadoCita(id, target.value, totalCobradoValue);
+      } catch (error) {
+        alert(error.message);
+        renderizarCitasAgenda();
+      }
+      return;
+    }
+
     try {
       await cambiarEstadoCita(id, target.value);
     } catch (error) {
@@ -2793,7 +2869,10 @@ function configurarAgenda() {
   elementos.detailModal?.addEventListener("click", (event) => {
     if (event.target === elementos.detailModal) cerrarModalDetalle();
   });
-  elementos.detailEstado?.addEventListener("change", (event) => cambiarEstadoDesdeDetalle(event.target.value));
+  elementos.detailEstado?.addEventListener("change", (event) => {
+    actualizarDetalleTotalCobrado();
+    cambiarEstadoDesdeDetalle(event.target.value);
+  });
   elementos.detailGuardarCalificacion?.addEventListener("click", guardarCalificacionDesdeDetalle);
   elementos.detailEditar?.addEventListener("click", editarDesdeDetalle);
   elementos.detailCopiarResumen?.addEventListener("click", () => {

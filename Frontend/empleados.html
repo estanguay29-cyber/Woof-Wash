@@ -22,7 +22,8 @@
       </div>
       <div class="admin-actions">
         <a href="agenda.html" class="admin-button admin-button-light" data-admin-nav="agenda">Agenda</a>
-        <a href="empleados.html" class="admin-button admin-button-dark" data-admin-nav="employees">Empleados</a>
+        <button type="button" class="admin-button admin-button-light" data-admin-nav="employees">Empleados</button>
+        <button type="button" class="admin-button admin-button-light" data-admin-nav="performance">Desempeño</button>
         <button id="btnVolverSitio" type="button" class="admin-button admin-button-light">Volver al sitio</button>
         <button id="btnAdminLogout" type="button" class="admin-button admin-button-dark">Cerrar sesión</button>
       </div>
@@ -40,7 +41,7 @@
       </section>
       <section id="adminFeedback" class="admin-feedback hidden"></section>
 
-      <section class="admin-employees-card">
+      <section id="adminEmployeesSection" class="admin-employees-card">
         <div class="admin-orders-header">
           <div>
             <p class="admin-kicker">Equipo</p>
@@ -113,6 +114,105 @@
             No hay empleados registrados. Usa el botón "Nuevo" para crear uno.
           </div>
         </div>
+      </section>
+
+      <section id="adminPerformanceSection" class="admin-employees-card hidden">
+        <div class="admin-orders-header">
+          <div>
+            <p class="admin-kicker">Desempeño</p>
+            <h2>Panel de desempeño</h2>
+            <p class="admin-panel-copy">Monitorea métricas semanales, calificaciones y registros de asistencia.</p>
+          </div>
+          <div class="admin-controls">
+            <label class="admin-search-box" style="max-width:280px;">
+              <span class="sr-only">Semana de</span>
+              <input id="performanceWeekDate" type="date" />
+            </label>
+            <button id="btnPerformanceReload" type="button" class="small-icon-btn">Actualizar</button>
+          </div>
+        </div>
+
+        <div id="performanceFeedback" class="admin-feedback hidden"></div>
+
+        <div class="admin-employees-summary">
+          <div class="summary-card">
+            <span>Ventas semanales</span>
+            <strong id="performanceSales">$0.00 MXN</strong>
+          </div>
+          <div class="summary-card">
+            <span>Meta semanal</span>
+            <strong id="performanceGoal">$12,000.00 MXN</strong>
+          </div>
+          <div class="summary-card">
+            <span>Cumplió meta</span>
+            <strong id="performanceTargetMet">No</strong>
+          </div>
+          <div class="summary-card">
+            <span>Promedio estrellas</span>
+            <strong id="performanceRating">-</strong>
+          </div>
+          <div class="summary-card">
+            <span>Total evaluaciones</span>
+            <strong id="performanceEvaluations">0</strong>
+          </div>
+          <div class="summary-card">
+            <span>Retardos de la semana</span>
+            <strong id="performanceDelays">0</strong>
+          </div>
+        </div>
+
+        <div class="admin-table-panel">
+          <div class="admin-table-scroll">
+            <table class="admin-employees-table">
+              <thead>
+                <tr>
+                  <th>Empleado</th>
+                  <th>Ventas</th>
+                  <th>Meta</th>
+                  <th>Calificación</th>
+                  <th>Puntualidad</th>
+                  <th>Evaluaciones</th>
+                  <th>Retardos</th>
+                  <th>Elegible bono</th>
+                </tr>
+              </thead>
+              <tbody id="performanceMetricsList"></tbody>
+            </table>
+          </div>
+          <div id="performanceMetricsEmpty" class="admin-empty-state hidden">No hay métricas disponibles para esta semana.</div>
+        </div>
+
+        <section class="admin-employees-card" style="margin-top:1.5rem; padding:1.5rem;">
+          <div class="admin-orders-header">
+            <div>
+              <p class="admin-kicker">Asistencia</p>
+              <h3>Registrar puntualidad</h3>
+              <p class="admin-panel-copy">Marca si el empleado llegó puntual o con retardo para el día seleccionado.</p>
+            </div>
+          </div>
+          <form id="attendanceForm" class="admin-form-grid" style="gap:1rem; margin-top:1rem;">
+            <label>Empleado
+              <select id="attendanceEmployeeId"></select>
+            </label>
+            <label>Fecha
+              <input id="attendanceDate" type="date" />
+            </label>
+            <fieldset style="border:1px solid rgba(11,42,107,0.12); border-radius:16px; padding:1rem;">
+              <legend>Puntualidad</legend>
+              <label style="display:block; margin-bottom:0.5rem;">
+                <input type="radio" name="attendancePuntual" value="true" checked /> Puntual
+              </label>
+              <label style="display:block;">
+                <input type="radio" name="attendancePuntual" value="false" /> Retardo
+              </label>
+            </fieldset>
+            <div style="display:flex; align-items:flex-end; gap:1rem;">
+              <button id="btnAttendanceSave" type="submit" class="auth-cta auth-cta-primary">Guardar</button>
+            </div>
+          </form>
+
+          <div id="attendanceHistoryList" style="display:grid; gap:1rem; margin-top:1.25rem;"></div>
+        </section>
       </section>
     </section>
   </main>

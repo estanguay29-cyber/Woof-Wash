@@ -92,6 +92,15 @@ function renderEmployeeModal(employee, mode) {
     getById("emp_activo").checked = true;
     getById("emp_fechaIngreso").value = new Date().toISOString().slice(0, 10);
     state.modal.originalActivo = true;
+  } else {
+    getById("employeeForm")?.reset();
+    getById("emp_activo").checked = true;
+    getById("emp_fechaIngreso").value = new Date().toISOString().slice(0, 10);
+    setFormReadonly(true);
+    if (getById("btnEmployeeSave")) {
+      getById("btnEmployeeSave").classList.add("hidden");
+    }
+    state.modal.originalActivo = true;
   }
 }
 
@@ -168,21 +177,28 @@ export async function openEmployeeModal(mode = "view", empleadoId = "") {
     return;
   }
 
-  const employee = state.empleados.find((item) => String(item._id || item.id) === String(empleadoId));
-  if (employee) {
-    state.modal.empleado = employee;
-    renderEmployeeModal(employee, mode);
-    openModalElement();
+  if (!empleadoId) {
+    showFeedback("No se pudo identificar el empleado.", "error");
     return;
   }
+
+  renderEmployeeModal(null, mode);
+  openModalElement();
+  showSavingUI(true, "Cargando...");
 
   try {
     const employeeDetail = await loadEmployeeById(empleadoId);
     state.modal.empleado = employeeDetail;
     renderEmployeeModal(employeeDetail, mode);
-    openModalElement();
   } catch (error) {
-    showFeedback(error.message || "No se pudo cargar el empleado.", "error");
+    const serverError = getById("employeeModalServerError");
+    if (serverError) {
+      serverError.textContent = error?.message || "No se pudo cargar el empleado.";
+      serverError.classList.remove("hidden");
+    }
+    showFeedback(error?.message || "No se pudo cargar el empleado.", "error");
+  } finally {
+    showSavingUI(false);
   }
 }
 

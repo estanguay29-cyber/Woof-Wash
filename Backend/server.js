@@ -14,6 +14,7 @@ const Employee = require("./Employee");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
+const PerformanceAttendance = require("./PerformanceAttendance");
 const employeeService = require("./services/employeeService");
 
 const app = express();
@@ -787,6 +788,8 @@ const APPOINTMENT_CREATE_FIELDS = Object.freeze([
   "calificacionCliente",
   "comentarioCliente",
   "fechaCalificacion",
+  "totalCobrado",
+  "ingresoAproximadoMxn",
   "inicioServicioAt",
   "finServicioAt",
   "puntualidadMinutos",
@@ -821,6 +824,8 @@ const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
   "calificacionCliente",
   "comentarioCliente",
   "fechaCalificacion",
+  "totalCobrado",
+  "ingresoAproximadoMxn",
   "inicioServicioAt",
   "finServicioAt",
   "puntualidadMinutos",
@@ -1780,6 +1785,7 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     const valor = body.calificacionServicio;
     if (valor === null || valor === undefined || valor === "") {
       datos.calificacionServicio = null;
+      datos.fechaCalificacion = null;
     } else if (
       (
         (typeof valor === "number" && Number.isInteger(valor)) ||
@@ -1789,8 +1795,27 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
       Number(valor) <= 5
     ) {
       datos.calificacionServicio = Number(valor);
+      datos.fechaCalificacion = new Date();
     } else {
       errores.push("calificacionServicio debe ser un entero del 1 al 5");
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "ingresoAproximadoMxn")) {
+    const ingreso = Number(body.ingresoAproximadoMxn);
+    if (!Number.isFinite(ingreso) || ingreso < 0) {
+      errores.push("ingresoAproximadoMxn debe ser un número positivo");
+    } else {
+      datos.ingresoAproximadoMxn = ingreso;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "totalCobrado")) {
+    const totalCobrado = Number(body.totalCobrado);
+    if (!Number.isFinite(totalCobrado) || totalCobrado < 0) {
+      errores.push("totalCobrado debe ser un número positivo");
+    } else {
+      datos.totalCobrado = totalCobrado;
     }
   }
 
@@ -1846,6 +1871,8 @@ function construirCitaAdmin(cita) {
     calificacionCliente: Number.isInteger(obj.calificacionCliente) ? obj.calificacionCliente : null,
     comentarioCliente: obj.comentarioCliente || "",
     fechaCalificacion: obj.fechaCalificacion || null,
+    totalCobrado: Number.isFinite(obj.totalCobrado) ? obj.totalCobrado : 0,
+    ingresoAproximadoMxn: Number.isFinite(obj.ingresoAproximadoMxn) ? obj.ingresoAproximadoMxn : 0,
     inicioServicioAt: obj.inicioServicioAt || null,
     finServicioAt: obj.finServicioAt || null,
     puntualidadMinutos: Number.isInteger(obj.puntualidadMinutos) ? obj.puntualidadMinutos : null,
@@ -2520,8 +2547,8 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
       ? citas.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
       : [];
 
-    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
-    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
 
     res.json({
       fecha,
@@ -2541,7 +2568,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
 
         const metricas = calcularMetricasEmpleado(citasEmpleado);
         const metricasSemanal = calcularMetricasEmpleado(citasSemanaEmpleado);
-        const actualSemanaEmpleado = citasSemanaEmpleado.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+        const actualSemanaEmpleado = citasSemanaEmpleado.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
         const bonosSemana = calcularBonoSemanal(metricasSemanal, empleado, actualSemanaEmpleado, META_SEMANAL_EMPLEADOS_MXN);
 
         return {
@@ -2552,8 +2579,12 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
           puesto: empleado.puesto || "",
           especialidad: empleado.puesto || "",
           activo: Boolean(empleado.activo),
-          comisionPorcentaje: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
           fechaIngreso: empleado.fechaIngreso || "",
+          sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
+          comisionPorcentaje: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
+          bonoManual: Number.isFinite(Number(empleado.bonoManual)) ? Number(empleado.bonoManual) : 0,
+          descuentoAdministrativo: Number.isFinite(Number(empleado.descuentoAdministrativo)) ? Number(empleado.descuentoAdministrativo) : 0,
+          notasAdministrativas: empleado.notas || "",
           role: "empleado",
           metricas,
           metricasSemanal: {
@@ -2599,8 +2630,8 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
     const citasSemana = semana
       ? citas.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
       : [];
-    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
-    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
     const metricasSemanal = calcularMetricasEmpleado(citasSemana);
     const resenasPositivas = citas.filter((cita) => {
       const valor = Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio;
@@ -2664,6 +2695,172 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo obtener el empleado" });
+  }
+});
+
+app.get("/admin/performance/attendance", auth, requireAdmin, async (req, res) => {
+  try {
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+    const filtro = { fecha };
+    if (req.query?.empleadoId) {
+      const empleadoId = String(req.query.empleadoId).trim();
+      if (!mongoose.Types.ObjectId.isValid(empleadoId)) {
+        return res.status(400).json({ message: "empleadoId no valido" });
+      }
+      filtro.empleadoId = new mongoose.Types.ObjectId(empleadoId);
+    }
+
+    const registros = await PerformanceAttendance.find(filtro).sort({ fecha: 1, empleadoId: 1 });
+    const empleados = await Employee.find({ _id: { $in: registros.map((registro) => registro.empleadoId) } });
+    const empleadoMap = new Map(empleados.map((empleado) => [String(empleado._id), empleado]));
+
+    res.json({
+      fecha,
+      registros: registros.map((registro) => ({
+        id: String(registro._id),
+        empleadoId: String(registro.empleadoId),
+        nombreCompleto: empleadoMap.get(String(registro.empleadoId))?.nombreCompleto || "",
+        fecha: registro.fecha,
+        puntual: Boolean(registro.puntual),
+        createdAt: registro.createdAt,
+        updatedAt: registro.updatedAt
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener los registros de asistencia" });
+  }
+});
+
+app.post("/admin/performance/attendance", auth, requireAdmin, async (req, res) => {
+  try {
+    const empleadoId = typeof req.body?.empleadoId === "string" ? req.body.empleadoId.trim() : "";
+    const fecha = typeof req.body?.fecha === "string" ? req.body.fecha.trim() : "";
+    const puntual = req.body?.puntual;
+
+    if (!mongoose.Types.ObjectId.isValid(empleadoId)) {
+      return res.status(400).json({ message: "empleadoId no valido" });
+    }
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+    if (typeof puntual !== "boolean") {
+      return res.status(400).json({ message: "puntual debe ser booleano" });
+    }
+
+    const empleado = await Employee.findById(empleadoId);
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
+    const registro = await PerformanceAttendance.findOneAndUpdate(
+      { empleadoId: empleado._id, fecha },
+      { puntual },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    res.status(201).json({
+      message: "Registro de asistencia guardado correctamente",
+      registro: {
+        id: String(registro._id),
+        empleadoId: String(registro.empleadoId),
+        fecha: registro.fecha,
+        puntual: Boolean(registro.puntual),
+        createdAt: registro.createdAt,
+        updatedAt: registro.updatedAt
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo guardar el registro de asistencia" });
+  }
+});
+
+app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => {
+  try {
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const semana = obtenerRangoSemana(fecha);
+    if (!semana) {
+      return res.status(400).json({ message: "No se pudo calcular el rango de semana" });
+    }
+
+    const empleados = await Employee.find({}).sort({ nombreCompleto: 1 });
+    const citasSemana = await Appointment.find({
+      fecha: { $gte: semana.inicio, $lte: semana.fin },
+      estado: "completada"
+    });
+    const asistenciaSemana = await PerformanceAttendance.find({
+      fecha: { $gte: semana.inicio, $lte: semana.fin }
+    });
+
+    const asistenciaPorEmpleado = asistenciaSemana.reduce((acc, registro) => {
+      const key = String(registro.empleadoId);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(registro);
+      return acc;
+    }, {});
+
+    const empleadosResumen = empleados.map((empleado) => {
+      const citasEmpleado = citasSemana.filter((cita) => String(cita.empleadoAsignadoId) === String(empleado._id));
+      const ventasSemanales = citasEmpleado.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+      const calificaciones = citasEmpleado
+        .map((cita) => (Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio))
+        .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
+      const promedioEstrellas = calificaciones.length
+        ? Math.round((calificaciones.reduce((acc, valor) => acc + valor, 0) / calificaciones.length) * 10) / 10
+        : null;
+      const retardosSemana = (asistenciaPorEmpleado[String(empleado._id)] || []).filter((registro) => registro.puntual === false).length;
+      const totalEvaluaciones = calificaciones.length;
+
+      const metaSemanalOk = ventasSemanales >= 12000;
+      const calificacionMinimaOk = typeof promedioEstrellas === "number" ? promedioEstrellas >= 4.0 : false;
+      const puntualidadOk = retardosSemana < 3;
+      const elegibleBono = metaSemanalOk && calificacionMinimaOk && puntualidadOk;
+
+      return {
+        empleadoId: String(empleado._id),
+        nombreCompleto: empleado.nombreCompleto || "",
+        activo: Boolean(empleado.activo),
+        puesto: empleado.puesto || "",
+        ventasSemanales,
+        metaSemanalMxn: 12000,
+        metaSemanalOk,
+        calificacionMinimaOk,
+        puntualidadOk,
+        promedioEstrellas,
+        totalEvaluaciones,
+        retardosSemana,
+        elegibleBono
+      };
+    });
+
+    const ventasGlobales = empleadosResumen.reduce((total, item) => total + (Number(item.ventasSemanales) || 0), 0);
+    const totalEvaluaciones = empleadosResumen.reduce((total, item) => total + (Number(item.totalEvaluaciones) || 0), 0);
+    const empleadosConCalificacion = empleadosResumen.filter((item) => item.promedioEstrellas !== null);
+    const promedioEstrellasGlobal = empleadosConCalificacion.length
+      ? Math.round((empleadosConCalificacion.reduce((total, item) => total + item.promedioEstrellas, 0) / empleadosConCalificacion.length) * 10) / 10
+      : null;
+
+    res.json({
+      fecha,
+      semanaInicio: semana.inicio,
+      semanaFin: semana.fin,
+      metaSemanalMxn: 12000,
+      ventasSemanales: ventasGlobales,
+      // top-level flag: true if any employee met their weekly meta
+      cumplioMeta: empleadosResumen.some((item) => item.metaSemanalOk),
+      promedioEstrellas: promedioEstrellasGlobal,
+      totalEvaluaciones,
+      retardosSemana: asistenciaSemana.filter((registro) => registro.puntual === false).length,
+      empleados: empleadosResumen
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo cargar el dashboard de desempeño" });
   }
 });
 
@@ -3179,6 +3376,10 @@ app.post("/admin/appointments", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: errores[0], errors: errores });
     }
 
+    if (datos.estado === "completada" && !Object.prototype.hasOwnProperty.call(req.body, "totalCobrado")) {
+      return res.status(400).json({ message: "totalCobrado es obligatorio al completar la cita" });
+    }
+
     const empleadoAsignado = await completarEmpleadoAsignado(datos);
     if (!empleadoAsignado.ok) {
       return res.status(empleadoAsignado.status).json({ message: empleadoAsignado.message });
@@ -3281,6 +3482,10 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
 
     if (errores.length) {
       return res.status(400).json({ message: errores[0], errors: errores });
+    }
+
+    if (datos.estado === "completada" && cita.estado !== "completada" && !Object.prototype.hasOwnProperty.call(datos, "totalCobrado")) {
+      return res.status(400).json({ message: "totalCobrado es obligatorio al completar la cita" });
     }
 
     const empleadoAsignado = await completarEmpleadoAsignado(datos);
@@ -3396,6 +3601,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
       "calificacionCliente",
       "comentarioCliente",
       "fechaCalificacion",
+      "totalCobrado",
       "inicioServicioAt",
       "finServicioAt",
       "puntualidadMinutos",
@@ -3428,7 +3634,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
 app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res) => {
   try {
     const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
-    const camposNoPermitidos = validarCamposCitaPermitidos(req.body, ["estado"]);
+    const camposNoPermitidos = validarCamposCitaPermitidos(req.body, ["estado", "totalCobrado"]);
     if (camposNoPermitidos.length) {
       return res.status(400).json({ message: `Campo no permitido: ${camposNoPermitidos[0]}` });
     }
@@ -3447,6 +3653,18 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res)
 
     if (!cita) {
       return res.status(404).json({ message: "Cita no encontrada" });
+    }
+
+    const totalCobradoBody = req.body?.totalCobrado;
+    if (estado === "completada" && cita.estado !== "completada" && (totalCobradoBody === undefined || totalCobradoBody === null)) {
+      return res.status(400).json({ message: "totalCobrado es obligatorio al completar la cita" });
+    }
+    if (totalCobradoBody !== undefined && totalCobradoBody !== null) {
+      const totalCobradoParsed = Number(totalCobradoBody);
+      if (!Number.isFinite(totalCobradoParsed) || totalCobradoParsed < 0) {
+        return res.status(400).json({ message: "totalCobrado debe ser un número positivo" });
+      }
+      cita.totalCobrado = totalCobradoParsed;
     }
 
     if (!["cancelada", "no_asistio"].includes(estado)) {
@@ -3473,6 +3691,8 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res)
     cita.estado = estado;
     if (estado !== "completada") {
       cita.calificacionServicio = null;
+      cita.calificacionCliente = null;
+      cita.fechaCalificacion = null;
     }
     if (estado === "completada" && cita.rewardGratisAplicado) {
       const consumo = await consumirRecompensaCita(cita);

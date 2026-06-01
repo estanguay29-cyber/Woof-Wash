@@ -98,7 +98,7 @@ export function showAccessMessage(text) {
   }
 }
 
-export function showSavingUI(enable) {
+export function showSavingUI(enable, message = "Guardando...") {
   const modal = getById("adminEmployeeModal");
   const spinner = getById("employeeSpinner");
   const status = getById("employeeSavingStatus");
@@ -112,6 +112,7 @@ export function showSavingUI(enable) {
     state.modal.saving = true;
     modal.classList.add("saving");
     spinner.classList.remove("hidden");
+    status.textContent = message;
     status.classList.remove("hidden");
     saveBtn.disabled = true;
     cancelBtn.disabled = true;

@@ -3,6 +3,7 @@ import { loadAdminProfile, loadEmployeeList } from "./empleados.api.js";
 import { renderEmployeeStats, renderEmployeeTable, renderFilterChips, renderSearchValue, showAccessMessage, showFeedback } from "./empleados.ui.js";
 import { openEmployeeModal, closeEmployeeModal, saveEmployee } from "./empleados.modal.js";
 import { getById, setTextContent } from "./empleados.utils.js";
+import { iniciarDesempeno, actualizarSeleccionEmpleados } from "./desempeno.js";
 
 function updateEmployeeSearchValue(value) {
   setSearch(value);
@@ -40,10 +41,36 @@ async function loadEmployees() {
     renderEmployeeStats();
     renderEmployeeTable();
     renderFilterChips();
+    actualizarSeleccionEmpleados();
   } catch (error) {
     showFeedback(error.message || "No se pudieron cargar los empleados.", "error");
     setEmployees([]);
     renderEmployeeTable();
+  }
+}
+
+let performanceLoaded = false;
+function setActiveNavButton(panel) {
+  document.querySelectorAll("[data-admin-nav]").forEach((button) => {
+    const isActive = button.dataset.adminNav === panel;
+    button.classList.toggle("is-active", isActive);
+  });
+}
+
+async function showAdminPanel(panel) {
+  const employeesSection = getById("adminEmployeesSection");
+  const performanceSection = getById("adminPerformanceSection");
+  if (employeesSection) {
+    employeesSection.classList.toggle("hidden", panel !== "employees");
+  }
+  if (performanceSection) {
+    performanceSection.classList.toggle("hidden", panel !== "performance");
+  }
+  setActiveNavButton(panel);
+
+  if (panel === "performance" && !performanceLoaded) {
+    performanceLoaded = true;
+    await iniciarDesempeno();
   }
 }
 
@@ -66,6 +93,7 @@ async function initializePage() {
     if (accessMessage) accessMessage.classList.add("hidden");
     if (status) setTextContent("adminStatus", `Sesión admin activa: ${admin.usuario}`);
     await loadEmployees();
+    await showAdminPanel("employees");
   } catch (error) {
     if (error.status === 401 || error.status === 403) {
       showAccessMessage("No tienes permisos para acceder al panel administrador.");
@@ -86,6 +114,16 @@ function attachEventHandlers() {
   getById("btnAdminLogout")?.addEventListener("click", () => {
     setToken("");
     window.location.href = "login.html";
+  });
+
+  document.querySelectorAll("[data-admin-nav]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      const targetPanel = button.dataset.adminNav;
+      if (targetPanel === "employees" || targetPanel === "performance") {
+        await showAdminPanel(targetPanel);
+      }
+    });
   });
 
   getById("btnNuevoEmpleado")?.addEventListener("click", () => {

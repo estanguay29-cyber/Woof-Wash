@@ -23,7 +23,7 @@ function calcularMetricasEmpleado(citas = []) {
     .filter((valor) => Number.isInteger(valor));
   const puntuales = puntualidades.filter((valor) => valor <= 5).length;
 
-  const ingresosGeneradosAproximados = citas.reduce((total, cita) => total + (Number(cita.ingresoAproximadoMxn) || 0), 0);
+  const ingresosGeneradosAproximados = citas.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
 
   return {
     serviciosCompletados: completadas.reduce((total, cita) => total + contarServiciosCita(cita), 0),
