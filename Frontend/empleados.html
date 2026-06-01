@@ -24,6 +24,7 @@
         <a href="agenda.html" class="admin-button admin-button-light" data-admin-nav="agenda">Agenda</a>
         <button type="button" class="admin-button admin-button-light" data-admin-nav="employees">Empleados</button>
         <button type="button" class="admin-button admin-button-light" data-admin-nav="performance">Desempeño</button>
+        <button type="button" class="admin-button admin-button-light" data-admin-nav="payroll">Nómina</button>
         <button id="btnVolverSitio" type="button" class="admin-button admin-button-light">Volver al sitio</button>
         <button id="btnAdminLogout" type="button" class="admin-button admin-button-dark">Cerrar sesión</button>
       </div>
@@ -144,6 +145,14 @@
             <strong id="performanceGoal">$12,000.00 MXN</strong>
           </div>
           <div class="summary-card">
+            <span>Empleados elegibles</span>
+            <strong id="performanceEligibleCount">0</strong>
+          </div>
+          <div class="summary-card">
+            <span>Total bonos calculados</span>
+            <strong id="performanceBonusesTotal">$0.00 MXN</strong>
+          </div>
+          <div class="summary-card">
             <span>Cumplió meta</span>
             <strong id="performanceTargetMet">No</strong>
           </div>
@@ -162,6 +171,15 @@
         </div>
 
         <div class="admin-table-panel">
+          <div style="margin:12px 0">
+            <div class="progress-wrap" aria-hidden="true">
+              <div id="performanceProgressBar" class="progress-bar" style="width:0%"></div>
+            </div>
+            <div class="progress-meta">
+              <div id="performanceProgressPercent">0%</div>
+              <div id="performanceProgressAmount">$0 MXN / $12,000 MXN</div>
+            </div>
+          </div>
           <div class="admin-table-scroll">
             <table class="admin-employees-table">
               <thead>
@@ -174,6 +192,7 @@
                   <th>Evaluaciones</th>
                   <th>Retardos</th>
                   <th>Elegible bono</th>
+                  <th>Estado de Bono</th>
                 </tr>
               </thead>
               <tbody id="performanceMetricsList"></tbody>
@@ -213,8 +232,66 @@
 
           <div id="attendanceHistoryList" style="display:grid; gap:1rem; margin-top:1.25rem;"></div>
         </section>
+
+        <section id="adminPayrollSection" class="admin-employees-card hidden">
+          <div class="admin-orders-header">
+            <div>
+              <p class="admin-kicker">Nómina semanal</p>
+              <h2>Calcular nómina</h2>
+              <p class="admin-panel-copy">Consulta el cálculo de nómina por semana y revisa elegibilidad de bono para cada empleado.</p>
+            </div>
+            <div class="admin-controls">
+              <label class="admin-search-box" style="max-width:280px;">
+                <span class="sr-only">Semana de</span>
+                <input id="payrollWeekDate" type="date" />
+              </label>
+              <button id="btnPayrollCalculate" type="button" class="small-icon-btn">Calcular Nómina</button>
+            </div>
+          </div>
+
+          <div id="payrollFeedback" class="admin-feedback hidden"></div>
+
+          <div class="admin-employees-summary">
+            <div class="summary-card">
+              <span>Semana</span>
+              <strong id="payrollWeekRange">-</strong>
+            </div>
+            <div class="summary-card">
+              <span>Empleados</span>
+              <strong id="payrollEmployeeCount">0</strong>
+            </div>
+            <div class="summary-card">
+              <span>Total a pagar</span>
+              <strong id="payrollTotalPagar">$0.00 MXN</strong>
+            </div>
+          </div>
+
+          <div class="admin-table-panel">
+            <div class="admin-table-scroll">
+              <table class="admin-employees-table">
+                <thead>
+                  <tr>
+                    <th>Empleado</th>
+                    <th>Sueldo base</th>
+                    <th>Ventas semana</th>
+                    <th>Promedio estrellas</th>
+                    <th>Retardos</th>
+                    <th>metaSemanalOk</th>
+                    <th>calificacionMinimaOk</th>
+                    <th>puntualidadOk</th>
+                    <th>elegibleBono</th>
+                    <th>Estado Bono</th>
+                    <th>Bono calculado</th>
+                    <th>Total a pagar</th>
+                  </tr>
+                </thead>
+                <tbody id="payrollTableBody"></tbody>
+              </table>
+            </div>
+            <div id="payrollTableEmpty" class="admin-empty-state hidden">No hay datos de nómina para esta semana.</div>
+          </div>
+        </section>
       </section>
-    </section>
   </main>
 
   <div id="adminEmployeeModal" class="admin-modal hidden">

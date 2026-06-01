@@ -784,6 +784,7 @@ const APPOINTMENT_CREATE_FIELDS = Object.freeze([
   "atendidoPor",
   "empleadoAsignadoId",
   "empleadoAsignadoNombre",
+  "empleadosAsignados",
   "calificacionServicio",
   "calificacionCliente",
   "comentarioCliente",
@@ -820,6 +821,7 @@ const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
   "atendidoPor",
   "empleadoAsignadoId",
   "empleadoAsignadoNombre",
+  "empleadosAsignados",
   "calificacionServicio",
   "calificacionCliente",
   "comentarioCliente",
@@ -1102,12 +1104,45 @@ async function validarAplicacionRecompensa({ clienteTelefono, servicioTipo, excl
 }
 
 async function completarEmpleadoAsignado(datos = {}) {
+  if (Object.prototype.hasOwnProperty.call(datos, "empleadosAsignados")) {
+    if (!Array.isArray(datos.empleadosAsignados) || datos.empleadosAsignados.length < 1 || datos.empleadosAsignados.length > 2) {
+      return { ok: false, status: 400, message: "empleadosAsignados debe contener 1 o 2 empleados" };
+    }
+
+    const idsUnicos = [...new Set(datos.empleadosAsignados.map((id) => String(id || "").trim()))];
+    if (idsUnicos.length !== datos.empleadosAsignados.length) {
+      return { ok: false, status: 400, message: "empleadosAsignados no puede contener empleados duplicados" };
+    }
+
+    if (!idsUnicos.every((id) => mongoose.Types.ObjectId.isValid(id))) {
+      return { ok: false, status: 400, message: "empleadosAsignados contiene un id no valido" };
+    }
+
+    const empleados = await Employee.find({ _id: { $in: idsUnicos } }).select("nombreCompleto");
+    if (empleados.length !== idsUnicos.length) {
+      return { ok: false, status: 400, message: "empleadosAsignados contiene un empleado no operativo" };
+    }
+
+    const nombres = idsUnicos.map((id) => {
+      const empleado = empleados.find((item) => String(item._id) === id);
+      return empleado ? empleado.nombreCompleto || "" : "";
+    });
+
+    datos.empleadosAsignados = idsUnicos.map((id) => new mongoose.Types.ObjectId(id));
+    datos.empleadosAsignadosNombres = nombres;
+    datos.empleadoAsignadoId = new mongoose.Types.ObjectId(idsUnicos[0]);
+    datos.empleadoAsignadoNombre = nombres[0] || "";
+    return { ok: true };
+  }
+
   if (!Object.prototype.hasOwnProperty.call(datos, "empleadoAsignadoId")) {
     return { ok: true };
   }
 
   if (!datos.empleadoAsignadoId) {
     datos.empleadoAsignadoNombre = "";
+    datos.empleadosAsignados = undefined;
+    datos.empleadosAsignadosNombres = undefined;
     return { ok: true };
   }
 
@@ -1117,6 +1152,8 @@ async function completarEmpleadoAsignado(datos = {}) {
   }
 
   datos.empleadoAsignadoNombre = empleado.nombreCompleto || "";
+  datos.empleadosAsignados = [datos.empleadoAsignadoId];
+  datos.empleadosAsignadosNombres = [datos.empleadoAsignadoNombre];
   return { ok: true };
 }
 
@@ -1655,6 +1692,15 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(body || {}, "empleadosAsignados")) {
+    const values = Array.isArray(body.empleadosAsignados)
+      ? body.empleadosAsignados
+      : [body.empleadosAsignados];
+    datos.empleadosAsignados = values
+      .map((value) => String(value || "").trim())
+      .filter((value) => value);
+  }
+
   if (Object.prototype.hasOwnProperty.call(body || {}, "calificacionCliente")) {
     const valor = body.calificacionCliente === "" || body.calificacionCliente === null
       ? null
@@ -1865,8 +1911,14 @@ function construirCitaAdmin(cita) {
     direccion: obj.direccion || "",
     notas: obj.notas || "",
     atendidoPor: obj.atendidoPor || "",
-    empleadoAsignadoId: obj.empleadoAsignadoId ? String(obj.empleadoAsignadoId) : "",
-    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || "",
+    empleadoAsignadoId: obj.empleadoAsignadoId ? String(obj.empleadoAsignadoId) : (Array.isArray(obj.empleadosAsignados) && obj.empleadosAsignados[0] ? String(obj.empleadosAsignados[0]) : ""),
+    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || (Array.isArray(obj.empleadosAsignadosNombres) && obj.empleadosAsignadosNombres[0] ? obj.empleadosAsignadosNombres[0] : ""),
+    empleadosAsignados: Array.isArray(obj.empleadosAsignados)
+      ? obj.empleadosAsignados.map((id) => String(id))
+      : obj.empleadoAsignadoId ? [String(obj.empleadoAsignadoId)] : [],
+    empleadosAsignadosNombres: Array.isArray(obj.empleadosAsignadosNombres)
+      ? obj.empleadosAsignadosNombres
+      : obj.empleadoAsignadoNombre ? [obj.empleadoAsignadoNombre] : [],
     calificacionServicio: Number.isInteger(obj.calificacionServicio) ? obj.calificacionServicio : null,
     calificacionCliente: Number.isInteger(obj.calificacionCliente) ? obj.calificacionCliente : null,
     comentarioCliente: obj.comentarioCliente || "",
@@ -2539,7 +2591,12 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
 
     const empleadoIds = empleados.map((empleado) => empleado._id);
     const citas = empleadoIds.length
-      ? await Appointment.find({ empleadoAsignadoId: { $in: empleadoIds } }).sort({ fecha: 1, hora: 1 })
+      ? await Appointment.find({
+          $or: [
+            { empleadoAsignadoId: { $in: empleadoIds } },
+            { empleadosAsignados: { $in: empleadoIds } }
+          ]
+        }).sort({ fecha: 1, hora: 1 })
       : [];
 
     const citasDia = citas.filter((cita) => cita.fecha === fecha);
@@ -2561,7 +2618,10 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
       progresoMetaPorcentaje: Math.min(Math.round((actualDia / META_DIARIA_EMPLEADOS_MXN) * 100), 100),
       progresoMetaSemanalPorcentaje: Math.min(Math.round((actualSemana / META_SEMANAL_EMPLEADOS_MXN) * 100), 100),
       empleados: empleados.map((empleado) => {
-        const citasEmpleado = citas.filter((cita) => String(cita.empleadoAsignadoId || "") === String(empleado._id));
+        const citasEmpleado = citas.filter((cita) =>
+          String(cita.empleadoAsignadoId || "") === String(empleado._id) ||
+          (Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.some((id) => String(id) === String(empleado._id)))
+        );
         const citasSemanaEmpleado = semana
           ? citasEmpleado.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
           : [];
@@ -2624,7 +2684,12 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
     }
 
     const semana = obtenerRangoSemana(fecha);
-    const citas = await Appointment.find({ empleadoAsignadoId: empleado._id }).sort({ fecha: 1, hora: 1 });
+    const citas = await Appointment.find({
+      $or: [
+        { empleadoAsignadoId: empleado._id },
+        { empleadosAsignados: empleado._id }
+      ]
+    }).sort({ fecha: 1, hora: 1 });
     const metricas = calcularMetricasEmpleado(citas);
     const citasDia = citas.filter((cita) => cita.fecha === fecha);
     const citasSemana = semana
@@ -2806,7 +2871,10 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
     }, {});
 
     const empleadosResumen = empleados.map((empleado) => {
-      const citasEmpleado = citasSemana.filter((cita) => String(cita.empleadoAsignadoId) === String(empleado._id));
+      const citasEmpleado = citasSemana.filter((cita) =>
+        String(cita.empleadoAsignadoId) === String(empleado._id) ||
+        (Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.some((id) => String(id) === String(empleado._id)))
+      );
       const ventasSemanales = citasEmpleado.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
       const calificaciones = citasEmpleado
         .map((cita) => (Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio))
@@ -2816,17 +2884,23 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
         : null;
       const retardosSemana = (asistenciaPorEmpleado[String(empleado._id)] || []).filter((registro) => registro.puntual === false).length;
       const totalEvaluaciones = calificaciones.length;
-
+      const sueldoBase = Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0;
+      const comisionPorcentaje = Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0;
       const metaSemanalOk = ventasSemanales >= 12000;
       const calificacionMinimaOk = typeof promedioEstrellas === "number" ? promedioEstrellas >= 4.0 : false;
       const puntualidadOk = retardosSemana < 3;
       const elegibleBono = metaSemanalOk && calificacionMinimaOk && puntualidadOk;
+      const bonoCalculado = elegibleBono ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
+      const totalAPagar = sueldoBase + bonoCalculado;
 
       return {
         empleadoId: String(empleado._id),
         nombreCompleto: empleado.nombreCompleto || "",
+        email: empleado.email || "",
         activo: Boolean(empleado.activo),
         puesto: empleado.puesto || "",
+        sueldoBase,
+        comisionPorcentaje,
         ventasSemanales,
         metaSemanalMxn: 12000,
         metaSemanalOk,
@@ -2835,7 +2909,9 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
         promedioEstrellas,
         totalEvaluaciones,
         retardosSemana,
-        elegibleBono
+        elegibleBono,
+        bonoCalculado,
+        totalAPagar
       };
     });
 
@@ -3045,11 +3121,19 @@ app.get("/empleados/appointments", auth, requireEmpleado, async (req, res) => {
 
     const filtro = {
       fecha,
-      empleadoAsignadoId: req.empleado._id,
+      $or: [
+        { empleadoAsignadoId: req.empleado._id },
+        { empleadosAsignados: req.empleado._id }
+      ],
       estado: { $nin: ["cancelada", "no_asistio"] }
     };
     const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
-    const metricas = calcularMetricasEmpleado(await Appointment.find({ empleadoAsignadoId: req.empleado._id }));
+    const metricas = calcularMetricasEmpleado(await Appointment.find({
+      $or: [
+        { empleadoAsignadoId: req.empleado._id },
+        { empleadosAsignados: req.empleado._id }
+      ]
+    }));
 
     res.json({
       fecha,
@@ -3085,7 +3169,10 @@ app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado,
 
     const cita = await Appointment.findOne({
       _id: appointmentId,
-      empleadoAsignadoId: req.empleado._id
+      $or: [
+        { empleadoAsignadoId: req.empleado._id },
+        { empleadosAsignados: req.empleado._id }
+      ]
     });
 
     if (!cita) {

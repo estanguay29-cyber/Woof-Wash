@@ -96,7 +96,7 @@ function obtenerRangoSemana(fecha = "") {
   const inicio = new Date(fechaBase);
   inicio.setDate(fechaBase.getDate() - diasDesdeLunes);
   const fin = new Date(inicio);
-  fin.setDate(inicio.getDate() + 6);
+  fin.setDate(inicio.getDate() + 5);
 
   return {
     inicio: formatoFechaISO(inicio),

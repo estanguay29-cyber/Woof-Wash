@@ -4,6 +4,7 @@ import { renderEmployeeStats, renderEmployeeTable, renderFilterChips, renderSear
 import { openEmployeeModal, closeEmployeeModal, saveEmployee } from "./empleados.modal.js";
 import { getById, setTextContent } from "./empleados.utils.js";
 import { iniciarDesempeno, actualizarSeleccionEmpleados } from "./desempeno.js";
+import { iniciarNomina } from "./empleados.nomina.js";
 
 function updateEmployeeSearchValue(value) {
   setSearch(value);
@@ -50,6 +51,7 @@ async function loadEmployees() {
 }
 
 let performanceLoaded = false;
+let payrollLoaded = false;
 function setActiveNavButton(panel) {
   document.querySelectorAll("[data-admin-nav]").forEach((button) => {
     const isActive = button.dataset.adminNav === panel;
@@ -60,17 +62,26 @@ function setActiveNavButton(panel) {
 async function showAdminPanel(panel) {
   const employeesSection = getById("adminEmployeesSection");
   const performanceSection = getById("adminPerformanceSection");
+  const payrollSection = getById("adminPayrollSection");
   if (employeesSection) {
     employeesSection.classList.toggle("hidden", panel !== "employees");
   }
   if (performanceSection) {
     performanceSection.classList.toggle("hidden", panel !== "performance");
   }
+  if (payrollSection) {
+    payrollSection.classList.toggle("hidden", panel !== "payroll");
+  }
   setActiveNavButton(panel);
 
   if (panel === "performance" && !performanceLoaded) {
     performanceLoaded = true;
     await iniciarDesempeno();
+  }
+
+  if (panel === "payroll" && !payrollLoaded) {
+    payrollLoaded = true;
+    await iniciarNomina();
   }
 }
 
@@ -118,9 +129,9 @@ function attachEventHandlers() {
 
   document.querySelectorAll("[data-admin-nav]").forEach((button) => {
     button.addEventListener("click", async (event) => {
-      event.preventDefault();
       const targetPanel = button.dataset.adminNav;
-      if (targetPanel === "employees" || targetPanel === "performance") {
+      if (targetPanel === "employees" || targetPanel === "performance" || targetPanel === "payroll") {
+        event.preventDefault();
         await showAdminPanel(targetPanel);
       }
     });

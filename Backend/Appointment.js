@@ -204,6 +204,22 @@ const AppointmentSchema = new mongoose.Schema(
       maxlength: 120,
       default: ""
     },
+    empleadosAsignados: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Employee" }],
+      default: undefined,
+      validate: {
+        validator(value) {
+          if (value === undefined) return true;
+          if (!Array.isArray(value) || value.length < 1 || value.length > 2) return false;
+          return value.every((id) => mongoose.Types.ObjectId.isValid(String(id)));
+        },
+        message: "empleadosAsignados debe contener 1 o 2 empleados"
+      }
+    },
+    empleadosAsignadosNombres: {
+      type: [String],
+      default: undefined
+    },
     calificacionServicio: {
       type: Number,
       min: 1,
@@ -309,6 +325,7 @@ AppointmentSchema.index({ estado: 1 });
 AppointmentSchema.index({ clienteTelefono: 1 });
 AppointmentSchema.index({ servicioKey: 1 });
 AppointmentSchema.index({ empleadoAsignadoId: 1, fecha: 1 });
+AppointmentSchema.index({ empleadosAsignados: 1 });
 AppointmentSchema.index({ estadoOperativo: 1 });
 AppointmentSchema.index({ clienteTelefono: 1, servicioTipo: 1, estado: 1, rewardConsumido: 1 });
 
