@@ -1052,7 +1052,7 @@ function llenarSelectEmpleados(select, selectedValue = "") {
   const opciones = [
     `<option value="">Sin asignar</option>`,
     ...empleadosAgenda.map((empleado) => (
-      `<option value="${escapeHtml(empleado.id)}">${escapeHtml(empleado.usuario || empleado.email || "Empleado")}</option>`
+      `<option value="${escapeHtml(empleado.id)}">${escapeHtml(empleado.nombreCompleto || empleado.usuario || empleado.email || "Empleado")}</option>`
     ))
   ];
   select.innerHTML = opciones.join("");
