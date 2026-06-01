@@ -1,5 +1,5 @@
 import { state } from "./empleados.state.js";
-import { loadPerformanceDashboard, loadPerformanceAttendance, saveAttendanceRecord } from "./empleados.desempeno.api.js";
+import { loadPerformanceDashboard, loadPerformanceAttendance, saveAttendanceRecord } from "./desempeno.api.js";
 import { renderPerformanceSummary, renderPerformanceTable, renderAttendanceOptions, renderAttendanceHistory, showPerformanceFeedback } from "./desempeno.ui.js";
 
 const performanceState = {
