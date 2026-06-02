@@ -195,14 +195,10 @@
               <select id="servicioPaquete" name="servicioPaquete" required></select>
             </label>
             <label class="agenda-field-full">
-              &iquest;Qui&eacute;n atender&aacute; el servicio?
-              <input id="atendidoPor" name="atendidoPor" type="text" maxlength="80" autocomplete="off" placeholder="Nombre del colaborador">
-            </label>
-            <label class="agenda-field-full">
-              Empleado asignado
-              <select id="empleadoAsignadoId" name="empleadoAsignadoId">
-                <option value="">Sin asignar</option>
-              </select>
+              Empleados asignados (máx 2)
+              <div id="empleadoAsignadoContainer" class="employee-selector-grid"></div>
+              <div id="empleadoAsignadoError" class="employee-selector-error hidden"></div>
+              <input type="hidden" id="empleadoAsignadoId" name="empleadoAsignadoId">
             </label>
             <label>
               Fecha
@@ -313,14 +309,10 @@
           <select id="editServicioPaquete" name="editServicioPaquete" required></select>
         </label>
         <label class="agenda-field-full">
-          &iquest;Qui&eacute;n atender&aacute; el servicio?
-          <input id="editAtendidoPor" name="editAtendidoPor" type="text" maxlength="80" autocomplete="off" placeholder="Nombre del colaborador">
-        </label>
-        <label class="agenda-field-full">
-          Empleado asignado
-          <select id="editEmpleadoAsignadoId" name="editEmpleadoAsignadoId">
-            <option value="">Sin asignar</option>
-          </select>
+          Empleados asignados (máx 2)
+          <div id="editEmpleadoAsignadoContainer" class="employee-selector-grid"></div>
+          <div id="editEmpleadoAsignadoError" class="employee-selector-error hidden"></div>
+          <input type="hidden" id="editEmpleadoAsignadoId" name="editEmpleadoAsignadoId">
         </label>
         <label>
           Estado

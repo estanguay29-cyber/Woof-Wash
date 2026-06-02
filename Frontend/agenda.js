@@ -594,21 +594,20 @@ function calcularDuracionEstimadaFormulario(prefijo = "") {
   const servicios = obtenerServiciosDesdeBloques(prefijo);
   const duracionServicios = servicios.reduce((total, servicio) => (
     total + obtenerDuracionServicioFormulario(servicio.tipo, servicio.paquete)
-  ), 0);
-  return duracionServicios + AGENDA_TRASLADO_UNICO_MINUTOS;
-}
-
-function actualizarDuracionFormulario(prefijo = "", { forzarBloqueada = false } = {}) {
-  const esEdicion = prefijo === "edit";
-  const texto = document.getElementById(esEdicion ? "editDuracionEstimadaTexto" : "duracionEstimadaTexto");
-  const input = document.getElementById(esEdicion ? "editDuracionBloqueadaMinutos" : "duracionBloqueadaMinutos");
-  const manual = esEdicion ? duracionBloqueadaManualEditar : duracionBloqueadaManualCrear;
-  const estimada = calcularDuracionEstimadaFormulario(prefijo);
-
-  if (texto) {
-    texto.textContent = `${estimada} min aprox.`;
-  }
-
+    : {
+        clienteNombre: "editClienteNombre",
+        clienteTelefono: "editClienteTelefono",
+        clienteEmail: "editClienteEmail",
+        servicioTipo: "editTipoServicio",
+        servicioCategoria: "editServicioCategoria",
+        servicioPaquete: "editServicioPaquete",
+        calificacionServicio: "editCalificacionServicio",
+        comentarioCliente: "editComentarioCliente",
+        fecha: "editFechaCita",
+        hora: "editHoraCita",
+        direccion: "editDireccionCita",
+        notas: "editNotasCita"
+      }
   if (input && (forzarBloqueada || !manual || !input.value)) {
     input.value = String(estimada);
   }
@@ -1047,16 +1046,91 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-function llenarSelectEmpleados(select, selectedValue = "") {
-  if (!select) return;
-  const opciones = [
-    `<option value="">Sin asignar</option>`,
-    ...empleadosAgenda.map((empleado) => (
-      `<option value="${escapeHtml(empleado.id)}">${escapeHtml(empleado.nombreCompleto || empleado.usuario || empleado.email || "Empleado")}</option>`
-    ))
-  ];
-  select.innerHTML = opciones.join("");
-  select.value = empleadosAgenda.some((empleado) => empleado.id === selectedValue) ? selectedValue : "";
+function llenarSelectEmpleados(containerId, selectedValues = []) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  // Normalizar selectedValues a array
+  if (!Array.isArray(selectedValues)) {
+    selectedValues = selectedValues ? [selectedValues] : [];
+  }
+  selectedValues = selectedValues.filter(v => v);
+
+  // Generar checkboxes para cada empleado
+  const html = empleadosAgenda.map((empleado) => {
+    const isChecked = selectedValues.includes(empleado.id);
+    const checkboxId = `${containerId}_${empleado.id}`;
+    return `
+      <label class="employee-selector-item ${isChecked ? 'is-checked' : ''}" data-employee-id="${escapeHtml(empleado.id)}">
+        <input 
+          type="checkbox" 
+          id="${escapeHtml(checkboxId)}"
+          value="${escapeHtml(empleado.id)}"
+          ${isChecked ? 'checked' : ''}
+          class="employee-checkbox"
+          data-container="${escapeHtml(containerId)}"
+        >
+        <span>${escapeHtml(empleado.nombreCompleto || empleado.usuario || empleado.email || "Empleado")}</span>
+      </label>
+    `;
+  });
+  
+  container.innerHTML = html.join("");
+  
+  // Agregar listeners para validación de máx 2 empleados
+  container.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+    checkbox.addEventListener('change', validarMaximoEmpleados);
+  });
+}
+
+function validarMaximoEmpleados(event) {
+  const checkbox = event.target;
+  const containerId = checkbox.dataset.container;
+  const container = document.getElementById(containerId);
+  const errorDiv = document.getElementById(`${containerId}Error`);
+  
+  if (!container || !errorDiv) return;
+  
+  const checkedCount = container.querySelectorAll('input[type="checkbox"]:checked').length;
+  
+  // Si intenta seleccionar más de 2, desmarcar el actual
+  if (checkedCount > 2) {
+    checkbox.checked = false;
+    errorDiv.textContent = "Máximo 2 empleados por cita";
+    errorDiv.classList.remove("hidden");
+    
+    // Actualizar estilos
+    const label = checkbox.parentElement;
+    if (label) label.classList.remove("is-checked");
+    
+    // Limpiar error después de 3 segundos
+    setTimeout(() => {
+      if (errorDiv) {
+        errorDiv.classList.add("hidden");
+        errorDiv.textContent = "";
+      }
+    }, 3000);
+  } else {
+    // Actualizar estilos del checkbox
+    const label = checkbox.parentElement;
+    if (label) {
+      if (checkbox.checked) {
+        label.classList.add("is-checked");
+      } else {
+        label.classList.remove("is-checked");
+      }
+    }
+    errorDiv.classList.add("hidden");
+    errorDiv.textContent = "";
+  }
+}
+
+function obtenerEmpleadosSeleccionados(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return [];
+  
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+  return Array.from(checkboxes).map(cb => String(cb.value));
 }
 
 function obtenerEmpleadoAgenda(id) {
@@ -1096,8 +1170,8 @@ async function cargarEmpleadosAgenda() {
   }
 
   const elementos = obtenerElementosAgenda();
-  llenarSelectEmpleados(elementos.empleadoAsignadoId, elementos.empleadoAsignadoId?.value || "");
-  llenarSelectEmpleados(elementos.editEmpleadoAsignadoId, elementos.editEmpleadoAsignadoId?.value || "");
+  llenarSelectEmpleados("empleadoAsignadoContainer", elementos.empleadoAsignadoId?.value || "");
+  llenarSelectEmpleados("editEmpleadoAsignadoContainer", elementos.editEmpleadoAsignadoId?.value || "");
 }
 
 function renderizarMetricasEmpleadosAgenda(data) {
@@ -1288,6 +1362,8 @@ function mapearCitaApi(cita) {
     atendidoPor: cita.atendidoPor || "",
     empleadoAsignadoId: cita.empleadoAsignadoId || "",
     empleadoAsignadoNombre: cita.empleadoAsignadoNombre || "",
+    empleadosAsignados: Array.isArray(cita.empleadosAsignados) ? cita.empleadosAsignados : [],
+    empleadosAsignadosNombres: Array.isArray(cita.empleadosAsignadosNombres) ? cita.empleadosAsignadosNombres : [],
     estadoOperativo: cita.estadoOperativo || "pendiente",
     calificacionCliente: Number(cita.calificacionCliente) || null,
     comentarioCliente: cita.comentarioCliente || "",
@@ -1436,7 +1512,6 @@ function obtenerCitasFiltradasLocal() {
         cita.telefono,
         cita.detalle,
         crearTextoServiciosDetalle(cita),
-        cita.atendidoPor,
         cita.empleadoAsignadoNombre,
         cita.zona,
         cita.direccion
@@ -1540,8 +1615,7 @@ function crearCardCita(cita) {
         <div><dt>Teléfono</dt><dd>${escapeHtml(cita.telefono)}</dd></div>
         <div><dt>Servicio</dt><dd>${escapeHtml(formatearServicio(cita.tipoServicio))}</dd></div>
         <div><dt>Zona</dt><dd>${escapeHtml(cita.zona)}</dd></div>
-        <div><dt>Atiende</dt><dd>${escapeHtml(cita.atendidoPor || "Por asignar")}</dd></div>
-        <div><dt>Empleado</dt><dd>${escapeHtml(cita.empleadoAsignadoNombre || "Sin asignar")}</dd></div>
+        <div><dt>Empleados asignados</dt><dd>${escapeHtml(formatearEmpleadosAsignados(cita))}</dd></div>
         <div><dt>Dirección</dt><dd>${escapeHtml(cita.direccion)}</dd></div>
       </dl>
       ${detalleBloque}
@@ -1582,7 +1656,7 @@ function crearUrlWhatsApp(cita) {
   const mensaje = [
     `Hola ${cita.cliente}, te contactamos de Woof & Wash para confirmar tu cita.`,
     `Servicio: ${crearTextoServiciosDetalle(cita)}.`,
-    cita.atendidoPor ? `Te atendera: ${cita.atendidoPor}.` : "",
+    formatearEmpleadosAsignados(cita) !== "Por asignar" ? `Te atendera: ${formatearEmpleadosAsignados(cita)}.` : "",
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.`,
     `Zona: ${cita.zona}.`,
     "Por favor confirmanos si todo esta correcto."
@@ -1595,7 +1669,7 @@ function crearUrlWhatsAppDetalle(cita) {
   const telefono = normalizarTelefonoWhatsApp(cita.telefono);
   if (!telefono) return "#";
   const tipo = cita.tipoServicio === "auto" ? "lavado" : "estética";
-  const atendido = cita.atendidoPor ? ` Te atendera ${cita.atendidoPor}.` : "";
+  const atendido = formatearEmpleadosAsignados(cita) !== "Por asignar" ? ` Te atendera ${formatearEmpleadosAsignados(cita)}.` : "";
   const mensaje = `Hola, soy de Woof & Wash. Te escribimos sobre tu cita de ${tipo} programada para el ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.${atendido}\nServicio: ${crearTextoServiciosDetalle(cita)}.`;
 
   return `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
@@ -1880,7 +1954,6 @@ function construirPayloadFormulario(form, prefijo = "") {
         servicioTipo: "editTipoServicio",
         servicioCategoria: "editServicioCategoria",
         servicioPaquete: "editServicioPaquete",
-        atendidoPor: "editAtendidoPor",
         calificacionServicio: "editCalificacionServicio",
         comentarioCliente: "editComentarioCliente",
         fecha: "editFechaCita",
@@ -1895,7 +1968,6 @@ function construirPayloadFormulario(form, prefijo = "") {
         servicioTipo: "tipoServicio",
         servicioCategoria: "servicioCategoria",
         servicioPaquete: "servicioPaquete",
-        atendidoPor: "atendidoPor",
         fecha: "fechaCita",
         hora: "horaCita",
         direccion: "direccionCita",
@@ -1930,8 +2002,7 @@ function construirPayloadFormulario(form, prefijo = "") {
     serviciosDetalle,
     duracionEstimadaMinutos,
     duracionBloqueadaMinutos,
-    atendidoPor: get("atendidoPor"),
-    empleadoAsignadoId: String(document.getElementById(`${prefijo ? "editEmpleadoAsignadoId" : "empleadoAsignadoId"}`)?.value || ""),
+    empleadosAsignados: obtenerEmpleadosSeleccionados(prefijo ? "editEmpleadoAsignadoContainer" : "empleadoAsignadoContainer"),
     fecha: get("fecha"),
     hora: get("hora"),
     zona: normalizarZonaAgenda(document.getElementById(`${prefijo ? "editZonaCita" : "zonaCita"}`)?.value),
@@ -2008,7 +2079,7 @@ async function crearCitaDesdeFormulario(event) {
     duracionBloqueadaManualCrear = false;
     fechaCita.value = payload.fecha;
     actualizarCatalogoFormulario();
-    llenarSelectEmpleados(document.getElementById("empleadoAsignadoId"));
+    llenarSelectEmpleados("empleadoAsignadoContainer", []);
     actualizarZonaFormulario();
     await actualizarDisponibilidadCrear();
     await cargarCitasAgenda();
@@ -2050,8 +2121,13 @@ function abrirModalEdicion(id) {
   editForm.elements.editZonaCita.value = cita.zona;
   editForm.elements.editDireccionCita.value = cita.direccion;
   editForm.elements.editNotasCita.value = cita.notas;
-  editForm.elements.editAtendidoPor.value = cita.atendidoPor || "";
-  llenarSelectEmpleados(document.getElementById("editEmpleadoAsignadoId"), cita.empleadoAsignadoId || "");
+  
+  // Cargar empleados asignados (primero intenta con array empleadosAsignados, si no, usa empleadoAsignadoId)
+  const empleadosPrevios = Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.length > 0
+    ? cita.empleadosAsignados
+    : (cita.empleadoAsignadoId ? [cita.empleadoAsignadoId] : []);
+  llenarSelectEmpleados("editEmpleadoAsignadoContainer", empleadosPrevios);
+  
   editForm.elements.editEstadoCita.value = cita.estado;
   const editTotalCobrado = document.getElementById("editTotalCobrado");
   if (editTotalCobrado) {
@@ -2221,8 +2297,7 @@ function renderizarDetalleCita(cita) {
       ${crearItemDetalleAgenda("Fecha", formatearFechaAgenda(cita.fecha))}
       ${crearItemDetalleAgenda("Hora", cita.hora)}
       ${crearItemDetalleAgenda("Zona", cita.zona)}
-      ${crearItemDetalleAgenda("Atendido por", cita.atendidoPor || "Por asignar")}
-      ${crearItemDetalleAgenda("Empleado asignado", cita.empleadoAsignadoNombre || "Sin asignar")}
+      ${crearItemDetalleAgenda("Empleados asignados", formatearEmpleadosAsignados(cita))}
       ${crearItemDetalleAgenda("Calificación", formatearEstrellasCalificacion(calificacion))}
       ${crearItemDetalleAgenda("Comentario cliente", cita.comentarioCliente || "-")}
       ${crearItemDetalleAgenda("Dirección", cita.direccion)}
@@ -2537,8 +2612,7 @@ function construirResumenCita(cita) {
     `Telefono: ${cita.telefono || "-"}`,
     `Servicio: ${crearTextoServiciosDetalle(cita)}`,
     `Recompensa: ${obtenerTextoRecompensaCita(cita) || "No aplica"}`,
-    `Atiende: ${cita.atendidoPor || "Por asignar"}`,
-    `Empleado: ${cita.empleadoAsignadoNombre || "Sin asignar"}`,
+    `Atiende: ${formatearEmpleadosAsignados(cita)}`,
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora || "-"}`,
     `Zona: ${cita.zona || "-"}`,
     `Direccion: ${cita.direccion || "-"}`,
@@ -2546,6 +2620,18 @@ function construirResumenCita(cita) {
     `Calificación: ${formatearEstrellasCalificacion(cita.calificacionServicio)}`,
     `Notas: ${cita.notas || "Sin notas"}`
   ].join("\n");
+}
+
+function formatearEmpleadosAsignados(cita) {
+  // Primero intenta usar empleadosAsignadosNombres (si existen múltiples)
+  if (Array.isArray(cita.empleadosAsignadosNombres) && cita.empleadosAsignadosNombres.length > 0) {
+    return cita.empleadosAsignadosNombres.filter(n => n).join(", ");
+  }
+  // Si no, usa empleadoAsignadoNombre (compatibilidad con antiguas)
+  if (cita.empleadoAsignadoNombre) {
+    return cita.empleadoAsignadoNombre;
+  }
+  return "Por asignar";
 }
 
 function abrirModalReward(cita) {
