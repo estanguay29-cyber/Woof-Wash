@@ -24,7 +24,7 @@
   font-size: 0.94rem;
 }
 
-..admin-employee-item {
+.admin-employee-item {
   margin-bottom: 1rem;
 }
 
@@ -87,9 +87,10 @@
 }
 
 .employees-page .admin-action-primary {
-  background: #8cc63f;
-  border-color: #8cc63f;
-  color: #0b2a6b;
+  background: linear-gradient(135deg, #8cc63f, #72ad2d);
+  border-color: rgba(114, 173, 45, 0.75);
+  color: #ffffff;
+  box-shadow: 0 10px 22px rgba(114, 173, 45, 0.18);
 }
 
 .employees-page .admin-action-light {
@@ -110,6 +111,10 @@
   margin-top: 1.5rem;
   align-items: center;
   grid-template-columns: 1fr auto;
+  padding: 0.95rem;
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.88);
 }
 
 .admin-search-box {
@@ -181,10 +186,17 @@
 
 .summary-card {
   padding: 1rem 1.15rem;
-  border-radius: 18px;
+  border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 14px 30px rgba(11, 42, 107, 0.06);
-  border: 1px solid rgba(11, 42, 107, 0.06);
+  box-shadow: 0 12px 26px rgba(11, 42, 107, 0.07);
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(140, 198, 63, 0.28);
+  box-shadow: 0 18px 34px rgba(11, 42, 107, 0.09);
 }
 
 .summary-card span {
@@ -202,11 +214,11 @@
 
 .admin-table-panel {
   margin-top: 1.5rem;
-  border-radius: 22px;
+  border-radius: 16px;
   overflow: hidden;
   background: #fff;
-  border: 1px solid rgba(11, 42, 107, 0.08);
-  box-shadow: 0 18px 45px rgba(11, 42, 107, 0.05);
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  box-shadow: 0 18px 42px rgba(11, 42, 107, 0.06);
 }
 
 .admin-table-scroll {
@@ -256,6 +268,60 @@
 
 .admin-employee-actions-cell button {
   min-width: 110px;
+}
+
+.employees-page .admin-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0.58rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 42, 107, 0.14);
+  background: #ffffff;
+  color: #0b2a6b;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(11, 42, 107, 0.06);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.employees-page .admin-action-button:hover {
+  border-color: rgba(140, 198, 63, 0.42);
+  box-shadow: 0 12px 24px rgba(11, 42, 107, 0.1);
+}
+
+.employees-page .admin-orders-header {
+  gap: 1rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid rgba(11, 42, 107, 0.08);
+}
+
+.employees-page .admin-employees-card {
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  box-shadow: 0 20px 54px rgba(11, 42, 107, 0.07);
+}
+
+.employees-page .progress-wrap {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(11, 42, 107, 0.08);
+  overflow: hidden;
+}
+
+.employees-page .progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #8cc63f, #0b2a6b);
+}
+
+.employees-page .progress-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.65rem;
+  color: #475569;
+  font-weight: 800;
+  font-size: 0.9rem;
 }
 
 .admin-badge-success {

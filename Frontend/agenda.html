@@ -194,12 +194,15 @@
               Paquete
               <select id="servicioPaquete" name="servicioPaquete" required></select>
             </label>
-            <label class="agenda-field-full">
-              Empleados asignados (máx 2)
+            <section class="agenda-field-full employee-assignment-card" aria-labelledby="empleadoAsignadoTitle">
+              <div class="employee-assignment-header">
+                <h3 id="empleadoAsignadoTitle">Empleados asignados</h3>
+                <p>Selecciona hasta 2 empleados para esta cita</p>
+              </div>
               <div id="empleadoAsignadoContainer" class="employee-selector-grid"></div>
               <div id="empleadoAsignadoError" class="employee-selector-error hidden"></div>
               <input type="hidden" id="empleadoAsignadoId" name="empleadoAsignadoId">
-            </label>
+            </section>
             <label>
               Fecha
               <input id="fechaCita" name="fechaCita" type="date" required>
@@ -308,12 +311,15 @@
           Paquete
           <select id="editServicioPaquete" name="editServicioPaquete" required></select>
         </label>
-        <label class="agenda-field-full">
-          Empleados asignados (máx 2)
+        <section class="agenda-field-full employee-assignment-card" aria-labelledby="editEmpleadoAsignadoTitle">
+          <div class="employee-assignment-header">
+            <h3 id="editEmpleadoAsignadoTitle">Empleados asignados</h3>
+            <p>Selecciona hasta 2 empleados para esta cita</p>
+          </div>
           <div id="editEmpleadoAsignadoContainer" class="employee-selector-grid"></div>
           <div id="editEmpleadoAsignadoError" class="employee-selector-error hidden"></div>
           <input type="hidden" id="editEmpleadoAsignadoId" name="editEmpleadoAsignadoId">
-        </label>
+        </section>
         <label>
           Estado
           <select id="editEstadoCita" name="editEstadoCita" required>
