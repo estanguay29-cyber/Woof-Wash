@@ -1068,6 +1068,30 @@ function obtenerFechaCumpleanosEmpleado(body = {}) {
   return { presente: false, valor: "" };
 }
 
+function normalizarFechaCumpleanosEmpleadoSalida(value) {
+  if (!value) return "";
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const texto = String(value || "").trim();
+  if (!texto) return "";
+
+  const fechaIso = texto.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (fechaIso && validarFechaISOAgenda(fechaIso[1])) {
+    return fechaIso[1];
+  }
+
+  const mesDia = texto.match(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
+  if (mesDia) {
+    const fechaCompat = `2000-${mesDia[1]}-${mesDia[2]}`;
+    return validarFechaISOAgenda(fechaCompat) ? fechaCompat : "";
+  }
+
+  return "";
+}
+
 function construirRegexTelefonoAgenda(digitos) {
   const limpio = String(digitos || "").replace(/\D/g, "");
   if (!limpio) return null;
@@ -2950,7 +2974,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
           especialidad: empleado.puesto || "",
           activo: Boolean(empleado.activo),
           fechaIngreso: empleado.fechaIngreso || "",
-          fechaCumpleanos: empleado.fechaCumpleanos || "",
+          fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos),
           sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
           comisionPorcentaje: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
           bonoManual: Number.isFinite(Number(empleado.bonoManual)) ? Number(empleado.bonoManual) : 0,
@@ -3031,7 +3055,7 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       especialidad: empleado.puesto || "",
       role: "empleado",
       fechaIngreso: empleado.fechaIngreso || "",
-      fechaCumpleanos: empleado.fechaCumpleanos || "",
+      fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos),
       activo: Boolean(empleado.activo),
       sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
       comision: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,

@@ -25,7 +25,10 @@ function obtenerMesDiaLocalMexico() {
 
 function obtenerMesDiaFechaISO(value) {
   const fecha = String(value || "").trim();
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  const mesDia = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.exec(fecha);
+  if (mesDia) return `${mesDia[1]}-${mesDia[2]}`;
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(fecha);
   if (!match) return "";
 
   const year = Number(match[1]);

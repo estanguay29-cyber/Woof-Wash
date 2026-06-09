@@ -33,6 +33,17 @@ function getEmployeeFormValues() {
   };
 }
 
+function normalizarFechaParaInputDate(value) {
+  const texto = String(value || "").trim();
+  if (!texto) return "";
+
+  const fechaIso = texto.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (fechaIso) return fechaIso[1];
+
+  const mesDia = texto.match(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
+  return mesDia ? `2000-${mesDia[1]}-${mesDia[2]}` : "";
+}
+
 function setFormValues(values = {}) {
   const nombreInput = getById("emp_nombre");
   const telefonoInput = getById("emp_telefono");
@@ -52,7 +63,7 @@ function setFormValues(values = {}) {
   if (emailInput) emailInput.value = values.email || "";
   if (puestoInput) puestoInput.value = values.puesto || values.especialidad || "";
   if (fechaInput) fechaInput.value = values.fechaIngreso || "";
-  if (fechaCumpleanosInput) fechaCumpleanosInput.value = values.fechaCumpleanos || "";
+  if (fechaCumpleanosInput) fechaCumpleanosInput.value = normalizarFechaParaInputDate(values.fechaCumpleanos);
   if (sueldoInput) sueldoInput.value = values.sueldoBase ?? 0;
   if (comisionInput) comisionInput.value = values.comisionPorcentaje ?? values.comision ?? 0;
   if (bonoInput) bonoInput.value = values.bonoManual ?? values.bono ?? 0;
