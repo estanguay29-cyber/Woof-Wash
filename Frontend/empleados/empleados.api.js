@@ -55,6 +55,7 @@ export async function fetchAdmin(path, options = {}) {
 
   const response = await fetch(`${getApiBase()}${path}`, {
     ...options,
+    cache: "no-store",
     headers: buildHeaders(options.headers || {}),
     body: options.body
   });

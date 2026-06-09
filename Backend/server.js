@@ -1055,6 +1055,19 @@ function normalizarMontoEmpleado(value, { campo, max, porcentaje = false }) {
   return { ok: true, value: monto };
 }
 
+function obtenerFechaCumpleanosEmpleado(body = {}) {
+  for (const campo of ["fechaCumpleanos", "cumpleanos", "fechaNacimiento"]) {
+    if (Object.prototype.hasOwnProperty.call(body, campo)) {
+      return {
+        presente: true,
+        valor: String(body[campo] || "").trim()
+      };
+    }
+  }
+
+  return { presente: false, valor: "" };
+}
+
 function construirRegexTelefonoAgenda(digitos) {
   const limpio = String(digitos || "").replace(/\D/g, "");
   if (!limpio) return null;
@@ -3435,7 +3448,6 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
       especialidad,
       puesto,
       fechaIngreso,
-      fechaCumpleanos,
       sueldoBase,
       comision,
       comisionPorcentaje,
@@ -3450,7 +3462,7 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
     const telefonoLimpio = String(telefono || "").trim();
     const puestoLimpio = String(puesto || especialidad || "").trim();
     const fechaIngresoLimpia = String(fechaIngreso || "").trim();
-    const fechaCumpleanosLimpia = String(fechaCumpleanos || "").trim();
+    const fechaCumpleanosLimpia = obtenerFechaCumpleanosEmpleado(req.body).valor;
     const sueldoBaseValidado = normalizarMontoEmpleado(sueldoBase, { campo: "sueldoBase", max: 100000 });
     const comisionValidada = normalizarMontoEmpleado(comision ?? comisionPorcentaje, { campo: "comision", max: 100, porcentaje: true });
     const bonoManualValidado = normalizarMontoEmpleado(bonoManual, { campo: "bonoManual", max: 50000 });
@@ -3529,7 +3541,6 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
       especialidad,
       puesto,
       fechaIngreso,
-      fechaCumpleanos,
       sueldoBase,
       comision,
       comisionPorcentaje,
@@ -3574,8 +3585,9 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
       }
       empleado.fechaIngreso = fechaIngreso.trim();
     }
-    if (typeof fechaCumpleanos === "string") {
-      const fechaCumpleanosLimpia = fechaCumpleanos.trim();
+    const fechaCumpleanosPayload = obtenerFechaCumpleanosEmpleado(req.body);
+    if (fechaCumpleanosPayload.presente) {
+      const fechaCumpleanosLimpia = fechaCumpleanosPayload.valor;
       if (fechaCumpleanosLimpia && !validarFechaISOAgenda(fechaCumpleanosLimpia)) {
         return res.status(400).json({ message: "La fecha de cumpleanos no es valida." });
       }

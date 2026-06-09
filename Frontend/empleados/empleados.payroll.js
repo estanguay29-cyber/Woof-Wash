@@ -3,7 +3,12 @@ export function formatCurrency(value) {
   if (Number.isNaN(monto)) {
     return "$0.00 MXN";
   }
-  return `$${monto.toFixed(2)} MXN`;
+  return `${new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(monto)} MXN`;
 }
 
 export function formatDate(value) {

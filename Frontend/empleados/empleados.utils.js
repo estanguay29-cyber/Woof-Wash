@@ -2,6 +2,8 @@ export function getById(id) {
   return document.getElementById(id);
 }
 
+export const META_SEMANAL_OFICIAL_MXN = 22000;
+
 export function setTextContent(id, text) {
   const element = getById(id);
   if (element) {

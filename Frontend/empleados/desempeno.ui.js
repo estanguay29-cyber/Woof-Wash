@@ -1,9 +1,9 @@
-import { getById, setTextContent, escapeHtml } from "./empleados.utils.js";
+import { getById, setTextContent, escapeHtml, META_SEMANAL_OFICIAL_MXN } from "./empleados.utils.js";
 import { formatCurrency, formatDate } from "./empleados.payroll.js";
 
 export function renderPerformanceSummary(summary) {
   const ventas = Number.isFinite(Number(summary.ventasSemanales)) ? Number(summary.ventasSemanales) : 0;
-  const meta = Number.isFinite(Number(summary.metaSemanalMxn)) ? Number(summary.metaSemanalMxn) : 22000;
+  const meta = Number.isFinite(Number(summary.metaSemanalMxn)) ? Number(summary.metaSemanalMxn) : META_SEMANAL_OFICIAL_MXN;
   setTextContent("performanceSales", formatCurrency(ventas));
   setTextContent("performanceGoal", formatCurrency(meta));
 

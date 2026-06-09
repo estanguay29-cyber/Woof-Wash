@@ -1,6 +1,7 @@
 import { state } from "./empleados.state.js";
 import { loadPerformanceDashboard, loadPerformanceAttendance, loadPerformanceMetrics, saveAttendanceRecord, savePerformanceMetric } from "./desempeno.api.js";
 import { renderPerformanceSummary, renderPerformanceTable, renderAttendanceOptions, renderAttendanceHistory, renderAttendanceEventHistory, renderCleanlinessHistory, showPerformanceFeedback } from "./desempeno.ui.js";
+import { META_SEMANAL_OFICIAL_MXN } from "./empleados.utils.js";
 
 const ATTENDANCE_EVENT_KEYS = Object.freeze(["falta_justificada", "falta_injustificada", "vacaciones"]);
 
@@ -99,7 +100,7 @@ async function actualizarDashboardDesempeno(fecha) {
     performanceState.dashboard = datos;
     const empleadoResumen = {
       ventasSemanales: datos.ventasSemanales || 0,
-      metaSemanalMxn: datos.metaSemanalMxn || 22000,
+      metaSemanalMxn: datos.metaSemanalMxn || META_SEMANAL_OFICIAL_MXN,
       metaSemanalOk: typeof datos.metaSemanalOk === 'boolean' ? datos.metaSemanalOk : !!datos.cumplioMeta,
       promedioEstrellas: datos.promedioEstrellas !== undefined ? datos.promedioEstrellas : null,
       calificacionMinimaOk: typeof datos.calificacionMinimaOk === 'boolean' ? datos.calificacionMinimaOk : (typeof datos.promedioEstrellas === 'number' ? datos.promedioEstrellas >= 4.0 : false),
