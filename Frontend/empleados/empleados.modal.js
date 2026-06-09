@@ -1,7 +1,7 @@
 import { state, resetModalState, setEmployees } from "./empleados.state.js";
 import { getById, setTextContent } from "./empleados.utils.js";
 import { loadEmployeeById, createEmployee, updateEmployee, loadEmployeeList, setEmployeeActive } from "./empleados.api.js";
-import { renderEmployeeStats, renderEmployeeTable, showFeedback, showSavingUI, setFormReadonly, resetFieldErrors, setFieldError } from "./empleados.ui.js";
+import { renderEmployeeBirthdayNotice, renderEmployeeStats, renderEmployeeTable, showFeedback, showSavingUI, setFormReadonly, resetFieldErrors, setFieldError } from "./empleados.ui.js";
 
 function getEmployeeFormValues() {
   const nombreInput = getById("emp_nombre");
@@ -9,6 +9,7 @@ function getEmployeeFormValues() {
   const emailInput = getById("emp_email");
   const puestoInput = getById("emp_puesto");
   const fechaInput = getById("emp_fechaIngreso");
+  const fechaCumpleanosInput = getById("emp_fechaCumpleanos");
   const sueldoInput = getById("emp_sueldoBase");
   const comisionInput = getById("emp_comisionPorcentaje");
   const bonoInput = getById("emp_bono");
@@ -22,6 +23,7 @@ function getEmployeeFormValues() {
     email: emailInput?.value.trim() || "",
     puesto: puestoInput?.value.trim() || "",
     fechaIngreso: fechaInput?.value.trim() || "",
+    fechaCumpleanos: fechaCumpleanosInput?.value.trim() || "",
     sueldoBase: Number(sueldoInput?.value) || 0,
     comisionPorcentaje: Number(comisionInput?.value) || 0,
     bonoManual: Number(bonoInput?.value) || 0,
@@ -37,6 +39,7 @@ function setFormValues(values = {}) {
   const emailInput = getById("emp_email");
   const puestoInput = getById("emp_puesto");
   const fechaInput = getById("emp_fechaIngreso");
+  const fechaCumpleanosInput = getById("emp_fechaCumpleanos");
   const sueldoInput = getById("emp_sueldoBase");
   const comisionInput = getById("emp_comisionPorcentaje");
   const bonoInput = getById("emp_bono");
@@ -49,6 +52,7 @@ function setFormValues(values = {}) {
   if (emailInput) emailInput.value = values.email || "";
   if (puestoInput) puestoInput.value = values.puesto || values.especialidad || "";
   if (fechaInput) fechaInput.value = values.fechaIngreso || "";
+  if (fechaCumpleanosInput) fechaCumpleanosInput.value = values.fechaCumpleanos || "";
   if (sueldoInput) sueldoInput.value = values.sueldoBase ?? 0;
   if (comisionInput) comisionInput.value = values.comisionPorcentaje ?? values.comision ?? 0;
   if (bonoInput) bonoInput.value = values.bonoManual ?? values.bono ?? 0;
@@ -242,6 +246,7 @@ async function handleEmployeeStatusToggle() {
     const updatedEmployee = await loadEmployeeById(id);
     state.modal.empleado = updatedEmployee;
     setEmployees(await loadEmployeeList());
+    renderEmployeeBirthdayNotice();
     renderEmployeeStats();
     renderEmployeeTable();
     renderEmployeeModal(updatedEmployee, state.modal.mode);
@@ -316,6 +321,7 @@ export async function saveEmployee() {
     telefono: payload.telefono,
     puesto: payload.puesto,
     fechaIngreso: payload.fechaIngreso,
+    fechaCumpleanos: payload.fechaCumpleanos,
     sueldoBase: payload.sueldoBase,
     comisionPorcentaje: payload.comisionPorcentaje,
     bonoManual: payload.bonoManual,
@@ -344,6 +350,7 @@ export async function saveEmployee() {
 
     const employees = await loadEmployeeList();
     setEmployees(employees);
+    renderEmployeeBirthdayNotice();
     renderEmployeeStats();
     renderEmployeeTable();
     showFeedback("Empleado guardado correctamente");

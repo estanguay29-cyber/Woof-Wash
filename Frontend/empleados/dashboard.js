@@ -11,6 +11,29 @@ function obtenerTokenEmpleado() {
   return localStorage.getItem("token") || "";
 }
 
+function cerrarSesionEmpleado() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("usuario");
+}
+
+function manejarRespuestaAuthEmpleado(res, data = {}) {
+  if (res.status === 401) {
+    const message = data.message || "Tu sesion expiro. Inicia sesion de nuevo.";
+    cerrarSesionEmpleado();
+    setTimeout(() => {
+      window.location.href = "../login.html";
+    }, 900);
+    throw { status: 401, message };
+  }
+
+  if (res.status === 403) {
+    throw {
+      status: 403,
+      message: data.message || "No tienes permisos suficientes para acceder a este panel."
+    };
+  }
+}
+
 async function empleadoFetch(path, options = {}) {
   const token = obtenerTokenEmpleado();
   const res = await fetch(`${obtenerApiBaseEmpleado()}${path}`, {
@@ -23,7 +46,10 @@ async function empleadoFetch(path, options = {}) {
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || "No se pudo completar la solicitud");
+  if (!res.ok) {
+    manejarRespuestaAuthEmpleado(res, data);
+    throw new Error(data.message || "No se pudo completar la solicitud");
+  }
   return data;
 }
 
@@ -124,7 +150,7 @@ async function protegerDashboardEmpleado() {
   const access = document.getElementById("employeeAccessMessage");
   const dashboard = document.getElementById("employeeDashboard");
   if (!token) {
-    window.location.href = "../index.html";
+    window.location.href = "../login.html";
     return false;
   }
 

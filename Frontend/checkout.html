@@ -225,6 +225,28 @@ function logout() {
   window.location.href = "login.html";
 }
 
+function manejarRespuestaAuthCheckout(res, data = {}) {
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("usuario");
+    localStorage.setItem("authRedirect", "checkout.html");
+    mensaje.textContent = data.message || "Tu sesion expiro. Inicia sesion de nuevo.";
+    mensaje.className = "text-center text-sm font-semibold text-red-500";
+    setTimeout(() => {
+      window.location.href = "login.html";
+    }, 900);
+    return true;
+  }
+
+  if (res.status === 403) {
+    mensaje.textContent = data.message || "No tienes permisos suficientes para iniciar el checkout.";
+    mensaje.className = "text-center text-sm font-semibold text-red-500";
+    return true;
+  }
+
+  return false;
+}
+
 const direccionGuardada = JSON.parse(localStorage.getItem("direccion") || "null");
 
 if (direccionGuardada) {
@@ -272,6 +294,10 @@ form.addEventListener("submit", async (e) => {
 
     if (res.ok && data.url) {
       window.location.href = data.url;
+      return;
+    }
+
+    if (manejarRespuestaAuthCheckout(res, data)) {
       return;
     }
 

@@ -125,7 +125,7 @@ function calcularScoreSemanal(metricas = {}) {
   );
 }
 
-function calcularBonoSemanal(metricas = {}, empleado = {}, actualSemanaMxn = 0, metaSemanalMxn = 10000) {
+function calcularBonoSemanal(metricas = {}, empleado = {}, actualSemanaMxn = 0, metaSemanalMxn = 22000) {
   let bonoMeta = 0;
   if (Number.isFinite(actualSemanaMxn) && Number.isFinite(metaSemanalMxn) && actualSemanaMxn >= metaSemanalMxn) {
     bonoMeta = 600;

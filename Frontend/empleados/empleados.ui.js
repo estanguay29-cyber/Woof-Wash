@@ -11,6 +11,64 @@ export function renderEmployeeStats() {
   setTextContent("employeeStatTopPuesto", stats.topPuesto);
 }
 
+function obtenerMesDiaLocalMexico() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const parts = formatter.formatToParts(new Date());
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return month && day ? `${month}-${day}` : "";
+}
+
+function obtenerMesDiaFechaISO(value) {
+  const fecha = String(value || "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  if (!match) return "";
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  const valid = parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day;
+
+  return valid ? `${match[2]}-${match[3]}` : "";
+}
+
+export function renderEmployeeBirthdayNotice() {
+  const notice = getById("employeeBirthdayNotice");
+  if (!notice) return;
+
+  const hoyMesDia = obtenerMesDiaLocalMexico();
+  const cumpleaneros = state.empleados
+    .filter((empleado) => empleado?.activo !== false)
+    .filter((empleado) => obtenerMesDiaFechaISO(empleado?.fechaCumpleanos) === hoyMesDia)
+    .map((empleado) => empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado")
+    .filter(Boolean);
+
+  if (!hoyMesDia || !cumpleaneros.length) {
+    notice.classList.add("hidden");
+    notice.innerHTML = "";
+    return;
+  }
+
+  const texto = cumpleaneros.length === 1
+    ? `Hoy es cumplea&ntilde;os de ${escapeHtml(cumpleaneros[0])}`
+    : `Hoy cumplen a&ntilde;os: ${cumpleaneros.map(escapeHtml).join(", ")}`;
+
+  notice.innerHTML = `
+    <span class="employee-birthday-icon" aria-hidden="true">
+      <span></span>
+    </span>
+    <p>${texto}</p>
+  `;
+  notice.classList.remove("hidden");
+}
+
 export function renderEmployeeTable() {
   const lista = getById("adminEmployeesList");
   const estadoVacio = getById("adminEmployeesEmpty");

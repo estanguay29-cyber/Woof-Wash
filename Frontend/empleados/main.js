@@ -1,6 +1,6 @@
 import { state, setEmployees, setFilter, setSearch, setToken } from "./empleados.state.js";
 import { loadAdminProfile, loadEmployeeList } from "./empleados.api.js";
-import { renderEmployeeStats, renderEmployeeTable, renderFilterChips, renderSearchValue, showAccessMessage, showFeedback } from "./empleados.ui.js";
+import { renderEmployeeBirthdayNotice, renderEmployeeStats, renderEmployeeTable, renderFilterChips, renderSearchValue, showAccessMessage, showFeedback } from "./empleados.ui.js";
 import { openEmployeeModal, closeEmployeeModal, saveEmployee } from "./empleados.modal.js";
 import { getById, setTextContent } from "./empleados.utils.js";
 import { iniciarDesempeno, actualizarSeleccionEmpleados } from "./desempeno.js";
@@ -39,6 +39,7 @@ async function loadEmployees() {
   try {
     const employees = await loadEmployeeList();
     setEmployees(employees);
+    renderEmployeeBirthdayNotice();
     renderEmployeeStats();
     renderEmployeeTable();
     renderFilterChips();
@@ -46,6 +47,7 @@ async function loadEmployees() {
   } catch (error) {
     showFeedback(error.message || "No se pudieron cargar los empleados.", "error");
     setEmployees([]);
+    renderEmployeeBirthdayNotice();
     renderEmployeeTable();
   }
 }
@@ -91,6 +93,7 @@ async function initializePage() {
   const status = getById("adminStatus");
 
   if (!state.token) {
+    localStorage.setItem("authRedirect", "empleados.html");
     showAccessMessage("Inicia sesión para acceder al panel administrador.");
     setTimeout(() => {
       window.location.href = "login.html";
@@ -106,11 +109,15 @@ async function initializePage() {
     await loadEmployees();
     await showAdminPanel("employees");
   } catch (error) {
-    if (error.status === 401 || error.status === 403) {
-      showAccessMessage("No tienes permisos para acceder al panel administrador.");
+    if (error.status === 401) {
+      showAccessMessage(error.message || "Tu sesion expiro. Inicia sesion de nuevo.");
       setTimeout(() => {
         window.location.href = "login.html";
       }, 900);
+      return;
+    }
+    if (error.status === 403) {
+      showAccessMessage(error.message || "No tienes permisos para acceder al panel administrador.");
       return;
     }
     showAccessMessage(error.message || "No se pudo cargar el panel administrador.");

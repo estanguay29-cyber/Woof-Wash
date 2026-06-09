@@ -91,6 +91,18 @@ const AppointmentSchema = new mongoose.Schema(
       enum: ["mascota", "auto"],
       required: true
     },
+    mascotaNombre: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: ""
+    },
+    mascotaEdad: {
+      type: Number,
+      min: 1,
+      max: 40,
+      default: null
+    },
     servicioNombre: {
       type: String,
       required: true,

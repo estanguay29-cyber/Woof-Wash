@@ -14,7 +14,9 @@ const Employee = require("./Employee");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
+const AppointmentSlotLock = require("./AppointmentSlotLock");
 const PerformanceAttendance = require("./PerformanceAttendance");
+const PerformanceMetricRecord = require("./PerformanceMetricRecord");
 const employeeService = require("./services/employeeService");
 
 const app = express();
@@ -26,6 +28,23 @@ const missingEnvVars = REQUIRED_ENV_VARS.filter((envName) => !process.env[envNam
 if (missingEnvVars.length > 0) {
   throw new Error(`Faltan variables de entorno requeridas: ${missingEnvVars.join(", ")}`);
 }
+
+function validarJwtSecretConfig() {
+  const jwtSecret = process.env.JWT_SECRET;
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!jwtSecret || jwtSecret.length < 32) {
+    const message = "JWT_SECRET debe existir y tener al menos 32 caracteres.";
+
+    if (isProduction) {
+      throw new Error(`${message} Configura un secreto fuerte antes de iniciar en produccion.`);
+    }
+
+    console.warn(`ADVERTENCIA: ${message} Solo se permite continuar en desarrollo con un secreto local.`);
+  }
+}
+
+validarJwtSecretConfig();
 
 const DEFAULT_FRONTEND_ORIGINS = [
   "http://127.0.0.1:5500",
@@ -39,10 +58,12 @@ const FRONTEND_ORIGINS = Array.from(new Set((process.env.FRONTEND_ORIGINS || pro
   .filter(Boolean)));
 const AUTH_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_LIMIT_MAX_ATTEMPTS = 8;
+const SENSITIVE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const MAIL_CODE_TTL_MINUTES = 10;
 const META_DIARIA_EMPLEADOS_MXN = 2000;
-const META_SEMANAL_EMPLEADOS_MXN = META_DIARIA_EMPLEADOS_MXN * 5;
+const META_SEMANAL_EMPLEADOS_MXN = 22000;
 const authAttempts = new Map();
+const sensitiveActionAttempts = new Map();
 let mailTransporterPromise = null;
 const PRODUCT_CATALOG = Object.freeze({
   "shampoo-premium": { id: "shampoo-premium", nombre: "Shampoo Premium", precio: 12900 },
@@ -78,6 +99,14 @@ function limpiarIntentosExpirados(now) {
   }
 }
 
+function limpiarRateLimitExpirados(store, now) {
+  for (const [key, value] of store.entries()) {
+    if (value.expiresAt <= now) {
+      store.delete(key);
+    }
+  }
+}
+
 function authRateLimit(req, res, next) {
   const now = Date.now();
   limpiarIntentosExpirados(now);
@@ -97,6 +126,34 @@ function authRateLimit(req, res, next) {
   current.count += 1;
   next();
 }
+
+function crearRateLimiter(nombre, maxRequests, windowMs = SENSITIVE_RATE_LIMIT_WINDOW_MS) {
+  return (req, res, next) => {
+    const now = Date.now();
+    limpiarRateLimitExpirados(sensitiveActionAttempts, now);
+
+    const actor = req.user?.id ? `user:${req.user.id}` : `ip:${getClientIp(req)}`;
+    const routePath = req.route?.path || req.path;
+    const key = `${nombre}:${actor}:${req.method}:${routePath}`;
+    const current = sensitiveActionAttempts.get(key);
+
+    if (!current || current.expiresAt <= now) {
+      sensitiveActionAttempts.set(key, { count: 1, expiresAt: now + windowMs });
+      return next();
+    }
+
+    if (current.count >= maxRequests) {
+      return res.status(429).json({ message: "Demasiadas solicitudes. Intenta de nuevo más tarde." });
+    }
+
+    current.count += 1;
+    next();
+  };
+}
+
+const checkoutLimiter = crearRateLimiter("checkout", 20);
+const customerActionLimiter = crearRateLimiter("customer-action", 30);
+const adminWriteLimiter = crearRateLimiter("admin-write", 120);
 
 function validarTextoSeguro(value, maxLength = 120) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
@@ -640,7 +697,7 @@ function auth(req, res, next) {
       return res.status(401).json({ message: "No autorizado" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
     req.user = decoded;
 
     next();
@@ -650,7 +707,9 @@ function auth(req, res, next) {
 }
 
 function obtenerRolUsuario(user) {
-  return user?.role || "admin";
+  const role = typeof user?.role === "string" ? user.role.trim() : "";
+  // Fallback seguro: usuarios sin rol valido son cliente, nunca admin.
+  return ["cliente", "admin", "empleado"].includes(role) ? role : "cliente";
 }
 
 async function requireAdmin(req, res, next) {
@@ -746,6 +805,25 @@ async function construirPedidoAdmin(pedido, incluirDetalle = false) {
   };
 }
 
+function construirPedidoCliente(pedido, usuario) {
+  const pedidoObj = typeof pedido.toObject === "function" ? pedido.toObject() : pedido;
+
+  return {
+    _id: pedidoObj._id,
+    createdAt: pedidoObj.createdAt,
+    estado: pedidoObj.estado || pedidoObj.status || "pendiente",
+    total: pedidoObj.total || 0,
+    carrito: Array.isArray(pedidoObj.carrito) ? pedidoObj.carrito : [],
+    direccion: pedidoObj.direccion || {},
+    cliente: usuario ? {
+      usuario: usuario.usuario || "",
+      email: usuario.email || ""
+    } : null,
+    canceladoEn: pedidoObj.canceladoEn || null,
+    motivoCancelacion: pedidoObj.motivoCancelacion || ""
+  };
+}
+
 const APPOINTMENT_STATUSES = Object.freeze([
   "pendiente",
   "confirmada",
@@ -768,6 +846,8 @@ const APPOINTMENT_CREATE_FIELDS = Object.freeze([
   "clienteNombre",
   "clienteTelefono",
   "clienteEmail",
+  "mascotaNombre",
+  "mascotaEdad",
   "servicioTipo",
   "servicioNombre",
   "servicioKey",
@@ -805,6 +885,8 @@ const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
   "clienteNombre",
   "clienteTelefono",
   "clienteEmail",
+  "mascotaNombre",
+  "mascotaEdad",
   "servicioTipo",
   "servicioNombre",
   "servicioKey",
@@ -915,6 +997,62 @@ function normalizarTelefonoAgenda(value) {
   }
 
   return "";
+}
+
+function normalizarTotalCobradoAgenda(value) {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0) {
+      return { ok: false };
+    }
+    const centavos = Math.round((value + Number.EPSILON) * 100);
+    return Math.abs(value * 100 - centavos) < 1e-8 ? { ok: true, value } : { ok: false };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+
+  const texto = value.trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(texto)) {
+    return { ok: false };
+  }
+
+  const monto = Number(texto);
+  return Number.isFinite(monto) && monto >= 0 ? { ok: true, value: monto } : { ok: false };
+}
+
+function normalizarMontoEmpleado(value, { campo, max, porcentaje = false }) {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, value: 0 };
+  }
+
+  if (typeof value === "string" && value.trim() === "") {
+    return { ok: true, value: 0 };
+  }
+
+  if (typeof value !== "number" && typeof value !== "string") {
+    return { ok: false, message: `${campo} debe ser un numero valido.` };
+  }
+
+  const monto = Number(value);
+
+  if (!Number.isFinite(monto)) {
+    return { ok: false, message: `${campo} debe ser un numero finito.` };
+  }
+
+  if (monto < 0) {
+    return { ok: false, message: `${campo} no puede ser negativo.` };
+  }
+
+  if (porcentaje && monto > 100) {
+    return { ok: false, message: `${campo} debe estar entre 0 y 100.` };
+  }
+
+  if (monto > max) {
+    return { ok: false, message: `${campo} no puede ser mayor a ${max}.` };
+  }
+
+  return { ok: true, value: monto };
 }
 
 function construirRegexTelefonoAgenda(digitos) {
@@ -1477,6 +1615,106 @@ function bloquesTraslapados(nuevoBloque, bloqueExistente) {
   return nuevoBloque.inicioBloque < bloqueExistente.finBloque && nuevoBloque.finBloque > bloqueExistente.inicioBloque;
 }
 
+function estadoOcupaAgenda(estado = "pendiente") {
+  return !["cancelada", "no_asistio"].includes(estado || "pendiente");
+}
+
+function generarMinutosBloque(inicioMinutos, finMinutos) {
+  if (!Number.isInteger(inicioMinutos) || !Number.isInteger(finMinutos) || finMinutos <= inicioMinutos) {
+    return [];
+  }
+
+  const minutos = [];
+  for (let minuto = inicioMinutos; minuto < finMinutos; minuto += 1) {
+    minutos.push(minuto);
+  }
+  return minutos;
+}
+
+function crearErrorConflictoAgenda() {
+  const error = new Error("Este horario ya no está disponible. Elige otro horario.");
+  error.status = 409;
+  return error;
+}
+
+function esErrorDuplicadoMongo(error) {
+  return error?.code === 11000 || error?.writeErrors?.some((item) => item?.code === 11000);
+}
+
+async function liberarLocksAgenda(appointmentId) {
+  if (!appointmentId) return;
+  await AppointmentSlotLock.deleteMany({ appointmentId });
+}
+
+async function adquirirLocksAgenda({ fecha, inicioMinutos, finMinutos, appointmentId }) {
+  const minutos = generarMinutosBloque(inicioMinutos, finMinutos);
+  if (!fecha || !appointmentId || !minutos.length) {
+    return;
+  }
+
+  const locks = minutos.map((minuto) => ({
+    fecha,
+    minuto,
+    appointmentId
+  }));
+
+  try {
+    await AppointmentSlotLock.insertMany(locks, { ordered: true });
+  } catch (error) {
+    await liberarLocksAgenda(appointmentId);
+
+    if (esErrorDuplicadoMongo(error)) {
+      throw crearErrorConflictoAgenda();
+    }
+
+    throw error;
+  }
+}
+
+function crearSnapshotLocksAgenda(cita) {
+  if (!cita || !estadoOcupaAgenda(cita.estado)) {
+    return { activo: false, appointmentId: cita?._id || null };
+  }
+
+  const bloque = obtenerBloqueCitaAgenda(cita);
+  if (!bloque) {
+    return { activo: false, appointmentId: cita._id };
+  }
+
+  return {
+    activo: true,
+    fecha: cita.fecha,
+    inicioMinutos: bloque.inicioBloque,
+    finMinutos: bloque.finBloque,
+    appointmentId: cita._id
+  };
+}
+
+async function restaurarLocksAgenda(snapshot) {
+  if (!snapshot?.activo) return;
+  await adquirirLocksAgenda(snapshot);
+}
+
+async function reconstruirLocksAgenda() {
+  await AppointmentSlotLock.deleteMany({});
+
+  const citasActivas = await Appointment.find({
+    estado: { $nin: ["cancelada", "no_asistio"] }
+  }).sort({ fecha: 1, hora: 1, createdAt: 1 });
+
+  for (const cita of citasActivas) {
+    const bloque = obtenerBloqueCitaAgenda(cita);
+    if (!bloque) continue;
+
+    await adquirirLocksAgenda({
+      fecha: cita.fecha,
+      inicioMinutos: bloque.inicioBloque,
+      finMinutos: bloque.finBloque,
+      appointmentId: cita._id
+    });
+  }
+}
+
 async function obtenerCitasOcupadasAgenda(fecha, excludeId = "") {
   const filtro = {
     fecha,
@@ -1630,6 +1868,7 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     ["clienteNombre", 120],
     ["clienteTelefono", 30],
     ["clienteEmail", 120],
+    ["mascotaNombre", 80],
     ["servicioNombre", 160],
     ["servicioKey", 180],
     ["servicioCategoria", 80],
@@ -1659,6 +1898,20 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
 
   if (Object.prototype.hasOwnProperty.call(body || {}, "servicioTipo")) {
     datos.servicioTipo = normalizarTextoPlano(body.servicioTipo, 20);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body || {}, "mascotaEdad")) {
+    const valorRaw = body.mascotaEdad;
+    if (valorRaw === "" || valorRaw === null || valorRaw === undefined) {
+      datos.mascotaEdad = null;
+    } else {
+      const valor = Number(valorRaw);
+      if (!Number.isInteger(valor) || valor < 1 || valor > 40) {
+        errores.push("mascotaEdad debe ser un entero entre 1 y 40");
+      } else {
+        datos.mascotaEdad = valor;
+      }
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(body || {}, "rewardGratisAplicado")) {
@@ -1753,6 +2006,11 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
       datos.servicioNombre = principal.nombre;
       datos.servicioKey = principal.key;
     }
+  }
+
+  if (datos.servicioTipo === "auto") {
+    datos.mascotaNombre = "";
+    datos.mascotaEdad = null;
   }
 
   if (datos.servicioTipo && datos.servicioPaquete) {
@@ -1857,11 +2115,11 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
   }
 
   if (Object.prototype.hasOwnProperty.call(body || {}, "totalCobrado")) {
-    const totalCobrado = Number(body.totalCobrado);
-    if (!Number.isFinite(totalCobrado) || totalCobrado < 0) {
-      errores.push("totalCobrado debe ser un número positivo");
+    const totalCobrado = normalizarTotalCobradoAgenda(body.totalCobrado);
+    if (!totalCobrado.ok) {
+      errores.push("totalCobrado debe ser un numero positivo con maximo 2 decimales");
     } else {
-      datos.totalCobrado = totalCobrado;
+      datos.totalCobrado = totalCobrado.value;
     }
   }
 
@@ -1893,6 +2151,8 @@ function construirCitaAdmin(cita) {
     clienteNombre: obj.clienteNombre || "",
     clienteTelefono: obj.clienteTelefono || "",
     clienteEmail: obj.clienteEmail || "",
+    mascotaNombre: obj.mascotaNombre || "",
+    mascotaEdad: Number.isInteger(obj.mascotaEdad) ? obj.mascotaEdad : null,
     servicioTipo: obj.servicioTipo || "",
     servicioNombre: obj.servicioNombre || "",
     servicioCategoria: obj.servicioCategoria || "",
@@ -2233,11 +2493,10 @@ app.post("/login", authRateLimit, async (req, res) => {
     const token = jwt.sign(
       {
         id: user._id.toString(),
-        usuario: user.usuario,
         role: obtenerRolUsuario(user)
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "8h" }
     );
 
     res.json({ success: true, token, role: obtenerRolUsuario(user) });
@@ -2338,7 +2597,7 @@ function obtenerStripeClient() {
   return stripe;
 }
 
-app.post("/create-checkout-session", auth, async (req, res) => {
+app.post("/create-checkout-session", auth, checkoutLimiter, async (req, res) => {
   try {
     const { carrito, datos } = req.body;
     const userId = req.user.id;
@@ -2427,17 +2686,7 @@ app.get("/mis-pedidos", auth, async (req, res) => {
   try {
     const pedidos = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
     const user = await User.findById(req.user.id).select("email usuario");
-    const pedidosConCliente = pedidos.map((pedido) => {
-      const pedidoJson = pedido.toObject();
-
-      return {
-        ...pedidoJson,
-        cliente: user ? {
-          usuario: user.usuario || "",
-          email: user.email || ""
-        } : null
-      };
-    });
+    const pedidosConCliente = pedidos.map((pedido) => construirPedidoCliente(pedido, user));
 
     res.json({ pedidos: pedidosConCliente });
   } catch (error) {
@@ -2445,7 +2694,7 @@ app.get("/mis-pedidos", auth, async (req, res) => {
   }
 });
 
-app.post("/confirm-order", auth, async (req, res) => {
+app.post("/confirm-order", auth, checkoutLimiter, async (req, res) => {
   try {
     const { sessionId } = req.body;
     const stripeClient = obtenerStripeClient();
@@ -2497,7 +2746,12 @@ app.post("/confirm-order", auth, async (req, res) => {
       console.log("No se pudo enviar el correo de confirmación del pedido:", error.message);
     }
 
-    res.json({ success: true, pedido });
+    const user = await User.findById(req.user.id).select("email usuario");
+
+    res.json({
+      success: true,
+      pedido: construirPedidoCliente(pedido, user)
+    });
   } catch (error) {
     res.status(500).json({ message: "No se pudo confirmar el pedido" });
   }
@@ -2586,7 +2840,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
 
     const semana = obtenerRangoSemana(fecha);
     const empleados = await Employee.find()
-      .select("nombreCompleto email telefono puesto activo fechaIngreso sueldoBase comision bonoManual descuentoAdministrativo notas")
+      .select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos sueldoBase comision bonoManual descuentoAdministrativo notas")
       .sort({ nombreCompleto: 1 });
 
     const empleadoIds = empleados.map((empleado) => empleado._id);
@@ -2640,6 +2894,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
           especialidad: empleado.puesto || "",
           activo: Boolean(empleado.activo),
           fechaIngreso: empleado.fechaIngreso || "",
+          fechaCumpleanos: empleado.fechaCumpleanos || "",
           sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
           comisionPorcentaje: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
           bonoManual: Number.isFinite(Number(empleado.bonoManual)) ? Number(empleado.bonoManual) : 0,
@@ -2720,6 +2975,7 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       especialidad: empleado.puesto || "",
       role: "empleado",
       fechaIngreso: empleado.fechaIngreso || "",
+      fechaCumpleanos: empleado.fechaCumpleanos || "",
       activo: Boolean(empleado.activo),
       sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
       comision: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
@@ -2799,7 +3055,7 @@ app.get("/admin/performance/attendance", auth, requireAdmin, async (req, res) =>
   }
 });
 
-app.post("/admin/performance/attendance", auth, requireAdmin, async (req, res) => {
+app.post("/admin/performance/attendance", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const empleadoId = typeof req.body?.empleadoId === "string" ? req.body.empleadoId.trim() : "";
     const fecha = typeof req.body?.fecha === "string" ? req.body.fecha.trim() : "";
@@ -2842,6 +3098,122 @@ app.post("/admin/performance/attendance", auth, requireAdmin, async (req, res) =
   }
 });
 
+function validarPerformanceMetricKey(metricKey = "") {
+  return PerformanceMetricRecord.METRIC_KEYS.includes(metricKey);
+}
+
+const PERFORMANCE_PRIMARY_ATTENDANCE_KEYS = Object.freeze([
+  "falta_justificada",
+  "falta_injustificada",
+  "vacaciones"
+]);
+
+function esEventoAsistenciaPrincipal(metricKey = "") {
+  return PERFORMANCE_PRIMARY_ATTENDANCE_KEYS.includes(metricKey);
+}
+
+function construirPerformanceMetricRecord(registro, empleadoMap = new Map()) {
+  return {
+    id: String(registro._id),
+    empleadoId: String(registro.empleadoId),
+    nombreCompleto: empleadoMap.get(String(registro.empleadoId))?.nombreCompleto || "",
+    fecha: registro.fecha,
+    metricKey: registro.metricKey,
+    value: Boolean(registro.value),
+    notes: registro.notes || "",
+    createdBy: registro.createdBy ? String(registro.createdBy) : null,
+    createdAt: registro.createdAt,
+    updatedAt: registro.updatedAt
+  };
+}
+
+app.get("/admin/performance/metrics", auth, requireAdmin, async (req, res) => {
+  try {
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    const metricKey = normalizarTextoPlano(req.query?.metricKey, 40);
+
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+    if (!validarPerformanceMetricKey(metricKey)) {
+      return res.status(400).json({ message: "metricKey no valido" });
+    }
+
+    const filtro = { fecha, metricKey };
+    if (req.query?.empleadoId) {
+      const empleadoId = String(req.query.empleadoId).trim();
+      if (!mongoose.Types.ObjectId.isValid(empleadoId)) {
+        return res.status(400).json({ message: "empleadoId no valido" });
+      }
+      filtro.empleadoId = new mongoose.Types.ObjectId(empleadoId);
+    }
+
+    const registros = await PerformanceMetricRecord.find(filtro).sort({ fecha: 1, empleadoId: 1 });
+    const empleados = await Employee.find({ _id: { $in: registros.map((registro) => registro.empleadoId) } });
+    const empleadoMap = new Map(empleados.map((empleado) => [String(empleado._id), empleado]));
+
+    res.json({
+      fecha,
+      metricKey,
+      registros: registros.map((registro) => construirPerformanceMetricRecord(registro, empleadoMap))
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener los registros de metricas" });
+  }
+});
+
+app.post("/admin/performance/metrics", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const empleadoId = typeof req.body?.empleadoId === "string" ? req.body.empleadoId.trim() : "";
+    const fecha = typeof req.body?.fecha === "string" ? req.body.fecha.trim() : "";
+    const metricKey = typeof req.body?.metricKey === "string" ? req.body.metricKey.trim() : "";
+    const value = req.body?.value;
+    const notes = typeof req.body?.notes === "string" ? req.body.notes.trim().slice(0, 500) : "";
+
+    if (!mongoose.Types.ObjectId.isValid(empleadoId)) {
+      return res.status(400).json({ message: "empleadoId no valido" });
+    }
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+    if (!validarPerformanceMetricKey(metricKey)) {
+      return res.status(400).json({ message: "metricKey no valido" });
+    }
+    if (typeof value !== "boolean") {
+      return res.status(400).json({ message: "value debe ser booleano" });
+    }
+
+    const empleado = await Employee.findById(empleadoId);
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
+    if (value === true && esEventoAsistenciaPrincipal(metricKey)) {
+      await PerformanceMetricRecord.deleteMany({
+        empleadoId: empleado._id,
+        fecha,
+        metricKey: {
+          $in: PERFORMANCE_PRIMARY_ATTENDANCE_KEYS.filter((key) => key !== metricKey)
+        }
+      });
+    }
+
+    const registro = await PerformanceMetricRecord.findOneAndUpdate(
+      { empleadoId: empleado._id, fecha, metricKey },
+      { value, notes, createdBy: req.admin?._id || null },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const empleadoMap = new Map([[String(empleado._id), empleado]]);
+    res.status(201).json({
+      message: "Registro de metrica guardado correctamente",
+      registro: construirPerformanceMetricRecord(registro, empleadoMap)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo guardar el registro de metrica" });
+  }
+});
+
 app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => {
   try {
     const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
@@ -2862,8 +3234,29 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
     const asistenciaSemana = await PerformanceAttendance.find({
       fecha: { $gte: semana.inicio, $lte: semana.fin }
     });
+    const limpiezaOrdenSemana = await PerformanceMetricRecord.find({
+      fecha: { $gte: semana.inicio, $lte: semana.fin },
+      metricKey: "limpieza_orden"
+    });
+    const eventosAsistenciaSemana = await PerformanceMetricRecord.find({
+      fecha: { $gte: semana.inicio, $lte: semana.fin },
+      metricKey: { $in: PERFORMANCE_PRIMARY_ATTENDANCE_KEYS },
+      value: true
+    });
 
     const asistenciaPorEmpleado = asistenciaSemana.reduce((acc, registro) => {
+      const key = String(registro.empleadoId);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(registro);
+      return acc;
+    }, {});
+    const limpiezaOrdenPorEmpleado = limpiezaOrdenSemana.reduce((acc, registro) => {
+      const key = String(registro.empleadoId);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(registro);
+      return acc;
+    }, {});
+    const eventosAsistenciaPorEmpleado = eventosAsistenciaSemana.reduce((acc, registro) => {
       const key = String(registro.empleadoId);
       if (!acc[key]) acc[key] = [];
       acc[key].push(registro);
@@ -2886,12 +3279,34 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
       const totalEvaluaciones = calificaciones.length;
       const sueldoBase = Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0;
       const comisionPorcentaje = Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0;
-      const metaSemanalOk = ventasSemanales >= 12000;
+      const metaSemanalOk = ventasSemanales >= META_SEMANAL_EMPLEADOS_MXN;
       const calificacionMinimaOk = typeof promedioEstrellas === "number" ? promedioEstrellas >= 4.0 : false;
-      const puntualidadOk = retardosSemana < 3;
-      const elegibleBono = metaSemanalOk && calificacionMinimaOk && puntualidadOk;
+      const puntualidadOkBase = retardosSemana < 3;
+      // Base conserva la regla previa a faltas injustificadas y limpieza.
+      const elegibleBonoBase = metaSemanalOk && calificacionMinimaOk && puntualidadOkBase;
+      const bonoCalculadoBase = elegibleBonoBase ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
+      const totalAPagarBase = sueldoBase + bonoCalculadoBase;
+      const limpiezaOrdenRegistros = limpiezaOrdenPorEmpleado[String(empleado._id)] || [];
+      const limpiezaOrdenEvaluaciones = limpiezaOrdenRegistros.length;
+      const limpiezaOrdenIncumplimientos = limpiezaOrdenRegistros.filter((registro) => registro.value === false).length;
+      const limpiezaOrdenOk = limpiezaOrdenEvaluaciones ? limpiezaOrdenIncumplimientos === 0 : null;
+      const limpiezaOrdenBonoOk = limpiezaOrdenOk !== false;
+      const eventosAsistenciaRegistros = eventosAsistenciaPorEmpleado[String(empleado._id)] || [];
+      const faltasJustificadas = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "falta_justificada").length;
+      const faltasInjustificadas = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "falta_injustificada").length;
+      const vacacionesDias = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "vacaciones").length;
+      const sueldoDiario = sueldoBase / 7;
+      const descuentoPorFaltas = Math.round((faltasJustificadas + faltasInjustificadas) * sueldoDiario);
+      const puntualidadOk = puntualidadOkBase && faltasInjustificadas === 0;
+      const elegibleBono = metaSemanalOk && calificacionMinimaOk && puntualidadOk && limpiezaOrdenBonoOk;
       const bonoCalculado = elegibleBono ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
-      const totalAPagar = sueldoBase + bonoCalculado;
+      const totalAPagar = Math.max(0, sueldoBase + bonoCalculado - descuentoPorFaltas);
+      const descuentoPorFaltasProyectado = descuentoPorFaltas;
+      const puntualidadOkProyectada = puntualidadOk;
+      const elegibleBonoProyectado = elegibleBono;
+      const bonoCalculadoProyectado = elegibleBonoProyectado ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
+      const totalAPagarProyectado = totalAPagar;
+      const impactoAsistenciaProyectado = totalAPagarProyectado - totalAPagarBase;
 
       return {
         empleadoId: String(empleado._id),
@@ -2902,37 +3317,65 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
         sueldoBase,
         comisionPorcentaje,
         ventasSemanales,
-        metaSemanalMxn: 12000,
+        metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
         metaSemanalOk,
         calificacionMinimaOk,
         puntualidadOk,
         promedioEstrellas,
         totalEvaluaciones,
         retardosSemana,
+        limpiezaOrdenEvaluaciones,
+        limpiezaOrdenIncumplimientos,
+        limpiezaOrdenOk,
+        limpiezaOrdenBonoOk,
+        faltasJustificadas,
+        faltasInjustificadas,
+        vacacionesDias,
+        sueldoDiario,
+        descuentoPorFaltas,
+        descuentoPorFaltasProyectado,
+        puntualidadOkBase,
+        puntualidadOkProyectada,
+        elegibleBonoBase,
+        elegibleBonoProyectado,
+        bonoCalculadoBase,
+        bonoCalculadoProyectado,
+        totalAPagarBase,
+        totalAPagarProyectado,
+        impactoAsistenciaProyectado,
         elegibleBono,
         bonoCalculado,
         totalAPagar
       };
     });
 
-    const ventasGlobales = empleadosResumen.reduce((total, item) => total + (Number(item.ventasSemanales) || 0), 0);
-    const totalEvaluaciones = empleadosResumen.reduce((total, item) => total + (Number(item.totalEvaluaciones) || 0), 0);
-    const empleadosConCalificacion = empleadosResumen.filter((item) => item.promedioEstrellas !== null);
-    const promedioEstrellasGlobal = empleadosConCalificacion.length
-      ? Math.round((empleadosConCalificacion.reduce((total, item) => total + item.promedioEstrellas, 0) / empleadosConCalificacion.length) * 10) / 10
+    const ventasGlobales = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+    const calificacionesGlobales = citasSemana
+      .map((cita) => (Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio))
+      .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
+    const totalEvaluaciones = calificacionesGlobales.length;
+    const promedioEstrellasGlobal = calificacionesGlobales.length
+      ? Math.round((calificacionesGlobales.reduce((total, valor) => total + valor, 0) / calificacionesGlobales.length) * 10) / 10
       : null;
 
     res.json({
       fecha,
       semanaInicio: semana.inicio,
       semanaFin: semana.fin,
-      metaSemanalMxn: 12000,
+      metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
       ventasSemanales: ventasGlobales,
-      // top-level flag: true if any employee met their weekly meta
-      cumplioMeta: empleadosResumen.some((item) => item.metaSemanalOk),
+      cumplioMeta: ventasGlobales >= META_SEMANAL_EMPLEADOS_MXN,
       promedioEstrellas: promedioEstrellasGlobal,
       totalEvaluaciones,
       retardosSemana: asistenciaSemana.filter((registro) => registro.puntual === false).length,
+      limpiezaOrdenEvaluaciones: limpiezaOrdenSemana.length,
+      limpiezaOrdenIncumplimientos: limpiezaOrdenSemana.filter((registro) => registro.value === false).length,
+      limpiezaOrdenOk: limpiezaOrdenSemana.length
+        ? limpiezaOrdenSemana.every((registro) => registro.value !== false)
+        : null,
+      faltasJustificadas: eventosAsistenciaSemana.filter((registro) => registro.metricKey === "falta_justificada").length,
+      faltasInjustificadas: eventosAsistenciaSemana.filter((registro) => registro.metricKey === "falta_injustificada").length,
+      vacacionesDias: eventosAsistenciaSemana.filter((registro) => registro.metricKey === "vacaciones").length,
       empleados: empleadosResumen
     });
   } catch (error) {
@@ -2940,7 +3383,7 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
   }
 });
 
-app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
+app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const {
       nombreCompleto,
@@ -2949,6 +3392,7 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
       especialidad,
       puesto,
       fechaIngreso,
+      fechaCumpleanos,
       sueldoBase,
       comision,
       comisionPorcentaje,
@@ -2963,11 +3407,18 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
     const telefonoLimpio = String(telefono || "").trim();
     const puestoLimpio = String(puesto || especialidad || "").trim();
     const fechaIngresoLimpia = String(fechaIngreso || "").trim();
-    const sueldoBaseNum = Number(sueldoBase) || 0;
-    const comisionNum = Number(comision ?? comisionPorcentaje) || 0;
-    const bonoManualNum = Number(bonoManual) || 0;
-    const descuentoNum = Number(descuentoAdministrativo) || 0;
+    const fechaCumpleanosLimpia = String(fechaCumpleanos || "").trim();
+    const sueldoBaseValidado = normalizarMontoEmpleado(sueldoBase, { campo: "sueldoBase", max: 100000 });
+    const comisionValidada = normalizarMontoEmpleado(comision ?? comisionPorcentaje, { campo: "comision", max: 100, porcentaje: true });
+    const bonoManualValidado = normalizarMontoEmpleado(bonoManual, { campo: "bonoManual", max: 50000 });
+    const descuentoValidado = normalizarMontoEmpleado(descuentoAdministrativo, { campo: "descuentoAdministrativo", max: 50000 });
     const notas = String(notasAdministrativas || "").trim();
+
+    for (const validacionMonto of [sueldoBaseValidado, comisionValidada, bonoManualValidado, descuentoValidado]) {
+      if (!validacionMonto.ok) {
+        return res.status(400).json({ message: validacionMonto.message });
+      }
+    }
 
     if (!validarTextoSeguro(nombre, 120) || !validarTextoSeguro(emailLimpio, 120) || !validarEmail(emailLimpio)) {
       return res.status(400).json({ message: "Revisa el nombre y el correo del empleado." });
@@ -2979,6 +3430,10 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
 
     if (!validarFechaISOAgenda(fechaIngresoLimpia)) {
       return res.status(400).json({ message: "La fecha de ingreso no es válida." });
+    }
+
+    if (fechaCumpleanosLimpia && !validarFechaISOAgenda(fechaCumpleanosLimpia)) {
+      return res.status(400).json({ message: "La fecha de cumpleanos no es valida." });
     }
 
     const [emailEnUsuarios, emailEnEmpleados] = await Promise.all([
@@ -2996,11 +3451,12 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
       telefono: telefonoLimpio,
       puesto: puestoLimpio,
       fechaIngreso: fechaIngresoLimpia,
+      fechaCumpleanos: fechaCumpleanosLimpia,
       activo: activo !== false,
-      sueldoBase: sueldoBaseNum,
-      comision: comisionNum,
-      bonoManual: bonoManualNum,
-      descuentoAdministrativo: descuentoNum,
+      sueldoBase: sueldoBaseValidado.value,
+      comision: comisionValidada.value,
+      bonoManual: bonoManualValidado.value,
+      descuentoAdministrativo: descuentoValidado.value,
       notas: notas
     });
 
@@ -3011,7 +3467,7 @@ app.post("/admin/employees", auth, requireAdmin, async (req, res) => {
   }
 });
 
-app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
+app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const id = String(req.params.id || "").trim();
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -3030,6 +3486,7 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       especialidad,
       puesto,
       fechaIngreso,
+      fechaCumpleanos,
       sueldoBase,
       comision,
       comisionPorcentaje,
@@ -3074,17 +3531,40 @@ app.patch("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       }
       empleado.fechaIngreso = fechaIngreso.trim();
     }
+    if (typeof fechaCumpleanos === "string") {
+      const fechaCumpleanosLimpia = fechaCumpleanos.trim();
+      if (fechaCumpleanosLimpia && !validarFechaISOAgenda(fechaCumpleanosLimpia)) {
+        return res.status(400).json({ message: "La fecha de cumpleanos no es valida." });
+      }
+      empleado.fechaCumpleanos = fechaCumpleanosLimpia;
+    }
     if (typeof sueldoBase !== "undefined") {
-      empleado.sueldoBase = Number(sueldoBase) || 0;
+      const sueldoBaseValidado = normalizarMontoEmpleado(sueldoBase, { campo: "sueldoBase", max: 100000 });
+      if (!sueldoBaseValidado.ok) {
+        return res.status(400).json({ message: sueldoBaseValidado.message });
+      }
+      empleado.sueldoBase = sueldoBaseValidado.value;
     }
     if (typeof comision !== "undefined" || typeof comisionPorcentaje !== "undefined") {
-      empleado.comision = Number(comision ?? comisionPorcentaje) || 0;
+      const comisionValidada = normalizarMontoEmpleado(comision ?? comisionPorcentaje, { campo: "comision", max: 100, porcentaje: true });
+      if (!comisionValidada.ok) {
+        return res.status(400).json({ message: comisionValidada.message });
+      }
+      empleado.comision = comisionValidada.value;
     }
     if (typeof bonoManual !== "undefined") {
-      empleado.bonoManual = Number(bonoManual) || 0;
+      const bonoManualValidado = normalizarMontoEmpleado(bonoManual, { campo: "bonoManual", max: 50000 });
+      if (!bonoManualValidado.ok) {
+        return res.status(400).json({ message: bonoManualValidado.message });
+      }
+      empleado.bonoManual = bonoManualValidado.value;
     }
     if (typeof descuentoAdministrativo !== "undefined") {
-      empleado.descuentoAdministrativo = Number(descuentoAdministrativo) || 0;
+      const descuentoValidado = normalizarMontoEmpleado(descuentoAdministrativo, { campo: "descuentoAdministrativo", max: 50000 });
+      if (!descuentoValidado.ok) {
+        return res.status(400).json({ message: descuentoValidado.message });
+      }
+      empleado.descuentoAdministrativo = descuentoValidado.value;
     }
     if (typeof notasAdministrativas === "string") {
       empleado.notas = notasAdministrativas.trim().slice(0, 500);
@@ -3450,7 +3930,7 @@ app.get("/admin/customers/lookup", auth, requireAdmin, async (req, res) => {
   }
 });
 
-app.post("/admin/appointments", auth, requireAdmin, async (req, res) => {
+app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const camposNoPermitidos = validarCamposCitaPermitidos(req.body, APPOINTMENT_CREATE_FIELDS);
     if (camposNoPermitidos.length) {
@@ -3507,28 +3987,55 @@ app.post("/admin/appointments", auth, requireAdmin, async (req, res) => {
       return res.status(disponibilidad.status).json({ message: disponibilidad.message });
     }
 
+    const appointmentId = new mongoose.Types.ObjectId();
     const cita = new Appointment({
+      _id: appointmentId,
       ...datos,
       ...disponibilidad.bloque,
       estado: datos.estado || "pendiente",
       origen: datos.origen || "admin"
     });
 
-    if (cita.estado === "completada" && cita.rewardGratisAplicado) {
-      const consumo = await consumirRecompensaCita(cita);
-      if (!consumo.ok) {
-        return res.status(consumo.status).json({ message: consumo.message });
-      }
+    const citaOcupaAgenda = estadoOcupaAgenda(cita.estado);
+
+    if (citaOcupaAgenda) {
+      await adquirirLocksAgenda({
+        fecha: cita.fecha,
+        inicioMinutos: cita.inicioBloque,
+        finMinutos: cita.finBloque,
+        appointmentId
+      });
     }
 
-    await cita.save();
+    try {
+      if (cita.estado === "completada" && cita.rewardGratisAplicado) {
+        const consumo = await consumirRecompensaCita(cita);
+        if (!consumo.ok) {
+          if (citaOcupaAgenda) {
+            await liberarLocksAgenda(appointmentId);
+          }
+          return res.status(consumo.status).json({ message: consumo.message });
+        }
+      }
+
+      await cita.save();
+    } catch (error) {
+      if (citaOcupaAgenda) {
+        await liberarLocksAgenda(appointmentId);
+      }
+      throw error;
+    }
+
     res.status(201).json({ message: "Cita creada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
     res.status(500).json({ message: "No se pudo crear la cita" });
   }
 });
 
-app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
+app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
 
@@ -3595,6 +4102,11 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
     const servicioTipoFinal = datos.servicioTipo || cita.servicioTipo;
     const clienteTelefonoFinal = datos.clienteTelefono || cita.clienteTelefono;
 
+    if (servicioTipoFinal === "auto") {
+      datos.mascotaNombre = "";
+      datos.mascotaEdad = null;
+    }
+
     if (cita.rewardGrupoId) {
       const camposProtegidosRecompensa = [
         "clienteTelefono",
@@ -3660,10 +4172,31 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
       Object.assign(datos, disponibilidad.bloque);
     }
 
+    const locksAnteriores = crearSnapshotLocksAgenda(cita);
+    const locksNuevos = estadoOcupaAgenda(datosParaDisponibilidad.estado)
+      ? {
+          activo: true,
+          fecha: datosParaDisponibilidad.fecha,
+          inicioMinutos: datos.inicioBloque,
+          finMinutos: datos.finBloque,
+          appointmentId: cita._id
+        }
+      : { activo: false, appointmentId: cita._id };
+    const cambiaronLocks = (
+      Boolean(locksAnteriores.activo) !== Boolean(locksNuevos.activo) ||
+      (locksAnteriores.activo && locksNuevos.activo && (
+        locksAnteriores.fecha !== locksNuevos.fecha ||
+        locksAnteriores.inicioMinutos !== locksNuevos.inicioMinutos ||
+        locksAnteriores.finMinutos !== locksNuevos.finMinutos
+      ))
+    );
+
     const camposEditables = [
       "clienteNombre",
       "clienteTelefono",
       "clienteEmail",
+      "mascotaNombre",
+      "mascotaEdad",
       "servicioTipo",
       "servicioNombre",
       "servicioCategoria",
@@ -3698,27 +4231,73 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
       "estado"
     ];
 
+    let locksNuevosAdquiridos = false;
+    let locksAnterioresLiberados = false;
+
+    if (cambiaronLocks) {
+      await liberarLocksAgenda(cita._id);
+      locksAnterioresLiberados = true;
+
+      try {
+        if (locksNuevos.activo) {
+          await adquirirLocksAgenda(locksNuevos);
+          locksNuevosAdquiridos = true;
+        }
+      } catch (error) {
+        try {
+          await restaurarLocksAgenda(locksAnteriores);
+        } catch (restoreError) {
+          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
+        }
+        throw error;
+      }
+    }
+
     for (const campo of camposEditables) {
       if (Object.prototype.hasOwnProperty.call(datos, campo)) {
         cita[campo] = datos[campo];
       }
     }
 
-    if (cita.estado === "completada" && cita.rewardGratisAplicado) {
-      const consumo = await consumirRecompensaCita(cita);
-      if (!consumo.ok) {
-        return res.status(consumo.status).json({ message: consumo.message });
+    try {
+      if (cita.estado === "completada" && cita.rewardGratisAplicado) {
+        const consumo = await consumirRecompensaCita(cita);
+        if (!consumo.ok) {
+          if (locksNuevosAdquiridos) {
+            await liberarLocksAgenda(cita._id);
+          }
+          if (locksAnterioresLiberados) {
+            await restaurarLocksAgenda(locksAnteriores);
+          }
+          return res.status(consumo.status).json({ message: consumo.message });
+        }
       }
+
+      await cita.save();
+    } catch (error) {
+      if (locksNuevosAdquiridos) {
+        await liberarLocksAgenda(cita._id);
+      }
+      if (locksAnterioresLiberados) {
+        try {
+          await restaurarLocksAgenda(locksAnteriores);
+        } catch (restoreError) {
+          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
+        }
+      }
+      throw error;
     }
 
-    await cita.save();
     res.json({ message: "Cita actualizada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
     res.status(500).json({ message: "No se pudo actualizar la cita" });
   }
 });
 
-app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res) => {
+app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
     const camposNoPermitidos = validarCamposCitaPermitidos(req.body, ["estado", "totalCobrado"]);
@@ -3742,16 +4321,17 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res)
       return res.status(404).json({ message: "Cita no encontrada" });
     }
 
+    const locksAnteriores = crearSnapshotLocksAgenda(cita);
     const totalCobradoBody = req.body?.totalCobrado;
     if (estado === "completada" && cita.estado !== "completada" && (totalCobradoBody === undefined || totalCobradoBody === null)) {
       return res.status(400).json({ message: "totalCobrado es obligatorio al completar la cita" });
     }
     if (totalCobradoBody !== undefined && totalCobradoBody !== null) {
-      const totalCobradoParsed = Number(totalCobradoBody);
-      if (!Number.isFinite(totalCobradoParsed) || totalCobradoParsed < 0) {
-        return res.status(400).json({ message: "totalCobrado debe ser un número positivo" });
+      const totalCobradoParsed = normalizarTotalCobradoAgenda(totalCobradoBody);
+      if (!totalCobradoParsed.ok) {
+        return res.status(400).json({ message: "totalCobrado debe ser un numero positivo con maximo 2 decimales" });
       }
-      cita.totalCobrado = totalCobradoParsed;
+      cita.totalCobrado = totalCobradoParsed.value;
     }
 
     if (!["cancelada", "no_asistio"].includes(estado)) {
@@ -3775,22 +4355,79 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, async (req, res)
       cita.finBloque = disponibilidad.bloque.finBloque;
     }
 
+    const locksNuevos = estadoOcupaAgenda(estado)
+      ? {
+          activo: true,
+          fecha: cita.fecha,
+          inicioMinutos: cita.inicioBloque,
+          finMinutos: cita.finBloque,
+          appointmentId: cita._id
+        }
+      : { activo: false, appointmentId: cita._id };
+    const cambiaronLocks = Boolean(locksAnteriores.activo) !== Boolean(locksNuevos.activo);
+    let locksNuevosAdquiridos = false;
+    let locksAnterioresLiberados = false;
+
+    if (cambiaronLocks) {
+      await liberarLocksAgenda(cita._id);
+      locksAnterioresLiberados = true;
+
+      try {
+        if (locksNuevos.activo) {
+          await adquirirLocksAgenda(locksNuevos);
+          locksNuevosAdquiridos = true;
+        }
+      } catch (error) {
+        try {
+          await restaurarLocksAgenda(locksAnteriores);
+        } catch (restoreError) {
+          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
+        }
+        throw error;
+      }
+    }
+
     cita.estado = estado;
     if (estado !== "completada") {
       cita.calificacionServicio = null;
       cita.calificacionCliente = null;
       cita.fechaCalificacion = null;
     }
-    if (estado === "completada" && cita.rewardGratisAplicado) {
-      const consumo = await consumirRecompensaCita(cita);
-      if (!consumo.ok) {
-        return res.status(consumo.status).json({ message: consumo.message });
+
+    try {
+      if (estado === "completada" && cita.rewardGratisAplicado) {
+        const consumo = await consumirRecompensaCita(cita);
+        if (!consumo.ok) {
+          if (locksNuevosAdquiridos) {
+            await liberarLocksAgenda(cita._id);
+          }
+          if (locksAnterioresLiberados) {
+            await restaurarLocksAgenda(locksAnteriores);
+          }
+          return res.status(consumo.status).json({ message: consumo.message });
+        }
       }
+
+      await cita.save();
+    } catch (error) {
+      if (locksNuevosAdquiridos) {
+        await liberarLocksAgenda(cita._id);
+      }
+      if (locksAnterioresLiberados) {
+        try {
+          await restaurarLocksAgenda(locksAnteriores);
+        } catch (restoreError) {
+          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
+        }
+      }
+      throw error;
     }
-    await cita.save();
 
     res.json({ message: "Estado actualizado correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
     res.status(500).json({ message: "No se pudo actualizar el estado de la cita" });
   }
 });
@@ -3811,6 +4448,7 @@ app.delete("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
 
     cita.estado = "cancelada";
     await cita.save();
+    await liberarLocksAgenda(cita._id);
 
     res.json({ message: "Cita cancelada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
@@ -3937,7 +4575,7 @@ app.patch("/admin/orders/:id/status", auth, requireAdmin, async (req, res) => {
 
 app.use(express.static(path.join(__dirname, "..", "Frontend")));
 
-app.patch("/orders/:id/cancel", auth, async (req, res) => {
+app.patch("/orders/:id/cancel", auth, customerActionLimiter, async (req, res) => {
   try {
     const orderId = typeof req.params.id === "string" ? req.params.id.trim() : "";
 
@@ -3992,7 +4630,7 @@ app.patch("/orders/:id/cancel", auth, async (req, res) => {
 
     res.json({
       message: "Pedido cancelado correctamente.",
-      pedido
+      pedido: construirPedidoCliente(pedido, user)
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo cancelar el pedido" });
@@ -4003,41 +4641,9 @@ app.patch("/orders/:id/cancel", auth, async (req, res) => {
 // PEDIDOS
 // ============================
 app.post("/pedidos", auth, async (req, res) => {
-  try {
-    const { carrito, direccion } = req.body;
-    const carritoSeguro = construirCarritoSeguro(carrito);
-
-    if (carritoSeguro.error) {
-      return res.status(400).json({ error: carritoSeguro.error });
-    }
-
-    if (!validarDatosEntrega(direccion)) {
-      return res.status(400).json({ error: "Los datos de entrega no son válidos" });
-    }
-
-    const nuevaOrden = new Order({
-      userId: req.user.id,
-      carrito: carritoSeguro.items,
-      total: carritoSeguro.total,
-      direccion,
-      status: "pendiente",
-      estado: "pendiente"
-    });
-
-    await nuevaOrden.save();
-
-    const user = await User.findById(req.user.id).select("email usuario");
-
-    try {
-      await notificarPedidoCreado(nuevaOrden, user);
-    } catch (error) {
-      console.log("No se pudo enviar el correo de pedido creado:", error.message);
-    }
-
-    res.json({ mensaje: "Pedido guardado correctamente" });
-  } catch (error) {
-    res.status(500).json({ error: "Error al guardar pedido" });
-  }
+  return res.status(410).json({
+    message: "Este flujo de pedidos fue deshabilitado. Usa el checkout con Stripe."
+  });
 });
 
 // ============================
@@ -4048,3 +4654,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor en puerto ${PORT}`);
 });
+
+

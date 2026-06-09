@@ -228,6 +228,14 @@ const diaNacimiento = document.getElementById("diaNacimiento");
 const mesNacimiento = document.getElementById("mesNacimiento");
 
 const API_URL = "https://woof-wash.onrender.com";
+const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
+  "index.html",
+  "admin.html",
+  "agenda.html",
+  "empleados.html",
+  "checkout.html",
+  "perfil.html"
+]);
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -247,8 +255,24 @@ function obtenerDestinoLogin() {
   return "login.html";
 }
 
+function obtenerRedirectSeguro() {
+  const destino = localStorage.getItem("authRedirect");
+
+  if (typeof destino !== "string") {
+    return "index.html";
+  }
+
+  const limpio = destino.trim();
+
+  if (!limpio || !RUTAS_AUTH_REDIRECT_PERMITIDAS.has(limpio)) {
+    return "index.html";
+  }
+
+  return limpio;
+}
+
 function obtenerDestinoInicio() {
-  return localStorage.getItem("authRedirect") || "index.html";
+  return obtenerRedirectSeguro();
 }
 
 function poblarDias() {

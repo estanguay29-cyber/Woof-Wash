@@ -1,11 +1,15 @@
 import { state } from "./empleados.state.js";
-import { loadPerformanceDashboard, loadPerformanceAttendance, saveAttendanceRecord } from "./desempeno.api.js";
-import { renderPerformanceSummary, renderPerformanceTable, renderAttendanceOptions, renderAttendanceHistory, showPerformanceFeedback } from "./desempeno.ui.js";
+import { loadPerformanceDashboard, loadPerformanceAttendance, loadPerformanceMetrics, saveAttendanceRecord, savePerformanceMetric } from "./desempeno.api.js";
+import { renderPerformanceSummary, renderPerformanceTable, renderAttendanceOptions, renderAttendanceHistory, renderAttendanceEventHistory, renderCleanlinessHistory, showPerformanceFeedback } from "./desempeno.ui.js";
+
+const ATTENDANCE_EVENT_KEYS = Object.freeze(["falta_justificada", "falta_injustificada", "vacaciones"]);
 
 const performanceState = {
   fechaSemana: obtenerFechaLocalISO(),
   dashboard: null,
-  attendance: null
+  attendance: null,
+  cleanliness: null,
+  attendanceEvents: null
 };
 
 function obtenerFechaLocalISO() {
@@ -21,6 +25,8 @@ function obtenerFechaLocalISO() {
 async function cargarPanelDesempeno() {
   const fechaInput = document.getElementById("performanceWeekDate");
   const attendanceDateInput = document.getElementById("attendanceDate");
+  const attendanceEventDateInput = document.getElementById("attendanceEventDate");
+  const cleanlinessDateInput = document.getElementById("cleanlinessDate");
 
   if (fechaInput) {
     fechaInput.value = performanceState.fechaSemana;
@@ -28,10 +34,18 @@ async function cargarPanelDesempeno() {
   if (attendanceDateInput) {
     attendanceDateInput.value = performanceState.fechaSemana;
   }
+  if (attendanceEventDateInput) {
+    attendanceEventDateInput.value = performanceState.fechaSemana;
+  }
+  if (cleanlinessDateInput) {
+    cleanlinessDateInput.value = performanceState.fechaSemana;
+  }
 
   renderAttendanceOptions(state.empleados);
   await actualizarDashboardDesempeno(performanceState.fechaSemana);
   await actualizarAsistencia(performanceState.fechaSemana);
+  await actualizarEventosAsistencia(performanceState.fechaSemana);
+  await actualizarLimpiezaOrden(performanceState.fechaSemana);
 }
 
 export async function iniciarDesempeno() {
@@ -50,6 +64,26 @@ export async function iniciarDesempeno() {
     await actualizarAsistencia(fecha);
   });
 
+  document.getElementById("attendanceEventForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await guardarEventoAsistencia();
+  });
+
+  document.getElementById("attendanceEventDate")?.addEventListener("change", async (event) => {
+    const fecha = event.target.value || performanceState.fechaSemana;
+    await actualizarEventosAsistencia(fecha);
+  });
+
+  document.getElementById("cleanlinessForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await guardarRegistroLimpiezaOrden();
+  });
+
+  document.getElementById("cleanlinessDate")?.addEventListener("change", async (event) => {
+    const fecha = event.target.value || performanceState.fechaSemana;
+    await actualizarLimpiezaOrden(fecha);
+  });
+
   await cargarPanelDesempeno();
 }
 
@@ -65,7 +99,7 @@ async function actualizarDashboardDesempeno(fecha) {
     performanceState.dashboard = datos;
     const empleadoResumen = {
       ventasSemanales: datos.ventasSemanales || 0,
-      metaSemanalMxn: datos.metaSemanalMxn || 12000,
+      metaSemanalMxn: datos.metaSemanalMxn || 22000,
       metaSemanalOk: typeof datos.metaSemanalOk === 'boolean' ? datos.metaSemanalOk : !!datos.cumplioMeta,
       promedioEstrellas: datos.promedioEstrellas !== undefined ? datos.promedioEstrellas : null,
       calificacionMinimaOk: typeof datos.calificacionMinimaOk === 'boolean' ? datos.calificacionMinimaOk : (typeof datos.promedioEstrellas === 'number' ? datos.promedioEstrellas >= 4.0 : false),
@@ -91,6 +125,32 @@ async function actualizarAsistencia(fecha) {
   }
 }
 
+async function actualizarLimpiezaOrden(fecha) {
+  const fechaLimpia = String(fecha || obtenerFechaLocalISO()).trim();
+  try {
+    const datos = await loadPerformanceMetrics(fechaLimpia, "limpieza_orden");
+    performanceState.cleanliness = datos;
+    renderCleanlinessHistory(Array.isArray(datos.registros) ? datos.registros : []);
+  } catch (error) {
+    showPerformanceFeedback(error.message || "No se pudo cargar los registros de limpieza y orden.", "error");
+  }
+}
+
+async function actualizarEventosAsistencia(fecha) {
+  const fechaLimpia = String(fecha || obtenerFechaLocalISO()).trim();
+  try {
+    const responses = await Promise.all(
+      ATTENDANCE_EVENT_KEYS.map((metricKey) => loadPerformanceMetrics(fechaLimpia, metricKey))
+    );
+    const registros = responses.flatMap((datos) => Array.isArray(datos.registros) ? datos.registros : [])
+      .filter((record) => record.value === true);
+    performanceState.attendanceEvents = registros;
+    renderAttendanceEventHistory(registros);
+  } catch (error) {
+    showPerformanceFeedback(error.message || "No se pudo cargar los eventos de asistencia.", "error");
+  }
+}
+
 async function guardarRegistroAsistencia() {
   const empleadoId = document.getElementById("attendanceEmployeeId")?.value || "";
   const fecha = document.getElementById("attendanceDate")?.value || "";
@@ -113,5 +173,62 @@ async function guardarRegistroAsistencia() {
     await actualizarDashboardDesempeno(document.getElementById("performanceWeekDate")?.value || performanceState.fechaSemana);
   } catch (error) {
     showPerformanceFeedback(error.message || "No se pudo guardar el registro de asistencia.", "error");
+  }
+}
+
+async function guardarRegistroLimpiezaOrden() {
+  const empleadoId = document.getElementById("cleanlinessEmployeeId")?.value || "";
+  const fecha = document.getElementById("cleanlinessDate")?.value || "";
+  const value = document.querySelector("input[name=cleanlinessValue]:checked")?.value === "true";
+  const notes = document.getElementById("cleanlinessNotes")?.value || "";
+
+  if (!empleadoId) {
+    showPerformanceFeedback("Selecciona un empleado para registrar limpieza y orden.", "error");
+    return;
+  }
+
+  if (!fecha) {
+    showPerformanceFeedback("Selecciona una fecha valida.", "error");
+    return;
+  }
+
+  try {
+    await savePerformanceMetric({ empleadoId, fecha, metricKey: "limpieza_orden", value, notes });
+    showPerformanceFeedback("Registro de limpieza y orden guardado correctamente.");
+    await actualizarLimpiezaOrden(fecha);
+    await actualizarDashboardDesempeno(document.getElementById("performanceWeekDate")?.value || performanceState.fechaSemana);
+  } catch (error) {
+    showPerformanceFeedback(error.message || "No se pudo guardar el registro de limpieza y orden.", "error");
+  }
+}
+
+async function guardarEventoAsistencia() {
+  const empleadoId = document.getElementById("attendanceEventEmployeeId")?.value || "";
+  const fecha = document.getElementById("attendanceEventDate")?.value || "";
+  const metricKey = document.getElementById("attendanceEventType")?.value || "";
+  const notes = document.getElementById("attendanceEventNotes")?.value || "";
+
+  if (!empleadoId) {
+    showPerformanceFeedback("Selecciona un empleado para registrar el evento de asistencia.", "error");
+    return;
+  }
+
+  if (!fecha) {
+    showPerformanceFeedback("Selecciona una fecha valida.", "error");
+    return;
+  }
+
+  if (!ATTENDANCE_EVENT_KEYS.includes(metricKey)) {
+    showPerformanceFeedback("Selecciona un tipo de evento valido.", "error");
+    return;
+  }
+
+  try {
+    await savePerformanceMetric({ empleadoId, fecha, metricKey, value: true, notes });
+    showPerformanceFeedback("Evento de asistencia guardado correctamente.");
+    await actualizarEventosAsistencia(fecha);
+    await actualizarDashboardDesempeno(document.getElementById("performanceWeekDate")?.value || performanceState.fechaSemana);
+  } catch (error) {
+    showPerformanceFeedback(error.message || "No se pudo guardar el evento de asistencia.", "error");
   }
 }

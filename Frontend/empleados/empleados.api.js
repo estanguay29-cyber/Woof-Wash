@@ -1,4 +1,4 @@
-import { state } from "./empleados.state.js";
+import { state, setToken } from "./empleados.state.js";
 import { getApiBase } from "./empleados.utils.js";
 
 function buildHeaders(headers = {}) {
@@ -18,6 +18,7 @@ async function parseResponse(res) {
     data = {};
   }
   if (!res.ok) {
+    manejarRespuestaAuth(res, data);
     throw {
       status: res.status,
       message: data.message || "No se pudo completar la solicitud"
@@ -26,8 +27,29 @@ async function parseResponse(res) {
   return data;
 }
 
+export function manejarRespuestaAuth(res, data = {}) {
+  if (res.status === 401) {
+    const message = data.message || "Tu sesion expiro. Inicia sesion de nuevo.";
+    setToken("");
+    localStorage.removeItem("usuario");
+    localStorage.setItem("authRedirect", "empleados.html");
+    setTimeout(() => {
+      window.location.href = "login.html";
+    }, 900);
+    throw { status: 401, message };
+  }
+
+  if (res.status === 403) {
+    throw {
+      status: 403,
+      message: data.message || "No tienes permisos suficientes para acceder a esta seccion."
+    };
+  }
+}
+
 export async function fetchAdmin(path, options = {}) {
   if (!state.token) {
+    localStorage.setItem("authRedirect", "empleados.html");
     throw { status: 401, message: "No autorizado" };
   }
 

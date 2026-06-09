@@ -38,6 +38,17 @@ const EmployeeSchema = new mongoose.Schema({
     match: /^\d{4}-\d{2}-\d{2}$/,
     default: ""
   },
+  fechaCumpleanos: {
+    type: String,
+    trim: true,
+    validate: {
+      validator(value) {
+        return !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+      },
+      message: "fechaCumpleanos debe tener formato YYYY-MM-DD"
+    },
+    default: ""
+  },
   notas: {
     type: String,
     trim: true,

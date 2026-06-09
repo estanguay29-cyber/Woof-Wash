@@ -112,6 +112,25 @@ function limpiarCompraFinalizada() {
   localStorage.removeItem("mostrarPedidosAlRegresar");
 }
 
+function manejarRespuestaAuthSuccess(res, data = {}) {
+  if (res.status === 401) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("usuario");
+    estadoPago.textContent = data.message || "Tu sesion expiro. Inicia sesion de nuevo para revisar tus pedidos.";
+    setTimeout(() => {
+      window.location.href = "login.html";
+    }, 1200);
+    return true;
+  }
+
+  if (res.status === 403) {
+    estadoPago.textContent = data.message || "No tienes permisos suficientes para confirmar este pedido.";
+    return true;
+  }
+
+  return false;
+}
+
 async function confirmarPedido() {
   const token = localStorage.getItem("token");
   const sessionId = new URLSearchParams(window.location.search).get("session_id");
@@ -138,6 +157,10 @@ async function confirmarPedido() {
     if (res.ok) {
       limpiarCompraFinalizada();
       estadoPago.textContent = "Tu pedido quedó registrado correctamente.";
+      return;
+    }
+
+    if (manejarRespuestaAuthSuccess(res, data)) {
       return;
     }
 

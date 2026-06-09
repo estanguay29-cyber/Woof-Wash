@@ -18,3 +18,17 @@ export async function saveAttendanceRecord(payload) {
     body: JSON.stringify(payload)
   });
 }
+
+export async function loadPerformanceMetrics(fecha, metricKey = "limpieza_orden") {
+  const params = new URLSearchParams();
+  if (fecha) params.set("fecha", fecha);
+  params.set("metricKey", metricKey);
+  return fetchAdmin(`/admin/performance/metrics?${params.toString()}`);
+}
+
+export async function savePerformanceMetric(payload) {
+  return fetchAdmin("/admin/performance/metrics", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}

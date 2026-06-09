@@ -116,6 +116,28 @@ function obtenerTokenAgenda() {
   return localStorage.getItem("token") || "";
 }
 
+function cerrarSesionAgenda() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("usuario");
+}
+
+function manejarRespuestaAuthAgenda(res, data = {}) {
+  if (res.status === 401) {
+    const message = data.message || "Tu sesion expiro. Inicia sesion de nuevo.";
+    cerrarSesionAgenda();
+    localStorage.setItem("authRedirect", "agenda.html");
+    alert(message);
+    window.location.href = "login.html";
+    throw { status: 401, message };
+  }
+
+  if (res.status === 403) {
+    const message = data.message || "No tienes permisos suficientes para acceder a la agenda.";
+    alert(message);
+    throw { status: 403, message };
+  }
+}
+
 async function agendaFetch(path, options = {}) {
   const token = obtenerTokenAgenda();
   const res = await fetch(`${obtenerApiBaseAgenda()}${path}`, {
@@ -130,6 +152,7 @@ async function agendaFetch(path, options = {}) {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
+    manejarRespuestaAuthAgenda(res, data);
     throw new Error(data.message || data.error || "No se pudo completar la solicitud");
   }
 
@@ -953,7 +976,8 @@ function protegerAgendaAdmin() {
   const token = obtenerTokenAgenda();
 
   if (!token) {
-    window.location.href = "index.html";
+    localStorage.setItem("authRedirect", "agenda.html");
+    window.location.href = "login.html";
     return Promise.resolve(false);
   }
 
@@ -968,7 +992,10 @@ function protegerAgendaAdmin() {
       document.getElementById("agendaPanel")?.classList.remove("hidden");
       return true;
     })
-    .catch(() => {
+    .catch((error) => {
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
       window.location.href = "index.html";
       return false;
     });
@@ -988,6 +1015,10 @@ function obtenerElementosAgenda() {
     listCount: document.getElementById("agendaListCount"),
     form: document.getElementById("agendaForm"),
     tipoServicio: document.getElementById("tipoServicio"),
+    mascotaNombreWrapper: document.getElementById("mascotaNombreWrapper"),
+    mascotaEdadWrapper: document.getElementById("mascotaEdadWrapper"),
+    mascotaNombre: document.getElementById("mascotaNombre"),
+    mascotaEdad: document.getElementById("mascotaEdad"),
     clienteTelefonoPais: document.getElementById("clienteTelefonoPais"),
     clienteTelefono: document.getElementById("clienteTelefono"),
     customerLookupNotice: document.getElementById("agendaCustomerLookupNotice"),
@@ -1018,6 +1049,10 @@ function obtenerElementosAgenda() {
     editClienteTelefonoPais: document.getElementById("editClienteTelefonoPais"),
     editClienteTelefono: document.getElementById("editClienteTelefono"),
     editTipoServicio: document.getElementById("editTipoServicio"),
+    editMascotaNombreWrapper: document.getElementById("editMascotaNombreWrapper"),
+    editMascotaEdadWrapper: document.getElementById("editMascotaEdadWrapper"),
+    editMascotaNombre: document.getElementById("editMascotaNombre"),
+    editMascotaEdad: document.getElementById("editMascotaEdad"),
     editServiciosCantidad: document.getElementById("editServiciosCantidad"),
     editServiciosDetalleContainer: document.getElementById("editServiciosDetalleContainer"),
     editDuracionBloqueada: document.getElementById("editDuracionBloqueadaMinutos"),
@@ -1110,6 +1145,47 @@ function obtenerNombresEmpleadosCita(cita = {}) {
 function formatearEmpleadosCita(cita = {}, separador = ", ") {
   const nombres = obtenerNombresEmpleadosCita(cita);
   return nombres.length ? nombres.join(separador) : "Sin asignar";
+}
+
+function formatearEdadMascota(value) {
+  if (!Number.isInteger(value)) return "";
+  return `${value} ${value === 1 ? "año" : "años"}`;
+}
+
+function obtenerTextoMascotaCita(cita = {}) {
+  const nombre = String(cita.mascotaNombre || "").trim();
+  const edad = formatearEdadMascota(cita.mascotaEdad);
+  if (nombre && edad) return `${nombre}, ${edad}`;
+  return nombre || edad || "";
+}
+
+function actualizarCamposMascotaFormulario(prefijo = "", { limpiarSiAuto = true } = {}) {
+  const elementos = obtenerElementosAgenda();
+  const esEdicion = prefijo === "edit";
+  const tipoSelect = esEdicion ? elementos.editTipoServicio : elementos.tipoServicio;
+  const nombreWrapper = esEdicion ? elementos.editMascotaNombreWrapper : elementos.mascotaNombreWrapper;
+  const edadWrapper = esEdicion ? elementos.editMascotaEdadWrapper : elementos.mascotaEdadWrapper;
+  const nombreInput = esEdicion ? elementos.editMascotaNombre : elementos.mascotaNombre;
+  const edadInput = esEdicion ? elementos.editMascotaEdad : elementos.mascotaEdad;
+  const esMascota = (tipoSelect?.value || "mascota") === "mascota";
+
+  nombreWrapper?.classList.toggle("hidden", !esMascota);
+  edadWrapper?.classList.toggle("hidden", !esMascota);
+
+  if (!esMascota && limpiarSiAuto) {
+    if (nombreInput) nombreInput.value = "";
+    if (edadInput) edadInput.value = "";
+  }
+}
+
+function obtenerEdadMascotaFormulario(input) {
+  const value = String(input?.value || "").trim();
+  if (!value) return null;
+  const edad = Number(value);
+  if (!Number.isInteger(edad) || edad < 1 || edad > 40) {
+    throw new Error("La edad de la mascota debe ser un número entero entre 1 y 40.");
+  }
+  return edad;
 }
 
 function actualizarSelectorEmpleadosAgenda(target) {
@@ -1405,6 +1481,8 @@ function mapearCitaApi(cita) {
     cliente: cita.clienteNombre || "",
     telefono: cita.clienteTelefono || "",
     email: cita.clienteEmail || "",
+    mascotaNombre: cita.mascotaNombre || "",
+    mascotaEdad: Number.isInteger(cita.mascotaEdad) ? cita.mascotaEdad : null,
     tipoServicio: cita.servicioTipo || "mascota",
     detalle: cita.servicioNombre || "",
     servicioCategoria: cita.servicioCategoria || "",
@@ -1695,7 +1773,7 @@ function crearCardCita(cita) {
         </label>
         <div class="agenda-action-buttons">
           <button type="button" class="admin-button admin-button-light" data-action="detalle" data-id="${escapeHtml(cita.id)}">Ver detalle</button>
-          <a class="admin-button admin-button-light agenda-whatsapp-btn" href="${escapeHtml(whatsappUrl)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          <a class="admin-button admin-button-light agenda-whatsapp-btn" href="${escapeHtml(whatsappUrl)}" target="_blank" rel="noopener noreferrer">Mensaje de confirmación</a>
           ${puedeEnviarEncuesta ? `<a class="admin-button admin-button-light agenda-survey-btn" href="${escapeHtml(surveyUrl)}" target="_blank" rel="noopener noreferrer">Enviar encuesta</a>` : ""}
           ${rewardEligible ? `<button type="button" class="admin-button admin-button-light agenda-reward-btn" data-action="preparar-correo" data-id="${escapeHtml(cita.id)}">Preparar correo</button>` : ""}
           <button type="button" class="admin-button admin-button-light" data-action="editar" data-id="${escapeHtml(cita.id)}">Editar cita</button>
@@ -2011,6 +2089,65 @@ function obtenerEtiquetaCalificacion(value) {
   return calificacion ? AGENDA_ETIQUETAS_CALIFICACION[calificacion] : "";
 }
 
+function normalizarMontoCobrado(value) {
+  const texto = String(value ?? "").trim();
+  if (!texto) {
+    throw new Error("Ingresa el total cobrado.");
+  }
+
+  if (!/^\d+(\.\d{1,2})?$/.test(texto)) {
+    throw new Error("Total cobrado debe contener solo números y hasta 2 decimales.");
+  }
+
+  const monto = Number(texto);
+  if (!Number.isFinite(monto) || monto < 0) {
+    throw new Error("Total cobrado debe ser un número positivo.");
+  }
+
+  return monto;
+}
+
+function obtenerMontoCobradoOpcional(input) {
+  const texto = String(input?.value || "").trim();
+  return texto ? normalizarMontoCobrado(texto) : null;
+}
+
+function esMontoCobradoParcialValido(value) {
+  return /^\d*(\.\d{0,2})?$/.test(String(value || ""));
+}
+
+function limpiarEntradaMontoCobrado(value) {
+  let limpio = String(value || "").replace(/[^\d.]/g, "");
+  const partes = limpio.split(".");
+  if (partes.length > 1) {
+    limpio = `${partes.shift()}.${partes.join("")}`;
+  }
+  const [entero, decimal] = limpio.split(".");
+  if (decimal !== undefined) {
+    return `${entero}.${decimal.slice(0, 2)}`;
+  }
+  return entero;
+}
+
+function configurarInputMontoCobrado(input) {
+  if (!input) return;
+
+  input.addEventListener("beforeinput", (event) => {
+    if (!event.data || event.inputType.startsWith("delete")) return;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    const siguiente = `${input.value.slice(0, start)}${event.data}${input.value.slice(end)}`;
+    if (!esMontoCobradoParcialValido(siguiente)) {
+      event.preventDefault();
+    }
+  });
+
+  input.addEventListener("input", () => {
+    const limpio = limpiarEntradaMontoCobrado(input.value);
+    if (input.value !== limpio) input.value = limpio;
+  });
+}
+
 function construirPayloadFormulario(form, prefijo = "") {
   const data = new FormData(form);
   const names = prefijo
@@ -2018,6 +2155,8 @@ function construirPayloadFormulario(form, prefijo = "") {
         clienteNombre: "editClienteNombre",
         clienteTelefono: "editClienteTelefono",
         clienteEmail: "editClienteEmail",
+        mascotaNombre: "editMascotaNombre",
+        mascotaEdad: "editMascotaEdad",
         servicioTipo: "editTipoServicio",
         servicioCategoria: "editServicioCategoria",
         servicioPaquete: "editServicioPaquete",
@@ -2033,6 +2172,8 @@ function construirPayloadFormulario(form, prefijo = "") {
         clienteNombre: "clienteNombre",
         clienteTelefono: "clienteTelefono",
         clienteEmail: "clienteEmail",
+        mascotaNombre: "mascotaNombre",
+        mascotaEdad: "mascotaEdad",
         servicioTipo: "tipoServicio",
         servicioCategoria: "servicioCategoria",
         servicioPaquete: "servicioPaquete",
@@ -2051,6 +2192,7 @@ function construirPayloadFormulario(form, prefijo = "") {
 
   const serviciosDetalle = construirServiciosDetalleFormulario(prefijo);
   const servicioPrincipal = serviciosDetalle[0];
+  const esServicioMascota = servicioPrincipal.tipo === "mascota";
   const duracionEstimadaMinutos = calcularDuracionEstimadaFormulario(prefijo);
   const duracionBloqueadaInput = document.getElementById(`${prefijo ? "editDuracionBloqueadaMinutos" : "duracionBloqueadaMinutos"}`);
   const duracionBloqueadaMinutos = obtenerDuracionBloqueadaValida(duracionBloqueadaInput?.value);
@@ -2074,6 +2216,8 @@ function construirPayloadFormulario(form, prefijo = "") {
     clienteNombre: get("clienteNombre"),
     clienteTelefono: telefono.normalizado,
     clienteEmail: get("clienteEmail"),
+    mascotaNombre: esServicioMascota ? get("mascotaNombre") : "",
+    mascotaEdad: esServicioMascota ? obtenerEdadMascotaFormulario(document.getElementById(`${prefijo ? "editMascotaEdad" : "mascotaEdad"}`)) : null,
     servicioTipo: servicioPrincipal.tipo,
     servicioCategoria: servicioPrincipal.categoria,
     servicioPaquete: servicioPrincipal.paquete,
@@ -2107,9 +2251,10 @@ function construirPayloadFormulario(form, prefijo = "") {
     payload.calificacionServicio = calificacion;
     payload.calificacionCliente = calificacion;
     payload.comentarioCliente = get("comentarioCliente");
-    const totalCobradoValue = get("totalCobrado");
-    if (totalCobradoValue !== "") {
-      payload.totalCobrado = Number(totalCobradoValue);
+    const totalCobradoInput = document.getElementById("editTotalCobrado");
+    const totalCobrado = obtenerMontoCobradoOpcional(totalCobradoInput);
+    if (totalCobrado !== null) {
+      payload.totalCobrado = totalCobrado;
     }
   }
 
@@ -2161,6 +2306,7 @@ async function crearCitaDesdeFormulario(event) {
     duracionBloqueadaManualCrear = false;
     fechaCita.value = payload.fecha;
     actualizarCatalogoFormulario();
+    actualizarCamposMascotaFormulario("", { limpiarSiAuto: true });
     renderizarSelectorEmpleadosAgenda(document.getElementById("empleadoAsignadoContainer"));
     actualizarZonaFormulario();
     await actualizarDisponibilidadCrear();
@@ -2186,12 +2332,15 @@ function abrirModalEdicion(id) {
   editForm.elements.editClienteNombre.value = cita.cliente;
   cargarTelefonoEnFormulario(cita.telefono, "edit");
   editForm.elements.editClienteEmail.value = cita.email;
+  editForm.elements.editMascotaNombre.value = cita.mascotaNombre || "";
+  editForm.elements.editMascotaEdad.value = Number.isInteger(cita.mascotaEdad) ? String(cita.mascotaEdad) : "";
   editForm.elements.editTipoServicio.value = cita.tipoServicio;
   const serviciosEdicion = obtenerServiciosEdicionCita(cita);
   if (serviciosEdicion.length && SERVICIOS_CATALOGO[serviciosEdicion[0].tipo]) {
     editForm.elements.editTipoServicio.value = serviciosEdicion[0].tipo;
   }
   actualizarCatalogoEdicion(cita.servicioCategoria, cita.servicioPaquete, serviciosEdicion);
+  actualizarCamposMascotaFormulario("edit", { limpiarSiAuto: cita.tipoServicio !== "mascota" });
   const duracionEstimadaEdicion = calcularDuracionEstimadaFormulario("edit");
   const duracionBloqueadaGuardada = obtenerDuracionBloqueadaValida(cita.duracionBloqueadaMinutos);
   const duracionBloqueadaInput = document.getElementById("editDuracionBloqueadaMinutos");
@@ -2358,6 +2507,7 @@ function renderizarDetalleCita(cita) {
   const textoServicios = crearTextoServiciosDetalle(cita);
   const listaServicios = crearListaServiciosDetalleHtml(cita);
   const miniCardsServicios = crearMiniCardsServiciosHtml(cita);
+  const textoMascota = cita.tipoServicio === "mascota" ? obtenerTextoMascotaCita(cita) : "";
 
   detailContent.innerHTML = `
     <div class="agenda-detail-hero ${cita.rewardGratisAplicado ? "is-reward-free" : ""}">
@@ -2373,6 +2523,7 @@ function renderizarDetalleCita(cita) {
       ${crearItemDetalleAgenda("Cliente", cita.cliente)}
       ${crearItemDetalleAgenda("Teléfono", cita.telefono)}
       ${crearItemDetalleAgenda("Servicio", textoServicios)}
+      ${cita.tipoServicio === "mascota" ? crearItemDetalleAgenda("Mascota", textoMascota || "Sin datos") : ""}
       ${crearItemDetalleAgenda("Recompensa", rewardCita || "No aplica")}
       ${crearItemDetalleAgenda("Fecha", formatearFechaAgenda(cita.fecha))}
       ${crearItemDetalleAgenda("Hora", cita.hora)}
@@ -2607,9 +2758,10 @@ async function cambiarEstadoDesdeDetalle(estado) {
       alert("Ingresa el total cobrado antes de completar la cita.");
       return;
     }
-    totalCobrado = Number(detailTotalCobrado.value);
-    if (!Number.isFinite(totalCobrado) || totalCobrado < 0) {
-      alert("Total cobrado debe ser un número positivo.");
+    try {
+      totalCobrado = normalizarMontoCobrado(detailTotalCobrado.value);
+    } catch (error) {
+      alert(error.message);
       return;
     }
   }
@@ -2688,10 +2840,12 @@ function obtenerCitaDetalleActual() {
 
 function construirResumenCita(cita) {
   if (!cita) return "";
+  const textoMascota = cita.tipoServicio === "mascota" ? obtenerTextoMascotaCita(cita) : "";
   return [
     `Cliente: ${cita.cliente || "-"}`,
     `Telefono: ${cita.telefono || "-"}`,
     `Servicio: ${crearTextoServiciosDetalle(cita)}`,
+    ...(cita.tipoServicio === "mascota" ? [`Mascota: ${textoMascota || "Sin datos"}`] : []),
     `Recompensa: ${obtenerTextoRecompensaCita(cita) || "No aplica"}`,
     `Atiende: ${cita.atendidoPor || "Por asignar"}`,
     `Empleados asignados: ${formatearEmpleadosCita(cita)}`,
@@ -2741,9 +2895,11 @@ async function manejarAccionesLista(event) {
         target.value = cita.estado;
         return;
       }
-      const totalCobradoValue = Number(totalCobradoInput.trim());
-      if (!Number.isFinite(totalCobradoValue) || totalCobradoValue < 0) {
-        alert("Total cobrado debe ser un número positivo.");
+      let totalCobradoValue = 0;
+      try {
+        totalCobradoValue = normalizarMontoCobrado(totalCobradoInput);
+      } catch (error) {
+        alert(error.message);
         target.value = cita.estado;
         return;
       }
@@ -2936,6 +3092,7 @@ function configurarAgenda() {
     actualizarDisponibilidadCrear();
   });
   elementos.tipoServicio?.addEventListener("change", () => {
+    actualizarCamposMascotaFormulario("", { limpiarSiAuto: true });
     actualizarCatalogoFormulario();
     actualizarPanelAplicarRecompensa();
     actualizarDisponibilidadCrear();
@@ -2955,6 +3112,8 @@ function configurarAgenda() {
     duracionBloqueadaManualCrear = true;
   });
   elementos.duracionBloqueada?.addEventListener("change", actualizarDisponibilidadCrear);
+  configurarInputMontoCobrado(document.getElementById("editTotalCobrado"));
+  configurarInputMontoCobrado(document.getElementById("agendaDetailTotalCobrado"));
   elementos.rewardGratisAplicado?.addEventListener("change", actualizarPanelAplicarRecompensa);
   elementos.btnUsarServicioGratis?.addEventListener("click", () => {
     if (!elementos.rewardGratisAplicado || elementos.rewardGratisAplicado.disabled) return;
@@ -2967,6 +3126,7 @@ function configurarAgenda() {
   elementos.servicioPaquete?.addEventListener("change", actualizarDisponibilidadCrear);
   elementos.editTipoServicio?.addEventListener("change", () => {
     servicioEdicionActualizado = true;
+    actualizarCamposMascotaFormulario("edit", { limpiarSiAuto: true });
     actualizarCatalogoEdicion();
     actualizarDisponibilidadEdicion();
   });
@@ -3059,6 +3219,7 @@ function configurarAgenda() {
   });
 
   actualizarCatalogoFormulario();
+  actualizarCamposMascotaFormulario("", { limpiarSiAuto: false });
   actualizarChipsEstadoAgenda();
   actualizarZonaFormulario();
   cargarEmpleadosAgenda();
@@ -3074,3 +3235,5 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 window.obtenerZonaPorFecha = obtenerZonaPorFecha;
+
+

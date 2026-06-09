@@ -41,6 +41,7 @@
         </article>
       </section>
       <section id="adminFeedback" class="admin-feedback hidden"></section>
+      <section id="employeeBirthdayNotice" class="employee-birthday-notice hidden" aria-live="polite"></section>
 
       <section id="adminEmployeesSection" class="admin-employees-card">
         <div class="admin-orders-header">
@@ -141,7 +142,7 @@
           </div>
           <div class="summary-card">
             <span>Meta semanal</span>
-            <strong id="performanceGoal">$12,000.00 MXN</strong>
+            <strong id="performanceGoal">$22,000.00 MXN</strong>
           </div>
           <div class="summary-card">
             <span>Empleados elegibles</span>
@@ -176,7 +177,7 @@
             </div>
             <div class="progress-meta">
               <div id="performanceProgressPercent">0%</div>
-              <div id="performanceProgressAmount">$0 MXN / $12,000 MXN</div>
+              <div id="performanceProgressAmount">$0 MXN / $22,000 MXN</div>
             </div>
           </div>
           <div class="admin-table-scroll">
@@ -190,6 +191,8 @@
                   <th>Puntualidad</th>
                   <th>Evaluaciones</th>
                   <th>Retardos</th>
+                  <th>Limpieza y orden</th>
+                  <th>Eventos asistencia</th>
                   <th>Elegible bono</th>
                   <th>Estado de Bono</th>
                 </tr>
@@ -230,6 +233,74 @@
           </form>
 
           <div id="attendanceHistoryList" style="display:grid; gap:1rem; margin-top:1.25rem;"></div>
+        </section>
+
+        <section class="admin-employees-card" style="margin-top:1.5rem; padding:1.5rem;">
+          <div class="admin-orders-header">
+            <div>
+              <p class="admin-kicker">Asistencia semanal</p>
+              <h3>Registrar evento de asistencia</h3>
+              <p class="admin-panel-copy">Registra faltas o vacaciones del dia. Es informativo y no impacta pago todavia.</p>
+            </div>
+          </div>
+          <form id="attendanceEventForm" class="admin-form-grid" style="gap:1rem; margin-top:1rem;">
+            <label>Empleado
+              <select id="attendanceEventEmployeeId"></select>
+            </label>
+            <label>Fecha
+              <input id="attendanceEventDate" type="date" />
+            </label>
+            <label>Tipo
+              <select id="attendanceEventType">
+                <option value="falta_justificada">Falta justificada</option>
+                <option value="falta_injustificada">Falta injustificada</option>
+                <option value="vacaciones">Vacaciones</option>
+              </select>
+            </label>
+            <label>Notas
+              <textarea id="attendanceEventNotes" rows="3" maxlength="500" placeholder="Opcional"></textarea>
+            </label>
+            <div style="display:flex; align-items:flex-end; gap:1rem;">
+              <button id="btnAttendanceEventSave" type="submit" class="auth-cta auth-cta-primary">Guardar</button>
+            </div>
+          </form>
+
+          <div id="attendanceEventHistoryList" style="display:grid; gap:1rem; margin-top:1.25rem;"></div>
+        </section>
+
+        <section class="admin-employees-card" style="margin-top:1.5rem; padding:1.5rem;">
+          <div class="admin-orders-header">
+            <div>
+              <p class="admin-kicker">Metrica semanal</p>
+              <h3>Registrar limpieza y orden</h3>
+              <p class="admin-panel-copy">Registra si el empleado cumplio con limpieza y orden para el dia seleccionado. Un incumplimiento registrado afecta la elegibilidad de bono.</p>
+            </div>
+          </div>
+          <form id="cleanlinessForm" class="admin-form-grid" style="gap:1rem; margin-top:1rem;">
+            <label>Empleado
+              <select id="cleanlinessEmployeeId"></select>
+            </label>
+            <label>Fecha
+              <input id="cleanlinessDate" type="date" />
+            </label>
+            <fieldset style="border:1px solid rgba(11,42,107,0.12); border-radius:16px; padding:1rem;">
+              <legend>Limpieza y orden</legend>
+              <label style="display:block; margin-bottom:0.5rem;">
+                <input type="radio" name="cleanlinessValue" value="true" checked /> Cumple
+              </label>
+              <label style="display:block;">
+                <input type="radio" name="cleanlinessValue" value="false" /> No cumple
+              </label>
+            </fieldset>
+            <label>Notas
+              <textarea id="cleanlinessNotes" rows="3" maxlength="500" placeholder="Opcional"></textarea>
+            </label>
+            <div style="display:flex; align-items:flex-end; gap:1rem;">
+              <button id="btnCleanlinessSave" type="submit" class="auth-cta auth-cta-primary">Guardar</button>
+            </div>
+          </form>
+
+          <div id="cleanlinessHistoryList" style="display:grid; gap:1rem; margin-top:1.25rem;"></div>
         </section>
 
         <section id="adminPayrollSection" class="admin-employees-card hidden">
@@ -278,10 +349,13 @@
                     <th>metaSemanalOk</th>
                     <th>calificacionMinimaOk</th>
                     <th>puntualidadOk</th>
+                    <th>Limpieza y orden</th>
+                    <th>Eventos asistencia</th>
                     <th>elegibleBono</th>
                     <th>Estado Bono</th>
                     <th>Bono calculado</th>
                     <th>Total a pagar</th>
+                    <th>Impacto asistencia aplicado</th>
                   </tr>
                 </thead>
                 <tbody id="payrollTableBody"></tbody>
@@ -336,6 +410,10 @@
               <label>Fecha de ingreso
                 <input name="fechaIngreso" id="emp_fechaIngreso" type="date" />
                 <small class="field-error hidden" id="err_fechaIngreso">Fecha de ingreso requerida</small>
+              </label>
+
+              <label>Fecha de cumplea&ntilde;os
+                <input name="fechaCumpleanos" id="emp_fechaCumpleanos" type="date" />
               </label>
 
               <label>Activo
@@ -394,6 +472,5 @@
   </div>
 
   <script type="module" src="empleados/main.js"></script>
-  <script src="empleados.js"></script>
 </body>
 </html>

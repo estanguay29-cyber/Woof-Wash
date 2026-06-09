@@ -538,6 +538,47 @@ h1, h2, h3 {
   background: rgba(100, 116, 139, 0.08);
 }
 
+.agenda-money-input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 1px solid rgba(11, 42, 107, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.agenda-money-input:focus-within {
+  border-color: #0b2a6b;
+  box-shadow: 0 0 0 4px rgba(11, 42, 107, 0.1);
+}
+
+.agenda-money-prefix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  align-self: stretch;
+  color: #0b2a6b;
+  background: rgba(11, 42, 107, 0.06);
+  font-weight: 900;
+}
+
+.agenda-money-input input {
+  border: 0;
+  width: 100%;
+  min-width: 0;
+  padding: 0.85rem 0.95rem;
+  background: transparent;
+  color: #0f172a;
+}
+
+.agenda-money-input input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 
 .footer-shell {
   position: relative;

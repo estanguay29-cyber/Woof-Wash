@@ -56,9 +56,23 @@ localStorage.setItem("carrito", JSON.stringify(carrito));
 let total = 0;
 let adminValidado = false;
 let tokenAdminValidado = null;
+const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
+  "index.html",
+  "admin.html",
+  "agenda.html",
+  "empleados.html",
+  "checkout.html",
+  "perfil.html"
+]);
+
+function obtenerRutaAuthRedirectSegura(fallback = "index.html") {
+  const pathname = window.location.pathname || "";
+  const ruta = pathname.split("/").filter(Boolean).pop() || "index.html";
+  return RUTAS_AUTH_REDIRECT_PERMITIDAS.has(ruta) ? ruta : fallback;
+}
 
 function guardarRetornoAuth() {
-  localStorage.setItem("authRedirect", window.location.pathname + window.location.search + window.location.hash);
+  localStorage.setItem("authRedirect", obtenerRutaAuthRedirectSegura());
   localStorage.setItem("abrirCarritoAlRegresar", "true");
 }
 
@@ -75,6 +89,42 @@ function guardarNombreUsuario(usuario) {
 function limpiarSesion() {
   localStorage.removeItem("token");
   localStorage.removeItem("usuario");
+}
+
+function manejarRespuestaAuthCliente(res, data = {}, options = {}) {
+  if (res.status === 401) {
+    limpiarSesion();
+    actualizarCarrito();
+
+    if (options.redirect) {
+      localStorage.setItem("authRedirect", obtenerRutaAuthRedirectSegura());
+      if (options.mensajeElemento) {
+        options.mensajeElemento.textContent = data.message || "Tu sesion expiro. Inicia sesion de nuevo.";
+        options.mensajeElemento.className = options.mensajeClase || "text-sm font-semibold text-red-500";
+      }
+      setTimeout(() => {
+        window.location.href = "login.html";
+      }, 900);
+    }
+
+    return true;
+  }
+
+  if (res.status === 403) {
+    if (options.silencioso) {
+      return true;
+    }
+
+    if (options.mensajeElemento) {
+      options.mensajeElemento.textContent = data.message || "No tienes permisos suficientes para esta accion.";
+      options.mensajeElemento.className = options.mensajeClase || "text-sm font-semibold text-red-500";
+    } else {
+      alert(data.message || "No tienes permisos suficientes para esta accion.");
+    }
+    return true;
+  }
+
+  return false;
 }
 
 function obtenerDeleteAccountElements() {
@@ -160,14 +210,15 @@ async function validarAccesosAdmin() {
         Authorization: "Bearer " + token
       }
     });
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      manejarRespuestaAuthCliente(res, data, { silencioso: true });
       adminValidado = false;
       renderizarAccesosAdmin(false);
       return false;
     }
 
-    const data = await res.json().catch(() => ({}));
     adminValidado = data?.role === "admin";
     renderizarAccesosAdmin(adminValidado);
     return adminValidado;
@@ -843,10 +894,7 @@ async function obtenerPerfil() {
     });
 
     if (!res.ok) {
-      if (res.status === 401) {
-        limpiarSesion();
-        actualizarCarrito();
-      }
+      manejarRespuestaAuthCliente(res, {});
       return;
     }
 
@@ -920,9 +968,11 @@ async function eliminarCuenta() {
     }));
 
     if (!res.ok) {
-      if (res.status === 401) {
-        limpiarSesion();
-        actualizarCarrito();
+      if (manejarRespuestaAuthCliente(res, data, {
+        redirect: true,
+        mensajeElemento: obtenerDeleteAccountElements().message
+      })) {
+        return;
       }
 
       mostrarMensajeEliminarCuenta(data.message || "No se pudo solicitar el código.");
@@ -977,9 +1027,11 @@ async function confirmarEliminarCuenta() {
     }));
 
     if (!res.ok) {
-      if (res.status === 401) {
-        limpiarSesion();
-        actualizarCarrito();
+      if (manejarRespuestaAuthCliente(res, data, {
+        redirect: true,
+        mensajeElemento: obtenerDeleteAccountElements().message
+      })) {
+        return;
       }
 
       mostrarMensajeEliminarCuenta(data.message || "No se pudo eliminar la cuenta.");
@@ -1004,7 +1056,7 @@ async function confirmarEliminarCuenta() {
   }
 }
 
-function renderizarPedidos(pedidos) {
+function renderizarPedidosLegacyInactivo(pedidos) {
   const listaPedidos = document.getElementById("listaPedidos");
   if (!listaPedidos) return;
 
@@ -1043,7 +1095,7 @@ function renderizarPedidos(pedidos) {
   }).join("");
 }
 
-async function cancelarPedido(orderId) {
+async function cancelarPedidoLegacyInactivo(orderId) {
   abrirCancelarPedido(orderId);
 }
 
@@ -1115,6 +1167,24 @@ function formatearDineroPedido(valorCentavos) {
   return `$${((Number(valorCentavos) || 0) / 100).toFixed(2)} MXN`;
 }
 
+function obtenerReferenciaPagoPublica(pedido) {
+  const estado = obtenerEstadoPedido(pedido);
+
+  if (estado === "confirmado" || estado === "completado") {
+    return "Pago en linea confirmado";
+  }
+
+  if (estado === "pendiente") {
+    return "Pago pendiente de confirmacion";
+  }
+
+  if (estado === "cancelado" || estado === "cancelado_por_cliente" || estado === "cancelado_por_admin") {
+    return "Pedido cancelado";
+  }
+
+  return "No disponible";
+}
+
 function obtenerPedidoPorId(orderId) {
   return pedidosActuales.find(pedido => String(pedido._id) === String(orderId));
 }
@@ -1181,7 +1251,7 @@ function verDetallesPedido(orderId) {
   const direccion = pedido.direccion || {};
   const cliente = pedido.cliente || {};
   const productos = Array.isArray(pedido.carrito) ? pedido.carrito : [];
-  const referenciaPago = pedido.paymentIntentId || pedido.stripeSessionId || pedido.stripeCheckoutStatus || "No disponible";
+  const referenciaPago = obtenerReferenciaPagoPublica(pedido);
 
   abrirModalPedidos("Detalles del pedido", "Consulta el estado y contenido de tu pedido.", `
     <div class="space-y-4 text-sm text-slate-700">
@@ -1328,9 +1398,11 @@ async function confirmarCancelacionPedido() {
     }));
 
     if (!res.ok) {
-      if (res.status === 401) {
-        limpiarSesion();
-        actualizarCarrito();
+      if (manejarRespuestaAuthCliente(res, data, {
+        redirect: true,
+        mensajeElemento: mensaje
+      })) {
+        return;
       }
 
       if (mensaje) {
@@ -1383,9 +1455,12 @@ async function cargarPedidos() {
     const data = await res.json().catch(() => ({ pedidos: [] }));
 
     if (!res.ok) {
-      if (res.status === 401) {
-        limpiarSesion();
-        actualizarCarrito();
+      if (manejarRespuestaAuthCliente(res, data, {
+        redirect: true,
+        mensajeElemento: listaPedidos,
+        mensajeClase: "text-red-500"
+      })) {
+        return;
       }
       listaPedidos.innerHTML = "<p class='text-red-500'>No se pudieron cargar tus pedidos.</p>";
       return;
