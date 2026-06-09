@@ -1124,6 +1124,15 @@ function obtenerSeleccionEmpleadosAgenda(target) {
     .filter(Boolean);
 }
 
+function obtenerNombresSeleccionEmpleadosAgenda(target) {
+  return obtenerSeleccionEmpleadosAgenda(target)
+    .map((id) => {
+      const empleado = obtenerEmpleadoAgendaPorId(id);
+      return empleado?.nombreCompleto || empleado?.usuario || "";
+    })
+    .filter(Boolean);
+}
+
 function obtenerEmpleadoAgendaPorId(id) {
   const empleadoId = String(id || "");
   return empleadosAgenda.find((empleado) => String(empleado.id || empleado._id || "") === empleadoId) || null;
@@ -2199,6 +2208,7 @@ function construirPayloadFormulario(form, prefijo = "") {
   const selectorEmpleadosId = prefijo ? "editEmpleadoAsignadoContainer" : "empleadoAsignadoContainer";
   const validacionEmpleados = validarSeleccionEmpleadosAgenda(selectorEmpleadosId);
   const empleadosSeleccionados = validacionEmpleados.seleccionados;
+  const nombresEmpleadosSeleccionados = obtenerNombresSeleccionEmpleadosAgenda(selectorEmpleadosId);
 
   if (!duracionBloqueadaMinutos) {
     throw new Error("Ingresa un tiempo bloqueado real entre 30 y 720 minutos.");
@@ -2226,7 +2236,7 @@ function construirPayloadFormulario(form, prefijo = "") {
     serviciosDetalle,
     duracionEstimadaMinutos,
     duracionBloqueadaMinutos,
-    atendidoPor: get("atendidoPor"),
+    atendidoPor: nombresEmpleadosSeleccionados.join(", ") || get("atendidoPor"),
     empleadoAsignadoId: empleadosSeleccionados[0] || "",
     empleadosAsignados: empleadosSeleccionados,
     fecha: get("fecha"),
@@ -2352,7 +2362,10 @@ function abrirModalEdicion(id) {
   editForm.elements.editZonaCita.value = cita.zona;
   editForm.elements.editDireccionCita.value = cita.direccion;
   editForm.elements.editNotasCita.value = cita.notas;
-  editForm.elements.editAtendidoPor.value = cita.atendidoPor || "";
+  const editAtendidoPor = editForm.elements.namedItem("editAtendidoPor");
+  if (editAtendidoPor) {
+    editAtendidoPor.value = cita.atendidoPor || "";
+  }
   renderizarSelectorEmpleadosAgenda(
     document.getElementById("editEmpleadoAsignadoContainer"),
     Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.length ? cita.empleadosAsignados : cita.empleadoAsignadoId || ""
