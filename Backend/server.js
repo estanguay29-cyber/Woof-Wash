@@ -1385,6 +1385,19 @@ function construirServicioAgenda({ servicioTipo, servicioCategoria, servicioPaqu
   };
 }
 
+function normalizarEdadMascotaAgenda(value, campo = "mascotaEdad") {
+  if (value === "" || value === null || value === undefined) {
+    return { value: null };
+  }
+
+  const edad = Number(value);
+  if (!Number.isInteger(edad) || edad < 1 || edad > 40) {
+    return { error: `${campo} debe ser un entero entre 1 y 40` };
+  }
+
+  return { value: edad };
+}
+
 function normalizarServicioDetalleAgenda(servicio, index = 0) {
   const tipo = normalizarTextoPlano(servicio?.tipo, 20).toLowerCase();
   const categoriaInput = normalizarTextoPlano(servicio?.categoria, 80);
@@ -1405,6 +1418,13 @@ function normalizarServicioDetalleAgenda(servicio, index = 0) {
   }
 
   const duracionNumero = obtenerDuracionServicioAgenda(tipo, servicioSeguro.servicioPaquete);
+  const mascotaEdad = tipo === "mascota"
+    ? normalizarEdadMascotaAgenda(servicio?.mascotaEdad, `serviciosDetalle[${index}].mascotaEdad`)
+    : { value: null };
+
+  if (mascotaEdad.error) {
+    return { error: mascotaEdad.error };
+  }
 
   return {
     servicio: {
@@ -1414,6 +1434,8 @@ function normalizarServicioDetalleAgenda(servicio, index = 0) {
       nombre: servicioSeguro.servicioNombre,
       key: servicioSeguro.servicioKey,
       notas: normalizarTextoPlano(servicio?.notas, 300),
+      mascotaNombre: tipo === "mascota" ? normalizarTextoPlano(servicio?.mascotaNombre, 80) : "",
+      mascotaEdad: tipo === "mascota" ? mascotaEdad.value : null,
       duracionMinutos: duracionNumero
     }
   };
@@ -1446,13 +1468,19 @@ function normalizarServiciosDetalleAgenda(value) {
 function construirServiciosDetalleCompatibles(cita) {
   const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
   if (Array.isArray(obj?.serviciosDetalle) && obj.serviciosDetalle.length) {
-    return obj.serviciosDetalle.map((servicio) => ({
+    return obj.serviciosDetalle.map((servicio, index) => ({
       tipo: servicio.tipo || "",
       categoria: servicio.categoria || "",
       paquete: servicio.paquete || "",
       nombre: servicio.nombre || "",
       key: servicio.key || "",
       notas: servicio.notas || "",
+      mascotaNombre: servicio.tipo === "mascota" ? servicio.mascotaNombre || (index === 0 ? obj.mascotaNombre || "" : "") : "",
+      mascotaEdad: servicio.tipo === "mascota"
+        ? (Number.isInteger(servicio.mascotaEdad)
+          ? servicio.mascotaEdad
+          : (index === 0 && Number.isInteger(obj.mascotaEdad) ? obj.mascotaEdad : null))
+        : null,
       duracionMinutos: Number(servicio.duracionMinutos) || 0
     }));
   }
@@ -2005,12 +2033,27 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
       datos.servicioPaquete = principal.paquete;
       datos.servicioNombre = principal.nombre;
       datos.servicioKey = principal.key;
+      datos.mascotaNombre = principal.tipo === "mascota" ? principal.mascotaNombre || datos.mascotaNombre || "" : "";
+      datos.mascotaEdad = principal.tipo === "mascota"
+        ? (Number.isInteger(principal.mascotaEdad) ? principal.mascotaEdad : (Number.isInteger(datos.mascotaEdad) ? datos.mascotaEdad : null))
+        : null;
+      if (principal.tipo === "mascota" && datos.serviciosDetalle[0]) {
+        datos.serviciosDetalle[0].mascotaNombre = datos.mascotaNombre;
+        datos.serviciosDetalle[0].mascotaEdad = datos.mascotaEdad;
+      }
     }
   }
 
   if (datos.servicioTipo === "auto") {
     datos.mascotaNombre = "";
     datos.mascotaEdad = null;
+    if (Array.isArray(datos.serviciosDetalle)) {
+      datos.serviciosDetalle = datos.serviciosDetalle.map((servicio) => ({
+        ...servicio,
+        mascotaNombre: "",
+        mascotaEdad: null
+      }));
+    }
   }
 
   if (datos.servicioTipo && datos.servicioPaquete) {
@@ -4105,6 +4148,16 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
     if (servicioTipoFinal === "auto") {
       datos.mascotaNombre = "";
       datos.mascotaEdad = null;
+      const serviciosParaLimpiar = Array.isArray(datos.serviciosDetalle)
+        ? datos.serviciosDetalle
+        : construirServiciosDetalleCompatibles(cita);
+      if (serviciosParaLimpiar.length) {
+        datos.serviciosDetalle = serviciosParaLimpiar.map((servicio) => ({
+          ...servicio,
+          mascotaNombre: "",
+          mascotaEdad: null
+        }));
+      }
     }
 
     if (cita.rewardGrupoId) {

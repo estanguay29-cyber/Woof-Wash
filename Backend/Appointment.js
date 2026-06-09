@@ -56,6 +56,18 @@ const ServicioDetalleSchema = new mongoose.Schema(
       maxlength: 300,
       default: ""
     },
+    mascotaNombre: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+      default: ""
+    },
+    mascotaEdad: {
+      type: Number,
+      min: 1,
+      max: 40,
+      default: null
+    },
     duracionMinutos: {
       type: Number,
       min: 0,

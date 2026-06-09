@@ -687,23 +687,41 @@ function obtenerServiciosDesdeBloques(prefijo = "") {
   const tipo = SERVICIOS_CATALOGO[tipoSelect?.value] ? tipoSelect.value : "mascota";
   if (!container) return [];
 
-  return [...container.querySelectorAll("[data-service-block]")].map((bloque) => ({
-    tipo,
-    categoria: bloque.querySelector("[data-service-category]")?.value || "",
-    paquete: bloque.querySelector("[data-service-package]")?.value || "",
-    notas: bloque.querySelector("[data-service-notes]")?.value || ""
-  }));
+  return [...container.querySelectorAll("[data-service-block]")].map((bloque) => {
+    const servicio = {
+      tipo,
+      categoria: bloque.querySelector("[data-service-category]")?.value || "",
+      paquete: bloque.querySelector("[data-service-package]")?.value || "",
+      notas: bloque.querySelector("[data-service-notes]")?.value || ""
+    };
+
+    if (tipo === "mascota") {
+      servicio.mascotaNombre = bloque.querySelector("[data-pet-name]")?.value || "";
+      servicio.mascotaEdad = bloque.querySelector("[data-pet-age]")?.value || "";
+    }
+
+    return servicio;
+  });
 }
 
 function obtenerServicioFallbackFormulario(prefijo = "") {
   const { tipoSelect, categoriaPrincipal, paquetePrincipal } = obtenerConfigServiciosFormulario(prefijo);
   const tipo = SERVICIOS_CATALOGO[tipoSelect?.value] ? tipoSelect.value : "mascota";
-  return [{
+  const servicio = {
     tipo,
     categoria: categoriaPrincipal?.value || "",
     paquete: paquetePrincipal?.value || "",
     notas: ""
-  }];
+  };
+
+  if (tipo === "mascota") {
+    const nombreInput = document.getElementById(prefijo ? "editMascotaNombre" : "mascotaNombre");
+    const edadInput = document.getElementById(prefijo ? "editMascotaEdad" : "mascotaEdad");
+    servicio.mascotaNombre = nombreInput?.value || "";
+    servicio.mascotaEdad = edadInput?.value || "";
+  }
+
+  return [servicio];
 }
 
 function actualizarEtiquetaCantidadServicios(prefijo = "") {
@@ -731,12 +749,25 @@ function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
     const categoria = buscarOpcionServicio(catalogo.categorias, servicio.categoria)?.value || catalogo.categorias[0]?.value || "";
     const paquete = buscarOpcionServicio(catalogo.paquetes, servicio.paquete)?.value || catalogo.paquetes[0]?.value || "";
     const titulo = `${formatearServicio(tipo)} ${index + 1}`;
+    const camposMascota = tipo === "mascota"
+      ? `
+        <label>
+          Nombre de mascota
+          <input type="text" maxlength="80" autocomplete="off" data-pet-name value="${escapeHtml(servicio.mascotaNombre || "")}">
+        </label>
+        <label>
+          Edad de mascota
+          <input type="number" min="1" max="40" step="1" inputmode="numeric" data-pet-age value="${Number.isInteger(servicio.mascotaEdad) ? String(servicio.mascotaEdad) : escapeHtml(servicio.mascotaEdad || "")}">
+        </label>
+      `
+      : "";
 
     return `
       <article class="agenda-service-block" data-service-block data-service-index="${index}">
         <div class="agenda-service-block-header">
           <strong>${escapeHtml(titulo)}</strong>
         </div>
+        ${camposMascota}
         <label>
           Tamaño o tipo
           <select data-service-category required>
@@ -796,7 +827,7 @@ function construirServiciosDetalleFormulario(prefijo = "") {
     }
 
     const normalizado = obtenerServicioSeleccionado(tipo, servicio.categoria, servicio.paquete);
-    return {
+    const detalle = {
       tipo: normalizado.servicioTipo,
       categoria: normalizado.servicioCategoria,
       paquete: normalizado.servicioPaquete,
@@ -804,6 +835,13 @@ function construirServiciosDetalleFormulario(prefijo = "") {
       key: normalizado.servicioKey,
       notas: String(servicio.notas || "").trim().slice(0, 300)
     };
+
+    if (normalizado.servicioTipo === "mascota") {
+      detalle.mascotaNombre = String(servicio.mascotaNombre || "").trim().slice(0, 80);
+      detalle.mascotaEdad = normalizarEdadMascotaServicio(servicio.mascotaEdad, index);
+    }
+
+    return detalle;
   });
 }
 
@@ -1162,6 +1200,20 @@ function formatearEdadMascota(value) {
 }
 
 function obtenerTextoMascotaCita(cita = {}) {
+  const mascotas = Array.isArray(cita.serviciosDetalle)
+    ? cita.serviciosDetalle
+      .filter((servicio) => servicio?.tipo === "mascota")
+      .map((servicio) => {
+        const nombreServicio = String(servicio.mascotaNombre || "").trim();
+        const edadServicio = formatearEdadMascota(servicio.mascotaEdad);
+        if (nombreServicio && edadServicio) return `${nombreServicio}, ${edadServicio}`;
+        return nombreServicio || edadServicio || "";
+      })
+      .filter(Boolean)
+    : [];
+
+  if (mascotas.length) return mascotas.join(" | ");
+
   const nombre = String(cita.mascotaNombre || "").trim();
   const edad = formatearEdadMascota(cita.mascotaEdad);
   if (nombre && edad) return `${nombre}, ${edad}`;
@@ -1178,8 +1230,8 @@ function actualizarCamposMascotaFormulario(prefijo = "", { limpiarSiAuto = true 
   const edadInput = esEdicion ? elementos.editMascotaEdad : elementos.mascotaEdad;
   const esMascota = (tipoSelect?.value || "mascota") === "mascota";
 
-  nombreWrapper?.classList.toggle("hidden", !esMascota);
-  edadWrapper?.classList.toggle("hidden", !esMascota);
+  nombreWrapper?.classList.add("hidden");
+  edadWrapper?.classList.add("hidden");
 
   if (!esMascota && limpiarSiAuto) {
     if (nombreInput) nombreInput.value = "";
@@ -1193,6 +1245,16 @@ function obtenerEdadMascotaFormulario(input) {
   const edad = Number(value);
   if (!Number.isInteger(edad) || edad < 1 || edad > 40) {
     throw new Error("La edad de la mascota debe ser un número entero entre 1 y 40.");
+  }
+  return edad;
+}
+
+function normalizarEdadMascotaServicio(value, index = 0) {
+  const texto = String(value ?? "").trim();
+  if (!texto) return null;
+  const edad = Number(texto);
+  if (!Number.isInteger(edad) || edad < 1 || edad > 40) {
+    throw new Error(`La edad de la mascota ${index + 1} debe ser un nÃºmero entero entre 1 y 40.`);
   }
   return edad;
 }
@@ -1886,14 +1948,18 @@ function normalizarServiciosDetalleCita(cita) {
   return servicios
     .filter((servicio) => servicio && ["mascota", "auto"].includes(servicio.tipo))
     .slice(0, 5)
-    .map((servicio) => ({
+    .map((servicio, index) => ({
       tipo: servicio.tipo || cita?.servicioTipo || "mascota",
       categoria: servicio.categoria || "",
       paquete: servicio.paquete || "",
       nombre: servicio.nombre || "",
       key: servicio.key || "",
       notas: servicio.notas || "",
-      duracionMinutos: Number(servicio.duracionMinutos) || 0
+      duracionMinutos: Number(servicio.duracionMinutos) || 0,
+      mascotaNombre: servicio.mascotaNombre || (index === 0 ? cita?.mascotaNombre || "" : ""),
+      mascotaEdad: Number.isInteger(servicio.mascotaEdad)
+        ? servicio.mascotaEdad
+        : (index === 0 && Number.isInteger(cita?.mascotaEdad) ? cita.mascotaEdad : null)
     }));
 }
 
@@ -1909,7 +1975,9 @@ function obtenerServiciosVisualesCita(cita) {
     nombre: cita?.detalle || "",
     key: cita?.servicioKey || "",
     notas: "",
-    duracionMinutos: Number(cita?.duracionMinutos) || 0
+    duracionMinutos: Number(cita?.duracionMinutos) || 0,
+    mascotaNombre: cita?.mascotaNombre || "",
+    mascotaEdad: Number.isInteger(cita?.mascotaEdad) ? cita.mascotaEdad : null
   }];
 }
 
@@ -1976,6 +2044,9 @@ function crearMiniCardsServiciosHtml(cita) {
           <article class="agenda-detail-service-card">
             <span>${escapeHtml(`${formatearServicio(servicio.tipo)} ${index + 1}`)}</span>
             <strong>${escapeHtml(crearDetalleCortoServicio(servicio))}</strong>
+            ${servicio.tipo === "mascota" && (servicio.mascotaNombre || Number.isInteger(servicio.mascotaEdad))
+              ? `<p>${escapeHtml([servicio.mascotaNombre, formatearEdadMascota(servicio.mascotaEdad)].filter(Boolean).join(", "))}</p>`
+              : ""}
             ${servicio.notas ? `<p>${escapeHtml(servicio.notas)}</p>` : ""}
           </article>
         `).join("")}
@@ -2047,15 +2118,24 @@ function inferirServicioDesdeCita(cita) {
 
 function obtenerServiciosEdicionCita(cita) {
   if (Array.isArray(cita?.serviciosDetalle) && cita.serviciosDetalle.length) {
-    return cita.serviciosDetalle.slice(0, AGENDA_SERVICIOS_MAX).map((servicio) => ({
+    return cita.serviciosDetalle.slice(0, AGENDA_SERVICIOS_MAX).map((servicio, index) => ({
       tipo: servicio.tipo || cita.tipoServicio || "mascota",
       categoria: servicio.categoria || "",
       paquete: servicio.paquete || "",
-      notas: servicio.notas || ""
+      notas: servicio.notas || "",
+      mascotaNombre: servicio.mascotaNombre || (index === 0 ? cita.mascotaNombre || "" : ""),
+      mascotaEdad: Number.isInteger(servicio.mascotaEdad)
+        ? servicio.mascotaEdad
+        : (index === 0 && Number.isInteger(cita.mascotaEdad) ? cita.mascotaEdad : null)
     }));
   }
 
-  return [inferirServicioDesdeCita(cita)];
+  const servicio = inferirServicioDesdeCita(cita);
+  if ((servicio.tipo || cita?.servicioTipo) === "mascota") {
+    servicio.mascotaNombre = cita?.mascotaNombre || "";
+    servicio.mascotaEdad = Number.isInteger(cita?.mascotaEdad) ? cita.mascotaEdad : null;
+  }
+  return [servicio];
 }
 
 function obtenerTextoRecompensaCita(cita) {
@@ -2202,6 +2282,7 @@ function construirPayloadFormulario(form, prefijo = "") {
   const serviciosDetalle = construirServiciosDetalleFormulario(prefijo);
   const servicioPrincipal = serviciosDetalle[0];
   const esServicioMascota = servicioPrincipal.tipo === "mascota";
+  const mascotaPrincipal = esServicioMascota ? servicioPrincipal : null;
   const duracionEstimadaMinutos = calcularDuracionEstimadaFormulario(prefijo);
   const duracionBloqueadaInput = document.getElementById(`${prefijo ? "editDuracionBloqueadaMinutos" : "duracionBloqueadaMinutos"}`);
   const duracionBloqueadaMinutos = obtenerDuracionBloqueadaValida(duracionBloqueadaInput?.value);
@@ -2226,8 +2307,8 @@ function construirPayloadFormulario(form, prefijo = "") {
     clienteNombre: get("clienteNombre"),
     clienteTelefono: telefono.normalizado,
     clienteEmail: get("clienteEmail"),
-    mascotaNombre: esServicioMascota ? get("mascotaNombre") : "",
-    mascotaEdad: esServicioMascota ? obtenerEdadMascotaFormulario(document.getElementById(`${prefijo ? "editMascotaEdad" : "mascotaEdad"}`)) : null,
+    mascotaNombre: mascotaPrincipal?.mascotaNombre || "",
+    mascotaEdad: mascotaPrincipal?.mascotaEdad ?? null,
     servicioTipo: servicioPrincipal.tipo,
     servicioCategoria: servicioPrincipal.categoria,
     servicioPaquete: servicioPrincipal.paquete,
