@@ -3650,7 +3650,8 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
     }
     if (fechaCumpleanosPayload.presente) {
       const fechaCumpleanosLimpia = fechaCumpleanosPayload.valor;
-      empleado.fechaCumpleanos = fechaCumpleanosLimpia;
+      empleado.set("fechaCumpleanos", fechaCumpleanosLimpia);
+      empleado.markModified("fechaCumpleanos");
     }
     if (typeof sueldoBase !== "undefined") {
       const sueldoBaseValidado = normalizarMontoEmpleado(sueldoBase, { campo: "sueldoBase", max: 100000 });
@@ -3691,9 +3692,23 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
     }
 
     await empleado.save();
+
+    const empleadoConfirmado = await Employee.findById(id);
+    if (!empleadoConfirmado) {
+      return res.status(404).json({ message: "Empleado no encontrado despues de guardar" });
+    }
+
+    if (fechaCumpleanosPayload.presente) {
+      const fechaEsperada = fechaCumpleanosPayload.valor;
+      const fechaConfirmada = normalizarFechaCumpleanosEmpleadoSalida(empleadoConfirmado.fechaCumpleanos);
+      if (fechaConfirmada !== fechaEsperada) {
+        return res.status(500).json({ message: "No se pudo persistir fechaCumpleanos" });
+      }
+    }
+
     res.json({
       message: "Empleado actualizado correctamente",
-      empleado: construirEmpleadoAdminRespuesta(empleado)
+      empleado: construirEmpleadoAdminRespuesta(empleadoConfirmado)
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo actualizar el empleado" });
