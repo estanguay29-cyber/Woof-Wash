@@ -62,6 +62,7 @@ const SENSITIVE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const MAIL_CODE_TTL_MINUTES = 10;
 const META_DIARIA_EMPLEADOS_MXN = 2000;
 const META_SEMANAL_EMPLEADOS_MXN = 22000;
+const BACKEND_VERSION = "fecha-cumpleanos-persistencia-v2";
 const authAttempts = new Map();
 const sensitiveActionAttempts = new Map();
 let mailTransporterPromise = null;
@@ -2420,6 +2421,13 @@ app.use(express.json({ limit: "100kb" }));
 // ============================
 // CONEXIÓN A MONGO
 // ============================
+app.get("/version", (req, res) => {
+  res.json({
+    ok: true,
+    version: BACKEND_VERSION
+  });
+});
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Mongo conectado"))
   .catch((err) => console.log(err));
@@ -4795,6 +4803,7 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Servidor en puerto ${PORT}`);
+  console.log(`BACKEND VERSION ${BACKEND_VERSION}`);
 });
 
 
