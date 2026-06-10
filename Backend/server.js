@@ -3656,7 +3656,13 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
     }
 
     await empleado.save();
-    res.json({ message: "Empleado actualizado correctamente" });
+    res.json({
+      message: "Empleado actualizado correctamente",
+      empleado: {
+        id: String(empleado._id),
+        fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos)
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: "No se pudo actualizar el empleado" });
   }

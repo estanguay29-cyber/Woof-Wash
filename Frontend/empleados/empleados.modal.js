@@ -63,7 +63,10 @@ function setFormValues(values = {}) {
   if (emailInput) emailInput.value = values.email || "";
   if (puestoInput) puestoInput.value = values.puesto || values.especialidad || "";
   if (fechaInput) fechaInput.value = values.fechaIngreso || "";
-  if (fechaCumpleanosInput) fechaCumpleanosInput.value = normalizarFechaParaInputDate(values.fechaCumpleanos);
+  if (fechaCumpleanosInput) {
+    const fechaNormalizada = normalizarFechaParaInputDate(values.fechaCumpleanos);
+    fechaCumpleanosInput.value = fechaNormalizada;
+  }
   if (sueldoInput) sueldoInput.value = values.sueldoBase ?? 0;
   if (comisionInput) comisionInput.value = values.comisionPorcentaje ?? values.comision ?? 0;
   if (bonoInput) bonoInput.value = values.bonoManual ?? values.bono ?? 0;
@@ -356,7 +359,17 @@ export async function saveEmployee() {
       if (!id) {
         throw new Error("No se pudo identificar el empleado para editar.");
       }
-      await updateEmployee(id, body);
+      const patchResponse = await updateEmployee(id, body);
+      const fechaPatch = normalizarFechaParaInputDate(patchResponse?.empleado?.fechaCumpleanos);
+      if (fechaPatch !== body.fechaCumpleanos) {
+        throw new Error("No se pudo confirmar la fecha de cumplea\u00f1os guardada.");
+      }
+      const empleadoActualizado = await loadEmployeeById(id);
+      const fechaDetalle = normalizarFechaParaInputDate(empleadoActualizado?.fechaCumpleanos);
+      if (fechaDetalle !== body.fechaCumpleanos) {
+        throw new Error("La fecha de cumplea\u00f1os no qued\u00f3 persistida en el detalle del empleado.");
+      }
+      state.modal.empleado = empleadoActualizado;
     }
 
     const employees = await loadEmployeeList();
