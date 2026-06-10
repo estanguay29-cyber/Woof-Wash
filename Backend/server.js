@@ -1058,14 +1058,45 @@ function normalizarMontoEmpleado(value, { campo, max, porcentaje = false }) {
 function obtenerFechaCumpleanosEmpleado(body = {}) {
   for (const campo of ["fechaCumpleanos", "cumpleanos", "fechaNacimiento"]) {
     if (Object.prototype.hasOwnProperty.call(body, campo)) {
+      const valor = body[campo];
+      if (valor === "") {
+        return { presente: true, valor: "" };
+      }
+      if (typeof valor !== "string" || !validarFechaISOAgenda(valor.trim())) {
+        return {
+          presente: true,
+          error: "La fecha de cumpleanos no es valida."
+        };
+      }
       return {
         presente: true,
-        valor: String(body[campo] || "").trim()
+        valor: valor.trim()
       };
     }
   }
 
   return { presente: false, valor: "" };
+}
+
+function construirEmpleadoAdminRespuesta(empleado) {
+  return {
+    id: String(empleado._id),
+    _id: String(empleado._id),
+    nombreCompleto: empleado.nombreCompleto || "",
+    telefono: empleado.telefono || "",
+    email: empleado.email || "",
+    puesto: empleado.puesto || "",
+    activo: empleado.activo !== false,
+    fechaIngreso: empleado.fechaIngreso || "",
+    fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos),
+    sueldoBase: Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0,
+    comision: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
+    comisionPorcentaje: Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0,
+    bonoManual: Number.isFinite(Number(empleado.bonoManual)) ? Number(empleado.bonoManual) : 0,
+    descuentoAdministrativo: Number.isFinite(Number(empleado.descuentoAdministrativo)) ? Number(empleado.descuentoAdministrativo) : 0,
+    notas: empleado.notas || "",
+    notasAdministrativas: empleado.notas || ""
+  };
 }
 
 function normalizarFechaCumpleanosEmpleadoSalida(value) {
@@ -3486,7 +3517,11 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
     const telefonoLimpio = String(telefono || "").trim();
     const puestoLimpio = String(puesto || especialidad || "").trim();
     const fechaIngresoLimpia = String(fechaIngreso || "").trim();
-    const fechaCumpleanosLimpia = obtenerFechaCumpleanosEmpleado(req.body).valor;
+    const fechaCumpleanosPayload = obtenerFechaCumpleanosEmpleado(req.body);
+    if (fechaCumpleanosPayload.error) {
+      return res.status(400).json({ message: fechaCumpleanosPayload.error });
+    }
+    const fechaCumpleanosLimpia = fechaCumpleanosPayload.valor;
     const sueldoBaseValidado = normalizarMontoEmpleado(sueldoBase, { campo: "sueldoBase", max: 100000 });
     const comisionValidada = normalizarMontoEmpleado(comision ?? comisionPorcentaje, { campo: "comision", max: 100, porcentaje: true });
     const bonoManualValidado = normalizarMontoEmpleado(bonoManual, { campo: "bonoManual", max: 50000 });
@@ -3610,11 +3645,11 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
       empleado.fechaIngreso = fechaIngreso.trim();
     }
     const fechaCumpleanosPayload = obtenerFechaCumpleanosEmpleado(req.body);
+    if (fechaCumpleanosPayload.error) {
+      return res.status(400).json({ message: fechaCumpleanosPayload.error });
+    }
     if (fechaCumpleanosPayload.presente) {
       const fechaCumpleanosLimpia = fechaCumpleanosPayload.valor;
-      if (fechaCumpleanosLimpia && !validarFechaISOAgenda(fechaCumpleanosLimpia)) {
-        return res.status(400).json({ message: "La fecha de cumpleanos no es valida." });
-      }
       empleado.fechaCumpleanos = fechaCumpleanosLimpia;
     }
     if (typeof sueldoBase !== "undefined") {
@@ -3658,10 +3693,7 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
     await empleado.save();
     res.json({
       message: "Empleado actualizado correctamente",
-      empleado: {
-        id: String(empleado._id),
-        fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos)
-      }
+      empleado: construirEmpleadoAdminRespuesta(empleado)
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo actualizar el empleado" });
