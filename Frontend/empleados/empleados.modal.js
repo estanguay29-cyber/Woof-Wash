@@ -359,15 +359,11 @@ export async function saveEmployee() {
       if (!id) {
         throw new Error("No se pudo identificar el empleado para editar.");
       }
-      const patchResponse = await updateEmployee(id, body);
-      const fechaPatch = normalizarFechaParaInputDate(patchResponse?.empleado?.fechaCumpleanos);
-      if (fechaPatch !== body.fechaCumpleanos) {
-        throw new Error("No se pudo confirmar la fecha de cumplea\u00f1os guardada.");
-      }
+      await updateEmployee(id, body);
       const empleadoActualizado = await loadEmployeeById(id);
       const fechaDetalle = normalizarFechaParaInputDate(empleadoActualizado?.fechaCumpleanos);
       if (fechaDetalle !== body.fechaCumpleanos) {
-        throw new Error("La fecha de cumplea\u00f1os no qued\u00f3 persistida en el detalle del empleado.");
+        throw new Error(`La fecha no se guard\u00f3. Esperado: ${body.fechaCumpleanos || "(vac\u00edo)"}, recibido: ${fechaDetalle || "(vac\u00edo)"}`);
       }
       state.modal.empleado = empleadoActualizado;
     }
