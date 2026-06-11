@@ -782,15 +782,78 @@ function toggleMenu() {
 
 const hoy = new Date().getDay();
 
-const zonas = {
-  0: { dia: "Domingo", zona: "Descanso 😴" },
-  1: { dia: "Lunes", zona: "Zapopan" },
-  2: { dia: "Martes", zona: "Guadalajara" },
-  3: { dia: "Miércoles", zona: "Tlaquepaque" },
-  4: { dia: "Jueves", zona: "Tonalá" },
-  5: { dia: "Viernes", zona: "Zapopan Norte" },
-  6: { dia: "Sábado", zona: "Toda la ZMG 🚀" }
+const zonasServicioFallback = [
+  { value: "zona_1", label: "Zona 1", nombre: "Valle Real - Solares", mapImage: "img/Zona1.jpg" },
+  { value: "zona_2", label: "Zona 2", nombre: "Jardín Real", mapImage: "img/Zona2.jpg" },
+  { value: "zona_3", label: "Zona 3", nombre: "Puerta de Hierro - Rinconada del Bosque", mapImage: "img/Zona3.jpg" },
+  { value: "zona_4", label: "Zona 4", nombre: "San Javier", mapImage: "img/Zona4.jpg" },
+  { value: "zona_5", label: "Zona 5", nombre: "Guadalupe - Paseos del Sol", mapImage: "img/Zona5.jpg" },
+  { value: "zona_6", label: "Zona 6", nombre: "Expo Guadalajara", mapImage: "img/Zona6.jpg" }
+];
+
+let zonasServicioConfig = {
+  zones: zonasServicioFallback,
+  rulesByDay: {
+    0: { dia: "Domingo", zona: "Descanso", esDescanso: true },
+    1: { dia: "Lunes", zona: "zona_1", esDescanso: false },
+    2: { dia: "Martes", zona: "zona_2", esDescanso: false },
+    3: { dia: "Miércoles", zona: "zona_3", esDescanso: false },
+    4: { dia: "Jueves", zona: "zona_4", esDescanso: false },
+    5: { dia: "Viernes", zona: "zona_5", esDescanso: false },
+    6: { dia: "Sábado", zona: "zona_6", esDescanso: false }
+  }
 };
+
+function obtenerZonaServicioPublica(value) {
+  return zonasServicioConfig.zones.find((zona) => zona.value === value) || null;
+}
+
+function obtenerReglaZonaPublica(dia = hoy) {
+  const regla = zonasServicioConfig.rulesByDay[dia] || zonasServicioConfig.rulesByDay[0];
+  const zona = obtenerZonaServicioPublica(regla?.zona);
+  return { ...regla, zone: zona };
+}
+
+async function cargarZonasServicioPublicas() {
+  try {
+    const res = await fetch(`${obtenerApiBase()}/service-zones`, { cache: "no-store" });
+    if (!res.ok) throw new Error("No se pudo cargar zonas.");
+    const data = await res.json();
+    zonasServicioConfig = {
+      zones: Array.isArray(data.zones) && data.zones.length ? data.zones : zonasServicioFallback,
+      rulesByDay: data.rulesByDay || zonasServicioConfig.rulesByDay
+    };
+  } catch (error) {
+    // Fallback local para que el sitio publico no dependa del deploy del backend.
+  }
+}
+
+function crearImagenZonaPublica(zona) {
+  if (!zona?.mapImage) return "";
+  return `
+    <figure class="mt-3 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+      <img src="${zona.mapImage}" alt="${zona.label} ${zona.nombre}" class="h-32 w-full object-cover" onerror="this.closest('figure').remove();">
+      <figcaption class="px-3 py-2 text-xs text-gray-500">${zona.label} · ${zona.nombre}</figcaption>
+    </figure>
+  `;
+}
+
+function renderizarZonaHoyPublica() {
+  const zonaHTML = document.getElementById("zonaHoy");
+  if (!zonaHTML) return;
+
+  const regla = obtenerReglaZonaPublica(hoy);
+  if (regla.esDescanso) {
+    zonaHTML.innerHTML = "Hoy descansamos. Consulta las zonas activas de lunes a sábado.";
+    return;
+  }
+
+  zonaHTML.innerHTML = `
+    Hoy atendemos <span class="text-[#0b2a6b] font-semibold">${regla.zone?.label || regla.zona}</span>
+    <span class="block text-xs md:text-sm text-gray-500">${regla.zone?.nombre || ""}</span>
+    ${crearImagenZonaPublica(regla.zone)}
+  `;
+}
 
 // MODAL
 function abrirZonas() {
@@ -801,15 +864,18 @@ function abrirZonas() {
 
   lista.innerHTML = "";
 
-  Object.keys(zonas).forEach(dia => {
-    const item = zonas[dia];
-    const activo = dia == hoy;
+  Object.keys(zonasServicioConfig.rulesByDay).forEach(dia => {
+    const item = obtenerReglaZonaPublica(Number(dia));
+    const activo = Number(dia) === hoy;
+    const titulo = item.esDescanso ? "Descanso" : `${item.zone?.label || item.zona} - ${item.zone?.nombre || ""}`;
 
     lista.innerHTML += `
-      <div class="flex justify-between items-center p-3 rounded-xl 
-      ${activo ? "bg-[#8cc63f] text-white" : "bg-gray-100"}">
-        <span class="font-medium">${item.dia}</span>
-        <span>${item.zona}</span>
+      <div class="p-3 rounded-xl ${activo ? "bg-[#8cc63f] text-white" : "bg-gray-100"}">
+        <div class="flex justify-between items-center gap-4">
+          <span class="font-medium">${item.dia}</span>
+          <span class="text-right">${titulo}</span>
+        </div>
+        ${item.esDescanso ? "" : crearImagenZonaPublica(item.zone)}
       </div>
     `;
   });
@@ -1472,7 +1538,7 @@ async function cargarPedidos() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const loader = document.getElementById("loader");
 
   if (loader) {
@@ -1483,15 +1549,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 700);
   }
 
-  const zonaHTML = document.getElementById("zonaHoy");
-
-  if (zonaHTML) {
-    zonaHTML.innerHTML = `
-      <span class="text-gray-500">Hoy estamos en</span> 
-      <span class="text-[#0b2a6b] font-semibold">${zonas[hoy].zona}</span>
-      <span class="text-[#8cc63f] font-medium">• ¡Agenda ya!</span>
-    `;
-  }
+  await cargarZonasServicioPublicas();
+  renderizarZonaHoyPublica();
 
   const inputProductos = document.getElementById("buscadorProductos");
 
@@ -1749,7 +1808,7 @@ function configurarJuegoNosotros() {
   video.addEventListener("error", restaurarImagen);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const experienciaInteractiva = document.getElementById("experienciaInteractiva");
   if (!experienciaInteractiva) return;
 

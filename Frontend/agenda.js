@@ -1,6 +1,15 @@
 const AGENDA_API_URL = "https://woof-wash.onrender.com";
 
-const AGENDA_ZONAS_SABADO = [
+const AGENDA_SERVICE_ZONES_FALLBACK = [
+  { value: "zona_1", label: "Zona 1", nombre: "Valle Real - Solares", mapImage: "img/Zona1.jpg" },
+  { value: "zona_2", label: "Zona 2", nombre: "Jardín Real", mapImage: "img/Zona2.jpg" },
+  { value: "zona_3", label: "Zona 3", nombre: "Puerta de Hierro - Rinconada del Bosque", mapImage: "img/Zona3.jpg" },
+  { value: "zona_4", label: "Zona 4", nombre: "San Javier", mapImage: "img/Zona4.jpg" },
+  { value: "zona_5", label: "Zona 5", nombre: "Guadalupe - Paseos del Sol", mapImage: "img/Zona5.jpg" },
+  { value: "zona_6", label: "Zona 6", nombre: "Expo Guadalajara", mapImage: "img/Zona6.jpg" }
+];
+
+const AGENDA_LEGACY_ZONES_FALLBACK = [
   "Zapopan",
   "Guadalajara",
   "Tlaquepaque",
@@ -8,6 +17,22 @@ const AGENDA_ZONAS_SABADO = [
   "Zapopan Norte",
   "Toda la ZMG"
 ];
+
+const AGENDA_ZONE_RULES_FALLBACK = {
+  0: { dia: "Domingo", zona: "Descanso", esDescanso: true, permiteTodasLasZonas: false },
+  1: { dia: "Lunes", zona: "zona_1", esDescanso: false, permiteTodasLasZonas: false },
+  2: { dia: "Martes", zona: "zona_2", esDescanso: false, permiteTodasLasZonas: false },
+  3: { dia: "Miércoles", zona: "zona_3", esDescanso: false, permiteTodasLasZonas: false },
+  4: { dia: "Jueves", zona: "zona_4", esDescanso: false, permiteTodasLasZonas: false },
+  5: { dia: "Viernes", zona: "zona_5", esDescanso: false, permiteTodasLasZonas: false },
+  6: { dia: "Sábado", zona: "zona_6", esDescanso: false, permiteTodasLasZonas: false }
+};
+
+let agendaZoneConfig = {
+  zones: AGENDA_SERVICE_ZONES_FALLBACK,
+  rulesByDay: AGENDA_ZONE_RULES_FALLBACK,
+  legacyZones: AGENDA_LEGACY_ZONES_FALLBACK
+};
 
 const AGENDA_ESTADOS = {
   pendiente: "Pendiente",
@@ -293,6 +318,13 @@ function obtenerRangoSemana(fechaBase = new Date()) {
 
 function normalizarZonaAgenda(zona) {
   const value = String(zona || "").trim();
+  const key = normalizarServicioKey(value);
+  const zonaOficial = agendaZoneConfig.zones.find((item) => (
+    item.value === value ||
+    normalizarServicioKey(item.label) === key ||
+    normalizarServicioKey(item.nombre) === key
+  ));
+  if (zonaOficial) return zonaOficial.value;
   if (value === "Tonal\u00c3\u00a1" || value === "Tonala" || value === "Tonalá") return "Tonala";
   return value;
 }
@@ -304,6 +336,89 @@ function normalizarServicioKey(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
+}
+
+function obtenerZonaServicio(value) {
+  const normalizada = normalizarZonaAgenda(value);
+  return agendaZoneConfig.zones.find((zona) => zona.value === normalizada) || null;
+}
+
+function formatearZonaServicio(value) {
+  const zona = obtenerZonaServicio(value);
+  if (!zona) return String(value || "");
+  return `${zona.label} - ${zona.nombre}`;
+}
+
+function enriquecerReglaZona(regla = {}) {
+  const zona = obtenerZonaServicio(regla.zona);
+  return {
+    ...regla,
+    label: zona?.label || regla.zona || "",
+    nombre: zona?.nombre || "",
+    mapImage: zona?.mapImage || "",
+    zone: zona
+  };
+}
+
+async function cargarConfigZonasAgenda() {
+  try {
+    const res = await fetch(`${obtenerApiBaseAgenda()}/service-zones`, { cache: "no-store" });
+    if (!res.ok) throw new Error("No se pudo cargar la configuracion de zonas.");
+    const data = await res.json();
+    agendaZoneConfig = {
+      zones: Array.isArray(data.zones) && data.zones.length ? data.zones : AGENDA_SERVICE_ZONES_FALLBACK,
+      rulesByDay: data.rulesByDay || AGENDA_ZONE_RULES_FALLBACK,
+      legacyZones: Array.isArray(data.legacyZones) ? data.legacyZones : AGENDA_LEGACY_ZONES_FALLBACK
+    };
+  } catch (error) {
+    agendaZoneConfig = {
+      zones: AGENDA_SERVICE_ZONES_FALLBACK,
+      rulesByDay: AGENDA_ZONE_RULES_FALLBACK,
+      legacyZones: AGENDA_LEGACY_ZONES_FALLBACK
+    };
+  }
+}
+
+function poblarSelectZonasAgenda() {
+  const elementos = obtenerElementosAgenda();
+  const opcionesActivas = agendaZoneConfig.zones
+    .map((zona) => `<option value="${escapeHtml(zona.value)}">${escapeHtml(`${zona.label} - ${zona.nombre}`)}</option>`)
+    .join("");
+  const opcionesLegacy = agendaZoneConfig.legacyZones
+    .map((zona) => `<option value="${escapeHtml(zona)}">${escapeHtml(`${zona} (legacy)`)}</option>`)
+    .join("");
+
+  [elementos.zonaCita, elementos.editZonaCita].forEach((select) => {
+    if (!select) return;
+    const actual = normalizarZonaAgenda(select.value);
+    select.innerHTML = `<option value="">Selecciona una fecha</option>${opcionesActivas}`;
+    select.value = actual && [...select.options].some((option) => option.value === actual) ? actual : "";
+  });
+
+  if (elementos.filtroZona) {
+    const actualFiltro = normalizarZonaAgenda(elementos.filtroZona.value || "todas");
+    elementos.filtroZona.innerHTML = `<option value="todas">Todas</option>${opcionesActivas}${opcionesLegacy}`;
+    elementos.filtroZona.value = [...elementos.filtroZona.options].some((option) => option.value === actualFiltro)
+      ? actualFiltro
+      : "todas";
+  }
+}
+
+function crearResumenZonaHtml(regla, mensaje) {
+  const zona = regla?.zone || obtenerZonaServicio(regla?.zona);
+  const titulo = zona ? `${zona.label} - ${zona.nombre}` : regla?.zona || "";
+  const imagen = zona?.mapImage
+    ? `
+      <figure class="agenda-zone-map-preview">
+        <img src="${escapeHtml(zona.mapImage)}" alt="${escapeHtml(titulo)}" onerror="this.closest('figure').classList.add('is-image-missing');this.remove();">
+        <figcaption>${escapeHtml(titulo)}</figcaption>
+      </figure>
+    `
+    : "";
+  return `
+    <span>${escapeHtml(mensaje)}</span>
+    ${imagen}
+  `;
 }
 
 function normalizarBusquedaAgenda(value) {
@@ -997,17 +1112,7 @@ function obtenerZonaPorFecha(fecha) {
     return { dia: "", zona: "", esDescanso: false, permiteTodasLasZonas: false };
   }
 
-  const reglas = {
-    0: { dia: "Domingo", zona: "Descanso", esDescanso: true, permiteTodasLasZonas: false },
-    1: { dia: "Lunes", zona: "Zapopan", esDescanso: false, permiteTodasLasZonas: false },
-    2: { dia: "Martes", zona: "Guadalajara", esDescanso: false, permiteTodasLasZonas: false },
-    3: { dia: "Miércoles", zona: "Tlaquepaque", esDescanso: false, permiteTodasLasZonas: false },
-    4: { dia: "Jueves", zona: "Tonala", esDescanso: false, permiteTodasLasZonas: false },
-    5: { dia: "Viernes", zona: "Zapopan Norte", esDescanso: false, permiteTodasLasZonas: false },
-    6: { dia: "Sábado", zona: "Toda la ZMG", esDescanso: false, permiteTodasLasZonas: true }
-  };
-
-  return reglas[fechaLocal.getDay()];
+  return enriquecerReglaZona(agendaZoneConfig.rulesByDay[fechaLocal.getDay()]);
 }
 
 function protegerAgendaAdmin() {
@@ -1500,7 +1605,7 @@ function aplicarReglaZonaEnCampos({ fechaInput, zonaSelect, notice, submitButton
   }
 
   if (regla.esDescanso) {
-    zonaSelect.value = "Zapopan";
+    zonaSelect.value = "";
     zonaSelect.disabled = true;
     submitButton.disabled = true;
     notice.textContent = `${regla.dia}: día de descanso. No se pueden guardar citas.`;
@@ -1508,18 +1613,8 @@ function aplicarReglaZonaEnCampos({ fechaInput, zonaSelect, notice, submitButton
     return false;
   }
 
-  if (regla.permiteTodasLasZonas) {
-    zonaSelect.disabled = false;
-    if (!AGENDA_ZONAS_SABADO.includes(normalizarZonaAgenda(zonaSelect.value))) {
-      zonaSelect.value = "Toda la ZMG";
-    }
-    notice.textContent = `${regla.dia}: ruta flexible. Puedes elegir la zona manualmente.`;
-    notice.className = "agenda-date-notice is-open";
-    return true;
-  }
-
   zonaSelect.value = regla.zona;
-  notice.textContent = `${regla.dia}: zona asignada automáticamente, ${regla.zona}.`;
+  notice.innerHTML = crearResumenZonaHtml(regla, `${regla.dia}: zona asignada automáticamente, ${formatearZonaServicio(regla.zona)}.`);
   zonaSelect.disabled = true;
   notice.className = "agenda-date-notice is-fixed";
   return true;
@@ -1727,6 +1822,7 @@ function obtenerCitasFiltradasLocal() {
         cita.atendidoPor,
         formatearEmpleadosCita(cita),
         cita.zona,
+        formatearZonaServicio(cita.zona),
         cita.direccion
       ].map(normalizarBusquedaAgenda).join(" ");
       const telefonoDigitos = String(cita.telefono || "").replace(/\D/g, "");
@@ -1751,7 +1847,7 @@ function renderizarResumenAgenda() {
   document.getElementById("statConfirmadasDia").textContent = String(confirmadas);
   document.getElementById("statCompletadasDia").textContent = String(completadas);
   document.getElementById("statCanceladasDia").textContent = String(canceladas);
-  document.getElementById("statZonaDia").textContent = regla.zona || "-";
+  document.getElementById("statZonaDia").textContent = regla.esDescanso ? "Descanso" : formatearZonaServicio(regla.zona) || "-";
   document.getElementById("statDiaSemana").textContent = regla.dia || "Ruta activa";
 }
 
@@ -1827,7 +1923,7 @@ function crearCardCita(cita) {
       <dl class="agenda-appointment-meta">
         <div><dt>Teléfono</dt><dd>${escapeHtml(cita.telefono)}</dd></div>
         <div><dt>Servicio</dt><dd>${escapeHtml(formatearServicio(cita.tipoServicio))}</dd></div>
-        <div><dt>Zona</dt><dd>${escapeHtml(cita.zona)}</dd></div>
+        <div><dt>Zona</dt><dd>${escapeHtml(formatearZonaServicio(cita.zona))}</dd></div>
         <div><dt>Atiende</dt><dd>${escapeHtml(cita.atendidoPor || "Por asignar")}</dd></div>
         <div><dt>Empleados</dt><dd>${escapeHtml(formatearEmpleadosCita(cita))}</dd></div>
         <div><dt>Dirección</dt><dd>${escapeHtml(cita.direccion)}</dd></div>
@@ -1873,7 +1969,7 @@ function crearUrlWhatsApp(cita) {
     cita.atendidoPor ? `Te atendera: ${cita.atendidoPor}.` : "",
     `Empleados asignados: ${formatearEmpleadosCita(cita)}.`,
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.`,
-    `Zona: ${cita.zona}.`,
+    `Zona: ${formatearZonaServicio(cita.zona)}.`,
     "Por favor confirmanos si todo esta correcto."
   ].filter(Boolean).join("\n");
 
@@ -2621,7 +2717,7 @@ function renderizarDetalleCita(cita) {
       ${crearItemDetalleAgenda("Recompensa", rewardCita || "No aplica")}
       ${crearItemDetalleAgenda("Fecha", formatearFechaAgenda(cita.fecha))}
       ${crearItemDetalleAgenda("Hora", cita.hora)}
-      ${crearItemDetalleAgenda("Zona", cita.zona)}
+      ${crearItemDetalleAgenda("Zona", formatearZonaServicio(cita.zona))}
       ${crearItemDetalleAgenda("Atendido por", cita.atendidoPor || "Por asignar")}
       ${crearItemDetalleAgenda("Empleados asignados", formatearEmpleadosCita(cita))}
       ${crearItemDetalleAgenda("Calificación", formatearEstrellasCalificacion(calificacion))}
@@ -2944,7 +3040,7 @@ function construirResumenCita(cita) {
     `Atiende: ${cita.atendidoPor || "Por asignar"}`,
     `Empleados asignados: ${formatearEmpleadosCita(cita)}`,
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora || "-"}`,
-    `Zona: ${cita.zona || "-"}`,
+    `Zona: ${formatearZonaServicio(cita.zona) || "-"}`,
     `Direccion: ${cita.direccion || "-"}`,
     `Estado: ${AGENDA_ESTADOS[cita.estado] || cita.estado || "-"}`,
     `Calificación: ${formatearEstrellasCalificacion(cita.calificacionServicio)}`,
@@ -3100,8 +3196,10 @@ function aplicarFiltroRapido(tipo) {
   cargarCitasAgenda();
 }
 
-function configurarAgenda() {
+async function configurarAgenda() {
   const elementos = obtenerElementosAgenda();
+  await cargarConfigZonasAgenda();
+  poblarSelectZonasAgenda();
   const hoy = obtenerFechaLocalISO();
   const rangoGuardado = leerRangoAgendaStorage();
 
@@ -3325,7 +3423,7 @@ function configurarAgenda() {
 document.addEventListener("DOMContentLoaded", async () => {
   const autorizado = await protegerAgendaAdmin();
   if (!autorizado) return;
-  configurarAgenda();
+  await configurarAgenda();
 });
 
 window.obtenerZonaPorFecha = obtenerZonaPorFecha;

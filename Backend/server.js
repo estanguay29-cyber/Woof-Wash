@@ -834,7 +834,46 @@ const APPOINTMENT_STATUSES = Object.freeze([
   "no_asistio"
 ]);
 
-const APPOINTMENT_ZONES = Object.freeze([
+const SERVICE_ZONES = Object.freeze([
+  {
+    value: "zona_1",
+    label: "Zona 1",
+    nombre: "Valle Real - Solares",
+    mapImage: "img/Zona1.jpg"
+  },
+  {
+    value: "zona_2",
+    label: "Zona 2",
+    nombre: "Jardín Real",
+    mapImage: "img/Zona2.jpg"
+  },
+  {
+    value: "zona_3",
+    label: "Zona 3",
+    nombre: "Puerta de Hierro - Rinconada del Bosque",
+    mapImage: "img/Zona3.jpg"
+  },
+  {
+    value: "zona_4",
+    label: "Zona 4",
+    nombre: "San Javier",
+    mapImage: "img/Zona4.jpg"
+  },
+  {
+    value: "zona_5",
+    label: "Zona 5",
+    nombre: "Guadalupe - Paseos del Sol",
+    mapImage: "img/Zona5.jpg"
+  },
+  {
+    value: "zona_6",
+    label: "Zona 6",
+    nombre: "Expo Guadalajara",
+    mapImage: "img/Zona6.jpg"
+  }
+]);
+
+const LEGACY_APPOINTMENT_ZONES = Object.freeze([
   "Zapopan",
   "Guadalajara",
   "Tlaquepaque",
@@ -842,6 +881,18 @@ const APPOINTMENT_ZONES = Object.freeze([
   "Zapopan Norte",
   "Toda la ZMG"
 ]);
+
+const APPOINTMENT_ZONES = Object.freeze(SERVICE_ZONES.map((zona) => zona.value));
+
+const SERVICE_ZONE_RULES = Object.freeze({
+  0: { dia: "Domingo", zona: "Descanso", esDescanso: true, permiteTodasLasZonas: false },
+  1: { dia: "Lunes", zona: "zona_1", esDescanso: false, permiteTodasLasZonas: false },
+  2: { dia: "Martes", zona: "zona_2", esDescanso: false, permiteTodasLasZonas: false },
+  3: { dia: "Miércoles", zona: "zona_3", esDescanso: false, permiteTodasLasZonas: false },
+  4: { dia: "Jueves", zona: "zona_4", esDescanso: false, permiteTodasLasZonas: false },
+  5: { dia: "Viernes", zona: "zona_5", esDescanso: false, permiteTodasLasZonas: false },
+  6: { dia: "Sábado", zona: "zona_6", esDescanso: false, permiteTodasLasZonas: false }
+});
 
 const APPOINTMENT_CREATE_FIELDS = Object.freeze([
   "clienteNombre",
@@ -1167,8 +1218,26 @@ function construirFiltroTelefonoAgenda(value) {
 
 function normalizarZonaAgenda(value) {
   const zona = normalizarTextoPlano(value, 80);
+  const zonaKey = normalizarServicioKey(zona);
+  const zonaOficial = SERVICE_ZONES.find((item) => (
+    item.value === zona ||
+    normalizarServicioKey(item.label) === zonaKey ||
+    normalizarServicioKey(item.nombre) === zonaKey
+  ));
+  if (zonaOficial) return zonaOficial.value;
   if (zona === "Tonalá" || zona === "TonalÃ¡" || zona === "Tonala") return "Tonala";
   return zona;
+}
+
+function construirReglaZonaRespuesta(regla) {
+  const zona = SERVICE_ZONES.find((item) => item.value === regla?.zona) || null;
+  return {
+    ...(regla || {}),
+    label: zona?.label || regla?.zona || "",
+    nombre: zona?.nombre || "",
+    mapImage: zona?.mapImage || "",
+    zone: zona
+  };
 }
 
 function normalizarServicioKey(value) {
@@ -1585,17 +1654,7 @@ function obtenerReglaZonaAgenda(fecha) {
   }
 
   const fechaLocal = new Date(`${fecha}T00:00:00`);
-  const reglas = {
-    0: { dia: "Domingo", zona: "Descanso", esDescanso: true, permiteTodasLasZonas: false },
-    1: { dia: "Lunes", zona: "Zapopan", esDescanso: false, permiteTodasLasZonas: false },
-    2: { dia: "Martes", zona: "Guadalajara", esDescanso: false, permiteTodasLasZonas: false },
-    3: { dia: "Miercoles", zona: "Tlaquepaque", esDescanso: false, permiteTodasLasZonas: false },
-    4: { dia: "Jueves", zona: "Tonala", esDescanso: false, permiteTodasLasZonas: false },
-    5: { dia: "Viernes", zona: "Zapopan Norte", esDescanso: false, permiteTodasLasZonas: false },
-    6: { dia: "Sabado", zona: "Toda la ZMG", esDescanso: false, permiteTodasLasZonas: true }
-  };
-
-  return reglas[fechaLocal.getDay()];
+  return construirReglaZonaRespuesta(SERVICE_ZONE_RULES[fechaLocal.getDay()]);
 }
 
 function obtenerHorarioOperacionAgenda(fecha) {
@@ -2425,6 +2484,15 @@ app.get("/version", (req, res) => {
   res.json({
     ok: true,
     version: BACKEND_VERSION
+  });
+});
+
+app.get("/service-zones", (req, res) => {
+  res.json({
+    zones: SERVICE_ZONES,
+    rulesByDay: SERVICE_ZONE_RULES,
+    legacyZones: LEGACY_APPOINTMENT_ZONES,
+    todayRule: obtenerReglaZonaAgenda(obtenerFechaLocalAgenda())
   });
 });
 
