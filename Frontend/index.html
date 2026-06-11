@@ -1404,21 +1404,28 @@ class="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-[#fffdf7] shadow-[0_20p
 
 </div>
 <!-- MODAL ZONAS -->
-<div id="modalZonas" class="zones-modal fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition duration-300 z-50">
+<div id="modalZonas" class="zones-modal fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center opacity-0 pointer-events-none transition duration-300 z-50" role="dialog" aria-modal="true" aria-labelledby="zonasTitulo">
 
   <div class="zones-panel bg-white rounded-2xl shadow-2xl p-6 w-[90%] max-w-md">
 
     <!-- HEADER -->
-    <div class="zones-header flex justify-between items-center mb-4">
+    <div class="zones-header flex justify-between items-start mb-4">
       <div>
         <span class="zones-kicker">Cobertura semanal</span>
-        <h3 class="text-lg font-bold text-[#0b2a6b]">Zonas por día</h3>
+        <h3 id="zonasTitulo" class="text-lg font-bold text-[#0b2a6b]">Zonas por día</h3>
+        <p class="zones-subtitle">Consulta la zona que cubrimos cada día y revisa el mapa de cobertura.</p>
       </div>
-      <button onclick="cerrarZonas()" class="zones-close text-gray-400 hover:text-red-500 text-xl" aria-label="Cerrar zonas">&times;</button>
+      <button type="button" onclick="cerrarZonas()" class="zones-close text-gray-400 hover:text-red-500 text-xl" aria-label="Cerrar zonas">&times;</button>
     </div>
 
-    <!-- LISTA -->
-    <div id="listaZonas" class="zones-list space-y-3 text-sm"></div>
+    <div id="vistaZonasLista" class="zones-view is-active">
+      <div id="zonaDestacada" class="zones-feature"></div>
+
+      <!-- LISTA -->
+      <div id="listaZonas" class="zones-list space-y-3 text-sm"></div>
+    </div>
+
+    <div id="vistaZonaMapa" class="zones-map-view zones-view" aria-live="polite"></div>
 
 <!-- BOTÓN RESERVAR -->
 <a href="https://wa.me/523337276934?text=Hola,%20quiero%20agendar%20un%20servicio"

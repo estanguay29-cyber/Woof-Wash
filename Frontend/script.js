@@ -804,6 +804,15 @@ let zonasServicioConfig = {
   }
 };
 
+function escapeHtmlPublico(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function obtenerZonaServicioPublica(value) {
   return zonasServicioConfig.zones.find((zona) => zona.value === value) || null;
 }
@@ -830,10 +839,25 @@ async function cargarZonasServicioPublicas() {
 
 function crearImagenZonaPublica(zona) {
   if (!zona?.mapImage) return "";
+  const label = zona.label || "Zona";
+  const nombre = zona.nombre || "";
   return `
-    <figure class="mt-3 overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
-      <img src="${zona.mapImage}" alt="${zona.label} ${zona.nombre}" class="h-32 w-full object-cover" onerror="this.closest('figure').remove();">
-      <figcaption class="px-3 py-2 text-xs text-gray-500">${zona.label} · ${zona.nombre}</figcaption>
+    <figure class="zone-card-preview">
+      <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa de cobertura ${escapeHtmlPublico(label)} - ${escapeHtmlPublico(nombre)}" loading="lazy" decoding="async" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
+      <span class="zone-map-fallback">Mapa pendiente</span>
+    </figure>
+  `;
+}
+
+function crearImagenZonaGrandePublica(zona) {
+  if (!zona?.mapImage) {
+    return `<div class="zones-map-empty">Mapa pendiente</div>`;
+  }
+
+  return `
+    <figure class="zones-map-figure">
+      <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa ampliado de cobertura ${escapeHtmlPublico(zona.label || "Zona")} - ${escapeHtmlPublico(zona.nombre || "")}" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
+      <span class="zone-map-fallback">Mapa pendiente</span>
     </figure>
   `;
 }
@@ -849,10 +873,104 @@ function renderizarZonaHoyPublica() {
   }
 
   zonaHTML.innerHTML = `
-    Hoy atendemos <span class="text-[#0b2a6b] font-semibold">${regla.zone?.label || regla.zona}</span>
-    <span class="block text-xs md:text-sm text-gray-500">${regla.zone?.nombre || ""}</span>
+    Hoy atendemos <span class="text-[#0b2a6b] font-semibold">${escapeHtmlPublico(regla.zone?.label || regla.zona)}</span>
+    <span class="block text-xs md:text-sm text-gray-500">${escapeHtmlPublico(regla.zone?.nombre || "")}</span>
     ${crearImagenZonaPublica(regla.zone)}
   `;
+}
+
+function crearTarjetaZonaPublica(dia) {
+  const item = obtenerReglaZonaPublica(Number(dia));
+  const activo = Number(dia) === hoy;
+
+  if (item.esDescanso) {
+    return `
+      <article class="zone-day-card is-rest ${activo ? "is-today" : ""}">
+        <div class="zone-day-card-main">
+          <div>
+            <span class="zone-day-name">${escapeHtmlPublico(item.dia)}</span>
+            <h4>Descanso</h4>
+            <p>Descanso - no hay servicio programado.</p>
+          </div>
+          <span class="zone-status">Descanso</span>
+        </div>
+      </article>
+    `;
+  }
+
+  const zona = item.zone || {};
+  const label = zona.label || item.zona || "Zona";
+  const nombre = zona.nombre || "";
+
+  return `
+    <article class="zone-day-card ${activo ? "is-today" : ""}">
+      ${crearImagenZonaPublica(zona)}
+      <div class="zone-day-card-main">
+        <div>
+          <span class="zone-day-name">${escapeHtmlPublico(item.dia)}</span>
+          <h4>${escapeHtmlPublico(label)}</h4>
+          <p>${escapeHtmlPublico(nombre)}</p>
+        </div>
+        ${activo ? `<span class="zone-status">Hoy</span>` : ""}
+      </div>
+      <button type="button" class="zone-map-button" onclick="abrirMapaZonaPublica(${Number(dia)})">Ver mapa</button>
+    </article>
+  `;
+}
+
+function renderizarZonaDestacadaPublica() {
+  const destino = document.getElementById("zonaDestacada");
+  if (!destino) return;
+
+  const item = obtenerReglaZonaPublica(hoy);
+  if (item.esDescanso) {
+    destino.innerHTML = `
+      <section class="zones-today-panel is-rest">
+        <span class="zone-status">Hoy</span>
+        <h4>${escapeHtmlPublico(item.dia)} de descanso</h4>
+        <p>Descanso - no hay servicio programado.</p>
+      </section>
+    `;
+    return;
+  }
+
+  const zona = item.zone || {};
+  destino.innerHTML = `
+    <section class="zones-today-panel">
+      <div class="zones-today-copy">
+        <span class="zone-status">Hoy</span>
+        <h4>${escapeHtmlPublico(zona.label || item.zona)}</h4>
+        <p>${escapeHtmlPublico(zona.nombre || "")}</p>
+        <button type="button" class="zone-map-button is-primary" onclick="abrirMapaZonaPublica(${hoy})">Ver mapa</button>
+      </div>
+      ${crearImagenZonaGrandePublica(zona)}
+    </section>
+  `;
+}
+
+function mostrarListaZonasPublica() {
+  document.getElementById("vistaZonasLista")?.classList.add("is-active");
+  document.getElementById("vistaZonaMapa")?.classList.remove("is-active");
+}
+
+function abrirMapaZonaPublica(dia) {
+  const panel = document.getElementById("vistaZonaMapa");
+  const item = obtenerReglaZonaPublica(Number(dia));
+  if (!panel || !item || item.esDescanso) return;
+
+  const zona = item.zone || {};
+  panel.innerHTML = `
+    <button type="button" class="zones-back-button" onclick="mostrarListaZonasPublica()">Volver a zonas</button>
+    ${crearImagenZonaGrandePublica(zona)}
+    <div class="zones-map-details">
+      <span>${escapeHtmlPublico(item.dia)}</span>
+      <h4>${escapeHtmlPublico(zona.label || item.zona)}</h4>
+      <p>${escapeHtmlPublico(zona.nombre || "")}</p>
+    </div>
+  `;
+
+  document.getElementById("vistaZonasLista")?.classList.remove("is-active");
+  panel.classList.add("is-active");
 }
 
 // MODAL
@@ -862,31 +980,36 @@ function abrirZonas() {
 
   if (!modal || !lista) return;
 
-  lista.innerHTML = "";
-
-  Object.keys(zonasServicioConfig.rulesByDay).forEach(dia => {
-    const item = obtenerReglaZonaPublica(Number(dia));
-    const activo = Number(dia) === hoy;
-    const titulo = item.esDescanso ? "Descanso" : `${item.zone?.label || item.zona} - ${item.zone?.nombre || ""}`;
-
-    lista.innerHTML += `
-      <div class="p-3 rounded-xl ${activo ? "bg-[#8cc63f] text-white" : "bg-gray-100"}">
-        <div class="flex justify-between items-center gap-4">
-          <span class="font-medium">${item.dia}</span>
-          <span class="text-right">${titulo}</span>
-        </div>
-        ${item.esDescanso ? "" : crearImagenZonaPublica(item.zone)}
-      </div>
-    `;
-  });
+  lista.innerHTML = Object.keys(zonasServicioConfig.rulesByDay)
+    .sort((a, b) => Number(a) - Number(b))
+    .map(crearTarjetaZonaPublica)
+    .join("");
+  renderizarZonaDestacadaPublica();
+  mostrarListaZonasPublica();
 
   modal.classList.remove("opacity-0", "pointer-events-none");
+  document.body.classList.add("overflow-hidden");
 }
 
 function cerrarZonas() {
   const modal = document.getElementById("modalZonas");
   if (modal) modal.classList.add("opacity-0", "pointer-events-none");
+  document.body.classList.remove("overflow-hidden");
 }
+
+document.addEventListener("keydown", (event) => {
+  const modal = document.getElementById("modalZonas");
+  if (event.key === "Escape" && modal && !modal.classList.contains("pointer-events-none")) {
+    cerrarZonas();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  const modal = document.getElementById("modalZonas");
+  if (event.target === modal) {
+    cerrarZonas();
+  }
+});
 
 function toggleBuscador() {
   const contenedor = document.getElementById("contenedorBuscador");
