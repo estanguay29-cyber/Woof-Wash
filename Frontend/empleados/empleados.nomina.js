@@ -48,10 +48,26 @@ function renderPayrollSummary(datos = {}) {
     const { totalAPagar } = calcularNominaEmpleado(item);
     return total + totalAPagar;
   }, 0);
+  const totalBonos = Number.isFinite(Number(datos.totalBonosCalculados))
+    ? Number(datos.totalBonosCalculados)
+    : items.reduce((total, item) => total + calcularNominaEmpleado(item).bonoCalculado, 0);
+  const ventasGlobales = Number.isFinite(Number(datos.ventasGlobalesSemanales ?? datos.ventasSemanales))
+    ? Number(datos.ventasGlobalesSemanales ?? datos.ventasSemanales)
+    : 0;
+  const metaGlobal = Number.isFinite(Number(datos.metaGlobalSemanalMxn ?? datos.metaSemanalMxn))
+    ? Number(datos.metaGlobalSemanalMxn ?? datos.metaSemanalMxn)
+    : 0;
+  const progresoGlobal = Number.isFinite(Number(datos.progresoMetaGlobal))
+    ? Math.min(100, Math.round(Number(datos.progresoMetaGlobal)))
+    : (metaGlobal ? Math.min(100, Math.round((ventasGlobales / metaGlobal) * 100)) : 0);
 
   setTextContent("payrollWeekRange", weekRange);
   setTextContent("payrollEmployeeCount", items.length);
   setTextContent("payrollTotalPagar", formatCurrency(totalPagar));
+  setTextContent("payrollTotalBonos", formatCurrency(totalBonos));
+  setTextContent("payrollGlobalSales", formatCurrency(ventasGlobales));
+  setTextContent("payrollGlobalGoal", formatCurrency(metaGlobal));
+  setTextContent("payrollGlobalProgress", `${progresoGlobal}%`);
 }
 
 function renderPayrollTable(items = []) {
@@ -73,7 +89,8 @@ function renderPayrollTable(items = []) {
   body.innerHTML = items.map((item) => {
     const { sueldoBase, bonoCalculado, descuentoPorFaltas, totalAPagar } = calcularNominaEmpleado(item);
     const promedioEstrellas = typeof item.promedioEstrellas === "number" ? item.promedioEstrellas.toFixed(1) : "-";
-    const metaBadge = item.metaSemanalOk ? '<span class="admin-badge admin-badge-success">Cumple</span>' : '<span class="admin-badge admin-badge-muted">No cumple</span>';
+    const metaGlobalOk = typeof item.metaGlobalSemanalOk === "boolean" ? item.metaGlobalSemanalOk : !!item.metaSemanalOk;
+    const metaBadge = metaGlobalOk ? '<span class="admin-badge admin-badge-success">Cumple</span>' : '<span class="admin-badge admin-badge-muted">No cumple</span>';
     const califBadge = item.calificacionMinimaOk ? '<span class="admin-badge admin-badge-success">Cumple</span>' : '<span class="admin-badge admin-badge-muted">No cumple</span>';
     const puntualidadBadge = item.puntualidadOk ? '<span class="admin-badge admin-badge-success">Puntual</span>' : '<span class="admin-badge admin-badge-muted">Retardos</span>';
     const elegibleBadge = item.elegibleBono ? '<span class="admin-badge admin-badge-info">Elegible</span>' : '<span class="admin-badge admin-badge-danger">No</span>';
@@ -105,16 +122,23 @@ function renderPayrollTable(items = []) {
 
     const retardos = Number.isFinite(Number(item.retardosSemana)) ? Number(item.retardosSemana) : 0;
     const delayCls = retardos >= 3 ? 'delay-3' : retardos === 2 ? 'delay-2' : retardos === 1 ? 'delay-1' : 'delay-0';
+    const reasons = Array.isArray(item.razonesNoElegible) ? item.razonesNoElegible.slice() : [];
+    if (!reasons.length) {
+      if (!metaGlobalOk) reasons.push("Meta global semanal no cumplida");
+      if (!item.calificacionMinimaOk) reasons.push("Promedio menor a 4.0");
+      if (!item.puntualidadOk) reasons.push("3 o mas retardos o falta injustificada");
+      if (item.limpiezaOrdenOk === false) reasons.push("Limpieza y orden no cumplida");
+    }
 
     // estado bono
     let estado = 'Elegible';
-    if (!item.metaSemanalOk) estado = 'No cumplió meta';
+    if (!metaGlobalOk) estado = 'Meta global no cumplida';
     else if (!item.calificacionMinimaOk) estado = 'Menos de 4 estrellas';
-    else if (!item.puntualidadOk) estado = 'Exceso de retardos';
+    else if (!item.puntualidadOk) estado = 'Asistencia no cumple';
 
     else if (item.limpiezaOrdenOk === false) estado = 'Limpieza y orden no cumplida';
 
-    const estadoClass = item.elegibleBono ? 'admin-badge-info' : (!item.metaSemanalOk ? 'admin-badge-danger' : (!item.calificacionMinimaOk ? 'admin-badge-warning' : 'admin-badge-orange'));
+    const estadoClass = item.elegibleBono ? 'admin-badge-info' : (!metaGlobalOk ? 'admin-badge-danger' : (!item.calificacionMinimaOk ? 'admin-badge-warning' : 'admin-badge-orange'));
 
     return `
       <tr>
@@ -129,7 +153,7 @@ function renderPayrollTable(items = []) {
         <td>${limpiezaBadge}<br><small>${escapeHtml(limpiezaDetalle)}</small><br><small>${escapeHtml(limpiezaEstado)}</small></td>
         <td><span class="admin-badge admin-badge-muted">Informativo</span><br><small>${escapeHtml(eventosAsistenciaDetalle)}</small><br><small>No impacta pago</small></td>
         <td>${elegibleBadge}</td>
-        <td><span class="admin-badge ${estadoClass}">${escapeHtml(estado)}</span></td>
+        <td><span class="admin-badge ${estadoClass}">${escapeHtml(estado)}</span>${reasons.length ? `<br><small>${escapeHtml(reasons.join("; "))}</small>` : ""}</td>
         <td>${formatCurrency(bonoCalculado)}</td>
         <td>${formatCurrency(totalAPagar)}</td>
         <td>
@@ -162,6 +186,10 @@ function limpiarNomina() {
   setTextContent("payrollWeekRange", "-");
   setTextContent("payrollEmployeeCount", "0");
   setTextContent("payrollTotalPagar", formatCurrency(0));
+  setTextContent("payrollTotalBonos", formatCurrency(0));
+  setTextContent("payrollGlobalSales", formatCurrency(0));
+  setTextContent("payrollGlobalGoal", formatCurrency(0));
+  setTextContent("payrollGlobalProgress", "0%");
 }
 
 async function actualizarNominaSemanal(fecha) {

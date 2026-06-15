@@ -6706,6 +6706,22 @@ body {
   width: min(100%, 720px);
 }
 
+.agenda-complete-panel {
+  width: min(100%, 480px);
+}
+
+.agenda-complete-form .agenda-copy-feedback {
+  border-color: rgba(190, 18, 60, 0.28);
+  background: rgba(255, 241, 242, 0.92);
+  color: #9f1239;
+}
+
+.agenda-whatsapp-btn.is-disabled {
+  pointer-events: none;
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
 .agenda-detail-content {
   display: grid;
   gap: 16px;

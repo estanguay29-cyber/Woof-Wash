@@ -2,13 +2,17 @@ import { getById, setTextContent, escapeHtml, META_SEMANAL_OFICIAL_MXN } from ".
 import { formatCurrency, formatDate } from "./empleados.payroll.js";
 
 export function renderPerformanceSummary(summary) {
-  const ventas = Number.isFinite(Number(summary.ventasSemanales)) ? Number(summary.ventasSemanales) : 0;
-  const meta = Number.isFinite(Number(summary.metaSemanalMxn)) ? Number(summary.metaSemanalMxn) : META_SEMANAL_OFICIAL_MXN;
+  const ventasResumen = summary.ventasGlobalesSemanales ?? summary.ventasSemanales;
+  const metaResumen = summary.metaGlobalSemanalMxn ?? summary.metaSemanalMxn;
+  const ventas = Number.isFinite(Number(ventasResumen)) ? Number(ventasResumen) : 0;
+  const meta = Number.isFinite(Number(metaResumen)) ? Number(metaResumen) : META_SEMANAL_OFICIAL_MXN;
   setTextContent("performanceSales", formatCurrency(ventas));
   setTextContent("performanceGoal", formatCurrency(meta));
 
   // progress bar
-  const percent = Math.min(100, Math.round((ventas / (meta || 1)) * 100));
+  const percent = Number.isFinite(Number(summary.progresoMetaGlobal))
+    ? Math.min(100, Math.round(Number(summary.progresoMetaGlobal)))
+    : Math.min(100, Math.round((ventas / (meta || 1)) * 100));
   const progressBar = getById("performanceProgressBar");
   if (progressBar) progressBar.style.width = `${percent}%`;
   setTextContent("performanceProgressPercent", `${percent}%`);
@@ -16,7 +20,9 @@ export function renderPerformanceSummary(summary) {
 
   // target met
   const targetEl = getById("performanceTargetMet");
-  const metaOk = typeof summary.metaSemanalOk === "boolean" ? summary.metaSemanalOk : ventas >= meta;
+  const metaOk = typeof summary.metaGlobalSemanalOk === "boolean"
+    ? summary.metaGlobalSemanalOk
+    : (typeof summary.metaSemanalOk === "boolean" ? summary.metaSemanalOk : ventas >= meta);
   if (targetEl) {
     targetEl.innerHTML = metaOk ? '<span class="admin-badge admin-badge-success">Cumple</span>' : '<span class="admin-badge admin-badge-muted">No cumple</span>';
   }
@@ -66,7 +72,8 @@ export function renderPerformanceTable(items = []) {
   if (empty) empty.classList.add("hidden");
 
   body.innerHTML = items.map((item) => {
-    const metaBadge = item.metaSemanalOk ? '<span class="admin-badge admin-badge-success">Cumple</span>' : '<span class="admin-badge admin-badge-muted">No cumple</span>';
+    const metaGlobalOk = typeof item.metaGlobalSemanalOk === "boolean" ? item.metaGlobalSemanalOk : !!item.metaSemanalOk;
+    const metaBadge = metaGlobalOk ? '<span class="admin-badge admin-badge-success">Cumple</span>' : '<span class="admin-badge admin-badge-muted">No cumple</span>';
     const califBadge = item.calificacionMinimaOk ? '<span class="admin-badge admin-badge-success">Cumple</span>' : '<span class="admin-badge admin-badge-muted">No cumple</span>';
     const punctualityBadge = item.puntualidadOk ? '<span class="admin-badge admin-badge-success">Puntual</span>' : '<span class="admin-badge admin-badge-muted">Retardos</span>';
     const elegibleBadge = item.elegibleBono ? '<span class="admin-badge admin-badge-info">Elegible</span>' : '<span class="admin-badge admin-badge-danger">No</span>';
@@ -92,22 +99,24 @@ export function renderPerformanceTable(items = []) {
         : '<span class="admin-badge admin-badge-warning">Rompe elegibilidad aplicada</span>';
     }
 
-    const reasons = [];
-    if (!item.metaSemanalOk) reasons.push('Meta semanal no cumplida');
-    if (!item.calificacionMinimaOk) reasons.push('Promedio menor a 4.0');
-    if (!item.puntualidadOk) reasons.push('3 o más retardos');
-    if (item.limpiezaOrdenOk === false) reasons.push('Limpieza y orden no cumplida');
+    const reasons = Array.isArray(item.razonesNoElegible) ? item.razonesNoElegible.slice() : [];
+    if (!reasons.length) {
+      if (!metaGlobalOk) reasons.push('Meta global semanal no cumplida');
+      if (!item.calificacionMinimaOk) reasons.push('Promedio menor a 4.0');
+      if (!item.puntualidadOk) reasons.push('3 o mas retardos o falta injustificada');
+      if (item.limpiezaOrdenOk === false) reasons.push('Limpieza y orden no cumplida');
+    }
     const tooltip = (!item.elegibleBono && reasons.length) ? `title="${escapeHtml(reasons.join('; '))}"` : '';
 
     // estado de bono
     let estado = 'Elegible';
-    if (!item.metaSemanalOk) estado = 'No cumplió meta';
+    if (!metaGlobalOk) estado = 'Meta global no cumplida';
     else if (!item.calificacionMinimaOk) estado = 'Menos de 4 estrellas';
-    else if (!item.puntualidadOk) estado = 'Exceso de retardos';
+    else if (!item.puntualidadOk) estado = 'Asistencia no cumple';
 
     else if (item.limpiezaOrdenOk === false) estado = 'Limpieza y orden no cumplida';
 
-    const estadoClass = item.elegibleBono ? 'admin-badge-info' : (!item.metaSemanalOk ? 'admin-badge-danger' : (!item.calificacionMinimaOk ? 'admin-badge-warning' : 'admin-badge-orange'));
+    const estadoClass = item.elegibleBono ? 'admin-badge-info' : (!metaGlobalOk ? 'admin-badge-danger' : (!item.calificacionMinimaOk ? 'admin-badge-warning' : 'admin-badge-orange'));
 
     const stars = typeof item.promedioEstrellas === 'number' ? Math.round(item.promedioEstrellas) : 0;
     const starsHtml = Array.from({ length: 5 }).map((_, i) => i < stars ? '★' : '<span class="star-empty">★</span>').join('');
@@ -127,7 +136,7 @@ export function renderPerformanceTable(items = []) {
       <td>${limpiezaBadge}<br><small>${escapeHtml(limpiezaDetalle)}</small><br><small>${escapeHtml(limpiezaEstado)}</small></td>
       <td><span class="admin-badge admin-badge-muted">Asistencia</span><br><small>${escapeHtml(eventosAsistenciaDetalle)}</small><br>${asistenciaProyectadaBadge}<br><small>Impacto aplicado en nomina</small></td>
       <td>${elegibleBadge}</td>
-      <td><span class="admin-badge ${estadoClass}">${escapeHtml(estado)}</span></td>
+      <td><span class="admin-badge ${estadoClass}">${escapeHtml(estado)}</span><br><small>Bono hasta ahora: ${formatCurrency(item.bonoCalculado || 0)}</small>${reasons.length ? `<br><small>${escapeHtml(reasons.join("; "))}</small>` : ""}</td>
     </tr>
   `;
   }).join("");

@@ -177,7 +177,7 @@
               </select>
             </label>
             <section id="serviciosDetalleContainer" class="agenda-services-builder agenda-field-full"></section>
-            <p id="serviciosDetalleNotice" class="agenda-services-builder-note agenda-field-full hidden">Por ahora la disponibilidad se calcula con el primer servicio. El cálculo avanzado de tiempos se hará en una fase posterior.</p>
+            <p id="serviciosDetalleNotice" class="agenda-services-builder-note agenda-field-full hidden">La disponibilidad se calcula sumando todos los servicios seleccionados y un traslado.</p>
             <section class="agenda-duration-panel agenda-field-full">
               <div>
                 <span>Tiempo estimado autom&aacute;tico</span>
@@ -297,7 +297,7 @@
           </select>
         </label>
         <section id="editServiciosDetalleContainer" class="agenda-services-builder agenda-field-full"></section>
-        <p id="editServiciosDetalleNotice" class="agenda-services-builder-note agenda-field-full hidden">Por ahora la disponibilidad se calcula con el primer servicio. El cálculo avanzado de tiempos se hará en una fase posterior.</p>
+        <p id="editServiciosDetalleNotice" class="agenda-services-builder-note agenda-field-full hidden">La disponibilidad se calcula sumando todos los servicios seleccionados y un traslado.</p>
         <section class="agenda-duration-panel agenda-field-full">
           <div>
             <span>Tiempo estimado autom&aacute;tico</span>
@@ -429,13 +429,54 @@
 
       <div class="agenda-detail-actions">
         <button id="btnDetailEditar" type="button" class="admin-button admin-button-dark">Editar cita</button>
-        <a id="btnDetailWhatsApp" class="admin-button admin-button-light agenda-whatsapp-btn" href="#" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a id="btnDetailWhatsApp" class="admin-button admin-button-light agenda-whatsapp-btn">WhatsApp</a>
         <button id="btnDetailCopiarTelefono" type="button" class="admin-button admin-button-light">Copiar teléfono</button>
         <button id="btnDetailCopiarDireccion" type="button" class="admin-button admin-button-light">Copiar dirección</button>
-        <a id="btnDetailEncuesta" class="admin-button admin-button-light agenda-survey-btn hidden" href="#" target="_blank" rel="noopener noreferrer">Enviar encuesta</a>
+        <a id="btnDetailEncuesta" class="admin-button admin-button-light agenda-survey-btn hidden" target="_blank" rel="noopener noreferrer">Enviar encuesta</a>
         <button id="btnDetailCopiarResumen" type="button" class="admin-button admin-button-light">Copiar resumen</button>
         <button id="btnCerrarDetailModalFooter" type="button" class="admin-button admin-button-light">Cerrar</button>
       </div>
+    </div>
+  </div>
+
+  <div id="agendaCompleteModal" class="agenda-edit-modal hidden" aria-hidden="true">
+    <div class="agenda-edit-panel agenda-complete-panel" role="dialog" aria-modal="true" aria-labelledby="agendaCompleteTitle">
+      <div class="agenda-edit-header">
+        <div>
+          <p class="admin-kicker">Completar cita</p>
+          <h2 id="agendaCompleteTitle">Registrar total cobrado</h2>
+        </div>
+        <button id="btnCerrarCompleteModal" type="button" class="agenda-icon-button" aria-label="Cerrar completar cita">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <form id="agendaCompleteForm" class="agenda-form agenda-complete-form">
+        <dl class="agenda-detail-grid">
+          <div>
+            <dt>Cliente</dt>
+            <dd id="agendaCompleteCliente">-</dd>
+          </div>
+          <div>
+            <dt>Servicio</dt>
+            <dd id="agendaCompleteServicio">-</dd>
+          </div>
+        </dl>
+        <label class="agenda-field-full">
+          Total cobrado
+          <span class="agenda-money-input">
+            <span class="agenda-money-prefix" aria-hidden="true">$</span>
+            <input id="agendaCompleteTotalCobrado" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej. 1200.00" aria-label="Total cobrado en pesos" required>
+          </span>
+        </label>
+        <p id="agendaCompleteError" class="agenda-copy-feedback hidden" aria-live="polite"></p>
+        <div class="agenda-edit-actions">
+          <button id="btnConfirmarCompleteCita" type="submit" class="admin-button admin-button-dark">Completar cita</button>
+          <button id="btnCancelarCompleteCita" type="button" class="admin-button admin-button-light">Cancelar</button>
+        </div>
+      </form>
     </div>
   </div>
 

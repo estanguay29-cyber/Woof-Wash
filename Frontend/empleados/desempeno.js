@@ -99,9 +99,15 @@ async function actualizarDashboardDesempeno(fecha) {
     const datos = await loadPerformanceDashboard(fechaLimpia);
     performanceState.dashboard = datos;
     const empleadoResumen = {
-      ventasSemanales: datos.ventasSemanales || 0,
-      metaSemanalMxn: datos.metaSemanalMxn || META_SEMANAL_OFICIAL_MXN,
-      metaSemanalOk: typeof datos.metaSemanalOk === 'boolean' ? datos.metaSemanalOk : !!datos.cumplioMeta,
+      ventasSemanales: datos.ventasGlobalesSemanales ?? datos.ventasSemanales ?? 0,
+      ventasGlobalesSemanales: datos.ventasGlobalesSemanales ?? datos.ventasSemanales ?? 0,
+      metaSemanalMxn: datos.metaGlobalSemanalMxn ?? datos.metaSemanalMxn ?? META_SEMANAL_OFICIAL_MXN,
+      metaGlobalSemanalMxn: datos.metaGlobalSemanalMxn ?? datos.metaSemanalMxn ?? META_SEMANAL_OFICIAL_MXN,
+      metaSemanalOk: typeof datos.metaGlobalSemanalOk === 'boolean' ? datos.metaGlobalSemanalOk : (typeof datos.metaSemanalOk === 'boolean' ? datos.metaSemanalOk : !!datos.cumplioMeta),
+      metaGlobalSemanalOk: typeof datos.metaGlobalSemanalOk === 'boolean' ? datos.metaGlobalSemanalOk : (typeof datos.metaSemanalOk === 'boolean' ? datos.metaSemanalOk : !!datos.cumplioMeta),
+      progresoMetaGlobal: datos.progresoMetaGlobal,
+      empleadosElegibles: datos.empleadosElegibles || 0,
+      totalBonosCalculados: datos.totalBonosCalculados || 0,
       promedioEstrellas: datos.promedioEstrellas !== undefined ? datos.promedioEstrellas : null,
       calificacionMinimaOk: typeof datos.calificacionMinimaOk === 'boolean' ? datos.calificacionMinimaOk : (typeof datos.promedioEstrellas === 'number' ? datos.promedioEstrellas >= 4.0 : false),
       retardosSemana: datos.retardosSemana || 0,

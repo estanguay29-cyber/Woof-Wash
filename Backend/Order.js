@@ -16,7 +16,7 @@ const OrderSchema = new mongoose.Schema({
   status: { type: String, default: "pendiente" },
   estado: {
     type: String,
-    enum: ["pendiente", "confirmado", "cancelado_por_cliente", "cancelado_por_admin", "completado"],
+    enum: ["pendiente", "confirmado", "cancelado", "cancelado_por_cliente", "cancelado_por_admin", "completado"],
     default: "pendiente"
   },
   canceladoEn: Date,

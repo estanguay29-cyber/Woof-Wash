@@ -70,7 +70,7 @@ const PRODUCT_CATALOG = Object.freeze({
   "shampoo-premium": { id: "shampoo-premium", nombre: "Shampoo Premium", precio: 12900 },
   "perfume-galan": { id: "perfume-galan", nombre: "Perfume Galán", precio: 9900 },
   "cepillo-ergonomico": { id: "cepillo-ergonomico", nombre: "Cepillo Ergonómico", precio: 8900 },
-  "spray-desenredante": { id: "spray-desenredante", nombre: "Spray Desenredante", precio: 11900 },
+  "cepillo-desenredante": { id: "cepillo-desenredante", nombre: "Cepillo Desenredante", precio: 11900 },
   "toallas-humedas": { id: "toallas-humedas", nombre: "Toallas Húmedas", precio: 7900 },
   "cortaunas-pro": { id: "cortaunas-pro", nombre: "Cortauñas Pro", precio: 10900 },
   "collar-antipulgas": { id: "collar-antipulgas", nombre: "Collar Antipulgas", precio: 14900 },
@@ -630,7 +630,9 @@ function generarSugerenciasUsuario(baseUsuario) {
 
 function obtenerProductoCatalogo(productId) {
   if (typeof productId !== "string") return null;
-  return PRODUCT_CATALOG[productId.trim()] || null;
+  const id = productId.trim();
+  if (id === "spray-desenredante") return PRODUCT_CATALOG["cepillo-desenredante"] || null;
+  return PRODUCT_CATALOG[id] || null;
 }
 
 function normalizarCantidad(cantidad) {
@@ -770,11 +772,36 @@ function formatearProductoAdmin(item) {
   };
 }
 
+function normalizarEstadoPedido(pedido = {}) {
+  const estado = typeof pedido.estado === "string" ? pedido.estado.trim() : "";
+  const status = typeof pedido.status === "string" ? pedido.status.trim() : "";
+  const stripeStatus = typeof pedido.stripeCheckoutStatus === "string" ? pedido.stripeCheckoutStatus.trim() : "";
+
+  if (estado === "confirmado") return "confirmado";
+
+  if (
+    estado === "cancelado" ||
+    estado === "cancelado_por_cliente" ||
+    estado === "cancelado_por_admin" ||
+    status === "cancelado" ||
+    stripeStatus === "expired"
+  ) {
+    return "cancelado";
+  }
+
+  if (status === "pagado" || stripeStatus === "complete" || stripeStatus === "completed") {
+    return "confirmado";
+  }
+
+  if (estado === "completado" || status === "completado") return "completado";
+  return estado || status || "pendiente";
+}
+
 async function construirPedidoAdmin(pedido, incluirDetalle = false) {
   const pedidoObj = typeof pedido.toObject === "function" ? pedido.toObject() : pedido;
   const user = pedidoObj.userId ? await User.findById(pedidoObj.userId).select("usuario email") : null;
   const direccion = pedidoObj.direccion || {};
-  const estado = pedidoObj.estado || pedidoObj.status || "pendiente";
+  const estado = normalizarEstadoPedido(pedidoObj);
   const base = {
     id: pedidoObj._id,
     fecha: pedidoObj.createdAt,
@@ -812,7 +839,7 @@ function construirPedidoCliente(pedido, usuario) {
   return {
     _id: pedidoObj._id,
     createdAt: pedidoObj.createdAt,
-    estado: pedidoObj.estado || pedidoObj.status || "pendiente",
+    estado: normalizarEstadoPedido(pedidoObj),
     total: pedidoObj.total || 0,
     carrito: Array.isArray(pedidoObj.carrito) ? pedidoObj.carrito : [],
     direccion: pedidoObj.direccion || {},
@@ -1950,9 +1977,13 @@ async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaqu
     return { error: { status: 400, message: "servicioPaquete no permitido" } };
   }
 
-  const duracionMinutos = obtenerDuracionServicioAgenda(servicioTipo, paquete);
   const trasladoMinutos = CONFIG_AGENDA.trasladoMinutos;
-  const bloqueTotalMinutos = obtenerDuracionBloqueadaAgenda(duracionBloqueadaMinutos) || duracionMinutos + trasladoMinutos;
+  const duracionBloqueadaValida = obtenerDuracionBloqueadaAgenda(duracionBloqueadaMinutos);
+  const duracionMinutosBase = obtenerDuracionServicioAgenda(servicioTipo, paquete);
+  const duracionMinutos = duracionBloqueadaValida
+    ? Math.max(0, duracionBloqueadaValida - trasladoMinutos)
+    : duracionMinutosBase;
+  const bloqueTotalMinutos = duracionBloqueadaValida || duracionMinutos + trasladoMinutos;
   const horario = obtenerHorarioOperacionAgenda(fecha);
   const abierto = Boolean(horario);
   const citasOcupadas = await obtenerCitasOcupadasAgenda(fecha, excludeId);
@@ -2186,7 +2217,9 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
 
   if (datos.servicioTipo && datos.servicioPaquete) {
     datos.duracionEstimadaMinutos = calcularDuracionEstimadaAgenda(datos);
-    if (!Object.prototype.hasOwnProperty.call(datos, "duracionBloqueadaMinutos")) {
+    if (Object.prototype.hasOwnProperty.call(datos, "duracionBloqueadaMinutos")) {
+      datos.duracionBloqueadaMinutos = Math.max(datos.duracionBloqueadaMinutos, datos.duracionEstimadaMinutos);
+    } else {
       datos.duracionBloqueadaMinutos = datos.duracionEstimadaMinutos;
     }
   }
@@ -2784,6 +2817,36 @@ function obtenerStripeClient() {
   return stripe;
 }
 
+async function confirmarPedidoPagado(pedido, session = {}) {
+  if (!pedido) return null;
+
+  const estadoPrevio = normalizarEstadoPedido(pedido);
+  const yaConfirmado = estadoPrevio === "confirmado";
+  const paymentIntentId = session.payment_intent || session.paymentIntentId || pedido.paymentIntentId || "";
+  const stripeSessionId = session.id || pedido.stripeSessionId || "";
+  const stripeCheckoutStatus = session.status || pedido.stripeCheckoutStatus || "complete";
+
+  pedido.stripeSessionId = stripeSessionId;
+  pedido.paymentIntentId = paymentIntentId;
+  pedido.stripeCheckoutStatus = stripeCheckoutStatus;
+  pedido.status = "pagado";
+  pedido.estado = "confirmado";
+
+  if (!yaConfirmado || pedido.isModified?.()) {
+    await pedido.save();
+  }
+
+  if (!pedido.confirmationEmailSentAt) {
+    try {
+      await notificarPedidoPagado(pedido);
+    } catch (error) {
+      console.log("No se pudo enviar el correo de confirmación del pedido:", error.message);
+    }
+  }
+
+  return pedido;
+}
+
 app.post("/create-checkout-session", auth, checkoutLimiter, async (req, res) => {
   try {
     const { carrito, datos } = req.body;
@@ -2920,18 +2983,7 @@ app.post("/confirm-order", auth, checkoutLimiter, async (req, res) => {
       return res.status(404).json({ message: "No se encontró la orden asociada al pago" });
     }
 
-    pedido.stripeSessionId = session.id;
-    pedido.paymentIntentId = session.payment_intent;
-    pedido.stripeCheckoutStatus = session.status || "complete";
-    pedido.status = "pagado";
-    pedido.estado = "confirmado";
-    await pedido.save();
-
-    try {
-      await notificarPedidoPagado(pedido);
-    } catch (error) {
-      console.log("No se pudo enviar el correo de confirmación del pedido:", error.message);
-    }
+    await confirmarPedidoPagado(pedido, session);
 
     const user = await User.findById(req.user.id).select("email usuario");
 
@@ -2976,21 +3028,8 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       return res.status(400).send("Falta la orden asociada al checkout");
     }
 
-    const pedido = await Order.findByIdAndUpdate(orderId, {
-      stripeSessionId: session.id,
-      paymentIntentId: session.payment_intent,
-      stripeCheckoutStatus: session.status || "complete",
-      status: "pagado",
-      estado: "confirmado"
-    }, { new: true });
-
-    if (pedido) {
-      try {
-        await notificarPedidoPagado(pedido);
-      } catch (error) {
-        console.log("No se pudo enviar el correo de confirmación del pedido:", error.message);
-      }
-    }
+    const pedido = await Order.findById(orderId);
+    await confirmarPedidoPagado(pedido, session);
 
     console.log("✅ Orden guardada");
   } else if (event.type === "checkout.session.expired") {
@@ -2998,11 +3037,14 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     const orderId = typeof session.metadata?.orderId === "string" ? session.metadata.orderId.trim() : "";
 
     if (orderId) {
-      await Order.findByIdAndUpdate(orderId, {
-        stripeSessionId: session.id,
-        stripeCheckoutStatus: "expired",
-        status: "cancelado"
-      });
+      const pedido = await Order.findById(orderId);
+      if (pedido && normalizarEstadoPedido(pedido) !== "confirmado") {
+        pedido.stripeSessionId = session.id;
+        pedido.stripeCheckoutStatus = "expired";
+        pedido.status = "cancelado";
+        pedido.estado = "cancelado";
+        await pedido.save();
+      }
     }
   }
 
@@ -3449,6 +3491,10 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
       acc[key].push(registro);
       return acc;
     }, {});
+    const ventasGlobalesSemanales = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+    const metaGlobalSemanalMxn = META_SEMANAL_EMPLEADOS_MXN;
+    const metaGlobalSemanalOk = ventasGlobalesSemanales >= metaGlobalSemanalMxn;
+    const progresoMetaGlobal = Math.min(Math.round((ventasGlobalesSemanales / (metaGlobalSemanalMxn || 1)) * 100), 100);
 
     const empleadosResumen = empleados.map((empleado) => {
       const citasEmpleado = citasSemana.filter((cita) =>
@@ -3466,7 +3512,7 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
       const totalEvaluaciones = calificaciones.length;
       const sueldoBase = Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0;
       const comisionPorcentaje = Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0;
-      const metaSemanalOk = ventasSemanales >= META_SEMANAL_EMPLEADOS_MXN;
+      const metaSemanalOk = metaGlobalSemanalOk;
       const calificacionMinimaOk = typeof promedioEstrellas === "number" ? promedioEstrellas >= 4.0 : false;
       const puntualidadOkBase = retardosSemana < 3;
       // Base conserva la regla previa a faltas injustificadas y limpieza.
@@ -3488,6 +3534,12 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
       const elegibleBono = metaSemanalOk && calificacionMinimaOk && puntualidadOk && limpiezaOrdenBonoOk;
       const bonoCalculado = elegibleBono ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
       const totalAPagar = Math.max(0, sueldoBase + bonoCalculado - descuentoPorFaltas);
+      const razonesNoElegible = [];
+      if (!metaGlobalSemanalOk) razonesNoElegible.push("Meta global semanal no cumplida");
+      if (!calificacionMinimaOk) razonesNoElegible.push("Promedio menor a 4.0");
+      if (!puntualidadOkBase) razonesNoElegible.push("3 o mas retardos");
+      if (faltasInjustificadas > 0) razonesNoElegible.push("Falta injustificada");
+      if (limpiezaOrdenOk === false) razonesNoElegible.push("Limpieza y orden no cumplida");
       const descuentoPorFaltasProyectado = descuentoPorFaltas;
       const puntualidadOkProyectada = puntualidadOk;
       const elegibleBonoProyectado = elegibleBono;
@@ -3506,6 +3558,10 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
         ventasSemanales,
         metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
         metaSemanalOk,
+        metaGlobalSemanalMxn,
+        metaGlobalSemanalOk,
+        ventasGlobalesSemanales,
+        progresoMetaGlobal,
         calificacionMinimaOk,
         puntualidadOk,
         promedioEstrellas,
@@ -3532,11 +3588,11 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
         impactoAsistenciaProyectado,
         elegibleBono,
         bonoCalculado,
-        totalAPagar
+        totalAPagar,
+        razonesNoElegible
       };
     });
 
-    const ventasGlobales = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
     const calificacionesGlobales = citasSemana
       .map((cita) => (Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio))
       .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
@@ -3544,14 +3600,23 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
     const promedioEstrellasGlobal = calificacionesGlobales.length
       ? Math.round((calificacionesGlobales.reduce((total, valor) => total + valor, 0) / calificacionesGlobales.length) * 10) / 10
       : null;
+    const empleadosElegibles = empleadosResumen.filter((empleado) => empleado.elegibleBono).length;
+    const totalBonosCalculados = empleadosResumen.reduce((total, empleado) => total + (Number(empleado.bonoCalculado) || 0), 0);
 
     res.json({
       fecha,
       semanaInicio: semana.inicio,
       semanaFin: semana.fin,
       metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
-      ventasSemanales: ventasGlobales,
-      cumplioMeta: ventasGlobales >= META_SEMANAL_EMPLEADOS_MXN,
+      ventasSemanales: ventasGlobalesSemanales,
+      metaSemanalOk: metaGlobalSemanalOk,
+      cumplioMeta: metaGlobalSemanalOk,
+      ventasGlobalesSemanales,
+      metaGlobalSemanalMxn,
+      metaGlobalSemanalOk,
+      progresoMetaGlobal,
+      empleadosElegibles,
+      totalBonosCalculados,
       promedioEstrellas: promedioEstrellasGlobal,
       totalEvaluaciones,
       retardosSemana: asistenciaSemana.filter((registro) => registro.puntual === false).length,
@@ -4746,7 +4811,7 @@ app.patch("/admin/orders/:id/status", auth, requireAdmin, async (req, res) => {
   try {
     const orderId = typeof req.params.id === "string" ? req.params.id.trim() : "";
     const estado = typeof req.body?.estado === "string" ? req.body.estado.trim() : "";
-    const estadosPermitidos = ["pendiente", "confirmado", "cancelado_por_admin", "completado"];
+    const estadosPermitidos = ["pendiente", "confirmado", "cancelado", "cancelado_por_admin", "completado"];
 
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       return res.status(400).json({ message: "El id del pedido no es valido" });
@@ -4766,20 +4831,23 @@ app.patch("/admin/orders/:id/status", auth, requireAdmin, async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
     }
 
-    pedido.estado = estado;
-
-    if (estado === "cancelado_por_admin") {
+    if (estado === "cancelado" || estado === "cancelado_por_admin") {
       const motivo = typeof req.body?.motivoCancelacion === "string"
         ? req.body.motivoCancelacion.trim().slice(0, 300)
         : "";
+
+      pedido.estado = "cancelado";
+      pedido.status = "cancelado";
 
       if (motivo) {
         pedido.motivoCancelacion = motivo;
       }
 
       pedido.canceladoEn = new Date();
+    } else {
+      pedido.estado = estado;
+      pedido.status = estado === "confirmado" ? "pagado" : estado;
     }
-
     await pedido.save();
 
     res.json({
@@ -4828,7 +4896,7 @@ app.patch("/orders/:id/cancel", auth, customerActionLimiter, async (req, res) =>
       ? req.body.motivoCancelacion.trim().slice(0, 300)
       : "";
 
-    pedido.estado = "cancelado_por_cliente";
+    pedido.estado = "cancelado";
     pedido.status = "cancelado";
     pedido.canceladoEn = new Date();
 

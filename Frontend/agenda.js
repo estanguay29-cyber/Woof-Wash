@@ -115,6 +115,7 @@ let rewardsPorTelefono = {};
 let citaEnEdicionId = null;
 let citaEnDetalleId = null;
 let detalleEstadoActualizando = false;
+let citaPendienteCompletar = null;
 let citaPendienteCancelacionId = null;
 let filtroRangoActual = null;
 let filtroEstadoActual = "todos";
@@ -948,6 +949,7 @@ function construirServiciosDetalleFormulario(prefijo = "") {
       paquete: normalizado.servicioPaquete,
       nombre: normalizado.servicioNombre,
       key: normalizado.servicioKey,
+      duracionMinutos: obtenerDuracionServicioFormulario(normalizado.servicioTipo, normalizado.servicioPaquete),
       notas: String(servicio.notas || "").trim().slice(0, 300)
     };
 
@@ -1219,6 +1221,13 @@ function obtenerElementosAgenda() {
     detailCopiarResumen: document.getElementById("btnDetailCopiarResumen"),
     detailCopiarTelefono: document.getElementById("btnDetailCopiarTelefono"),
     detailCopiarDireccion: document.getElementById("btnDetailCopiarDireccion"),
+    completeModal: document.getElementById("agendaCompleteModal"),
+    completeForm: document.getElementById("agendaCompleteForm"),
+    completeCliente: document.getElementById("agendaCompleteCliente"),
+    completeServicio: document.getElementById("agendaCompleteServicio"),
+    completeTotalCobrado: document.getElementById("agendaCompleteTotalCobrado"),
+    completeError: document.getElementById("agendaCompleteError"),
+    completeBtnConfirmar: document.getElementById("btnConfirmarCompleteCita"),
     rewardModal: document.getElementById("agendaRewardModal"),
     rewardText: document.getElementById("agendaRewardText")
   };
@@ -1887,6 +1896,7 @@ function renderizarCitasAgenda() {
 function crearCardCita(cita) {
   const cancelando = citaPendienteCancelacionId === cita.id;
   const whatsappUrl = crearUrlWhatsApp(cita);
+  const whatsappValido = esUrlWhatsAppValida(whatsappUrl);
   const reward = rewardsPorTelefono[cita.telefono];
   const rewardEligible = Boolean(reward?.rewardEligible);
   const rewardSummary = obtenerResumenRecompensa(reward);
@@ -1894,7 +1904,7 @@ function crearCardCita(cita) {
   const calificacion = normalizarCalificacionServicio(cita.calificacionServicio);
   const etiquetaCalificacion = obtenerEtiquetaCalificacion(calificacion);
   const surveyUrl = crearUrlEncuestaWhatsApp(cita);
-  const puedeEnviarEncuesta = cita.estado === "completada" && surveyUrl !== "#";
+  const puedeEnviarEncuesta = cita.estado === "completada" && esUrlWhatsAppValida(surveyUrl);
   const resumenServicios = obtenerResumenServiciosCita(cita);
   const listaServicios = crearListaServiciosDetalleHtml(cita);
   const badgeServicios = crearBadgeServiciosCita(cita);
@@ -1940,7 +1950,7 @@ function crearCardCita(cita) {
         </label>
         <div class="agenda-action-buttons">
           <button type="button" class="admin-button admin-button-light" data-action="detalle" data-id="${escapeHtml(cita.id)}">Ver detalle</button>
-          <a class="admin-button admin-button-light agenda-whatsapp-btn" href="${escapeHtml(whatsappUrl)}" target="_blank" rel="noopener noreferrer">Mensaje de confirmación</a>
+          ${crearBotonWhatsAppAgenda(whatsappUrl, "Mensaje de confirmación", whatsappValido)}
           ${puedeEnviarEncuesta ? `<a class="admin-button admin-button-light agenda-survey-btn" href="${escapeHtml(surveyUrl)}" target="_blank" rel="noopener noreferrer">Enviar encuesta</a>` : ""}
           ${rewardEligible ? `<button type="button" class="admin-button admin-button-light agenda-reward-btn" data-action="preparar-correo" data-id="${escapeHtml(cita.id)}">Preparar correo</button>` : ""}
           <button type="button" class="admin-button admin-button-light" data-action="editar" data-id="${escapeHtml(cita.id)}">Editar cita</button>
@@ -2005,6 +2015,18 @@ function crearUrlEncuestaWhatsApp(cita) {
   ].join("\n");
 
   return `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
+}
+
+function esUrlWhatsAppValida(url) {
+  return typeof url === "string" && url.startsWith("https://wa.me/");
+}
+
+function crearBotonWhatsAppAgenda(url, texto, valido = esUrlWhatsAppValida(url)) {
+  if (!valido) {
+    return `<button type="button" class="admin-button admin-button-light agenda-whatsapp-btn" disabled title="Agrega un teléfono válido para enviar WhatsApp">Sin teléfono válido</button>`;
+  }
+
+  return `<a class="admin-button admin-button-light agenda-whatsapp-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(texto)}</a>`;
 }
 
 function normalizarTelefonoWhatsApp(telefono) {
@@ -2667,6 +2689,96 @@ async function cambiarEstadoCita(id, estado, totalCobrado = null) {
   await cargarStatsAgenda();
 }
 
+function mostrarErrorCompletarCita(mensaje = "") {
+  const { completeError } = obtenerElementosAgenda();
+  if (!completeError) return;
+  completeError.textContent = mensaje;
+  completeError.classList.toggle("hidden", !mensaje);
+}
+
+function restaurarSelectCompletarPendiente() {
+  if (citaPendienteCompletar?.selectElement) {
+    citaPendienteCompletar.selectElement.value = citaPendienteCompletar.estadoAnterior || "";
+  }
+}
+
+function cerrarModalCompletarCita({ restaurarSelect = true } = {}) {
+  const { completeModal, completeForm, completeBtnConfirmar } = obtenerElementosAgenda();
+  if (restaurarSelect) restaurarSelectCompletarPendiente();
+  citaPendienteCompletar = null;
+  completeForm?.reset();
+  mostrarErrorCompletarCita("");
+  if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
+  completeModal?.classList.add("hidden");
+  document.body.classList.remove("agenda-modal-open");
+}
+
+function abrirModalCompletarCita(cita, selectElement) {
+  const {
+    completeModal,
+    completeCliente,
+    completeServicio,
+    completeTotalCobrado,
+    completeBtnConfirmar
+  } = obtenerElementosAgenda();
+
+  if (!cita || !completeModal) {
+    if (selectElement) selectElement.value = cita?.estado || "";
+    return;
+  }
+
+  citaPendienteCompletar = {
+    id: cita.id,
+    estadoAnterior: cita.estado,
+    selectElement
+  };
+
+  if (completeCliente) completeCliente.textContent = cita.cliente || "-";
+  if (completeServicio) {
+    const partes = [
+      crearTextoServiciosDetalle(cita),
+      cita.fecha && cita.hora ? `${formatearFechaAgenda(cita.fecha)} ${cita.hora}` : ""
+    ].filter(Boolean);
+    completeServicio.textContent = partes.join(" - ") || "-";
+  }
+  if (completeTotalCobrado) {
+    completeTotalCobrado.value = "";
+    completeTotalCobrado.setCustomValidity("");
+  }
+  if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
+  mostrarErrorCompletarCita("");
+  completeModal.classList.remove("hidden");
+  document.body.classList.add("agenda-modal-open");
+  completeTotalCobrado?.focus();
+}
+
+async function confirmarCompletarCita(event) {
+  event.preventDefault();
+  const { completeTotalCobrado, completeBtnConfirmar } = obtenerElementosAgenda();
+  const pendiente = citaPendienteCompletar;
+  if (!pendiente?.id || !completeTotalCobrado || completeBtnConfirmar?.disabled) return;
+
+  let totalCobrado = 0;
+  try {
+    totalCobrado = normalizarMontoCobrado(completeTotalCobrado.value);
+  } catch (error) {
+    mostrarErrorCompletarCita(error.message);
+    completeTotalCobrado.focus();
+    return;
+  }
+
+  if (completeBtnConfirmar) completeBtnConfirmar.disabled = true;
+  mostrarErrorCompletarCita("");
+
+  try {
+    await cambiarEstadoCita(pendiente.id, "completada", totalCobrado);
+    cerrarModalCompletarCita({ restaurarSelect: false });
+  } catch (error) {
+    mostrarErrorCompletarCita(error.message);
+    if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
+  }
+}
+
 function crearItemDetalleAgenda(etiqueta, valor) {
   return `
     <div>
@@ -2752,11 +2864,34 @@ function renderizarDetalleCita(cita) {
   if (detailGuardarCalificacion) {
     detailGuardarCalificacion.disabled = cita.estado !== "completada";
   }
-  detailWhatsApp.href = crearUrlWhatsAppDetalle(cita);
+  const whatsappDetalleUrl = crearUrlWhatsAppDetalle(cita);
+  const whatsappDetalleValido = esUrlWhatsAppValida(whatsappDetalleUrl);
+  detailWhatsApp.textContent = whatsappDetalleValido ? "WhatsApp" : "Sin teléfono válido";
+  detailWhatsApp.title = whatsappDetalleValido ? "" : "Agrega un teléfono válido para enviar WhatsApp";
+  detailWhatsApp.classList.toggle("is-disabled", !whatsappDetalleValido);
+  if (whatsappDetalleValido) {
+    detailWhatsApp.href = whatsappDetalleUrl;
+    detailWhatsApp.target = "_blank";
+    detailWhatsApp.rel = "noopener noreferrer";
+    detailWhatsApp.removeAttribute("aria-disabled");
+    detailWhatsApp.removeAttribute("tabindex");
+  } else {
+    detailWhatsApp.removeAttribute("href");
+    detailWhatsApp.removeAttribute("target");
+    detailWhatsApp.removeAttribute("rel");
+    detailWhatsApp.setAttribute("aria-disabled", "true");
+    detailWhatsApp.setAttribute("tabindex", "-1");
+  }
   if (detailEncuesta) {
     const surveyUrl = crearUrlEncuestaWhatsApp(cita);
-    detailEncuesta.href = surveyUrl;
-    detailEncuesta.classList.toggle("hidden", cita.estado !== "completada" || surveyUrl === "#");
+    const surveyValido = esUrlWhatsAppValida(surveyUrl);
+    if (surveyValido) {
+      detailEncuesta.href = surveyUrl;
+    } else {
+      detailEncuesta.removeAttribute("href");
+    }
+    detailEncuesta.title = surveyValido ? "" : "Agrega un teléfono válido para enviar WhatsApp";
+    detailEncuesta.classList.toggle("hidden", cita.estado !== "completada" || !surveyValido);
   }
 }
 
@@ -3080,25 +3215,7 @@ async function manejarAccionesLista(event) {
     if (event.type !== "change") return;
 
     if (target.value === "completada") {
-      const totalCobradoInput = window.prompt("Ingresa el total cobrado para completar la cita:", "");
-      if (totalCobradoInput === null) {
-        target.value = cita.estado;
-        return;
-      }
-      let totalCobradoValue = 0;
-      try {
-        totalCobradoValue = normalizarMontoCobrado(totalCobradoInput);
-      } catch (error) {
-        alert(error.message);
-        target.value = cita.estado;
-        return;
-      }
-      try {
-        await cambiarEstadoCita(id, target.value, totalCobradoValue);
-      } catch (error) {
-        alert(error.message);
-        renderizarCitasAgenda();
-      }
+      abrirModalCompletarCita(cita, target);
       return;
     }
 
@@ -3306,6 +3423,7 @@ async function configurarAgenda() {
   elementos.duracionBloqueada?.addEventListener("change", actualizarDisponibilidadCrear);
   configurarInputMontoCobrado(document.getElementById("editTotalCobrado"));
   configurarInputMontoCobrado(document.getElementById("agendaDetailTotalCobrado"));
+  configurarInputMontoCobrado(document.getElementById("agendaCompleteTotalCobrado"));
   elementos.rewardGratisAplicado?.addEventListener("change", actualizarPanelAplicarRecompensa);
   elementos.btnUsarServicioGratis?.addEventListener("click", () => {
     if (!elementos.rewardGratisAplicado || elementos.rewardGratisAplicado.disabled) return;
@@ -3396,6 +3514,13 @@ async function configurarAgenda() {
     copiarTextoAgenda(cita?.direccion, "Dirección");
   });
 
+  elementos.completeForm?.addEventListener("submit", confirmarCompletarCita);
+  document.getElementById("btnCerrarCompleteModal")?.addEventListener("click", () => cerrarModalCompletarCita());
+  document.getElementById("btnCancelarCompleteCita")?.addEventListener("click", () => cerrarModalCompletarCita());
+  elementos.completeModal?.addEventListener("click", (event) => {
+    if (event.target === elementos.completeModal) cerrarModalCompletarCita();
+  });
+
   document.getElementById("btnCerrarRewardModal")?.addEventListener("click", cerrarModalReward);
   document.getElementById("btnCerrarRewardModalFooter")?.addEventListener("click", cerrarModalReward);
   document.getElementById("btnCopiarRewardText")?.addEventListener("click", async () => {
@@ -3407,6 +3532,7 @@ async function configurarAgenda() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (citaPendienteCompletar) cerrarModalCompletarCita();
     if (citaEnDetalleId) cerrarModalDetalle();
   });
 
