@@ -5,6 +5,17 @@
   align-items: center;
 }
 
+.employees-page {
+  overflow-x: hidden;
+}
+
+.employees-page .admin-shell,
+.employees-page .admin-hero-grid,
+.employees-page .admin-employees-card {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
 .admin-button.is-active,
 .admin-button.admin-button-dark.is-active {
   background-color: #1f2937;
@@ -26,6 +37,42 @@
 
 .admin-employee-item {
   margin-bottom: 1rem;
+}
+
+.employees-compact-hero {
+  margin-bottom: 1rem;
+}
+
+.employees-hero-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.2rem;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 250, 232, 0.96), rgba(255, 255, 255, 0.98)),
+    linear-gradient(90deg, rgba(11, 42, 107, 0.08), rgba(140, 198, 63, 0.12));
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  box-shadow: 0 18px 42px rgba(11, 42, 107, 0.07);
+}
+
+.employees-hero-card h2 {
+  margin: 0.12rem 0 0;
+  font-size: clamp(1.35rem, 2.1vw, 1.85rem);
+  line-height: 1.05;
+}
+
+.employees-hero-card p:not(.admin-kicker) {
+  margin: 0.28rem 0 0;
+  max-width: 520px;
+  color: #475569;
+}
+
+.employees-hero-card .admin-status-pill {
+  justify-self: end;
+  margin-top: 0;
+  white-space: nowrap;
 }
 
 /* Small icon button for Nuevo empleado */
@@ -66,22 +113,28 @@
 }
 
 .employee-create-btn {
-  min-height: 40px;
-  padding: 0.62rem 0.95rem;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #8cc63f, #78b62f);
-  box-shadow: 0 12px 24px rgba(140, 198, 63, 0.24);
+  min-height: 38px;
+  padding: 0.58rem 0.9rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(140, 198, 63, 0.98), rgba(107, 166, 42, 0.98)),
+    #8cc63f;
+  box-shadow: 0 14px 28px rgba(140, 198, 63, 0.24);
   font-weight: 900;
+}
+
+.employee-create-btn:hover {
+  box-shadow: 0 18px 32px rgba(140, 198, 63, 0.3);
 }
 
 .performance-reload-btn {
   min-height: 34px;
-  padding: 0.5rem 0.78rem;
-  border-radius: 12px;
-  background: #ffffff;
+  padding: 0.48rem 0.86rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
   color: #0b2a6b;
   border: 1px solid rgba(11, 42, 107, 0.14);
-  box-shadow: 0 8px 18px rgba(11, 42, 107, 0.08);
+  box-shadow: 0 10px 22px rgba(11, 42, 107, 0.09);
   font-size: 0.84rem;
   font-weight: 900;
 }
@@ -240,28 +293,74 @@
   color: #0b2a6b;
 }
 
+.performance-dashboard-card {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 232, 0.72), rgba(255, 255, 255, 0.98) 220px),
+    #ffffff;
+}
+
+.performance-dashboard-header {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(11, 42, 107, 0.04), rgba(140, 198, 63, 0.08));
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.performance-dashboard-header h2 {
+  margin-top: 0.12rem;
+  font-size: clamp(1.45rem, 2.3vw, 2rem);
+  line-height: 1.05;
+}
+
+.performance-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.performance-week-picker {
+  max-width: 215px;
+}
+
+.performance-week-picker input {
+  min-height: 36px;
+  padding: 0.48rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.88rem;
+}
+
 .performance-summary-grid {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
+  align-items: stretch;
 }
 
 .performance-metric-card {
   position: relative;
-  min-height: 180px;
+  min-height: 190px;
   overflow: hidden;
-  padding: 1.1rem;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff, #fffae8);
-  border-color: rgba(11, 42, 107, 0.1);
-  box-shadow: 0 18px 38px rgba(11, 42, 107, 0.08);
+  padding: 1.18rem;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 250, 232, 0.92)),
+    #ffffff;
+  border-color: rgba(11, 42, 107, 0.09);
+  box-shadow: 0 22px 48px rgba(11, 42, 107, 0.1);
+  animation: metricCardIn 420ms ease both;
 }
 
 .performance-metric-card::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
-  width: 5px;
-  background: var(--metric-accent, #0b2a6b);
+  width: 6px;
+  background: linear-gradient(180deg, var(--metric-accent, #0b2a6b), rgba(140, 198, 63, 0.82));
 }
 
 .performance-metric-card::after {
@@ -276,13 +375,19 @@
   background: color-mix(in srgb, var(--metric-accent, #0b2a6b) 13%, transparent);
 }
 
+.performance-metric-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--metric-accent, #0b2a6b) 34%, rgba(11, 42, 107, 0.08));
+  box-shadow: 0 28px 58px rgba(11, 42, 107, 0.14);
+}
+
 .metric-card-head {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  min-height: 38px;
+  min-height: 42px;
 }
 
 .metric-card-head > span:last-child {
@@ -297,13 +402,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
   background: rgba(11, 42, 107, 0.08);
   background: color-mix(in srgb, var(--metric-accent, #0b2a6b) 14%, #ffffff);
   color: var(--metric-accent, #0b2a6b);
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 950;
   box-shadow: inset 0 0 0 1px rgba(11, 42, 107, 0.08);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--metric-accent, #0b2a6b) 18%, transparent);
@@ -311,6 +416,11 @@
 
 .performance-metric-card .admin-badge {
   display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-size: 0.72rem;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .performance-metric-card strong,
@@ -322,9 +432,10 @@
 }
 
 .performance-metric-card strong {
-  margin-top: 0.9rem;
-  font-size: clamp(1.45rem, 2.4vw, 2rem);
-  line-height: 1.08;
+  margin-top: 1rem;
+  font-size: clamp(1.75rem, 3vw, 2.55rem);
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .performance-metric-card p {
@@ -335,11 +446,12 @@
 }
 
 .metric-progress {
-  height: 9px;
-  margin-top: 0.9rem;
+  height: 12px;
+  margin-top: 1rem;
   border-radius: 999px;
-  background: rgba(11, 42, 107, 0.08);
+  background: rgba(11, 42, 107, 0.1);
   overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(11, 42, 107, 0.08);
 }
 
 .metric-progress span {
@@ -348,6 +460,7 @@
   border-radius: inherit;
   background: linear-gradient(90deg, var(--metric-accent, #8cc63f), #0b2a6b);
   transition: width 260ms ease;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--metric-accent, #8cc63f) 28%, transparent);
 }
 
 .metric-inline-status {
@@ -369,6 +482,10 @@
   --metric-accent: #d97706;
 }
 
+.metric-target {
+  --metric-accent: #0ea5e9;
+}
+
 .metric-rating {
   --metric-accent: #f59e0b;
 }
@@ -377,21 +494,110 @@
   --metric-accent: #2563eb;
 }
 
+.performance-progress-deck {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.15rem;
+}
+
+.performance-progress-card {
+  position: relative;
+  overflow: hidden;
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  box-shadow: 0 18px 38px rgba(11, 42, 107, 0.08);
+  animation: metricCardIn 500ms ease both;
+}
+
+.performance-progress-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, var(--metric-accent, #8cc63f), #0b2a6b);
+}
+
+.performance-progress-card > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.performance-progress-card span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.performance-progress-card strong {
+  color: #0b2a6b;
+  font-size: 1.18rem;
+  line-height: 1.1;
+}
+
+.performance-progress-card p {
+  margin: 0.45rem 0 0;
+  color: #64748b;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.metric-progress-large {
+  height: 16px;
+  margin-top: 0.9rem;
+}
+
+.progress-goal-card {
+  --metric-accent: #0b2a6b;
+}
+
+.progress-punctuality-card {
+  --metric-accent: #8cc63f;
+}
+
+.progress-rating-card {
+  --metric-accent: #f59e0b;
+}
+
+.performance-table-panel {
+  margin-top: 1.15rem;
+}
+
+.performance-progress-overview {
+  padding: 1rem 1rem 0;
+}
+
+.performance-metric-card:nth-child(2) { animation-delay: 45ms; }
+.performance-metric-card:nth-child(3) { animation-delay: 90ms; }
+.performance-metric-card:nth-child(4) { animation-delay: 135ms; }
+.performance-metric-card:nth-child(5) { animation-delay: 180ms; }
+.performance-metric-card:nth-child(6) { animation-delay: 225ms; }
+.performance-metric-card:nth-child(7) { animation-delay: 270ms; }
+.performance-metric-card:nth-child(8) { animation-delay: 315ms; }
+
 .employee-birthday-notice {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  margin: 1.25rem 0 0;
-  padding: 1rem 1.15rem;
-  border-radius: 18px;
-  border: 1px solid rgba(140, 198, 63, 0.35);
+  gap: 1rem;
+  margin: 1rem 0 0;
+  padding: 1.05rem 1.2rem;
+  border-radius: 22px;
+  border: 1px solid rgba(140, 198, 63, 0.38);
   background:
-    linear-gradient(135deg, rgba(255, 250, 232, 0.98), rgba(255, 255, 255, 0.96)),
-    radial-gradient(circle at 12% 20%, rgba(140, 198, 63, 0.22), transparent 28%);
+    linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.62) 44%, transparent 62%),
+    radial-gradient(circle at 10% 15%, rgba(140, 198, 63, 0.24), transparent 30%),
+    linear-gradient(135deg, rgba(255, 250, 232, 0.98), rgba(255, 255, 255, 0.96) 48%, rgba(140, 198, 63, 0.12));
+  background-size: 240% 100%, auto, auto;
   color: #0b2a6b;
-  box-shadow: 0 18px 42px rgba(11, 42, 107, 0.09);
-  animation: birthdayNoticeIn 420ms ease both;
+  box-shadow: 0 20px 46px rgba(11, 42, 107, 0.1);
+  animation: birthdayNoticeIn 420ms ease both, birthdayShine 4800ms ease-in-out infinite;
 }
 
 .employee-birthday-notice::before {
@@ -400,7 +606,22 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
+.employee-birthday-notice::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  top: 0.85rem;
+  width: 48px;
+  height: 28px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, #8cc63f 0 3px, transparent 4px) 0 0 / 18px 18px,
+    radial-gradient(circle, #0b2a6b 0 2px, transparent 3px) 11px 8px / 20px 20px,
+    radial-gradient(circle, #f59e0b 0 2px, transparent 3px) 24px 2px / 16px 16px;
+  opacity: 0.52;
 }
 
 .employee-birthday-notice.hidden {
@@ -410,6 +631,7 @@
 .employee-birthday-notice p {
   position: relative;
   margin: 0;
+  color: #334155;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -429,24 +651,30 @@
   text-transform: uppercase;
 }
 
+.employee-birthday-title {
+  color: #0b2a6b;
+  font-size: 1.04rem;
+  font-weight: 950;
+}
+
 .employee-birthday-icon {
   position: relative;
   flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   background: linear-gradient(135deg, #0b2a6b, #133d91);
-  box-shadow: inset 0 -5px 0 rgba(255, 255, 255, 0.12), 0 10px 18px rgba(11, 42, 107, 0.18);
+  box-shadow: inset 0 -5px 0 rgba(255, 255, 255, 0.12), 0 12px 22px rgba(11, 42, 107, 0.2);
   animation: birthdayIconGlow 2200ms ease-in-out infinite;
 }
 
 .employee-birthday-icon::before {
   content: "";
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
-  height: 12px;
+  left: 11px;
+  right: 11px;
+  bottom: 12px;
+  height: 14px;
   border-radius: 4px 4px 7px 7px;
   background: #8cc63f;
 }
@@ -454,9 +682,9 @@
 .employee-birthday-icon::after {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 22px;
+  left: 13px;
+  right: 13px;
+  bottom: 26px;
   height: 5px;
   border-radius: 5px 5px 2px 2px;
   background: #ffffff;
@@ -464,12 +692,23 @@
 
 .employee-birthday-icon span {
   position: absolute;
-  left: 20px;
-  bottom: 29px;
+  left: 22px;
+  bottom: 33px;
   width: 3px;
   height: 8px;
   border-radius: 999px;
   background: #8cc63f;
+}
+
+@keyframes metricCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes birthdayNoticeIn {
@@ -480,6 +719,16 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes birthdayShine {
+  0%,
+  100% {
+    background-position: -120% 0, 0 0, 0 0;
+  }
+  50% {
+    background-position: 120% 0, 0 0, 0 0;
   }
 }
 
@@ -641,6 +890,23 @@
 }
 
 @media (max-width: 860px) {
+  .employees-hero-card {
+    grid-template-columns: 1fr;
+  }
+
+  .employees-hero-card .admin-status-pill {
+    justify-self: start;
+  }
+
+  .performance-dashboard-header {
+    align-items: flex-start;
+  }
+
+  .performance-toolbar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .admin-employees-tools {
     grid-template-columns: 1fr;
   }
@@ -650,7 +916,11 @@
   }
 
   .performance-summary-grid {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .performance-progress-deck {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -664,6 +934,26 @@
     max-width: none;
   }
 
+  .employees-hero-card {
+    padding: 0.9rem;
+    border-radius: 16px;
+  }
+
+  .performance-dashboard-header {
+    padding: 0.85rem;
+  }
+
+  .performance-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    border-radius: 18px;
+    padding: 0.55rem;
+  }
+
+  .performance-week-picker {
+    max-width: none;
+  }
+
   .performance-summary-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.85rem;
@@ -672,10 +962,11 @@
   .performance-metric-card {
     min-height: auto;
     padding: 1rem;
+    border-radius: 18px;
   }
 
   .performance-metric-card strong {
-    font-size: 1.45rem;
+    font-size: 1.65rem;
     word-break: break-word;
   }
 
@@ -685,6 +976,11 @@
     width: 100%;
   }
 
+  .performance-progress-card {
+    padding: 0.95rem;
+    border-radius: 18px;
+  }
+
   .employee-birthday-notice {
     align-items: flex-start;
     padding: 0.9rem;
@@ -692,5 +988,21 @@
 
   .admin-employees-table {
     min-width: 620px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .performance-metric-card,
+  .performance-progress-card,
+  .employee-birthday-notice,
+  .employee-birthday-icon {
+    animation: none;
+  }
+
+  .summary-card,
+  .small-icon-btn,
+  .employees-page .admin-action-button,
+  .metric-progress span {
+    transition: none;
   }
 }

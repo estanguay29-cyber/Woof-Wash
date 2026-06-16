@@ -60,8 +60,8 @@ export function renderEmployeeBirthdayNotice() {
   }
 
   const texto = cumpleaneros.length === 1
-    ? `Hoy celebramos el cumplea&ntilde;os de ${escapeHtml(cumpleaneros[0])}`
-    : `Hoy celebramos a: ${cumpleaneros.map(escapeHtml).join(", ")}`;
+    ? `Hoy celebramos a ${escapeHtml(cumpleaneros[0])}`
+    : `Hoy celebramos a ${cumpleaneros.map(escapeHtml).join(", ")}`;
 
   notice.innerHTML = `
     <span class="employee-birthday-icon" aria-hidden="true">
@@ -69,7 +69,8 @@ export function renderEmployeeBirthdayNotice() {
     </span>
     <div class="employee-birthday-copy">
       <span>Celebracion del equipo</span>
-      <p>${texto}</p>
+      <p class="employee-birthday-title">${texto}</p>
+      <p>Que tenga un excelente dia dentro de la jauria Woof & Wash.</p>
     </div>
   `;
   notice.classList.remove("hidden");

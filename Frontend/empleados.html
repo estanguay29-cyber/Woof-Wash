@@ -32,8 +32,8 @@
 
     <section id="adminAccessMessage" class="admin-access-message">Validando permisos...</section>
     <section id="adminPanel" class="admin-panel hidden">
-      <section class="admin-hero-grid">
-        <article class="admin-welcome-card">
+      <section class="admin-hero-grid employees-compact-hero">
+        <article class="admin-welcome-card employees-hero-card">
           <p class="admin-kicker">Empleados</p>
           <h2>Woof & Wash Empleados</h2>
           <p>Lista y administración de empleados, métricas operativas y estado del equipo.</p>
@@ -117,15 +117,15 @@
         </div>
       </section>
 
-      <section id="adminPerformanceSection" class="admin-employees-card hidden">
-        <div class="admin-orders-header">
+      <section id="adminPerformanceSection" class="admin-employees-card performance-dashboard-card hidden">
+        <div class="admin-orders-header performance-dashboard-header">
           <div>
             <p class="admin-kicker">Desempeño</p>
             <h2>Panel de desempeño</h2>
             <p class="admin-panel-copy">Monitorea métricas semanales, calificaciones y registros de asistencia.</p>
           </div>
-          <div class="admin-controls">
-            <label class="admin-search-box" style="max-width:280px;">
+          <div class="admin-controls performance-toolbar">
+            <label class="admin-search-box performance-week-picker">
               <span class="sr-only">Semana de</span>
               <input id="performanceWeekDate" type="date" />
             </label>
@@ -149,87 +149,106 @@
           <div class="summary-card performance-metric-card metric-sales">
             <div class="metric-card-head">
               <span class="metric-icon" aria-hidden="true">$</span>
-              <span>Ventas semanales</span>
+              <span>Ventas globales semanales</span>
             </div>
             <strong id="performanceSales">$0.00 MXN</strong>
             <p>Ingresos globales registrados esta semana.</p>
           </div>
           <div class="summary-card performance-metric-card metric-goal">
             <div class="metric-card-head">
-              <span class="metric-icon" aria-hidden="true">%</span>
-              <span>Cumplimiento de meta</span>
+              <span class="metric-icon" aria-hidden="true">M</span>
+              <span>Meta global semanal</span>
             </div>
             <strong id="performanceGoal">$22,000.00 MXN</strong>
-            <p>Meta semanal oficial para calcular bonos.</p>
-            <div class="metric-progress" aria-hidden="true">
-              <span id="performanceGoalCardProgress" style="width:0%"></span>
-            </div>
-          </div>
-          <div class="summary-card performance-metric-card metric-punctuality">
-            <div class="metric-card-head">
-              <span class="metric-icon" aria-hidden="true">OK</span>
-              <span>Puntualidad semanal</span>
-            </div>
-            <strong id="performancePunctualityStatus">Sin datos</strong>
-            <p>Lectura visual basada en retardos de la semana.</p>
-            <div class="metric-progress" aria-hidden="true">
-              <span id="performancePunctualityProgress" style="width:0%"></span>
-            </div>
-          </div>
-          <div class="summary-card performance-metric-card metric-delays">
-            <div class="metric-card-head">
-              <span class="metric-icon" aria-hidden="true">!</span>
-              <span>Retardos</span>
-            </div>
-            <strong id="performanceDelays">0</strong>
-            <p>Retardos acumulados en la semana activa.</p>
-          </div>
-          <div class="summary-card performance-metric-card metric-rating">
-            <div class="metric-card-head">
-              <span class="metric-icon" aria-hidden="true">*</span>
-              <span>Promedio de estrellas</span>
-            </div>
-            <strong id="performanceRating">-</strong>
-            <p>Calificacion promedio del periodo.</p>
-            <div class="metric-progress" aria-hidden="true">
-              <span id="performanceRatingProgress" style="width:0%"></span>
-            </div>
-          </div>
-          <div class="summary-card performance-metric-card metric-attendance">
-            <div class="metric-card-head">
-              <span class="metric-icon" aria-hidden="true">#</span>
-              <span>Evaluaciones</span>
-            </div>
-            <strong id="performanceEvaluations">0</strong>
-            <p>Total de evaluaciones consideradas.</p>
-          </div>
-          <div class="summary-card performance-metric-card metric-bonus">
-            <div class="metric-card-head">
-              <span class="metric-icon" aria-hidden="true">$</span>
-              <span>Bono calculado</span>
-            </div>
-            <strong id="performanceBonusesTotal">$0.00 MXN</strong>
-            <p>Total de bonos estimados hasta ahora.</p>
+            <p>Objetivo oficial usado para evaluar bonos.</p>
           </div>
           <div class="summary-card performance-metric-card metric-eligibility">
             <div class="metric-card-head">
               <span class="metric-icon" aria-hidden="true">+</span>
-              <span>Elegibilidad del bono</span>
+              <span>Empleados elegibles</span>
             </div>
             <strong id="performanceEligibleCount">0</strong>
-            <p>Empleados que cumplen las reglas actuales.</p>
-            <div class="metric-inline-status" id="performanceTargetMet">No</div>
+            <p>Personas que cumplen las reglas actuales.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-bonus">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">$</span>
+              <span>Total bonos calculados</span>
+            </div>
+            <strong id="performanceBonusesTotal">$0.00 MXN</strong>
+            <p>Total estimado con los datos disponibles.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-target">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">%</span>
+              <span>Cumplimiento de meta</span>
+            </div>
+            <strong class="metric-status-value" id="performanceTargetMet">No</strong>
+            <p>Estado de la meta global semanal.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-rating">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">*</span>
+              <span>Promedio estrellas</span>
+            </div>
+            <strong id="performanceRating">-</strong>
+            <p>Calificacion promedio del periodo.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-attendance">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">#</span>
+              <span>Total evaluaciones</span>
+            </div>
+            <strong id="performanceEvaluations">0</strong>
+            <p>Evaluaciones consideradas en la semana.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-delays">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">!</span>
+              <span>Retardos de la semana</span>
+            </div>
+            <strong id="performanceDelays">0</strong>
+            <p>Retardos acumulados en la semana activa.</p>
           </div>
         </div>
 
-        <div class="admin-table-panel">
-          <div style="margin:12px 0">
+        <div class="performance-progress-deck" aria-label="Indicadores visuales de desempeno">
+          <article class="performance-progress-card progress-goal-card">
+            <div>
+              <span>Meta global</span>
+              <strong id="performanceProgressPercent">0%</strong>
+            </div>
+            <p id="performanceProgressAmount">$0 MXN / $22,000 MXN</p>
+            <div class="metric-progress metric-progress-large" aria-hidden="true">
+              <span id="performanceGoalCardProgress" style="width:0%"></span>
+            </div>
+          </article>
+          <article class="performance-progress-card progress-punctuality-card">
+            <div>
+              <span>Puntualidad</span>
+              <strong id="performancePunctualityStatus">Sin datos</strong>
+            </div>
+            <p>Lectura visual basada en retardos de la semana.</p>
+            <div class="metric-progress metric-progress-large" aria-hidden="true">
+              <span id="performancePunctualityProgress" style="width:0%"></span>
+            </div>
+          </article>
+          <article class="performance-progress-card progress-rating-card">
+            <div>
+              <span>Calificacion</span>
+              <strong>5 estrellas</strong>
+            </div>
+            <p>Progreso contra la calificacion maxima.</p>
+            <div class="metric-progress metric-progress-large" aria-hidden="true">
+              <span id="performanceRatingProgress" style="width:0%"></span>
+            </div>
+          </article>
+        </div>
+
+        <div class="admin-table-panel performance-table-panel">
+          <div class="performance-progress-overview">
             <div class="progress-wrap" aria-hidden="true">
               <div id="performanceProgressBar" class="progress-bar" style="width:0%"></div>
-            </div>
-            <div class="progress-meta">
-              <div id="performanceProgressPercent">0%</div>
-              <div id="performanceProgressAmount">$0 MXN / $22,000 MXN</div>
             </div>
           </div>
           <div class="admin-table-scroll">
