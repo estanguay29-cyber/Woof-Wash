@@ -65,6 +65,34 @@
   line-height: 1;
 }
 
+.employee-create-btn {
+  min-height: 40px;
+  padding: 0.62rem 0.95rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #8cc63f, #78b62f);
+  box-shadow: 0 12px 24px rgba(140, 198, 63, 0.24);
+  font-weight: 900;
+}
+
+.performance-reload-btn {
+  min-height: 34px;
+  padding: 0.5rem 0.78rem;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0b2a6b;
+  border: 1px solid rgba(11, 42, 107, 0.14);
+  box-shadow: 0 8px 18px rgba(11, 42, 107, 0.08);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.performance-reload-btn:hover {
+  background: #0b2a6b;
+  color: #ffffff;
+  border-color: #0b2a6b;
+  box-shadow: 0 14px 26px rgba(11, 42, 107, 0.18);
+}
+
 .employees-page .admin-action-button,
 .employees-page .admin-button,
 .employees-page .auth-cta {
@@ -212,17 +240,167 @@
   color: #0b2a6b;
 }
 
+.performance-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+}
+
+.performance-metric-card {
+  position: relative;
+  min-height: 180px;
+  overflow: hidden;
+  padding: 1.1rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #fffae8);
+  border-color: rgba(11, 42, 107, 0.1);
+  box-shadow: 0 18px 38px rgba(11, 42, 107, 0.08);
+}
+
+.performance-metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--metric-accent, #0b2a6b);
+}
+
+.performance-metric-card::after {
+  content: "";
+  position: absolute;
+  right: -34px;
+  top: -42px;
+  width: 120px;
+  height: 120px;
+  border-radius: 999px;
+  background: rgba(11, 42, 107, 0.08);
+  background: color-mix(in srgb, var(--metric-accent, #0b2a6b) 13%, transparent);
+}
+
+.metric-card-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 38px;
+}
+
+.metric-card-head > span:last-child {
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.summary-card .metric-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: rgba(11, 42, 107, 0.08);
+  background: color-mix(in srgb, var(--metric-accent, #0b2a6b) 14%, #ffffff);
+  color: var(--metric-accent, #0b2a6b);
+  font-size: 0.78rem;
+  font-weight: 950;
+  box-shadow: inset 0 0 0 1px rgba(11, 42, 107, 0.08);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--metric-accent, #0b2a6b) 18%, transparent);
+}
+
+.performance-metric-card .admin-badge {
+  display: inline-flex;
+}
+
+.performance-metric-card strong,
+.performance-metric-card p,
+.metric-inline-status,
+.metric-progress {
+  position: relative;
+  z-index: 1;
+}
+
+.performance-metric-card strong {
+  margin-top: 0.9rem;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  line-height: 1.08;
+}
+
+.performance-metric-card p {
+  margin: 0.6rem 0 0;
+  color: #64748b;
+  font-size: 0.88rem;
+  line-height: 1.38;
+}
+
+.metric-progress {
+  height: 9px;
+  margin-top: 0.9rem;
+  border-radius: 999px;
+  background: rgba(11, 42, 107, 0.08);
+  overflow: hidden;
+}
+
+.metric-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--metric-accent, #8cc63f), #0b2a6b);
+  transition: width 260ms ease;
+}
+
+.metric-inline-status {
+  margin-top: 0.75rem;
+}
+
+.metric-sales,
+.metric-goal {
+  --metric-accent: #0b2a6b;
+}
+
+.metric-punctuality,
+.metric-attendance,
+.metric-eligibility {
+  --metric-accent: #8cc63f;
+}
+
+.metric-delays {
+  --metric-accent: #d97706;
+}
+
+.metric-rating {
+  --metric-accent: #f59e0b;
+}
+
+.metric-bonus {
+  --metric-accent: #2563eb;
+}
+
 .employee-birthday-notice {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.85rem;
   margin: 1.25rem 0 0;
-  padding: 0.95rem 1.1rem;
-  border-radius: 16px;
-  border: 1px solid rgba(140, 198, 63, 0.28);
-  background: linear-gradient(135deg, rgba(140, 198, 63, 0.13), rgba(255, 255, 255, 0.95));
+  padding: 1rem 1.15rem;
+  border-radius: 18px;
+  border: 1px solid rgba(140, 198, 63, 0.35);
+  background:
+    linear-gradient(135deg, rgba(255, 250, 232, 0.98), rgba(255, 255, 255, 0.96)),
+    radial-gradient(circle at 12% 20%, rgba(140, 198, 63, 0.22), transparent 28%);
   color: #0b2a6b;
-  box-shadow: 0 16px 32px rgba(11, 42, 107, 0.07);
+  box-shadow: 0 18px 42px rgba(11, 42, 107, 0.09);
+  animation: birthdayNoticeIn 420ms ease both;
+}
+
+.employee-birthday-notice::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.65);
 }
 
 .employee-birthday-notice.hidden {
@@ -230,19 +408,36 @@
 }
 
 .employee-birthday-notice p {
+  position: relative;
   margin: 0;
   font-weight: 700;
   line-height: 1.4;
 }
 
+.employee-birthday-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.employee-birthday-copy > span {
+  display: block;
+  margin-bottom: 0.12rem;
+  color: #5d7f21;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .employee-birthday-icon {
   position: relative;
   flex: 0 0 auto;
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   border-radius: 999px;
-  background: #0b2a6b;
-  box-shadow: inset 0 -5px 0 rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, #0b2a6b, #133d91);
+  box-shadow: inset 0 -5px 0 rgba(255, 255, 255, 0.12), 0 10px 18px rgba(11, 42, 107, 0.18);
+  animation: birthdayIconGlow 2200ms ease-in-out infinite;
 }
 
 .employee-birthday-icon::before {
@@ -269,12 +464,35 @@
 
 .employee-birthday-icon span {
   position: absolute;
-  left: 18px;
-  bottom: 27px;
+  left: 20px;
+  bottom: 29px;
   width: 3px;
   height: 8px;
   border-radius: 999px;
   background: #8cc63f;
+}
+
+@keyframes birthdayNoticeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes birthdayIconGlow {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: inset 0 -5px 0 rgba(255, 255, 255, 0.12), 0 10px 18px rgba(11, 42, 107, 0.18);
+  }
+  50% {
+    transform: translateY(-2px);
+    box-shadow: inset 0 -5px 0 rgba(255, 255, 255, 0.12), 0 14px 24px rgba(140, 198, 63, 0.28);
+  }
 }
 
 .admin-table-panel {
@@ -430,9 +648,43 @@
   .admin-filter-group {
     justify-content: flex-start;
   }
+
+  .performance-summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
+  .employees-page .admin-controls {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .employees-page .admin-controls .admin-search-box {
+    max-width: none;
+  }
+
+  .performance-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.85rem;
+  }
+
+  .performance-metric-card {
+    min-height: auto;
+    padding: 1rem;
+  }
+
+  .performance-metric-card strong {
+    font-size: 1.45rem;
+    word-break: break-word;
+  }
+
+  .employee-create-btn,
+  .performance-reload-btn {
+    justify-content: center;
+    width: 100%;
+  }
+
   .employee-birthday-notice {
     align-items: flex-start;
     padding: 0.9rem;

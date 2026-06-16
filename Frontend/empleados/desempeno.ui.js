@@ -1,20 +1,44 @@
 import { getById, setTextContent, escapeHtml, META_SEMANAL_OFICIAL_MXN } from "./empleados.utils.js";
 import { formatCurrency, formatDate } from "./empleados.payroll.js";
 
-export function renderPerformanceSummary(summary) {
+function toFiniteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function toNonNegativeNumber(value, fallback = 0) {
+  return Math.max(0, toFiniteNumber(value, fallback));
+}
+
+function toPositiveNumber(value, fallback) {
+  const number = toFiniteNumber(value, fallback);
+  return number > 0 ? number : fallback;
+}
+
+function toCount(value) {
+  return Math.round(toNonNegativeNumber(value, 0));
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Math.round(toFiniteNumber(value, 0))));
+}
+
+export function renderPerformanceSummary(summary = {}) {
   const ventasResumen = summary.ventasGlobalesSemanales ?? summary.ventasSemanales;
   const metaResumen = summary.metaGlobalSemanalMxn ?? summary.metaSemanalMxn;
-  const ventas = Number.isFinite(Number(ventasResumen)) ? Number(ventasResumen) : 0;
-  const meta = Number.isFinite(Number(metaResumen)) ? Number(metaResumen) : META_SEMANAL_OFICIAL_MXN;
+  const ventas = toNonNegativeNumber(ventasResumen, 0);
+  const meta = toPositiveNumber(metaResumen, META_SEMANAL_OFICIAL_MXN);
   setTextContent("performanceSales", formatCurrency(ventas));
   setTextContent("performanceGoal", formatCurrency(meta));
 
   // progress bar
   const percent = Number.isFinite(Number(summary.progresoMetaGlobal))
-    ? Math.min(100, Math.round(Number(summary.progresoMetaGlobal)))
-    : Math.min(100, Math.round((ventas / (meta || 1)) * 100));
+    ? clampPercent(summary.progresoMetaGlobal)
+    : clampPercent((ventas / (meta || 1)) * 100);
   const progressBar = getById("performanceProgressBar");
   if (progressBar) progressBar.style.width = `${percent}%`;
+  const goalCardProgress = getById("performanceGoalCardProgress");
+  if (goalCardProgress) goalCardProgress.style.width = `${percent}%`;
   setTextContent("performanceProgressPercent", `${percent}%`);
   setTextContent("performanceProgressAmount", `${formatCurrency(ventas)} / ${formatCurrency(meta)}`);
 
@@ -30,29 +54,43 @@ export function renderPerformanceSummary(summary) {
   // rating with stars
   const ratingEl = getById("performanceRating");
   if (ratingEl) {
-    const rating = typeof summary.promedioEstrellas === "number" ? summary.promedioEstrellas : null;
+    const rating = Number.isFinite(Number(summary.promedioEstrellas)) ? Math.max(0, Math.min(5, Number(summary.promedioEstrellas))) : null;
     const ratingText = rating !== null ? rating.toFixed(1) : "-";
-    const starsCount = rating !== null ? Math.round(rating) : 0;
+    const starsCount = rating !== null ? Math.max(0, Math.min(5, Math.round(rating))) : 0;
     const stars = Array.from({ length: 5 }).map((_, i) => i < starsCount ? '★' : '<span class="star-empty">★</span>').join('');
     const califOk = typeof summary.calificacionMinimaOk === "boolean"
       ? summary.calificacionMinimaOk
       : (rating !== null ? rating >= 4.0 : false);
     const badgeClass = califOk ? 'admin-badge-success' : 'admin-badge-muted';
     ratingEl.innerHTML = `<span class="stars">${stars}</span> <span style="margin-left:8px">${ratingText}</span> <span class="admin-badge ${badgeClass}" style="margin-left:6px">${califOk ? 'Cumple' : 'No cumple'}</span>`;
+    const ratingProgress = getById("performanceRatingProgress");
+    if (ratingProgress) ratingProgress.style.width = rating !== null ? `${clampPercent((rating / 5) * 100)}%` : "0%";
   }
 
   // delays with color mapping
   const delaysEl = getById("performanceDelays");
+  const punctualityStatus = getById("performancePunctualityStatus");
+  const punctualityProgress = getById("performancePunctualityProgress");
   if (delaysEl) {
-    const delays = Number.isFinite(Number(summary.retardosSemana)) ? Number(summary.retardosSemana) : 0;
+    const delays = toCount(summary.retardosSemana);
     const cls = delays >= 3 ? 'delay-3' : delays === 2 ? 'delay-2' : delays === 1 ? 'delay-1' : 'delay-0';
     delaysEl.innerHTML = `<span class="${cls}">${delays}</span>`;
+    const puntualidadOk = typeof summary.puntualidadOk === "boolean" ? summary.puntualidadOk : delays < 3;
+    if (punctualityStatus) {
+      punctualityStatus.innerHTML = puntualidadOk
+        ? '<span class="admin-badge admin-badge-success">En regla</span>'
+        : '<span class="admin-badge admin-badge-warning">Revisar</span>';
+    }
+    if (punctualityProgress) {
+      const puntualidadPercent = clampPercent(((3 - Math.min(delays, 3)) / 3) * 100);
+      punctualityProgress.style.width = `${puntualidadPercent}%`;
+    }
   }
 
-  setTextContent("performanceEvaluations", summary.totalEvaluaciones || 0);
+  setTextContent("performanceEvaluations", toCount(summary.totalEvaluaciones));
   // additional summary values
-  setTextContent("performanceEligibleCount", summary.empleadosElegibles || 0);
-  setTextContent("performanceBonusesTotal", formatCurrency(summary.totalBonosCalculados || 0));
+  setTextContent("performanceEligibleCount", toCount(summary.empleadosElegibles));
+  setTextContent("performanceBonusesTotal", formatCurrency(toNonNegativeNumber(summary.totalBonosCalculados, 0)));
 }
 
 export function renderPerformanceTable(items = []) {
@@ -86,11 +124,11 @@ export function renderPerformanceTable(items = []) {
       limpiezaBadge = '<span class="admin-badge admin-badge-warning">Incumplimientos</span>';
       limpiezaEstado = "No cumple: afecta bono";
     }
-    const limpiezaDetalle = `${Number(item.limpiezaOrdenEvaluaciones) || 0} eval. / ${Number(item.limpiezaOrdenIncumplimientos) || 0} inc.`;
+    const limpiezaDetalle = `${toCount(item.limpiezaOrdenEvaluaciones)} eval. / ${toCount(item.limpiezaOrdenIncumplimientos)} inc.`;
     const eventosAsistenciaDetalle = [
-      `J: ${Number(item.faltasJustificadas) || 0}`,
-      `I: ${Number(item.faltasInjustificadas) || 0}`,
-      `V: ${Number(item.vacacionesDias) || 0}`
+      `J: ${toCount(item.faltasJustificadas)}`,
+      `I: ${toCount(item.faltasInjustificadas)}`,
+      `V: ${toCount(item.vacacionesDias)}`
     ].join(" / ");
     let asistenciaProyectadaBadge = '<span class="admin-badge admin-badge-muted">Sin impacto aplicado</span>';
     if (typeof item.elegibleBonoProyectado === "boolean") {
@@ -118,25 +156,27 @@ export function renderPerformanceTable(items = []) {
 
     const estadoClass = item.elegibleBono ? 'admin-badge-info' : (!metaGlobalOk ? 'admin-badge-danger' : (!item.calificacionMinimaOk ? 'admin-badge-warning' : 'admin-badge-orange'));
 
-    const stars = typeof item.promedioEstrellas === 'number' ? Math.round(item.promedioEstrellas) : 0;
+    const promedioEstrellas = Number.isFinite(Number(item.promedioEstrellas)) ? Math.max(0, Math.min(5, Number(item.promedioEstrellas))) : null;
+    const promedioEstrellasTexto = promedioEstrellas !== null ? promedioEstrellas.toFixed(1) : "-";
+    const stars = promedioEstrellas !== null ? Math.max(0, Math.min(5, Math.round(promedioEstrellas))) : 0;
     const starsHtml = Array.from({ length: 5 }).map((_, i) => i < stars ? '★' : '<span class="star-empty">★</span>').join('');
 
-    const retardos = Number.isFinite(Number(item.retardosSemana)) ? Number(item.retardosSemana) : 0;
+    const retardos = toCount(item.retardosSemana);
     const delayCls = retardos >= 3 ? 'delay-3' : retardos === 2 ? 'delay-2' : retardos === 1 ? 'delay-1' : 'delay-0';
 
     return `
     <tr ${tooltip}>
       <td>${escapeHtml(item.nombreCompleto || "Sin nombre")}</td>
-      <td>${formatCurrency(item.ventasSemanales || 0)}</td>
+      <td>${formatCurrency(toNonNegativeNumber(item.ventasSemanales, 0))}</td>
       <td>${metaBadge}</td>
-      <td><span class="stars">${starsHtml}</span> <span style="margin-left:8px">${escapeHtml(item.promedioEstrellas !== null ? item.promedioEstrellas.toFixed(1) : "-")}</span> ${califBadge}</td>
+      <td><span class="stars">${starsHtml}</span> <span style="margin-left:8px">${escapeHtml(promedioEstrellasTexto)}</span> ${califBadge}</td>
       <td>${punctualityBadge}</td>
-      <td>${item.totalEvaluaciones || 0}</td>
+      <td>${toCount(item.totalEvaluaciones)}</td>
       <td><span class="${delayCls}">${retardos}</span></td>
       <td>${limpiezaBadge}<br><small>${escapeHtml(limpiezaDetalle)}</small><br><small>${escapeHtml(limpiezaEstado)}</small></td>
       <td><span class="admin-badge admin-badge-muted">Asistencia</span><br><small>${escapeHtml(eventosAsistenciaDetalle)}</small><br>${asistenciaProyectadaBadge}<br><small>Impacto aplicado en nomina</small></td>
       <td>${elegibleBadge}</td>
-      <td><span class="admin-badge ${estadoClass}">${escapeHtml(estado)}</span><br><small>Bono hasta ahora: ${formatCurrency(item.bonoCalculado || 0)}</small>${reasons.length ? `<br><small>${escapeHtml(reasons.join("; "))}</small>` : ""}</td>
+      <td><span class="admin-badge ${estadoClass}">${escapeHtml(estado)}</span><br><small>Bono hasta ahora: ${formatCurrency(toNonNegativeNumber(item.bonoCalculado, 0))}</small>${reasons.length ? `<br><small>${escapeHtml(reasons.join("; "))}</small>` : ""}</td>
     </tr>
   `;
   }).join("");

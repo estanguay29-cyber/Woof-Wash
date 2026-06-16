@@ -51,7 +51,7 @@
             <p class="admin-panel-copy">Administra el equipo, filtra por estado y revisa el historial de registro.</p>
           </div>
           <div class="admin-controls">
-            <button id="btnNuevoEmpleado" type="button" class="auth-cta auth-cta-primary small-icon-btn" aria-label="Nuevo empleado">
+            <button id="btnNuevoEmpleado" type="button" class="auth-cta auth-cta-primary small-icon-btn employee-create-btn" aria-label="Nuevo empleado">
               <span class="btn-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M12 5v14" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -129,44 +129,96 @@
               <span class="sr-only">Semana de</span>
               <input id="performanceWeekDate" type="date" />
             </label>
-            <button id="btnPerformanceReload" type="button" class="small-icon-btn">Actualizar</button>
+            <button id="btnPerformanceReload" type="button" class="small-icon-btn performance-reload-btn">
+              <span class="btn-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="15" height="15" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12a9 9 0 0 1-15.3 6.4" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M3 12A9 9 0 0 1 18.3 5.6" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M18 2v4h-4" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M6 22v-4h4" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </span>
+              <span class="btn-text">Actualizar</span>
+            </button>
           </div>
         </div>
 
         <div id="performanceFeedback" class="admin-feedback hidden"></div>
 
-        <div class="admin-employees-summary">
-          <div class="summary-card">
-            <span>Ventas globales semanales</span>
+        <div class="admin-employees-summary performance-summary-grid">
+          <div class="summary-card performance-metric-card metric-sales">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">$</span>
+              <span>Ventas semanales</span>
+            </div>
             <strong id="performanceSales">$0.00 MXN</strong>
+            <p>Ingresos globales registrados esta semana.</p>
           </div>
-          <div class="summary-card">
-            <span>Meta global semanal</span>
+          <div class="summary-card performance-metric-card metric-goal">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">%</span>
+              <span>Cumplimiento de meta</span>
+            </div>
             <strong id="performanceGoal">$22,000.00 MXN</strong>
+            <p>Meta semanal oficial para calcular bonos.</p>
+            <div class="metric-progress" aria-hidden="true">
+              <span id="performanceGoalCardProgress" style="width:0%"></span>
+            </div>
           </div>
-          <div class="summary-card">
-            <span>Empleados elegibles</span>
-            <strong id="performanceEligibleCount">0</strong>
+          <div class="summary-card performance-metric-card metric-punctuality">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">OK</span>
+              <span>Puntualidad semanal</span>
+            </div>
+            <strong id="performancePunctualityStatus">Sin datos</strong>
+            <p>Lectura visual basada en retardos de la semana.</p>
+            <div class="metric-progress" aria-hidden="true">
+              <span id="performancePunctualityProgress" style="width:0%"></span>
+            </div>
           </div>
-          <div class="summary-card">
-            <span>Total bonos calculados</span>
-            <strong id="performanceBonusesTotal">$0.00 MXN</strong>
-          </div>
-          <div class="summary-card">
-            <span>Cumplio meta global</span>
-            <strong id="performanceTargetMet">No</strong>
-          </div>
-          <div class="summary-card">
-            <span>Promedio estrellas</span>
-            <strong id="performanceRating">-</strong>
-          </div>
-          <div class="summary-card">
-            <span>Total evaluaciones</span>
-            <strong id="performanceEvaluations">0</strong>
-          </div>
-          <div class="summary-card">
-            <span>Retardos de la semana</span>
+          <div class="summary-card performance-metric-card metric-delays">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">!</span>
+              <span>Retardos</span>
+            </div>
             <strong id="performanceDelays">0</strong>
+            <p>Retardos acumulados en la semana activa.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-rating">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">*</span>
+              <span>Promedio de estrellas</span>
+            </div>
+            <strong id="performanceRating">-</strong>
+            <p>Calificacion promedio del periodo.</p>
+            <div class="metric-progress" aria-hidden="true">
+              <span id="performanceRatingProgress" style="width:0%"></span>
+            </div>
+          </div>
+          <div class="summary-card performance-metric-card metric-attendance">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">#</span>
+              <span>Evaluaciones</span>
+            </div>
+            <strong id="performanceEvaluations">0</strong>
+            <p>Total de evaluaciones consideradas.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-bonus">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">$</span>
+              <span>Bono calculado</span>
+            </div>
+            <strong id="performanceBonusesTotal">$0.00 MXN</strong>
+            <p>Total de bonos estimados hasta ahora.</p>
+          </div>
+          <div class="summary-card performance-metric-card metric-eligibility">
+            <div class="metric-card-head">
+              <span class="metric-icon" aria-hidden="true">+</span>
+              <span>Elegibilidad del bono</span>
+            </div>
+            <strong id="performanceEligibleCount">0</strong>
+            <p>Empleados que cumplen las reglas actuales.</p>
+            <div class="metric-inline-status" id="performanceTargetMet">No</div>
           </div>
         </div>
 
