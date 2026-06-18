@@ -81,6 +81,10 @@ function obtenerNombreGuardado() {
   return localStorage.getItem("usuario");
 }
 
+function obtenerRoleGuardado() {
+  return (localStorage.getItem("role") || localStorage.getItem("userRole") || "").trim().toLowerCase();
+}
+
 function guardarNombreUsuario(usuario) {
   if (usuario) {
     localStorage.setItem("usuario", usuario);
@@ -90,6 +94,8 @@ function guardarNombreUsuario(usuario) {
 function limpiarSesion() {
   localStorage.removeItem("token");
   localStorage.removeItem("usuario");
+  localStorage.removeItem("role");
+  localStorage.removeItem("userRole");
 }
 
 function manejarRespuestaAuthCliente(res, data = {}, options = {}) {
@@ -186,10 +192,35 @@ function renderizarAccesosAdmin(esAdmin) {
   adminAccountActions.classList.toggle("hidden", !esAdmin);
 }
 
+function renderizarAccesosEmpleado(esEmpleado) {
+  const employeeAccountActions = document.getElementById("employeeAccountActions");
+  if (!employeeAccountActions) return;
+
+  employeeAccountActions.classList.toggle("hidden", !esEmpleado);
+}
+
+function renderizarAccesosCuentaPorRole() {
+  const role = obtenerRoleGuardado();
+  renderizarAccesosEmpleado(role === "empleado");
+  if (role === "empleado") {
+    renderizarAccesosAdmin(false);
+  }
+}
+
 async function validarAccesosAdmin() {
   const token = obtenerTokenValido();
+  const role = obtenerRoleGuardado();
+
+  renderizarAccesosEmpleado(Boolean(token) && role === "empleado");
 
   if (!token) {
+    adminValidado = false;
+    tokenAdminValidado = null;
+    renderizarAccesosAdmin(false);
+    return false;
+  }
+
+  if (role === "empleado") {
     adminValidado = false;
     tokenAdminValidado = null;
     renderizarAccesosAdmin(false);
@@ -457,6 +488,9 @@ if (!token) {
   adminValidado = false;
   tokenAdminValidado = null;
   renderizarAccesosAdmin(false);
+  renderizarAccesosEmpleado(false);
+} else {
+  renderizarAccesosCuentaPorRole();
 }
 
 if (menuCuentaUsuario && token) {
@@ -1765,6 +1799,7 @@ function toggleMenuCuenta() {
   const menu = document.getElementById("menuCuenta");
   if (!menu) return;
   menu.classList.toggle("hidden");
+  renderizarAccesosCuentaPorRole();
   validarAccesosAdmin();
 }
 

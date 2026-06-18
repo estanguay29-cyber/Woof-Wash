@@ -199,7 +199,10 @@ function obtenerDestinoPorRole(role) {
   const destinoSeguro = obtenerDestinoDespuesDeAuth();
 
   if (rol === "empleado") {
-    return "empleados/dashboard.html";
+    if (destinoSeguro === "admin.html" || destinoSeguro === "agenda.html" || destinoSeguro === "empleados.html") {
+      return "index.html";
+    }
+    return destinoSeguro;
   }
 
   if (rol === "admin") {
