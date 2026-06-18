@@ -738,21 +738,27 @@ async function requireAdmin(req, res, next) {
 
 async function requireEmpleado(req, res, next) {
   try {
-    const empleadoId = typeof req.user?.id === "string" ? req.user.id : "";
+    const userId = typeof req.user?.id === "string" ? req.user.id : "";
 
-    if (!mongoose.Types.ObjectId.isValid(empleadoId)) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({ message: "Token inválido" });
     }
 
-    const user = await User.findById(empleadoId).select("usuario email role");
+    const user = await User.findById(userId).select("usuario email role employeeId");
     const role = obtenerRolUsuario(user);
 
-    if (!user || !["empleado", "admin"].includes(role)) {
+    if (!user || role !== "empleado" || !user.employeeId) {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    const employee = await Employee.findById(user.employeeId).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos");
+    if (!employee || employee.activo === false) {
       return res.status(403).json({ message: "No autorizado" });
     }
 
     req.empleado = user;
     req.empleadoRole = role;
+    req.employeeProfile = employee;
     next();
   } catch (error) {
     res.status(500).json({ message: "No se pudo validar el acceso de empleado" });
@@ -1000,12 +1006,13 @@ const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
 
 const APPOINTMENT_SERVICE_CATALOG = Object.freeze({
   mascota: {
-    categorias: ["Chico", "Mediano", "Grande"],
+    categorias: ["Chico", "Mediano", "Grande", "Gigante"],
     paquetes: ["B\u00e1sico", "Completo", "Premium SPA"],
     nombres: {
       Chico: "Mascota chico",
       Mediano: "Mascota mediano",
-      Grande: "Mascota grande"
+      Grande: "Mascota grande",
+      Gigante: "Mascota gigante"
     }
   },
   auto: {
@@ -3356,6 +3363,116 @@ function construirPerformanceMetricRecord(registro, empleadoMap = new Map()) {
   };
 }
 
+function construirResumenPerformanceEmpleado({
+  empleado,
+  citasSemana = [],
+  asistenciaRegistros = [],
+  limpiezaOrdenRegistros = [],
+  eventosAsistenciaRegistros = [],
+  metaGlobalSemanalOk = false,
+  metaGlobalSemanalMxn = META_SEMANAL_EMPLEADOS_MXN,
+  ventasGlobalesSemanales = 0,
+  progresoMetaGlobal = 0
+} = {}) {
+  const empleadoId = String(empleado?._id || "");
+  const citasEmpleado = citasSemana.filter((cita) =>
+    String(cita.empleadoAsignadoId) === empleadoId ||
+    (Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.some((id) => String(id) === empleadoId))
+  );
+  const metricasEmpleado = calcularMetricasEmpleado(citasEmpleado);
+  const ventasSemanales = metricasEmpleado.ingresosGeneradosAproximados;
+  const calificaciones = citasEmpleado
+    .map((cita) => (Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio))
+    .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
+  const promedioEstrellas = calificaciones.length
+    ? Math.round((calificaciones.reduce((acc, valor) => acc + valor, 0) / calificaciones.length) * 10) / 10
+    : null;
+  const retardosSemana = asistenciaRegistros.filter((registro) => registro.puntual === false).length;
+  const totalEvaluaciones = calificaciones.length;
+  const sueldoBase = Number.isFinite(Number(empleado?.sueldoBase)) ? Number(empleado.sueldoBase) : 0;
+  const comisionPorcentaje = Number.isFinite(Number(empleado?.comision)) ? Number(empleado.comision) : 0;
+  const metaSemanalOk = metaGlobalSemanalOk;
+  const cumplioMetaPersonal = ventasSemanales >= META_SEMANAL_EMPLEADOS_MXN;
+  const calificacionMinimaOk = typeof promedioEstrellas === "number" ? promedioEstrellas >= 4.0 : false;
+  const puntualidadOkBase = retardosSemana < 3;
+  const elegibleBonoBase = metaSemanalOk && calificacionMinimaOk && puntualidadOkBase;
+  const bonoCalculadoBase = elegibleBonoBase ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
+  const totalAPagarBase = sueldoBase + bonoCalculadoBase;
+  const limpiezaOrdenEvaluaciones = limpiezaOrdenRegistros.length;
+  const limpiezaOrdenIncumplimientos = limpiezaOrdenRegistros.filter((registro) => registro.value === false).length;
+  const limpiezaOrdenOk = limpiezaOrdenEvaluaciones ? limpiezaOrdenIncumplimientos === 0 : null;
+  const limpiezaOrdenBonoOk = limpiezaOrdenOk !== false;
+  const faltasJustificadas = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "falta_justificada").length;
+  const faltasInjustificadas = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "falta_injustificada").length;
+  const vacacionesDias = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "vacaciones").length;
+  const sueldoDiario = sueldoBase / 7;
+  const descuentoPorFaltas = Math.round((faltasJustificadas + faltasInjustificadas) * sueldoDiario);
+  const puntualidadOk = puntualidadOkBase && faltasInjustificadas === 0;
+  const elegibleBono = metaSemanalOk && calificacionMinimaOk && puntualidadOk && limpiezaOrdenBonoOk;
+  const bonoCalculado = elegibleBono ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
+  const totalAPagar = Math.max(0, sueldoBase + bonoCalculado - descuentoPorFaltas);
+  const razonesNoElegible = [];
+  if (!metaGlobalSemanalOk) razonesNoElegible.push("Meta global semanal no cumplida");
+  if (!calificacionMinimaOk) razonesNoElegible.push("Promedio menor a 4.0");
+  if (!puntualidadOkBase) razonesNoElegible.push("3 o mas retardos");
+  if (faltasInjustificadas > 0) razonesNoElegible.push("Falta injustificada");
+  if (limpiezaOrdenOk === false) razonesNoElegible.push("Limpieza y orden no cumplida");
+  const descuentoPorFaltasProyectado = descuentoPorFaltas;
+  const puntualidadOkProyectada = puntualidadOk;
+  const elegibleBonoProyectado = elegibleBono;
+  const bonoCalculadoProyectado = elegibleBonoProyectado ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
+  const totalAPagarProyectado = totalAPagar;
+  const impactoAsistenciaProyectado = totalAPagarProyectado - totalAPagarBase;
+
+  return {
+    empleadoId,
+    nombreCompleto: empleado?.nombreCompleto || "",
+    email: empleado?.email || "",
+    activo: Boolean(empleado?.activo),
+    puesto: empleado?.puesto || "",
+    sueldoBase,
+    comisionPorcentaje,
+    ventasSemanales,
+    metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
+    metaSemanalOk,
+    cumplioMetaPersonal,
+    metaGlobalSemanalMxn,
+    metaGlobalSemanalOk,
+    ventasGlobalesSemanales,
+    progresoMetaGlobal,
+    calificacionMinimaOk,
+    puntualidadOk,
+    promedioEstrellas,
+    totalEvaluaciones,
+    retardosSemana,
+    limpiezaOrdenEvaluaciones,
+    limpiezaOrdenIncumplimientos,
+    limpiezaOrdenOk,
+    limpiezaOrdenBonoOk,
+    faltasJustificadas,
+    faltasInjustificadas,
+    vacacionesDias,
+    sueldoDiario,
+    descuentoPorFaltas,
+    descuentoPorFaltasProyectado,
+    puntualidadOkBase,
+    puntualidadOkProyectada,
+    elegibleBonoBase,
+    elegibleBonoProyectado,
+    bonoCalculadoBase,
+    bonoCalculadoProyectado,
+    totalAPagarBase,
+    totalAPagarProyectado,
+    impactoAsistenciaProyectado,
+    elegibleBono,
+    bonoCalculado,
+    totalAPagar,
+    razonesNoElegible,
+    porcentajePuntualidad: metricasEmpleado.puntualidadPorcentaje,
+    totalServicios: metricasEmpleado.serviciosCompletados
+  };
+}
+
 app.get("/admin/performance/metrics", auth, requireAdmin, async (req, res) => {
   try {
     const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
@@ -3497,100 +3614,19 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
     const progresoMetaGlobal = Math.min(Math.round((ventasGlobalesSemanales / (metaGlobalSemanalMxn || 1)) * 100), 100);
 
     const empleadosResumen = empleados.map((empleado) => {
-      const citasEmpleado = citasSemana.filter((cita) =>
-        String(cita.empleadoAsignadoId) === String(empleado._id) ||
-        (Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.some((id) => String(id) === String(empleado._id)))
-      );
-      const ventasSemanales = citasEmpleado.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
-      const calificaciones = citasEmpleado
-        .map((cita) => (Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio))
-        .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
-      const promedioEstrellas = calificaciones.length
-        ? Math.round((calificaciones.reduce((acc, valor) => acc + valor, 0) / calificaciones.length) * 10) / 10
-        : null;
-      const retardosSemana = (asistenciaPorEmpleado[String(empleado._id)] || []).filter((registro) => registro.puntual === false).length;
-      const totalEvaluaciones = calificaciones.length;
-      const sueldoBase = Number.isFinite(Number(empleado.sueldoBase)) ? Number(empleado.sueldoBase) : 0;
-      const comisionPorcentaje = Number.isFinite(Number(empleado.comision)) ? Number(empleado.comision) : 0;
-      const metaSemanalOk = metaGlobalSemanalOk;
-      const calificacionMinimaOk = typeof promedioEstrellas === "number" ? promedioEstrellas >= 4.0 : false;
-      const puntualidadOkBase = retardosSemana < 3;
-      // Base conserva la regla previa a faltas injustificadas y limpieza.
-      const elegibleBonoBase = metaSemanalOk && calificacionMinimaOk && puntualidadOkBase;
-      const bonoCalculadoBase = elegibleBonoBase ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
-      const totalAPagarBase = sueldoBase + bonoCalculadoBase;
-      const limpiezaOrdenRegistros = limpiezaOrdenPorEmpleado[String(empleado._id)] || [];
-      const limpiezaOrdenEvaluaciones = limpiezaOrdenRegistros.length;
-      const limpiezaOrdenIncumplimientos = limpiezaOrdenRegistros.filter((registro) => registro.value === false).length;
-      const limpiezaOrdenOk = limpiezaOrdenEvaluaciones ? limpiezaOrdenIncumplimientos === 0 : null;
-      const limpiezaOrdenBonoOk = limpiezaOrdenOk !== false;
-      const eventosAsistenciaRegistros = eventosAsistenciaPorEmpleado[String(empleado._id)] || [];
-      const faltasJustificadas = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "falta_justificada").length;
-      const faltasInjustificadas = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "falta_injustificada").length;
-      const vacacionesDias = eventosAsistenciaRegistros.filter((registro) => registro.metricKey === "vacaciones").length;
-      const sueldoDiario = sueldoBase / 7;
-      const descuentoPorFaltas = Math.round((faltasJustificadas + faltasInjustificadas) * sueldoDiario);
-      const puntualidadOk = puntualidadOkBase && faltasInjustificadas === 0;
-      const elegibleBono = metaSemanalOk && calificacionMinimaOk && puntualidadOk && limpiezaOrdenBonoOk;
-      const bonoCalculado = elegibleBono ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
-      const totalAPagar = Math.max(0, sueldoBase + bonoCalculado - descuentoPorFaltas);
-      const razonesNoElegible = [];
-      if (!metaGlobalSemanalOk) razonesNoElegible.push("Meta global semanal no cumplida");
-      if (!calificacionMinimaOk) razonesNoElegible.push("Promedio menor a 4.0");
-      if (!puntualidadOkBase) razonesNoElegible.push("3 o mas retardos");
-      if (faltasInjustificadas > 0) razonesNoElegible.push("Falta injustificada");
-      if (limpiezaOrdenOk === false) razonesNoElegible.push("Limpieza y orden no cumplida");
-      const descuentoPorFaltasProyectado = descuentoPorFaltas;
-      const puntualidadOkProyectada = puntualidadOk;
-      const elegibleBonoProyectado = elegibleBono;
-      const bonoCalculadoProyectado = elegibleBonoProyectado ? Math.round(sueldoBase * (comisionPorcentaje / 100)) : 0;
-      const totalAPagarProyectado = totalAPagar;
-      const impactoAsistenciaProyectado = totalAPagarProyectado - totalAPagarBase;
-
-      return {
-        empleadoId: String(empleado._id),
-        nombreCompleto: empleado.nombreCompleto || "",
-        email: empleado.email || "",
-        activo: Boolean(empleado.activo),
-        puesto: empleado.puesto || "",
-        sueldoBase,
-        comisionPorcentaje,
-        ventasSemanales,
-        metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
-        metaSemanalOk,
-        metaGlobalSemanalMxn,
+      const resumen = construirResumenPerformanceEmpleado({
+        empleado,
+        citasSemana,
+        asistenciaRegistros: asistenciaPorEmpleado[String(empleado._id)] || [],
+        limpiezaOrdenRegistros: limpiezaOrdenPorEmpleado[String(empleado._id)] || [],
+        eventosAsistenciaRegistros: eventosAsistenciaPorEmpleado[String(empleado._id)] || [],
         metaGlobalSemanalOk,
+        metaGlobalSemanalMxn,
         ventasGlobalesSemanales,
-        progresoMetaGlobal,
-        calificacionMinimaOk,
-        puntualidadOk,
-        promedioEstrellas,
-        totalEvaluaciones,
-        retardosSemana,
-        limpiezaOrdenEvaluaciones,
-        limpiezaOrdenIncumplimientos,
-        limpiezaOrdenOk,
-        limpiezaOrdenBonoOk,
-        faltasJustificadas,
-        faltasInjustificadas,
-        vacacionesDias,
-        sueldoDiario,
-        descuentoPorFaltas,
-        descuentoPorFaltasProyectado,
-        puntualidadOkBase,
-        puntualidadOkProyectada,
-        elegibleBonoBase,
-        elegibleBonoProyectado,
-        bonoCalculadoBase,
-        bonoCalculadoProyectado,
-        totalAPagarBase,
-        totalAPagarProyectado,
-        impactoAsistenciaProyectado,
-        elegibleBono,
-        bonoCalculado,
-        totalAPagar,
-        razonesNoElegible
-      };
+        progresoMetaGlobal
+      });
+      const { cumplioMetaPersonal, porcentajePuntualidad, totalServicios, ...respuestaAdmin } = resumen;
+      return respuestaAdmin;
     });
 
     const calificacionesGlobales = citasSemana
@@ -3719,6 +3755,110 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
     res.json({ message: "Empleado creado correctamente" });
   } catch (error) {
     res.status(500).json({ message: "No se pudo crear el empleado" });
+  }
+});
+
+function construirAccessUserRespuesta(user) {
+  if (!user) return null;
+  return {
+    id: String(user._id),
+    usuario: user.usuario || "",
+    email: user.email || "",
+    role: obtenerRolUsuario(user)
+  };
+}
+
+app.get("/admin/employees/:id/access-user", auth, requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no valido" });
+    }
+
+    const empleado = await Employee.findById(id).select("_id");
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
+    const user = await User.findOne({ role: "empleado", employeeId: empleado._id }).select("usuario email role");
+    res.json({
+      hasAccess: Boolean(user),
+      user: construirAccessUserRespuesta(user)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo consultar el acceso del empleado" });
+  }
+});
+
+app.post("/admin/employees/:id/access-user", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no valido" });
+    }
+
+    const empleado = await Employee.findById(id).select("_id activo");
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+    if (empleado.activo === false) {
+      return res.status(400).json({ message: "No se puede crear acceso para un empleado inactivo" });
+    }
+
+    const usuarioLimpio = typeof req.body?.usuario === "string" ? req.body.usuario.trim() : "";
+    const emailLimpio = normalizarEmail(req.body?.email);
+    const password = req.body?.password;
+
+    if (
+      !validarTextoSeguro(usuarioLimpio, 30) ||
+      !usuarioTieneFormatoValido(usuarioLimpio) ||
+      !validarTextoSeguro(emailLimpio, 120) ||
+      !validarEmail(emailLimpio) ||
+      !validarPassword(password)
+    ) {
+      return res.status(400).json({ message: "Revisa usuario, correo y contrasena temporal." });
+    }
+
+    const [usuarioExistente, emailExistente, accesoExistente] = await Promise.all([
+      User.findOne({ usuario: usuarioLimpio }).select("_id"),
+      User.findOne({ email: emailLimpio }).select("_id"),
+      User.findOne({ role: "empleado", employeeId: empleado._id }).select("usuario email role")
+    ]);
+
+    if (accesoExistente) {
+      return res.status(400).json({
+        message: "Este empleado ya tiene una cuenta de acceso vinculada.",
+        user: construirAccessUserRespuesta(accesoExistente)
+      });
+    }
+    if (usuarioExistente) {
+      return res.status(400).json({ message: "El usuario ya existe" });
+    }
+    if (emailExistente) {
+      return res.status(400).json({ message: "El correo ya esta registrado" });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const user = new User({
+      usuario: usuarioLimpio,
+      email: emailLimpio,
+      password: hash,
+      role: "empleado",
+      employeeId: empleado._id,
+      aceptaTerminos: true,
+      fechaAceptacionTerminos: new Date(),
+      versionTerminosAceptada: "1.0",
+      ipAceptacionTerminos: getClientIp(req)
+    });
+
+    await user.save();
+
+    res.status(201).json({
+      message: "Acceso de empleado creado correctamente",
+      user: construirAccessUserRespuesta(user)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo crear el acceso del empleado" });
   }
 });
 
@@ -3857,12 +3997,111 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
 });
 
 app.get("/empleados/me", auth, requireEmpleado, (req, res) => {
+  const employee = req.employeeProfile;
   res.json({
-    id: req.empleado._id,
-    usuario: req.empleado.usuario,
-    email: req.empleado.email,
-    role: req.empleadoRole
+    usuario: {
+      id: String(req.empleado._id),
+      usuario: req.empleado.usuario || "",
+      email: req.empleado.email || "",
+      role: req.empleadoRole
+    },
+    empleado: {
+      id: String(employee._id),
+      nombre: employee.nombreCompleto || "",
+      email: employee.email || "",
+      telefono: employee.telefono || "",
+      puesto: employee.puesto || "",
+      activo: employee.activo !== false,
+      fechaIngreso: employee.fechaIngreso || "",
+      fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(employee.fechaCumpleanos)
+    }
   });
+});
+
+app.get("/empleados/performance", auth, requireEmpleado, async (req, res) => {
+  try {
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const semana = obtenerRangoSemana(fecha);
+    if (!semana) {
+      return res.status(400).json({ message: "No se pudo calcular el rango de semana" });
+    }
+
+    const employeeId = req.employeeProfile._id;
+    const empleado = await Employee.findById(employeeId).select("nombreCompleto puesto activo sueldoBase comision bonoManual descuentoAdministrativo");
+    if (!empleado || empleado.activo === false) {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    const citasSemana = await Appointment.find({
+      fecha: { $gte: semana.inicio, $lte: semana.fin },
+      estado: "completada",
+      $or: [
+        { empleadoAsignadoId: employeeId },
+        { empleadosAsignados: employeeId }
+      ]
+    });
+    const asistenciaSemana = await PerformanceAttendance.find({
+      empleadoId: employeeId,
+      fecha: { $gte: semana.inicio, $lte: semana.fin }
+    });
+    const limpiezaOrdenSemana = await PerformanceMetricRecord.find({
+      empleadoId: employeeId,
+      fecha: { $gte: semana.inicio, $lte: semana.fin },
+      metricKey: "limpieza_orden"
+    });
+    const eventosAsistenciaSemana = await PerformanceMetricRecord.find({
+      empleadoId: employeeId,
+      fecha: { $gte: semana.inicio, $lte: semana.fin },
+      metricKey: { $in: PERFORMANCE_PRIMARY_ATTENDANCE_KEYS },
+      value: true
+    });
+
+    const metricasBase = calcularMetricasEmpleado(citasSemana);
+    const cumplioMetaPersonal = metricasBase.ingresosGeneradosAproximados >= META_SEMANAL_EMPLEADOS_MXN;
+    const resumen = construirResumenPerformanceEmpleado({
+      empleado,
+      citasSemana,
+      asistenciaRegistros: asistenciaSemana,
+      limpiezaOrdenRegistros: limpiezaOrdenSemana,
+      eventosAsistenciaRegistros: eventosAsistenciaSemana,
+      metaGlobalSemanalOk: cumplioMetaPersonal,
+      metaGlobalSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
+      ventasGlobalesSemanales: metricasBase.ingresosGeneradosAproximados,
+      progresoMetaGlobal: Math.min(Math.round((metricasBase.ingresosGeneradosAproximados / (META_SEMANAL_EMPLEADOS_MXN || 1)) * 100), 100)
+    });
+
+    res.json({
+      empleado: {
+        id: String(empleado._id),
+        nombre: empleado.nombreCompleto || "",
+        puesto: empleado.puesto || ""
+      },
+      semana: {
+        inicio: semana.inicio,
+        fin: semana.fin
+      },
+      metricas: {
+        ventasSemanales: resumen.ventasSemanales,
+        metaSemanal: resumen.metaSemanalMxn,
+        cumplioMetaPersonal: resumen.cumplioMetaPersonal,
+        promedioEstrellas: typeof resumen.promedioEstrellas === "number" ? resumen.promedioEstrellas : 0,
+        retardosSemana: resumen.retardosSemana,
+        faltasInjustificadas: resumen.faltasInjustificadas,
+        limpiezaOrdenOk: resumen.limpiezaOrdenOk,
+        elegibleBono: resumen.elegibleBono,
+        bonoCalculado: resumen.bonoCalculado,
+        totalAPagar: resumen.totalAPagar,
+        porcentajePuntualidad: typeof resumen.porcentajePuntualidad === "number" ? resumen.porcentajePuntualidad : 0,
+        totalServicios: resumen.totalServicios
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener las metricas del empleado" });
+  }
 });
 
 app.get("/empleados/appointments", auth, requireEmpleado, async (req, res) => {
@@ -3875,23 +4114,24 @@ app.get("/empleados/appointments", auth, requireEmpleado, async (req, res) => {
     const filtro = {
       fecha,
       $or: [
-        { empleadoAsignadoId: req.empleado._id },
-        { empleadosAsignados: req.empleado._id }
+        { empleadoAsignadoId: req.employeeProfile._id },
+        { empleadosAsignados: req.employeeProfile._id }
       ],
       estado: { $nin: ["cancelada", "no_asistio"] }
     };
     const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
     const metricas = calcularMetricasEmpleado(await Appointment.find({
       $or: [
-        { empleadoAsignadoId: req.empleado._id },
-        { empleadosAsignados: req.empleado._id }
+        { empleadoAsignadoId: req.employeeProfile._id },
+        { empleadosAsignados: req.employeeProfile._id }
       ]
     }));
 
     res.json({
       fecha,
       empleado: {
-        id: String(req.empleado._id),
+        id: String(req.employeeProfile._id),
+        nombre: req.employeeProfile.nombreCompleto || "",
         usuario: req.empleado.usuario || "",
         email: req.empleado.email || "",
         role: req.empleadoRole
@@ -3923,8 +4163,8 @@ app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado,
     const cita = await Appointment.findOne({
       _id: appointmentId,
       $or: [
-        { empleadoAsignadoId: req.empleado._id },
-        { empleadosAsignados: req.empleado._id }
+        { empleadoAsignadoId: req.employeeProfile._id },
+        { empleadosAsignados: req.employeeProfile._id }
       ]
     });
 

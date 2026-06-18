@@ -111,6 +111,12 @@ const UserSchema = new mongoose.Schema({
     default: "cliente"
   },
 
+  employeeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Employee",
+    default: null
+  },
+
   fechaAceptacionTerminos: {
     type: Date,
     default: null

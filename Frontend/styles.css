@@ -662,17 +662,77 @@ h1, h2, h3 {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-#footer .rounded-xl.overflow-hidden.scroll-smooth.shadow-lg {
-  border-radius: 24px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 24px 46px rgba(0, 0, 0, 0.16);
-}
-
 #footer .text-center.md\:text-left {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.footer-zone-carousel {
+  position: relative;
+  height: 220px;
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 46px rgba(0, 0, 0, 0.16);
+}
+
+.footer-zone-track {
+  display: flex;
+  width: 600%;
+  height: 100%;
+  animation: footerZoneCarousel 30s infinite ease-in-out;
+}
+
+.footer-zone-slide {
+  flex: 0 0 calc(100% / 6);
+  height: 100%;
+  margin: 0;
+  background: #ffffff;
+}
+
+.footer-zone-slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@keyframes footerZoneCarousel {
+  0%, 12% {
+    transform: translateX(0);
+  }
+  16%, 28% {
+    transform: translateX(calc(-100% / 6));
+  }
+  32%, 44% {
+    transform: translateX(calc(-200% / 6));
+  }
+  48%, 60% {
+    transform: translateX(calc(-300% / 6));
+  }
+  64%, 76% {
+    transform: translateX(calc(-400% / 6));
+  }
+  80%, 92% {
+    transform: translateX(calc(-500% / 6));
+  }
+  96%, 100% {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .footer-zone-track {
+    animation: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .footer-zone-carousel {
+    height: 190px;
+  }
 }
 
 #footer .text-center.md\:text-left .flex.md\:justify-start.justify-center.gap-6.mb-4 {

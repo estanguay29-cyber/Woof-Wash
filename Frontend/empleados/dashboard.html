@@ -3,66 +3,201 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard empleado - Woof & Wash</title>
-  <link rel="stylesheet" href="../tailwind.css">
+  <title>Panel empleado - Woof & Wash</title>
   <link rel="stylesheet" href="dashboard.css">
 </head>
-<body class="employee-page">
+<body>
   <main class="employee-shell">
     <header class="employee-topbar">
-      <div class="employee-brand">
-        <div class="employee-logo">W&W</div>
-        <div>
-          <p>Woof & Wash</p>
-          <h1>Dashboard empleado</h1>
-        </div>
-      </div>
-      <input id="employeeDate" type="date" aria-label="Fecha de agenda">
+      <a class="employee-brand" href="../index.html" aria-label="Woof and Wash">
+        <span class="employee-logo">W&amp;W</span>
+        <span>
+          <strong>Woof&amp;Wash</strong>
+          <small>Portal privado</small>
+        </span>
+      </a>
+      <button id="logoutButton" class="logout-button" type="button">Cerrar sesion</button>
     </header>
 
-    <section id="employeeAccessMessage" class="employee-access">Validando acceso...</section>
+    <section id="employeeAccessMessage" class="employee-message">Validando acceso...</section>
 
-    <section id="employeeDashboard" class="employee-dashboard hidden">
-      <section class="employee-hero">
-        <div>
-          <span>Hola</span>
-          <h2 id="employeeName">Empleado</h2>
-          <p id="employeeSubtitle">Agenda operativa del día</p>
-        </div>
-        <div class="employee-goal">
-          <span>Meta diaria</span>
-          <strong id="employeeGoal">$2000 MXN</strong>
-          <small id="employeeGoalProgress">0% de avance</small>
-        </div>
-      </section>
-
-      <section class="employee-metrics" aria-label="Métricas básicas">
-        <article>
-          <span>Promedio</span>
-          <strong id="metricRating">-</strong>
-          <small>Calificación</small>
-        </article>
-        <article>
-          <span>Servicios</span>
-          <strong id="metricServices">0</strong>
-          <small>Completados</small>
-        </article>
-        <article>
-          <span>Puntualidad</span>
-          <strong id="metricPunctuality">-</strong>
-          <small>Base preliminar</small>
-        </article>
-      </section>
-
-      <section class="employee-agenda">
-        <div class="employee-section-title">
-          <div>
-            <p>Agenda del día</p>
-            <h2>Próximas citas</h2>
+    <section id="employeeDashboard" class="employee-dashboard hidden" aria-live="polite">
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Panel del equipo</p>
+          <h1 id="employeeGreeting">Hola</h1>
+          <p id="employeeIntro">Este es tu desempeno de la semana.</p>
+          <div class="hero-badges" aria-label="Datos principales">
+            <span id="heroPositionBadge" class="hero-badge">Puesto</span>
+            <span id="heroWeekBadge" class="hero-badge hero-badge-light">Semana actual</span>
           </div>
-          <span id="employeeCount">0 citas</span>
         </div>
-        <div id="employeeAppointments" class="employee-appointments"></div>
+
+        <aside class="profile-card" aria-label="Datos del empleado">
+          <div class="profile-card-head">
+            <span id="employeeStatus" class="status-pill">Activo</span>
+            <span class="profile-chip">Cuenta segura</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Nombre</dt>
+              <dd id="profileName">-</dd>
+            </div>
+            <div>
+              <dt>Puesto</dt>
+              <dd id="profilePosition">-</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd id="profileEmail">-</dd>
+            </div>
+            <div>
+              <dt>Telefono</dt>
+              <dd id="profilePhone">-</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+
+      <section class="control-panel" aria-label="Controles de semana">
+        <label for="weekDate">
+          <span>Semana de trabajo</span>
+          <input id="weekDate" type="date">
+        </label>
+        <button id="refreshButton" class="refresh-button" type="button">
+          <span aria-hidden="true">↻</span>
+          Actualizar panel
+        </button>
+      </section>
+
+      <section id="loadingPanel" class="loading-panel hidden" aria-label="Cargando datos">
+        <div></div>
+        <div></div>
+        <div></div>
+      </section>
+
+      <section class="metric-grid" aria-label="Metricas personales">
+        <article class="metric-card metric-neutral" id="cardSales">
+          <span class="metric-icon">💰</span>
+          <div>
+            <p>Ventas semanales</p>
+            <strong id="metricSales">$0 MXN</strong>
+            <small id="metricSalesHint">Servicios completados esta semana</small>
+          </div>
+        </article>
+        <article class="metric-card metric-neutral" id="cardGoal">
+          <span class="metric-icon">🎯</span>
+          <div>
+            <p>Meta semanal</p>
+            <strong id="metricGoal">$0 MXN</strong>
+            <small id="metricGoalHint">Objetivo personal</small>
+          </div>
+        </article>
+        <article class="metric-card metric-neutral" id="cardCompliance">
+          <span class="metric-icon">✅</span>
+          <div>
+            <p>Cumplimiento</p>
+            <strong id="metricGoalStatus">En progreso</strong>
+            <small id="metricGoalStatusHint">Sigue avanzando</small>
+          </div>
+        </article>
+        <article class="metric-card metric-neutral" id="cardStars">
+          <span class="metric-icon">⭐</span>
+          <div>
+            <p>Estrellas</p>
+            <strong id="metricStars">0.0 / 5</strong>
+            <small id="metricStarsHint">Sin evaluaciones todavia</small>
+          </div>
+        </article>
+        <article class="metric-card metric-neutral" id="cardDelays">
+          <span class="metric-icon">⏱</span>
+          <div>
+            <p>Retardos</p>
+            <strong id="metricDelays">0</strong>
+            <small id="metricDelaysHint">Sin retardos</small>
+          </div>
+        </article>
+        <article class="metric-card metric-neutral" id="cardPunctuality">
+          <span class="metric-icon">🕒</span>
+          <div>
+            <p>Puntualidad</p>
+            <strong id="metricPunctuality">0%</strong>
+            <small id="metricPunctualityHint">Indicador semanal</small>
+          </div>
+        </article>
+        <article class="metric-card metric-neutral" id="cardBonus">
+          <span class="metric-icon">🏅</span>
+          <div>
+            <p>Bono estimado</p>
+            <strong id="metricBonus">$0 MXN</strong>
+            <small id="metricBonusHint">No elegible esta semana</small>
+          </div>
+        </article>
+        <article class="metric-card metric-neutral" id="cardPay">
+          <span class="metric-icon">📄</span>
+          <div>
+            <p>Total a pagar</p>
+            <strong id="metricPay">$0 MXN</strong>
+            <small id="metricPayHint">Estimado semanal</small>
+          </div>
+        </article>
+      </section>
+
+      <section class="progress-panel" aria-label="Progreso semanal">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Progreso</p>
+            <h2>Tu avance semanal</h2>
+          </div>
+          <span id="progressSummary" class="summary-pill">0% de meta</span>
+        </div>
+
+        <div class="progress-list">
+          <article class="progress-item">
+            <div>
+              <strong>Ventas vs meta</strong>
+              <span id="salesProgressText">$0 de $0</span>
+            </div>
+            <div class="progress-track"><span id="salesProgressBar"></span></div>
+          </article>
+          <article class="progress-item">
+            <div>
+              <strong>Puntualidad</strong>
+              <span id="punctualityProgressText">0%</span>
+            </div>
+            <div class="progress-track"><span id="punctualityProgressBar"></span></div>
+          </article>
+          <article class="progress-item">
+            <div>
+              <strong>Experiencia del cliente</strong>
+              <span id="starsProgressText">0.0 de 5</span>
+            </div>
+            <div class="progress-track"><span id="starsProgressBar"></span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <section class="panel services-panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Servicios</p>
+              <h2>Mis servicios de la semana</h2>
+            </div>
+            <span id="appointmentsCount" class="summary-pill">0 citas</span>
+          </div>
+          <div id="appointmentsList" class="timeline-list"></div>
+        </section>
+
+        <section class="panel training-panel">
+          <div class="section-title compact">
+            <div>
+              <p class="eyebrow">Crecimiento</p>
+              <h2>Manuales y capacitacion</h2>
+            </div>
+          </div>
+          <div id="manualsList" class="training-grid" aria-label="Recursos de capacitacion"></div>
+        </section>
       </section>
     </section>
   </main>

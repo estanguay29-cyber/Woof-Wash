@@ -823,6 +823,11 @@ function obtenerReglaZonaPublica(dia = hoy) {
   return { ...regla, zone: zona };
 }
 
+function obtenerDiaActualPublico() {
+  const dia = new Date().toLocaleDateString("es-MX", { weekday: "long" });
+  return dia ? dia.charAt(0).toUpperCase() + dia.slice(1) : "";
+}
+
 async function cargarZonasServicioPublicas() {
   try {
     const res = await fetch(`${obtenerApiBase()}/service-zones`, { cache: "no-store" });
@@ -844,20 +849,18 @@ function crearImagenZonaPublica(zona) {
   return `
     <figure class="zone-card-preview">
       <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa de cobertura ${escapeHtmlPublico(label)} - ${escapeHtmlPublico(nombre)}" loading="lazy" decoding="async" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
-      <span class="zone-map-fallback">Mapa pendiente</span>
     </figure>
   `;
 }
 
 function crearImagenZonaGrandePublica(zona) {
   if (!zona?.mapImage) {
-    return `<div class="zones-map-empty">Mapa pendiente</div>`;
+    return `<div class="zones-map-empty" aria-hidden="true"></div>`;
   }
 
   return `
     <figure class="zones-map-figure">
       <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa ampliado de cobertura ${escapeHtmlPublico(zona.label || "Zona")} - ${escapeHtmlPublico(zona.nombre || "")}" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
-      <span class="zone-map-fallback">Mapa pendiente</span>
     </figure>
   `;
 }
@@ -867,12 +870,17 @@ function renderizarZonaHoyPublica() {
   if (!zonaHTML) return;
 
   const regla = obtenerReglaZonaPublica(hoy);
+  const diaActual = obtenerDiaActualPublico();
   if (regla.esDescanso) {
-    zonaHTML.innerHTML = "Hoy descansamos. Consulta las zonas activas de lunes a sábado.";
+    zonaHTML.innerHTML = `
+      <span class="block text-xs uppercase font-bold tracking-[0.14em] text-[#8cc63f]">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
+      Hoy descansamos. Consulta las zonas activas de lunes a sábado.
+    `;
     return;
   }
 
   zonaHTML.innerHTML = `
+    <span class="block text-xs uppercase font-bold tracking-[0.14em] text-[#8cc63f]">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
     Hoy atendemos <span class="text-[#0b2a6b] font-semibold">${escapeHtmlPublico(regla.zone?.label || regla.zona)}</span>
     <span class="block text-xs md:text-sm text-gray-500">${escapeHtmlPublico(regla.zone?.nombre || "")}</span>
     ${crearImagenZonaPublica(regla.zone)}
@@ -923,10 +931,11 @@ function renderizarZonaDestacadaPublica() {
   if (!destino) return;
 
   const item = obtenerReglaZonaPublica(hoy);
+  const diaActual = obtenerDiaActualPublico();
   if (item.esDescanso) {
     destino.innerHTML = `
       <section class="zones-today-panel is-rest">
-        <span class="zone-status">Hoy</span>
+        <span class="zone-status">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
         <h4>${escapeHtmlPublico(item.dia)} de descanso</h4>
         <p>Descanso - no hay servicio programado.</p>
       </section>
@@ -938,7 +947,7 @@ function renderizarZonaDestacadaPublica() {
   destino.innerHTML = `
     <section class="zones-today-panel">
       <div class="zones-today-copy">
-        <span class="zone-status">Hoy</span>
+        <span class="zone-status">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
         <h4>${escapeHtmlPublico(zona.label || item.zona)}</h4>
         <p>${escapeHtmlPublico(zona.nombre || "")}</p>
         <button type="button" class="zone-map-button is-primary" onclick="abrirMapaZonaPublica(${hoy})">Ver mapa</button>

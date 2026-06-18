@@ -81,8 +81,9 @@ const SERVICIOS_CATALOGO = {
   mascota: {
     categorias: [
       { value: "Chico", label: "Chico, hasta 10 kg", nombre: "Mascota chico" },
-      { value: "Mediano", label: "Mediano, 11 kg hasta 25 kg", nombre: "Mascota mediano" },
-      { value: "Grande", label: "Grande, m\u00e1s de 25 kg", nombre: "Mascota grande" }
+      { value: "Mediano", label: "Mediano, 11 a 25 kg", nombre: "Mascota mediano" },
+      { value: "Grande", label: "Grande, 26 a 39 kg", nombre: "Mascota grande" },
+      { value: "Gigante", label: "Gigante, m\u00e1s de 40 kg", nombre: "Mascota gigante" }
     ],
     paquetes: [
       { value: "B\u00e1sico", label: "B\u00e1sico: ba\u00f1o + secado + o\u00eddos + perfumado", nombre: "B\u00e1sico" },

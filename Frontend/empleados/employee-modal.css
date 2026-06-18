@@ -35,6 +35,183 @@ input.invalid, textarea.invalid { border-color: #b91c1c; box-shadow: 0 0 0 4px r
 .admin-modal.saving { pointer-events: none; }
 .admin-modal.saving .admin-modal-panel { opacity: 0.8; filter: blur(0.2px); }
 
+.employee-access-admin {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(11, 42, 107, 0.12);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 250, 232, 0.96), rgba(140, 198, 63, 0.11)),
+    #fff;
+  padding: 16px;
+  box-shadow: 0 14px 32px rgba(11, 42, 107, 0.08);
+}
+
+.employee-access-admin::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, #0b2a6b, #8cc63f);
+}
+
+.employee-access-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.employee-access-kicker {
+  margin: 0 0 4px;
+  color: #6b7280;
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.employee-access-admin h3 {
+  margin: 0;
+  color: #0b2a6b;
+}
+
+.employee-access-copy {
+  max-width: 560px;
+  margin: 6px 0 0;
+  color: #4b5563;
+  font-weight: 760;
+  line-height: 1.42;
+}
+
+.employee-access-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 0 11px;
+  background: rgba(11, 42, 107, 0.09);
+  color: #0b2a6b;
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+
+.employee-access-existing {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(11, 42, 107, 0.08);
+}
+
+.employee-access-note {
+  margin: 0;
+  color: #2f6f1f;
+  font-weight: 850;
+}
+
+.employee-access-credential,
+.employee-access-input-row {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.employee-access-credential {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 250, 232, 0.9);
+}
+
+.employee-access-credential span {
+  color: #6b7280;
+  font-size: 0.78rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.employee-access-credential strong {
+  color: #0b2a6b;
+  overflow-wrap: anywhere;
+}
+
+.employee-access-form {
+  align-items: end;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(11, 42, 107, 0.08);
+}
+
+.employee-access-form label {
+  color: #0b2a6b;
+  font-weight: 850;
+}
+
+.employee-access-input-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 6px;
+}
+
+.employee-access-copy-btn {
+  min-height: 38px;
+  border: 1px solid rgba(11, 42, 107, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  color: #0b2a6b;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 0 10px;
+}
+
+.employee-access-copy-btn:hover {
+  border-color: rgba(140, 198, 63, 0.6);
+  background: rgba(140, 198, 63, 0.1);
+}
+
+.employee-access-action {
+  display: flex;
+  align-items: end;
+}
+
+.employee-access-action button {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 10px;
+  background: #0b2a6b;
+  color: #fff;
+}
+
+.employee-access-feedback {
+  margin: 12px 0 0;
+  border-radius: 12px;
+  font-weight: 850;
+}
+
+@media (max-width: 720px) {
+  .employee-access-header,
+  .employee-access-credential,
+  .employee-access-input-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .employee-access-header {
+    display: grid;
+  }
+
+  .employee-access-status,
+  .employee-access-copy-btn,
+  .employee-access-action button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* Smooth focus */
 #employeeForm input:focus, #employeeForm textarea:focus { outline: 3px solid rgba(140,198,63,0.14); outline-offset: 2px; }
 

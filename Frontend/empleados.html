@@ -537,6 +537,50 @@
             </label>
           </section>
 
+          <section id="employeeAccessSection" class="admin-modal-section employee-access-admin hidden">
+            <div class="employee-access-header">
+              <div>
+                <p class="employee-access-kicker">Portal privado</p>
+                <h3>Acceso al portal empleado</h3>
+                <p class="employee-access-copy">Crea una cuenta segura para que el empleado consulte su perfil, metricas y manuales.</p>
+              </div>
+              <span id="employeeAccessStatus" class="employee-access-status">Consultando acceso...</span>
+            </div>
+            <div id="employeeAccessExisting" class="employee-access-existing hidden">
+              <p class="employee-access-note">Este empleado ya puede iniciar sesion en su portal.</p>
+              <div class="employee-access-credential">
+                <span>Usuario</span>
+                <strong id="accessExistingUser">-</strong>
+                <button id="btnCopyExistingUser" type="button" class="employee-access-copy-btn" data-copy-target="accessExistingUser">Copiar</button>
+              </div>
+              <div class="employee-access-credential">
+                <span>Email</span>
+                <strong id="accessExistingEmail">-</strong>
+              </div>
+            </div>
+            <div id="employeeAccessForm" class="admin-form-grid employee-access-form hidden">
+              <label>Usuario
+                <div class="employee-access-input-row">
+                  <input name="accessUsuario" id="access_usuario" type="text" autocomplete="off" />
+                  <button id="btnCopyAccessUser" type="button" class="employee-access-copy-btn" data-copy-input="access_usuario">Copiar</button>
+                </div>
+              </label>
+              <label>Email
+                <input name="accessEmail" id="access_email" type="email" autocomplete="off" />
+              </label>
+              <label>Contrase&ntilde;a temporal
+                <div class="employee-access-input-row">
+                  <input name="accessPassword" id="access_password" type="text" autocomplete="new-password" />
+                  <button id="btnCopyAccessPassword" type="button" class="employee-access-copy-btn" data-copy-input="access_password">Copiar</button>
+                </div>
+              </label>
+              <div class="employee-access-action">
+                <button id="btnCreateEmployeeAccess" type="button" class="admin-action-button admin-action-primary">Crear acceso al portal</button>
+              </div>
+            </div>
+            <div id="employeeAccessFeedback" class="employee-access-feedback hidden" role="status" aria-live="polite"></div>
+          </section>
+
           <section id="adminActionsSection" class="admin-modal-section admin-admin-actions hidden">
             <h3>Acciones administrativas</h3>
             <p class="admin-admin-status">Estado actual: <strong id="adminStatusCurrent">Activo</strong></p>

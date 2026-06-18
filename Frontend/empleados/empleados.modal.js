@@ -1,6 +1,6 @@
 import { state, resetModalState, setEmployees } from "./empleados.state.js";
 import { getById, setTextContent } from "./empleados.utils.js";
-import { loadEmployeeById, createEmployee, updateEmployee, loadEmployeeList, setEmployeeActive } from "./empleados.api.js";
+import { loadEmployeeById, createEmployee, updateEmployee, loadEmployeeList, setEmployeeActive, loadEmployeeAccessUser, createEmployeeAccessUser } from "./empleados.api.js";
 import { renderEmployeeBirthdayNotice, renderEmployeeStats, renderEmployeeTable, showFeedback, showSavingUI, setFormReadonly, resetFieldErrors, setFieldError } from "./empleados.ui.js";
 
 function getEmployeeFormValues() {
@@ -42,6 +42,34 @@ function normalizarFechaParaInputDate(value) {
 
   const mesDia = texto.match(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/);
   return mesDia ? `2000-${mesDia[1]}-${mesDia[2]}` : "";
+}
+
+function normalizarUsuarioAcceso(value) {
+  const texto = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, ".")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 30);
+  return texto || "empleado";
+}
+
+function sugerirUsuarioAcceso(employee = {}) {
+  const nombre = employee.nombreCompleto || employee.nombre || "";
+  const partes = nombre.split(/\s+/).filter(Boolean);
+  if (partes.length >= 2) {
+    return normalizarUsuarioAcceso(`${partes[0]}.${partes[1]}`);
+  }
+  if (partes.length === 1) {
+    return normalizarUsuarioAcceso(partes[0]);
+  }
+  return normalizarUsuarioAcceso(String(employee.email || "").split("@")[0]);
+}
+
+function generarPasswordTemporal() {
+  const random = Math.random().toString(36).slice(2, 8);
+  return `Woof${random}7`;
 }
 
 function setFormValues(values = {}) {
@@ -105,11 +133,13 @@ function renderEmployeeModal(employee, mode) {
     setFormValues(employee);
     state.modal.originalActivo = employee.activo !== false;
     renderAdminActionSection(employee, mode);
+    renderEmployeeAccessSectionLoading(employee, mode);
   } else if (mode === "create") {
     getById("employeeForm")?.reset();
     getById("emp_activo").checked = true;
     getById("emp_fechaIngreso").value = new Date().toISOString().slice(0, 10);
     state.modal.originalActivo = true;
+    resetEmployeeAccessSection();
   } else {
     getById("employeeForm")?.reset();
     getById("emp_activo").checked = true;
@@ -119,6 +149,174 @@ function renderEmployeeModal(employee, mode) {
       getById("btnEmployeeSave").classList.add("hidden");
     }
     state.modal.originalActivo = true;
+    resetEmployeeAccessSection();
+  }
+}
+
+function resetEmployeeAccessSection() {
+  getById("employeeAccessSection")?.classList.add("hidden");
+  getById("employeeAccessExisting")?.classList.add("hidden");
+  getById("employeeAccessForm")?.classList.add("hidden");
+  getById("employeeAccessFeedback")?.classList.add("hidden");
+  setTextContent("employeeAccessStatus", "");
+  setTextContent("accessExistingUser", "-");
+  setTextContent("accessExistingEmail", "-");
+  ["access_usuario", "access_email", "access_password"].forEach((id) => {
+    const input = getById(id);
+    if (input) input.value = "";
+  });
+}
+
+function setAccessControlsEnabled(enabled) {
+  ["access_usuario", "access_email", "access_password", "btnCreateEmployeeAccess", "btnCopyAccessUser", "btnCopyAccessPassword"].forEach((id) => {
+    const control = getById(id);
+    if (control) control.disabled = !enabled;
+  });
+}
+
+function showEmployeeAccessFeedback(message, type = "success") {
+  const feedback = getById("employeeAccessFeedback");
+  if (!feedback) return;
+  feedback.textContent = message || "";
+  feedback.classList.remove("hidden", "admin-feedback-error", "admin-feedback-success");
+  feedback.classList.add(type === "error" ? "admin-feedback-error" : "admin-feedback-success");
+}
+
+async function copiarTextoEmpleadoAccess(value, successMessage = "Copiado al portapapeles.") {
+  const texto = String(value || "").trim();
+  if (!texto) {
+    showEmployeeAccessFeedback("No hay texto para copiar.", "error");
+    return;
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(texto);
+    } else {
+      const temp = document.createElement("textarea");
+      temp.value = texto;
+      temp.setAttribute("readonly", "readonly");
+      temp.style.position = "fixed";
+      temp.style.left = "-9999px";
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand("copy");
+      document.body.removeChild(temp);
+    }
+    showEmployeeAccessFeedback(successMessage);
+  } catch (error) {
+    showEmployeeAccessFeedback("No se pudo copiar. Copialo manualmente.", "error");
+  }
+}
+
+function attachEmployeeAccessCopyHandlers() {
+  document.querySelectorAll("#employeeAccessSection [data-copy-input]").forEach((button) => {
+    button.onclick = () => {
+      const input = getById(button.dataset.copyInput);
+      copiarTextoEmpleadoAccess(input?.value || "", "Dato copiado al portapapeles.");
+    };
+  });
+
+  document.querySelectorAll("#employeeAccessSection [data-copy-target]").forEach((button) => {
+    button.onclick = () => {
+      const target = getById(button.dataset.copyTarget);
+      copiarTextoEmpleadoAccess(target?.textContent || "", "Usuario copiado al portapapeles.");
+    };
+  });
+}
+
+function renderEmployeeAccessSectionLoading(employee, mode) {
+  const section = getById("employeeAccessSection");
+  if (!section) return;
+  if (!employee || mode === "create") {
+    resetEmployeeAccessSection();
+    return;
+  }
+  section.classList.remove("hidden");
+  getById("employeeAccessExisting")?.classList.add("hidden");
+  getById("employeeAccessForm")?.classList.add("hidden");
+  getById("employeeAccessFeedback")?.classList.add("hidden");
+  setTextContent("employeeAccessStatus", "Consultando acceso...");
+}
+
+async function cargarEmployeeAccessSection(employee, mode) {
+  const section = getById("employeeAccessSection");
+  if (!section || !employee || mode === "create") {
+    resetEmployeeAccessSection();
+    return;
+  }
+
+  const id = String(employee.id || employee._id || "");
+  if (!id) return;
+
+  renderEmployeeAccessSectionLoading(employee, mode);
+  try {
+    const data = await loadEmployeeAccessUser(id);
+    if (data?.hasAccess && data.user) {
+      setTextContent("employeeAccessStatus", "Acceso activo");
+      getById("employeeAccessExisting")?.classList.remove("hidden");
+      getById("employeeAccessForm")?.classList.add("hidden");
+      setTextContent("accessExistingUser", data.user.usuario || "-");
+      setTextContent("accessExistingEmail", data.user.email || "-");
+      attachEmployeeAccessCopyHandlers();
+      return;
+    }
+
+    if (employee.activo === false) {
+      setTextContent("employeeAccessStatus", "No se puede crear acceso para un empleado inactivo.");
+      getById("employeeAccessExisting")?.classList.add("hidden");
+      getById("employeeAccessForm")?.classList.add("hidden");
+      return;
+    }
+
+    setTextContent("employeeAccessStatus", "Sin acceso");
+    getById("employeeAccessExisting")?.classList.add("hidden");
+    getById("employeeAccessForm")?.classList.remove("hidden");
+    const usuarioInput = getById("access_usuario");
+    const emailInput = getById("access_email");
+    const passwordInput = getById("access_password");
+    if (usuarioInput) usuarioInput.value = sugerirUsuarioAcceso(employee);
+    if (emailInput) emailInput.value = employee.email || "";
+    if (passwordInput) passwordInput.value = generarPasswordTemporal();
+    setAccessControlsEnabled(true);
+    const createBtn = getById("btnCreateEmployeeAccess");
+    if (createBtn) {
+      createBtn.onclick = () => handleCreateEmployeeAccess(employee);
+    }
+    attachEmployeeAccessCopyHandlers();
+  } catch (error) {
+    setTextContent("employeeAccessStatus", "No se pudo consultar el acceso.");
+    showEmployeeAccessFeedback(error?.message || "No se pudo consultar el acceso del empleado.", "error");
+  }
+}
+
+async function handleCreateEmployeeAccess(employee) {
+  const id = String(employee?.id || employee?._id || "");
+  const usuario = getById("access_usuario")?.value.trim() || "";
+  const email = getById("access_email")?.value.trim() || "";
+  const password = getById("access_password")?.value || "";
+
+  if (!id) return;
+  if (!usuario || !email || !password) {
+    showEmployeeAccessFeedback("Completa usuario, email y contrasena temporal.", "error");
+    return;
+  }
+
+  try {
+    setAccessControlsEnabled(false);
+    setTextContent("employeeAccessStatus", "Creando acceso...");
+    const data = await createEmployeeAccessUser(id, { usuario, email, password });
+    showEmployeeAccessFeedback("Acceso creado correctamente. Comparte estas credenciales con el empleado.");
+    setTextContent("employeeAccessStatus", "Acceso activo");
+    getById("employeeAccessExisting")?.classList.remove("hidden");
+    getById("employeeAccessForm")?.classList.add("hidden");
+    setTextContent("accessExistingUser", data?.user?.usuario || usuario);
+    setTextContent("accessExistingEmail", data?.user?.email || email);
+    attachEmployeeAccessCopyHandlers();
+  } catch (error) {
+    setTextContent("employeeAccessStatus", "Sin acceso");
+    showEmployeeAccessFeedback(error?.message || "No se pudo crear el acceso.", "error");
+    setAccessControlsEnabled(true);
   }
 }
 
@@ -208,6 +406,7 @@ export async function openEmployeeModal(mode = "view", empleadoId = "") {
     const employeeDetail = await loadEmployeeById(empleadoId);
     state.modal.empleado = employeeDetail;
     renderEmployeeModal(employeeDetail, mode);
+    await cargarEmployeeAccessSection(employeeDetail, mode);
   } catch (error) {
     const serverError = getById("employeeModalServerError");
     if (serverError) {
@@ -217,6 +416,12 @@ export async function openEmployeeModal(mode = "view", empleadoId = "") {
     showFeedback(error?.message || "No se pudo cargar el empleado.", "error");
   } finally {
     showSavingUI(false);
+    if (state.modal.mode === "view") {
+      setFormReadonly(true);
+      if (!getById("employeeAccessForm")?.classList.contains("hidden")) {
+        setAccessControlsEnabled(true);
+      }
+    }
   }
 }
 

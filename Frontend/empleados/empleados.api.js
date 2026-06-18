@@ -90,6 +90,17 @@ export async function setEmployeeActive(id, activo) {
   return updateEmployee(id, { activo });
 }
 
+export async function loadEmployeeAccessUser(id) {
+  return fetchAdmin(`/admin/employees/${encodeURIComponent(String(id))}/access-user`);
+}
+
+export async function createEmployeeAccessUser(id, payload) {
+  return fetchAdmin(`/admin/employees/${encodeURIComponent(String(id))}/access-user`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function toggleEmployeeActive(id, activo) {
   return setEmployeeActive(id, !activo);
 }

@@ -202,7 +202,8 @@ export function showSavingUI(enable, message = "Guardando...") {
 }
 
 export function setFormReadonly(readonly) {
-  const controls = Array.from(document.querySelectorAll("#employeeForm input, #employeeForm textarea, #employeeForm select"));
+  const controls = Array.from(document.querySelectorAll("#employeeForm input, #employeeForm textarea, #employeeForm select"))
+    .filter((control) => !control.closest("#employeeAccessSection"));
   controls.forEach((control) => {
     if (readonly) {
       control.disabled = true;
