@@ -101,6 +101,13 @@ export async function createEmployeeAccessUser(id, payload) {
   });
 }
 
+export async function resetEmployeeAccessPassword(id, payload) {
+  return fetchAdmin(`/admin/employees/${encodeURIComponent(String(id))}/access-user/reset-password`, {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function toggleEmployeeActive(id, activo) {
   return setEmployeeActive(id, !activo);
 }

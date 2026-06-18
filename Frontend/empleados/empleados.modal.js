@@ -1,6 +1,6 @@
 import { state, resetModalState, setEmployees } from "./empleados.state.js";
 import { getById, setTextContent } from "./empleados.utils.js";
-import { loadEmployeeById, createEmployee, updateEmployee, loadEmployeeList, setEmployeeActive, loadEmployeeAccessUser, createEmployeeAccessUser } from "./empleados.api.js";
+import { loadEmployeeById, createEmployee, updateEmployee, loadEmployeeList, setEmployeeActive, loadEmployeeAccessUser, createEmployeeAccessUser, resetEmployeeAccessPassword } from "./empleados.api.js";
 import { renderEmployeeBirthdayNotice, renderEmployeeStats, renderEmployeeTable, showFeedback, showSavingUI, setFormReadonly, resetFieldErrors, setFieldError } from "./empleados.ui.js";
 
 function getEmployeeFormValues() {
@@ -157,18 +157,19 @@ function resetEmployeeAccessSection() {
   getById("employeeAccessSection")?.classList.add("hidden");
   getById("employeeAccessExisting")?.classList.add("hidden");
   getById("employeeAccessForm")?.classList.add("hidden");
+  getById("employeeAccessResetForm")?.classList.add("hidden");
   getById("employeeAccessFeedback")?.classList.add("hidden");
   setTextContent("employeeAccessStatus", "");
   setTextContent("accessExistingUser", "-");
   setTextContent("accessExistingEmail", "-");
-  ["access_usuario", "access_email", "access_password"].forEach((id) => {
+  ["access_usuario", "access_email", "access_password", "access_reset_password"].forEach((id) => {
     const input = getById(id);
     if (input) input.value = "";
   });
 }
 
 function setAccessControlsEnabled(enabled) {
-  ["access_usuario", "access_email", "access_password", "btnCreateEmployeeAccess", "btnCopyAccessUser", "btnCopyAccessPassword"].forEach((id) => {
+  ["access_usuario", "access_email", "access_password", "btnCreateEmployeeAccess", "btnCopyAccessUser", "btnCopyAccessPassword", "btnShowResetAccessPassword", "access_reset_password", "btnCopyResetAccessPassword", "btnSaveResetAccessPassword", "btnCancelResetAccessPassword"].forEach((id) => {
     const control = getById(id);
     if (control) control.disabled = !enabled;
   });
@@ -225,6 +226,33 @@ function attachEmployeeAccessCopyHandlers() {
   });
 }
 
+function hideEmployeeAccessResetForm() {
+  getById("employeeAccessResetForm")?.classList.add("hidden");
+  const input = getById("access_reset_password");
+  if (input) input.value = "";
+}
+
+function showEmployeeAccessResetForm(employee) {
+  const form = getById("employeeAccessResetForm");
+  const input = getById("access_reset_password");
+  if (!form || !input) return;
+  input.value = generarPasswordTemporal();
+  form.classList.remove("hidden");
+  getById("btnSaveResetAccessPassword")?.focus();
+  attachEmployeeAccessCopyHandlers();
+  const saveBtn = getById("btnSaveResetAccessPassword");
+  if (saveBtn) saveBtn.onclick = () => handleResetEmployeeAccessPassword(employee);
+}
+
+function attachEmployeeAccessResetHandlers(employee) {
+  const showBtn = getById("btnShowResetAccessPassword");
+  const cancelBtn = getById("btnCancelResetAccessPassword");
+  const saveBtn = getById("btnSaveResetAccessPassword");
+  if (showBtn) showBtn.onclick = () => showEmployeeAccessResetForm(employee);
+  if (cancelBtn) cancelBtn.onclick = hideEmployeeAccessResetForm;
+  if (saveBtn) saveBtn.onclick = () => handleResetEmployeeAccessPassword(employee);
+}
+
 function renderEmployeeAccessSectionLoading(employee, mode) {
   const section = getById("employeeAccessSection");
   if (!section) return;
@@ -235,6 +263,7 @@ function renderEmployeeAccessSectionLoading(employee, mode) {
   section.classList.remove("hidden");
   getById("employeeAccessExisting")?.classList.add("hidden");
   getById("employeeAccessForm")?.classList.add("hidden");
+  hideEmployeeAccessResetForm();
   getById("employeeAccessFeedback")?.classList.add("hidden");
   setTextContent("employeeAccessStatus", "Consultando acceso...");
 }
@@ -258,7 +287,10 @@ async function cargarEmployeeAccessSection(employee, mode) {
       getById("employeeAccessForm")?.classList.add("hidden");
       setTextContent("accessExistingUser", data.user.usuario || "-");
       setTextContent("accessExistingEmail", data.user.email || "-");
+      hideEmployeeAccessResetForm();
       attachEmployeeAccessCopyHandlers();
+      attachEmployeeAccessResetHandlers(employee);
+      setAccessControlsEnabled(true);
       return;
     }
 
@@ -310,13 +342,42 @@ async function handleCreateEmployeeAccess(employee) {
     setTextContent("employeeAccessStatus", "Acceso activo");
     getById("employeeAccessExisting")?.classList.remove("hidden");
     getById("employeeAccessForm")?.classList.add("hidden");
+    hideEmployeeAccessResetForm();
     setTextContent("accessExistingUser", data?.user?.usuario || usuario);
     setTextContent("accessExistingEmail", data?.user?.email || email);
     attachEmployeeAccessCopyHandlers();
+    attachEmployeeAccessResetHandlers(employee);
+    setAccessControlsEnabled(true);
   } catch (error) {
     setTextContent("employeeAccessStatus", "Sin acceso");
     showEmployeeAccessFeedback(error?.message || "No se pudo crear el acceso.", "error");
     setAccessControlsEnabled(true);
+  }
+}
+
+async function handleResetEmployeeAccessPassword(employee) {
+  const id = String(employee?.id || employee?._id || "");
+  const password = getById("access_reset_password")?.value || "";
+
+  if (!id) return;
+  if (!password) {
+    showEmployeeAccessFeedback("Escribe una nueva contrasena temporal.", "error");
+    return;
+  }
+
+  try {
+    setAccessControlsEnabled(false);
+    setTextContent("employeeAccessStatus", "Actualizando contrasena...");
+    await resetEmployeeAccessPassword(id, { password });
+    showEmployeeAccessFeedback("Contraseña actualizada correctamente. Comparte la nueva contraseña con el empleado.");
+    setTextContent("employeeAccessStatus", "Acceso activo");
+    hideEmployeeAccessResetForm();
+  } catch (error) {
+    showEmployeeAccessFeedback(error?.message || "No se pudo actualizar la contrasena.", "error");
+  } finally {
+    setAccessControlsEnabled(true);
+    attachEmployeeAccessCopyHandlers();
+    attachEmployeeAccessResetHandlers(employee);
   }
 }
 

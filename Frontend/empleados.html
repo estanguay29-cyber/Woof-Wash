@@ -557,6 +557,21 @@
                 <span>Email</span>
                 <strong id="accessExistingEmail">-</strong>
               </div>
+              <div class="employee-access-reset">
+                <button id="btnShowResetAccessPassword" type="button" class="employee-access-secondary-btn">Restablecer contrase&ntilde;a</button>
+                <div id="employeeAccessResetForm" class="employee-access-reset-form hidden">
+                  <label>Nueva contrase&ntilde;a temporal
+                    <div class="employee-access-input-row">
+                      <input name="accessResetPassword" id="access_reset_password" type="text" autocomplete="new-password" />
+                      <button id="btnCopyResetAccessPassword" type="button" class="employee-access-copy-btn" data-copy-input="access_reset_password">Copiar</button>
+                    </div>
+                  </label>
+                  <div class="employee-access-reset-actions">
+                    <button id="btnSaveResetAccessPassword" type="button" class="admin-action-button admin-action-primary">Guardar nueva contrase&ntilde;a</button>
+                    <button id="btnCancelResetAccessPassword" type="button" class="employee-access-secondary-btn">Cancelar</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div id="employeeAccessForm" class="admin-form-grid employee-access-form hidden">
               <label>Usuario

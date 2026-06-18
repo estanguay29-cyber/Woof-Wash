@@ -3862,6 +3862,37 @@ app.post("/admin/employees/:id/access-user", auth, requireAdmin, adminWriteLimit
   }
 });
 
+app.post("/admin/employees/:id/access-user/reset-password", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no valido" });
+    }
+
+    const empleado = await Employee.findById(id).select("_id");
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
+    const password = req.body?.password;
+    if (!validarPassword(password)) {
+      return res.status(400).json({ message: "La nueva contrasena debe tener entre 8 y 72 caracteres, incluir letras y numeros." });
+    }
+
+    const user = await User.findOne({ role: "empleado", employeeId: empleado._id }).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "Este empleado no tiene una cuenta de acceso vinculada." });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    await user.save();
+
+    res.json({ ok: true, message: "Contraseña actualizada correctamente" });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar la contrasena del empleado" });
+  }
+});
+
 app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const id = String(req.params.id || "").trim();

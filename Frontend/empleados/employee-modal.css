@@ -152,9 +152,59 @@ input.invalid, textarea.invalid { border-color: #b91c1c; box-shadow: 0 0 0 4px r
   font-weight: 850;
 }
 
+.employee-access-reset {
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(11, 42, 107, 0.08);
+}
+
+.employee-access-reset-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  border-radius: 12px;
+  background: rgba(11, 42, 107, 0.035);
+}
+
+.employee-access-reset-form label {
+  color: #0b2a6b;
+  font-weight: 850;
+}
+
+.employee-access-reset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.employee-access-reset-actions button {
+  min-height: 40px;
+}
+
 .employee-access-input-row {
   grid-template-columns: minmax(0, 1fr) auto;
   margin-top: 6px;
+}
+
+.employee-access-secondary-btn {
+  min-height: 38px;
+  width: fit-content;
+  border: 1px solid rgba(11, 42, 107, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  color: #0b2a6b;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 0 12px;
+}
+
+.employee-access-secondary-btn:hover {
+  border-color: rgba(140, 198, 63, 0.6);
+  background: rgba(140, 198, 63, 0.1);
 }
 
 .employee-access-copy-btn {
@@ -206,9 +256,14 @@ input.invalid, textarea.invalid { border-color: #b91c1c; box-shadow: 0 0 0 4px r
 
   .employee-access-status,
   .employee-access-copy-btn,
+  .employee-access-secondary-btn,
   .employee-access-action button {
     width: 100%;
     justify-content: center;
+  }
+
+  .employee-access-reset-actions {
+    display: grid;
   }
 }
 
