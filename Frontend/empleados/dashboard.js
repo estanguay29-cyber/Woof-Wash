@@ -35,7 +35,21 @@ function obtenerTokenEmpleado() {
 }
 
 function obtenerRoleLocal() {
-  return (localStorage.getItem("role") || localStorage.getItem("userRole") || "").trim().toLowerCase();
+  const roleGuardado = localStorage.getItem("role") || localStorage.getItem("userRole") || "";
+  return (roleGuardado || obtenerRoleDesdeToken(obtenerTokenEmpleado())).trim().toLowerCase();
+}
+
+function obtenerRoleDesdeToken(token) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return "";
+    const normalizado = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const relleno = normalizado.padEnd(normalizado.length + ((4 - normalizado.length % 4) % 4), "=");
+    const data = JSON.parse(atob(relleno));
+    return data?.role || data?.rol || "";
+  } catch (error) {
+    return "";
+  }
 }
 
 function cerrarSesionEmpleado() {
@@ -356,14 +370,31 @@ async function cargarPanelEmpleado() {
   mostrarCargando(false);
 }
 
+function mostrarVistaAdminPreview() {
+  mostrarCargando(false);
+  document.getElementById("employeeAccessMessage")?.classList.add("hidden");
+  document.getElementById("employeeDashboard")?.classList.add("hidden");
+  document.getElementById("adminPreviewPanel")?.classList.remove("hidden");
+}
+
+function mostrarVistaEmpleado() {
+  document.getElementById("adminPreviewPanel")?.classList.add("hidden");
+  document.getElementById("employeeAccessMessage")?.classList.add("hidden");
+  document.getElementById("employeeDashboard")?.classList.remove("hidden");
+}
+
 async function iniciarDashboardEmpleado() {
   const token = obtenerTokenEmpleado();
   const role = obtenerRoleLocal();
   const access = document.getElementById("employeeAccessMessage");
-  const dashboard = document.getElementById("employeeDashboard");
 
-  if (!token || (role && role !== "empleado")) {
+  if (!token || (role !== "empleado" && role !== "admin")) {
     redirigirLogin();
+    return;
+  }
+
+  if (role === "admin") {
+    mostrarVistaAdminPreview();
     return;
   }
 
@@ -376,8 +407,7 @@ async function iniciarDashboardEmpleado() {
     }
 
     renderPerfil(perfil);
-    if (access) access.classList.add("hidden");
-    if (dashboard) dashboard.classList.remove("hidden");
+    mostrarVistaEmpleado();
     await cargarPanelEmpleado();
   } catch (error) {
     mostrarCargando(false);

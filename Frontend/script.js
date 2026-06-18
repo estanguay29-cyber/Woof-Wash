@@ -61,6 +61,7 @@ const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
   "admin.html",
   "agenda.html",
   "empleados.html",
+  "empleados/dashboard.html",
   "checkout.html",
   "perfil.html"
 ]);
