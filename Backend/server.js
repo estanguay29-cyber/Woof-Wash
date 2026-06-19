@@ -3255,6 +3255,97 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/admin/employees/:id/portal", auth, requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no válido" });
+    }
+
+    const empleado = await Employee.findById(id).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos");
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
+    const user = await User.findOne({ role: "empleado", employeeId: empleado._id }).select("usuario email role employeeId");
+    res.json(construirPortalEmpleadoRespuesta(empleado, user));
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el portal del empleado" });
+  }
+});
+
+app.get("/admin/employees/:id/performance", auth, requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no válido" });
+    }
+
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const respuesta = await construirPerformanceEmpleadoRespuesta(id, fecha, { requireActive: false });
+    res.json(respuesta);
+  } catch (error) {
+    manejarErrorPortalEmpleado(res, error, "No se pudieron obtener las metricas del empleado");
+  }
+});
+
+app.get("/admin/employees/:id/appointments", auth, requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no válido" });
+    }
+
+    const empleado = await Employee.findById(id).select("_id nombreCompleto email activo");
+    if (!empleado) {
+      return res.status(404).json({ message: "Empleado no encontrado" });
+    }
+
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const filtro = {
+      fecha,
+      $or: [
+        { empleadoAsignadoId: empleado._id },
+        { empleadosAsignados: empleado._id }
+      ],
+      estado: { $nin: ["cancelada", "no_asistio"] }
+    };
+    const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
+    const metricas = calcularMetricasEmpleado(await Appointment.find({
+      $or: [
+        { empleadoAsignadoId: empleado._id },
+        { empleadosAsignados: empleado._id }
+      ]
+    }));
+
+    res.json({
+      fecha,
+      empleado: {
+        id: String(empleado._id),
+        nombre: empleado.nombreCompleto || "",
+        usuario: "",
+        email: empleado.email || "",
+        role: "empleado"
+      },
+      metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
+      actualDiaMxn: 0,
+      progresoMetaPorcentaje: 0,
+      metricas,
+      citas: citas.map(construirCitaEmpleado)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener las citas del empleado" });
+  }
+});
+
 app.get("/admin/performance/attendance", auth, requireAdmin, async (req, res) => {
   try {
     const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
@@ -3471,6 +3562,120 @@ function construirResumenPerformanceEmpleado({
     porcentajePuntualidad: metricasEmpleado.puntualidadPorcentaje,
     totalServicios: metricasEmpleado.serviciosCompletados
   };
+}
+
+function construirPortalEmpleadoRespuesta(empleado, user = null) {
+  return {
+    usuario: user ? {
+      id: String(user._id),
+      usuario: user.usuario || "",
+      email: user.email || "",
+      role: obtenerRolUsuario(user)
+    } : null,
+    empleado: {
+      id: String(empleado._id),
+      nombre: empleado.nombreCompleto || "",
+      email: empleado.email || "",
+      telefono: empleado.telefono || "",
+      puesto: empleado.puesto || "",
+      activo: empleado.activo !== false,
+      fechaIngreso: empleado.fechaIngreso || "",
+      fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos)
+    }
+  };
+}
+
+async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options = {}) {
+  const requireActive = options.requireActive !== false;
+  const semana = obtenerRangoSemana(fecha);
+  if (!semana) {
+    const error = new Error("No se pudo calcular el rango de semana");
+    error.status = 400;
+    throw error;
+  }
+
+  const empleado = await Employee.findById(employeeId).select("nombreCompleto puesto activo sueldoBase comision bonoManual descuentoAdministrativo");
+  if (!empleado) {
+    const error = new Error("Empleado no encontrado");
+    error.status = 404;
+    throw error;
+  }
+  if (requireActive && empleado.activo === false) {
+    const error = new Error("No autorizado");
+    error.status = 403;
+    throw error;
+  }
+
+  const citasSemana = await Appointment.find({
+    fecha: { $gte: semana.inicio, $lte: semana.fin },
+    estado: "completada",
+    $or: [
+      { empleadoAsignadoId: empleado._id },
+      { empleadosAsignados: empleado._id }
+    ]
+  });
+  const asistenciaSemana = await PerformanceAttendance.find({
+    empleadoId: empleado._id,
+    fecha: { $gte: semana.inicio, $lte: semana.fin }
+  });
+  const limpiezaOrdenSemana = await PerformanceMetricRecord.find({
+    empleadoId: empleado._id,
+    fecha: { $gte: semana.inicio, $lte: semana.fin },
+    metricKey: "limpieza_orden"
+  });
+  const eventosAsistenciaSemana = await PerformanceMetricRecord.find({
+    empleadoId: empleado._id,
+    fecha: { $gte: semana.inicio, $lte: semana.fin },
+    metricKey: { $in: PERFORMANCE_PRIMARY_ATTENDANCE_KEYS },
+    value: true
+  });
+
+  const metricasBase = calcularMetricasEmpleado(citasSemana);
+  const cumplioMetaPersonal = metricasBase.ingresosGeneradosAproximados >= META_SEMANAL_EMPLEADOS_MXN;
+  const resumen = construirResumenPerformanceEmpleado({
+    empleado,
+    citasSemana,
+    asistenciaRegistros: asistenciaSemana,
+    limpiezaOrdenRegistros: limpiezaOrdenSemana,
+    eventosAsistenciaRegistros: eventosAsistenciaSemana,
+    metaGlobalSemanalOk: cumplioMetaPersonal,
+    metaGlobalSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
+    ventasGlobalesSemanales: metricasBase.ingresosGeneradosAproximados,
+    progresoMetaGlobal: Math.min(Math.round((metricasBase.ingresosGeneradosAproximados / (META_SEMANAL_EMPLEADOS_MXN || 1)) * 100), 100)
+  });
+
+  return {
+    empleado: {
+      id: String(empleado._id),
+      nombre: empleado.nombreCompleto || "",
+      puesto: empleado.puesto || ""
+    },
+    semana: {
+      inicio: semana.inicio,
+      fin: semana.fin
+    },
+    metricas: {
+      ventasSemanales: resumen.ventasSemanales,
+      metaSemanal: resumen.metaSemanalMxn,
+      cumplioMetaPersonal: resumen.cumplioMetaPersonal,
+      promedioEstrellas: typeof resumen.promedioEstrellas === "number" ? resumen.promedioEstrellas : 0,
+      retardosSemana: resumen.retardosSemana,
+      faltasInjustificadas: resumen.faltasInjustificadas,
+      limpiezaOrdenOk: resumen.limpiezaOrdenOk,
+      elegibleBono: resumen.elegibleBono,
+      bonoCalculado: resumen.bonoCalculado,
+      totalAPagar: resumen.totalAPagar,
+      porcentajePuntualidad: typeof resumen.porcentajePuntualidad === "number" ? resumen.porcentajePuntualidad : 0,
+      totalServicios: resumen.totalServicios
+    }
+  };
+}
+
+function manejarErrorPortalEmpleado(res, error, fallbackMessage) {
+  if (error?.status) {
+    return res.status(error.status).json({ message: error.message || fallbackMessage });
+  }
+  return res.status(500).json({ message: fallbackMessage });
 }
 
 app.get("/admin/performance/metrics", auth, requireAdmin, async (req, res) => {
@@ -4028,25 +4233,7 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
 });
 
 app.get("/empleados/me", auth, requireEmpleado, (req, res) => {
-  const employee = req.employeeProfile;
-  res.json({
-    usuario: {
-      id: String(req.empleado._id),
-      usuario: req.empleado.usuario || "",
-      email: req.empleado.email || "",
-      role: req.empleadoRole
-    },
-    empleado: {
-      id: String(employee._id),
-      nombre: employee.nombreCompleto || "",
-      email: employee.email || "",
-      telefono: employee.telefono || "",
-      puesto: employee.puesto || "",
-      activo: employee.activo !== false,
-      fechaIngreso: employee.fechaIngreso || "",
-      fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(employee.fechaCumpleanos)
-    }
-  });
+  res.json(construirPortalEmpleadoRespuesta(req.employeeProfile, req.empleado));
 });
 
 app.get("/empleados/performance", auth, requireEmpleado, async (req, res) => {
@@ -4056,82 +4243,10 @@ app.get("/empleados/performance", auth, requireEmpleado, async (req, res) => {
       return res.status(400).json({ message: "fecha no valida" });
     }
 
-    const semana = obtenerRangoSemana(fecha);
-    if (!semana) {
-      return res.status(400).json({ message: "No se pudo calcular el rango de semana" });
-    }
-
-    const employeeId = req.employeeProfile._id;
-    const empleado = await Employee.findById(employeeId).select("nombreCompleto puesto activo sueldoBase comision bonoManual descuentoAdministrativo");
-    if (!empleado || empleado.activo === false) {
-      return res.status(403).json({ message: "No autorizado" });
-    }
-
-    const citasSemana = await Appointment.find({
-      fecha: { $gte: semana.inicio, $lte: semana.fin },
-      estado: "completada",
-      $or: [
-        { empleadoAsignadoId: employeeId },
-        { empleadosAsignados: employeeId }
-      ]
-    });
-    const asistenciaSemana = await PerformanceAttendance.find({
-      empleadoId: employeeId,
-      fecha: { $gte: semana.inicio, $lte: semana.fin }
-    });
-    const limpiezaOrdenSemana = await PerformanceMetricRecord.find({
-      empleadoId: employeeId,
-      fecha: { $gte: semana.inicio, $lte: semana.fin },
-      metricKey: "limpieza_orden"
-    });
-    const eventosAsistenciaSemana = await PerformanceMetricRecord.find({
-      empleadoId: employeeId,
-      fecha: { $gte: semana.inicio, $lte: semana.fin },
-      metricKey: { $in: PERFORMANCE_PRIMARY_ATTENDANCE_KEYS },
-      value: true
-    });
-
-    const metricasBase = calcularMetricasEmpleado(citasSemana);
-    const cumplioMetaPersonal = metricasBase.ingresosGeneradosAproximados >= META_SEMANAL_EMPLEADOS_MXN;
-    const resumen = construirResumenPerformanceEmpleado({
-      empleado,
-      citasSemana,
-      asistenciaRegistros: asistenciaSemana,
-      limpiezaOrdenRegistros: limpiezaOrdenSemana,
-      eventosAsistenciaRegistros: eventosAsistenciaSemana,
-      metaGlobalSemanalOk: cumplioMetaPersonal,
-      metaGlobalSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
-      ventasGlobalesSemanales: metricasBase.ingresosGeneradosAproximados,
-      progresoMetaGlobal: Math.min(Math.round((metricasBase.ingresosGeneradosAproximados / (META_SEMANAL_EMPLEADOS_MXN || 1)) * 100), 100)
-    });
-
-    res.json({
-      empleado: {
-        id: String(empleado._id),
-        nombre: empleado.nombreCompleto || "",
-        puesto: empleado.puesto || ""
-      },
-      semana: {
-        inicio: semana.inicio,
-        fin: semana.fin
-      },
-      metricas: {
-        ventasSemanales: resumen.ventasSemanales,
-        metaSemanal: resumen.metaSemanalMxn,
-        cumplioMetaPersonal: resumen.cumplioMetaPersonal,
-        promedioEstrellas: typeof resumen.promedioEstrellas === "number" ? resumen.promedioEstrellas : 0,
-        retardosSemana: resumen.retardosSemana,
-        faltasInjustificadas: resumen.faltasInjustificadas,
-        limpiezaOrdenOk: resumen.limpiezaOrdenOk,
-        elegibleBono: resumen.elegibleBono,
-        bonoCalculado: resumen.bonoCalculado,
-        totalAPagar: resumen.totalAPagar,
-        porcentajePuntualidad: typeof resumen.porcentajePuntualidad === "number" ? resumen.porcentajePuntualidad : 0,
-        totalServicios: resumen.totalServicios
-      }
-    });
+    const respuesta = await construirPerformanceEmpleadoRespuesta(req.employeeProfile._id, fecha, { requireActive: true });
+    res.json(respuesta);
   } catch (error) {
-    res.status(500).json({ message: "No se pudieron obtener las metricas del empleado" });
+    manejarErrorPortalEmpleado(res, error, "No se pudieron obtener las metricas del empleado");
   }
 });
 

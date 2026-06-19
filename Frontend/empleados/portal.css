@@ -25,8 +25,8 @@ body {
   color: var(--ink);
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at top left, rgba(140, 198, 63, 0.22), transparent 320px),
-    linear-gradient(135deg, var(--cream) 0%, #f6fbef 43%, #edf6ff 100%);
+    radial-gradient(circle at top left, rgba(140, 198, 63, 0.18), transparent 320px),
+    linear-gradient(135deg, var(--cream) 0%, #f8fbf0 38%, #eef7ff 100%);
 }
 
 body::before {
@@ -105,9 +105,7 @@ input {
 .portal-brand small,
 .portal-kicker,
 .portal-card-tag,
-.search-box span,
-.metric-card span,
-.profile-grid dt {
+.search-box span {
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 900;
@@ -174,7 +172,7 @@ input {
 
 .portal-content {
   display: grid;
-  gap: 22px;
+  gap: 24px;
 }
 
 .portal-hero,
@@ -191,8 +189,22 @@ input {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 20px;
   align-items: end;
-  padding: 28px;
-  min-height: 210px;
+  padding: 32px;
+  min-height: 230px;
+  overflow: hidden;
+  position: relative;
+}
+
+.portal-hero::after {
+  content: "";
+  position: absolute;
+  right: 28px;
+  top: 28px;
+  width: 132px;
+  height: 132px;
+  border: 1px solid rgba(140, 198, 63, 0.34);
+  border-radius: 999px;
+  opacity: 0.65;
 }
 
 .portal-hero h1 {
@@ -206,9 +218,7 @@ input {
 .portal-hero p,
 .portal-card p,
 .employee-meta,
-.empty-state,
-.appointment-card p,
-.manual-card p {
+.empty-state {
   color: var(--muted);
   line-height: 1.55;
 }
@@ -218,6 +228,8 @@ input {
 }
 
 .portal-admin-chip {
+  position: relative;
+  z-index: 1;
   border: 1px solid rgba(140, 198, 63, 0.45);
   border-radius: var(--radius);
   padding: 12px 14px;
@@ -229,7 +241,7 @@ input {
 
 .portal-card-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 
@@ -237,12 +249,14 @@ input {
   display: grid;
   align-content: space-between;
   gap: 12px;
-  min-height: 220px;
+  min-height: 210px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 22px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 16px 36px rgba(11, 42, 107, 0.09);
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.86)),
+    linear-gradient(135deg, rgba(140, 198, 63, 0.12), rgba(11, 42, 107, 0.06));
+  box-shadow: 0 18px 38px rgba(11, 42, 107, 0.1);
 }
 
 .portal-card h2,
@@ -264,6 +278,13 @@ input {
 .employees-panel,
 .employee-portal-panel {
   padding: 22px;
+}
+
+.employee-portal-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
 }
 
 .section-head {
@@ -301,8 +322,9 @@ input {
 .employee-card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px;
-  background: #fff;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 26px rgba(11, 42, 107, 0.07);
 }
 
 .employee-card strong {
@@ -333,93 +355,41 @@ input {
   gap: 18px;
 }
 
-.employee-portal-top {
-  align-items: flex-start;
+.admin-portal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.status-pill {
+.admin-view-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 32px;
   border-radius: 999px;
-  padding: 0 10px;
+  padding: 0 12px;
   color: var(--blue);
-  background: rgba(140, 198, 63, 0.16);
+  background: rgba(140, 198, 63, 0.18);
+  border: 1px solid rgba(140, 198, 63, 0.38);
   font-size: 0.78rem;
-  font-weight: 900;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.profile-grid,
-.metrics-grid,
-.appointment-list,
-.manual-list {
+.employee-dashboard.admin-employee-dashboard {
   display: grid;
-  gap: 12px;
+  gap: 22px;
 }
 
-.profile-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.admin-employee-dashboard .control-panel {
+  margin-top: 0;
 }
 
-.profile-grid div,
-.metric-card,
-.appointment-card,
-.manual-card {
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px;
-  background: #fff;
-}
-
-.profile-grid dt {
-  margin-bottom: 5px;
-}
-
-.profile-grid dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-weight: 850;
-}
-
-.metrics-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.metric-card strong {
-  display: block;
-  margin-top: 6px;
-  color: var(--blue);
-  font-size: 1.35rem;
-}
-
-.portal-subtitle {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.appointment-list,
-.manual-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.appointment-card h3,
-.manual-card h3 {
-  margin: 0 0 8px;
-  color: var(--ink);
-  font-size: 1rem;
-}
-
-.appointment-card p,
-.manual-card p {
-  margin: 0;
-}
-
-.manual-card a {
-  display: inline-flex;
-  margin-top: 12px;
-  color: var(--blue);
-  font-weight: 900;
+.admin-employee-dashboard .timeline-list .empty-state,
+.admin-employee-dashboard .training-grid .empty-state {
+  width: 100%;
 }
 
 @media (max-width: 860px) {
@@ -444,11 +414,12 @@ input {
     width: 100%;
   }
 
-  .portal-card-grid,
-  .profile-grid,
-  .metrics-grid,
-  .appointment-list,
-  .manual-list {
+  .portal-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-portal-toolbar {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

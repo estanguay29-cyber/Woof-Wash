@@ -4,20 +4,37 @@ const MANUALES_PORTAL = [
     titulo: "Manual de estilismo canino",
     tipo: "PDF",
     descripcion: "Guía base para preparación del manto, baño, secado y criterios de no rapar según tipo de pelo.",
-    url: "../manuales/manual-estilismo-canino-woofwash.pdf"
+    url: "../manuales/manual-estilismo-canino-woofwash.pdf",
+    estado: "Disponible"
   },
   {
     titulo: "Manual de manejo seguro de mascotas",
     tipo: "PDF",
     descripcion: "Protocolos de acercamiento, lenguaje corporal, manejo seguro, baño, secado y corte para garantizar el bienestar de cada mascota.",
-    url: "../manuales/manual-manejo-seguro-mascotas-woofwash.pdf"
+    url: "../manuales/manual-manejo-seguro-mascotas-woofwash.pdf",
+    estado: "Disponible"
+  },
+  {
+    titulo: "Atención al cliente",
+    tipo: "Guía",
+    descripcion: "Protocolos de comunicación, confirmación y trato con clientes.",
+    url: null,
+    estado: "Próximamente"
+  },
+  {
+    titulo: "Protocolos de unidad móvil",
+    tipo: "Guía",
+    descripcion: "Checklist de operación, limpieza y seguridad de la unidad móvil.",
+    url: null,
+    estado: "Próximamente"
   }
 ];
 
 const state = {
   token: "",
   empleados: [],
-  filtro: ""
+  filtro: "",
+  empleadoSeleccionadoId: ""
 };
 
 function obtenerApiBase() {
@@ -61,6 +78,32 @@ function formatoFecha(value) {
   }).format(date);
 }
 
+function formatoSemana(inicio, fin) {
+  const inicioTexto = formatoFecha(inicio);
+  const finTexto = formatoFecha(fin);
+  if (inicioTexto === "-" && finTexto === "-") return "Semana actual";
+  return `${inicioTexto} al ${finTexto}`;
+}
+
+function tieneDato(value) {
+  return value !== null && value !== undefined && value !== "";
+}
+
+function textoDato(value, formatter) {
+  if (!tieneDato(value)) return "Sin datos disponibles";
+  return formatter ? formatter(value) : String(value);
+}
+
+function porcentaje(value) {
+  if (!tieneDato(value)) return "Sin datos disponibles";
+  return `${Math.max(0, Math.min(100, Math.round(toNumber(value, 0))))}%`;
+}
+
+function clampPercent(value) {
+  if (!tieneDato(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(toNumber(value, 0))));
+}
+
 function fechaLocalISO(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Mexico_City",
@@ -68,6 +111,21 @@ function fechaLocalISO(date = new Date()) {
     month: "2-digit",
     day: "2-digit"
   }).format(date);
+}
+
+function obtenerRangoSemanaLocal(fechaISO) {
+  const base = new Date(`${fechaISO}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return { inicio: fechaISO, fin: fechaISO };
+  const dia = base.getDay();
+  const diasDesdeLunes = (dia + 6) % 7;
+  const inicio = new Date(base);
+  inicio.setDate(base.getDate() - diasDesdeLunes);
+  const fin = new Date(inicio);
+  fin.setDate(inicio.getDate() + 5);
+  return {
+    inicio: fechaLocalISO(inicio),
+    fin: fechaLocalISO(fin)
+  };
 }
 
 function decodificarPayloadJwt(token) {
@@ -203,31 +261,6 @@ function renderEmployeeList() {
   `).join("");
 }
 
-function renderMetricCard(label, value) {
-  return `
-    <article class="metric-card">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value)}</strong>
-    </article>
-  `;
-}
-
-function obtenerMetricasDetalle(detalle) {
-  const semanales = detalle?.metricasSemanal || {};
-  const metricas = detalle?.metricas || {};
-  const ventas = detalle?.actualSemanaMxn ?? semanales.ingresosGeneradosAproximados ?? metricas.ingresosGeneradosAproximados;
-  const servicios = semanales.totalServicios ?? metricas.totalServicios;
-  const estrellas = semanales.promedioEstrellas ?? metricas.promedioEstrellas ?? metricas.promedioCalificacion;
-  const pago = semanales.totalPagoAproximado ?? metricas.totalPagoAproximado;
-
-  return [
-    renderMetricCard("Ventas semanales", formatoMoneda(ventas)),
-    renderMetricCard("Servicios", servicios == null ? "-" : String(servicios)),
-    renderMetricCard("Promedio estrellas", estrellas == null ? "-" : String(estrellas)),
-    renderMetricCard("Pago aproximado", pago == null ? "-" : formatoMoneda(pago))
-  ].join("");
-}
-
 function ordenarCitasRecientes(citas) {
   return [...citas].sort((a, b) => {
     const fechaA = `${a.fecha || ""} ${a.hora || ""}`;
@@ -236,85 +269,357 @@ function ordenarCitasRecientes(citas) {
   }).slice(0, 6);
 }
 
-function renderCitas(citas = []) {
-  const recientes = ordenarCitasRecientes(Array.isArray(citas) ? citas : []);
-  if (!recientes.length) {
-    return `<div class="empty-state">Este empleado no tiene servicios recientes disponibles en la respuesta admin.</div>`;
-  }
+function estadoTexto(value) {
+  const estados = {
+    en_camino: "En camino",
+    en_proceso: "En proceso",
+    finalizada: "Finalizada",
+    pendiente: "Pendiente",
+    completada: "Completada",
+    cancelada: "Cancelada",
+    no_asistio: "No asistió"
+  };
+  return estados[value] || value || "Pendiente";
+}
 
+function textoServicio(servicio, index) {
+  const tipo = servicio?.tipo === "auto" ? "Auto" : "Mascota";
+  const nombre = servicio?.nombre || [servicio?.categoria, servicio?.paquete].filter(Boolean).join(" ") || "Servicio";
+  return `${tipo} ${index + 1}: ${nombre}`;
+}
+
+function serviciosCita(cita) {
+  if (Array.isArray(cita?.serviciosDetalle) && cita.serviciosDetalle.length) {
+    return cita.serviciosDetalle;
+  }
+  return [{ nombre: cita?.servicioNombre || "Servicio", tipo: cita?.servicioTipo || "mascota" }];
+}
+
+function metricState(value, type = "neutral") {
+  if (!tieneDato(value)) return "metric-neutral";
+  const number = toNumber(value, 0);
+  if (type === "positive") return number > 0 ? "metric-good" : "metric-neutral";
+  if (type === "percent") return number >= 90 ? "metric-good" : "metric-neutral";
+  if (type === "stars") return number >= 4.5 ? "metric-good" : number > 0 ? "metric-neutral" : "metric-alert";
+  if (type === "delays") return number === 0 ? "metric-good" : "metric-alert";
+  if (type === "boolean") return value ? "metric-good" : "metric-alert";
+  return "metric-neutral";
+}
+
+function datosMetricas(detalle) {
+  const metricas = detalle?.performance?.metricas || detalle?.metricas || {};
+  const ventasSemanales = metricas.ventasSemanales;
+  const metaSemanal = metricas.metaSemanal;
+  const progresoMeta = tieneDato(ventasSemanales) && tieneDato(metaSemanal) && toNumber(metaSemanal, 0) > 0
+    ? Math.min(Math.round((toNumber(ventasSemanales, 0) / toNumber(metaSemanal, 1)) * 100), 100)
+    : null;
+  const promedioEstrellas = metricas.promedioEstrellas;
+  const retardosSemana = metricas.retardosSemana;
+  const puntualidad = metricas.porcentajePuntualidad;
+  const bonoCalculado = metricas.bonoCalculado;
+  const totalAPagar = metricas.totalAPagar;
+  const servicios = metricas.totalServicios;
+  const elegibleBono = metricas.elegibleBono;
+
+  return {
+    ventasSemanales,
+    metaSemanal,
+    progresoMeta,
+    promedioEstrellas,
+    retardosSemana,
+    puntualidad,
+    bonoCalculado,
+    totalAPagar,
+    servicios,
+    elegibleBono
+  };
+}
+
+function renderMetricCard({ id, icon, label, value, hint, stateClass }) {
   return `
-    <div class="appointment-list">
-      ${recientes.map((cita) => `
-        <article class="appointment-card">
-          <h3>${escapeHtml(formatoFecha(cita.fecha))} · ${escapeHtml(cita.hora || "-")}</h3>
-          <p>${escapeHtml(cita.clienteNombre || "Cliente")} · ${escapeHtml(cita.servicioNombre || "Servicio")}</p>
-          <p>${escapeHtml(cita.estadoOperativo || cita.estado || "Pendiente")}</p>
-        </article>
-      `).join("")}
-    </div>
+    <article class="metric-card ${escapeHtml(stateClass || "metric-neutral")}" id="${escapeHtml(id)}">
+      <span class="metric-icon">${escapeHtml(icon)}</span>
+      <div>
+        <p>${escapeHtml(label)}</p>
+        <strong>${escapeHtml(value)}</strong>
+        <small>${escapeHtml(hint)}</small>
+      </div>
+    </article>
   `;
 }
 
-function renderManuales() {
+function renderMetricasDashboard(detalle) {
+  const metricas = datosMetricas(detalle);
+  const estrellasTexto = tieneDato(metricas.promedioEstrellas)
+    ? `${toNumber(metricas.promedioEstrellas, 0).toFixed(1)} / 5`
+    : "Sin datos disponibles";
+  const cumplimientoTexto = tieneDato(metricas.progresoMeta)
+    ? porcentaje(metricas.progresoMeta)
+    : "Sin datos disponibles";
+
+  return [
+    renderMetricCard({
+      id: "cardSalesAdmin",
+      icon: "$",
+      label: "Ventas semanales",
+      value: textoDato(metricas.ventasSemanales, formatoMoneda),
+      hint: tieneDato(metricas.servicios) ? `${metricas.servicios} servicios registrados` : "Servicios completados esta semana",
+      stateClass: metricState(metricas.ventasSemanales, "positive")
+    }),
+    renderMetricCard({
+      id: "cardGoalAdmin",
+      icon: "M",
+      label: "Meta semanal",
+      value: textoDato(metricas.metaSemanal, formatoMoneda),
+      hint: "Objetivo personal",
+      stateClass: "metric-neutral"
+    }),
+    renderMetricCard({
+      id: "cardComplianceAdmin",
+      icon: "%",
+      label: "Cumplimiento",
+      value: cumplimientoTexto,
+      hint: "Avance frente a meta",
+      stateClass: metricState(metricas.progresoMeta, "percent")
+    }),
+    renderMetricCard({
+      id: "cardStarsAdmin",
+      icon: "*",
+      label: "Estrellas",
+      value: estrellasTexto,
+      hint: tieneDato(metricas.promedioEstrellas) ? "Experiencia del cliente" : "Sin evaluaciones disponibles",
+      stateClass: metricState(metricas.promedioEstrellas, "stars")
+    }),
+    renderMetricCard({
+      id: "cardDelaysAdmin",
+      icon: "T",
+      label: "Retardos",
+      value: textoDato(metricas.retardosSemana),
+      hint: tieneDato(metricas.retardosSemana) && toNumber(metricas.retardosSemana, 0) === 0 ? "Sin retardos" : "Indicador semanal",
+      stateClass: metricState(metricas.retardosSemana, "delays")
+    }),
+    renderMetricCard({
+      id: "cardPunctualityAdmin",
+      icon: "P",
+      label: "Puntualidad",
+      value: porcentaje(metricas.puntualidad),
+      hint: "Indicador semanal",
+      stateClass: metricState(metricas.puntualidad, "percent")
+    }),
+    renderMetricCard({
+      id: "cardBonusAdmin",
+      icon: "B",
+      label: "Bono estimado",
+      value: textoDato(metricas.bonoCalculado, formatoMoneda),
+      hint: metricas.elegibleBono === true ? "Elegible esta semana" : metricas.elegibleBono === false ? "No elegible esta semana" : "Elegibilidad no disponible",
+      stateClass: metricState(metricas.elegibleBono, "boolean")
+    }),
+    renderMetricCard({
+      id: "cardPayAdmin",
+      icon: "N",
+      label: "Total a pagar",
+      value: textoDato(metricas.totalAPagar, formatoMoneda),
+      hint: "Estimado semanal",
+      stateClass: "metric-neutral"
+    })
+  ].join("");
+}
+
+function renderProgressPanel(detalle) {
+  const metricas = datosMetricas(detalle);
+  const ventas = textoDato(metricas.ventasSemanales, formatoMoneda);
+  const meta = textoDato(metricas.metaSemanal, formatoMoneda);
+  const progresoMeta = clampPercent(metricas.progresoMeta);
+  const puntualidad = clampPercent(metricas.puntualidad);
+  const estrellas = tieneDato(metricas.promedioEstrellas) ? toNumber(metricas.promedioEstrellas, 0) : null;
+  const estrellasPercent = estrellas === null ? 0 : Math.max(0, Math.min(100, Math.round((estrellas / 5) * 100)));
+
   return `
-    <div class="manual-list">
-      ${MANUALES_PORTAL.map((manual) => `
-        <article class="manual-card">
-          <h3>${escapeHtml(manual.titulo)}</h3>
-          <p>${escapeHtml(manual.descripcion)}</p>
-          <a href="${escapeHtml(manual.url)}" target="_blank" rel="noopener noreferrer">Abrir manual ${escapeHtml(manual.tipo)}</a>
+    <section class="progress-panel" aria-label="Progreso semanal">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Progreso</p>
+          <h2>Avance semanal</h2>
+        </div>
+        <span class="summary-pill">${tieneDato(metricas.progresoMeta) ? `${progresoMeta}% de meta` : "Sin datos disponibles"}</span>
+      </div>
+
+      <div class="progress-list">
+        <article class="progress-item">
+          <div>
+            <strong>Ventas vs meta</strong>
+            <span>${ventas} de ${meta}</span>
+          </div>
+          <div class="progress-track"><span style="width: ${progresoMeta}%"></span></div>
         </article>
-      `).join("")}
-    </div>
+        <article class="progress-item">
+          <div>
+            <strong>Puntualidad</strong>
+            <span>${porcentaje(metricas.puntualidad)}</span>
+          </div>
+          <div class="progress-track"><span style="width: ${puntualidad}%"></span></div>
+        </article>
+        <article class="progress-item">
+          <div>
+            <strong>Experiencia del cliente</strong>
+            <span>${estrellas === null ? "Sin datos disponibles" : `${estrellas.toFixed(1)} de 5`}</span>
+          </div>
+          <div class="progress-track"><span style="width: ${estrellasPercent}%"></span></div>
+        </article>
+      </div>
+    </section>
   `;
+}
+
+function renderCitasDashboard(citas = []) {
+  const recientes = ordenarCitasRecientes(Array.isArray(citas) ? citas : []);
+  if (!recientes.length) {
+    return `<div class="empty-state">Sin datos disponibles</div>`;
+  }
+
+  return recientes.map((cita) => {
+    const servicios = serviciosCita(cita);
+    const descripcion = cita.mascotaNombre || cita.vehiculoModelo || cita.direccion || "Servicio asignado";
+    return `
+      <article class="appointment-card">
+        <div class="appointment-head">
+          <strong>${escapeHtml(formatoFecha(cita.fecha))} - ${escapeHtml(cita.hora || "-")}</strong>
+          <span>${escapeHtml(estadoTexto(cita.estadoOperativo || cita.estado))}</span>
+        </div>
+        <h3>${escapeHtml(cita.clienteNombre || "Cliente")}</h3>
+        <p>${escapeHtml(descripcion)}</p>
+        <div class="appointment-meta">
+          ${tieneDato(cita.totalCobrado) ? `<span class="appointment-total">${escapeHtml(formatoMoneda(cita.totalCobrado))}</span>` : ""}
+          ${cita.direccion ? `<p>${escapeHtml(cita.direccion)}</p>` : ""}
+        </div>
+        <ul>
+          ${servicios.map((servicio, index) => `<li>${escapeHtml(textoServicio(servicio, index))}</li>`).join("")}
+        </ul>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderManualesDashboard() {
+  return MANUALES_PORTAL.map((manual) => {
+    const disponible = Boolean(manual.url);
+    const icono = manual.tipo === "PDF" ? "PDF" : "GUIA";
+    const action = disponible
+      ? `<a class="manual-action" href="${escapeHtml(manual.url)}" target="_blank" rel="noopener noreferrer">Abrir manual</a>`
+      : `<span class="manual-action manual-action-disabled">En preparación</span>`;
+
+    return `
+      <article class="manual-card ${disponible ? "is-available" : "is-locked"}">
+        <div class="manual-icon" aria-hidden="true">${escapeHtml(icono)}</div>
+        <div class="manual-copy">
+          <div class="manual-head">
+            <strong>${escapeHtml(manual.titulo)}</strong>
+            <span>${escapeHtml(manual.estado)}</span>
+          </div>
+          <p>${escapeHtml(manual.descripcion)}</p>
+          <small>${escapeHtml(manual.tipo)}</small>
+        </div>
+        ${action}
+      </article>
+    `;
+  }).join("");
 }
 
 function renderDetalleEmpleado(detalle) {
   const panel = document.getElementById("employeePortalPanel");
   if (!panel) return;
+  const empleado = detalle?.portal?.empleado || {};
+  const performance = detalle?.performance || {};
+  const appointments = detalle?.appointments || {};
+  const fecha = document.getElementById("adminWeekDate")?.value || appointments?.fecha || detalle?.fecha || fechaLocalISO();
+  const citas = Array.isArray(appointments?.citas) ? appointments.citas : [];
+  const nombre = empleado?.nombre || performance?.empleado?.nombre || "Empleado";
+  const puesto = empleado?.puesto || performance?.empleado?.puesto || "Sin datos disponibles";
+  const status = empleado?.activo === false ? "Inactivo" : "Activo";
 
   panel.innerHTML = `
-    <div class="employee-portal-top">
-      <div>
-        <span class="status-pill">Modo admin · ${escapeHtml(detalle.activo === false ? "Inactivo" : "Activo")}</span>
-        <h2>${escapeHtml(detalle.nombreCompleto || "Empleado")}</h2>
-        <p class="portal-subtitle">Portal individual consultado con endpoints administrativos.</p>
-      </div>
+    <div class="admin-portal-toolbar">
       <button class="back-button" type="button" data-action="back-to-list">Volver al portal empleados</button>
+      <span class="admin-view-badge">Vista admin</span>
     </div>
 
-    <dl class="profile-grid">
-      <div>
-        <dt>Puesto</dt>
-        <dd>${escapeHtml(detalle.puesto || "-")}</dd>
-      </div>
-      <div>
-        <dt>Email</dt>
-        <dd>${escapeHtml(detalle.email || "-")}</dd>
-      </div>
-      <div>
-        <dt>Teléfono</dt>
-        <dd>${escapeHtml(detalle.telefono || "-")}</dd>
-      </div>
-      <div>
-        <dt>Fecha ingreso</dt>
-        <dd>${escapeHtml(detalle.fechaIngreso || "-")}</dd>
-      </div>
-    </dl>
+    <section class="employee-dashboard admin-employee-dashboard" aria-live="polite">
+      <section class="hero-panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Panel del equipo</p>
+          <h1>Hola, ${escapeHtml(nombre.split(" ")[0] || "Empleado")}</h1>
+          <p>Este es el desempeño de la semana consultado por administración.</p>
+          <div class="hero-badges" aria-label="Datos principales">
+            <span class="hero-badge">${escapeHtml(puesto)}</span>
+            <span class="hero-badge hero-badge-light">${escapeHtml(formatoSemana(performance?.semana?.inicio, performance?.semana?.fin))}</span>
+          </div>
+        </div>
 
-    <section>
-      <p class="portal-kicker">Métricas disponibles</p>
-      <div class="metrics-grid">${obtenerMetricasDetalle(detalle)}</div>
-    </section>
+        <aside class="profile-card" aria-label="Datos del empleado">
+          <div class="profile-card-head">
+            <span class="status-pill">${escapeHtml(status)}</span>
+            <span class="profile-chip">Vista admin</span>
+          </div>
+          <dl>
+            <div>
+              <dt>Nombre</dt>
+              <dd>${escapeHtml(nombre)}</dd>
+            </div>
+            <div>
+              <dt>Puesto</dt>
+              <dd>${escapeHtml(puesto)}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>${escapeHtml(empleado?.email || "Sin datos disponibles")}</dd>
+            </div>
+            <div>
+              <dt>Telefono</dt>
+              <dd>${escapeHtml(empleado?.telefono || "Sin datos disponibles")}</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
 
-    <section>
-      <p class="portal-kicker">Servicios recientes</p>
-      ${renderCitas(detalle.citas)}
-    </section>
+      <section class="control-panel" aria-label="Controles de semana">
+        <label for="adminWeekDate">
+          <span>Semana de trabajo</span>
+          <input id="adminWeekDate" type="date" value="${escapeHtml(fecha)}">
+        </label>
+        <button class="refresh-button" type="button" data-action="refresh-admin-portal">
+          <span aria-hidden="true">↻</span>
+          Actualizar
+        </button>
+      </section>
 
-    <section>
-      <p class="portal-kicker">Manuales disponibles</p>
-      ${renderManuales()}
+      <section class="metric-grid" aria-label="Metricas personales">
+        ${renderMetricasDashboard(detalle)}
+      </section>
+
+      ${renderProgressPanel(detalle)}
+
+      <section class="content-grid">
+        <section class="panel services-panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Servicios</p>
+              <h2>Servicios de la semana</h2>
+            </div>
+            <span class="summary-pill">${citas.length} ${citas.length === 1 ? "cita" : "citas"}</span>
+          </div>
+          <div class="timeline-list">${renderCitasDashboard(citas)}</div>
+        </section>
+
+        <section class="panel training-panel">
+          <div class="section-title compact">
+            <div>
+              <p class="eyebrow">Crecimiento</p>
+              <h2>Manuales y capacitacion</h2>
+            </div>
+          </div>
+          <div class="training-grid" aria-label="Recursos de capacitacion">${renderManualesDashboard()}</div>
+        </section>
+      </section>
     </section>
   `;
 
@@ -322,8 +627,9 @@ function renderDetalleEmpleado(detalle) {
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-async function abrirPortalEmpleado(id, actualizarUrl = true) {
+async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalISO()) {
   if (!id) return;
+  state.empleadoSeleccionadoId = String(id);
   const panel = document.getElementById("employeePortalPanel");
   if (panel) {
     panel.classList.remove("hidden");
@@ -331,13 +637,24 @@ async function abrirPortalEmpleado(id, actualizarUrl = true) {
   }
 
   try {
-    const detalle = await fetchAdmin(`/admin/employees/${encodeURIComponent(String(id))}?fecha=${encodeURIComponent(fechaLocalISO())}`);
+    const employeeId = encodeURIComponent(String(id));
+    const fechaSeleccionada = encodeURIComponent(fecha || fechaLocalISO());
+    const [portal, performance, appointments] = await Promise.all([
+      fetchAdmin(`/admin/employees/${employeeId}/portal`),
+      fetchAdmin(`/admin/employees/${employeeId}/performance?fecha=${fechaSeleccionada}`),
+      cargarCitasSemanaAdmin(id, fecha || fechaLocalISO())
+    ]);
     if (actualizarUrl) {
       const url = new URL(window.location.href);
       url.searchParams.set("empleadoId", id);
       window.history.replaceState({}, "", url);
     }
-    renderDetalleEmpleado(detalle);
+    renderDetalleEmpleado({
+      fecha: fecha || fechaLocalISO(),
+      portal,
+      performance,
+      appointments
+    });
   } catch (error) {
     if (error.status === 401 || error.status === 403) return;
     if (panel) {
@@ -348,10 +665,34 @@ async function abrirPortalEmpleado(id, actualizarUrl = true) {
 
 function volverALista() {
   document.getElementById("employeePortalPanel")?.classList.add("hidden");
+  state.empleadoSeleccionadoId = "";
   const url = new URL(window.location.href);
   url.searchParams.delete("empleadoId");
   window.history.replaceState({}, "", url);
   document.getElementById("employeesPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function cargarCitasSemanaAdmin(id, fecha) {
+  const semana = obtenerRangoSemanaLocal(fecha);
+  const fechas = [];
+  const cursor = new Date(`${semana.inicio}T00:00:00`);
+  const fin = new Date(`${semana.fin}T00:00:00`);
+
+  while (cursor <= fin) {
+    fechas.push(fechaLocalISO(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const employeeId = encodeURIComponent(String(id));
+  const responses = await Promise.all(
+    fechas.map((dia) => fetchAdmin(`/admin/employees/${employeeId}/appointments?fecha=${encodeURIComponent(dia)}`))
+  );
+
+  return {
+    fecha,
+    empleado: responses.find((item) => item?.empleado)?.empleado || null,
+    citas: responses.flatMap((item) => Array.isArray(item?.citas) ? item.citas : [])
+  };
 }
 
 async function cargarEmpleados() {
@@ -417,7 +758,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("employeePortalPanel")?.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action='back-to-list']");
-    if (button) volverALista();
+    if (button) {
+      volverALista();
+      return;
+    }
+
+    const refresh = event.target.closest("button[data-action='refresh-admin-portal']");
+    if (refresh && state.empleadoSeleccionadoId) {
+      const fecha = document.getElementById("adminWeekDate")?.value || fechaLocalISO();
+      abrirPortalEmpleado(state.empleadoSeleccionadoId, true, fecha);
+    }
   });
 
   iniciarPortal();
