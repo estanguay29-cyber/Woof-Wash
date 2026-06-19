@@ -8,6 +8,13 @@ const MANUALES_EMPLEADO = [
     estado: "Disponible"
   },
   {
+    titulo: "Manual de manejo seguro de mascotas",
+    tipo: "PDF",
+    descripcion: "Protocolos de acercamiento, lenguaje corporal, manejo seguro, baño, secado y corte para garantizar el bienestar de cada mascota.",
+    url: "../manuales/manual-manejo-seguro-mascotas-woofwash.pdf",
+    estado: "Disponible"
+  },
+  {
     titulo: "Atención al cliente",
     tipo: "Guía",
     descripcion: "Protocolos de comunicación, confirmación y trato con clientes.",
