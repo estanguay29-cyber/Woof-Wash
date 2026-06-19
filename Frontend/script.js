@@ -61,6 +61,7 @@ const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
   "admin.html",
   "agenda.html",
   "empleados.html",
+  "empleados/portal.html",
   "empleados/dashboard.html",
   "checkout.html",
   "perfil.html"
@@ -68,7 +69,10 @@ const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
 
 function obtenerRutaAuthRedirectSegura(fallback = "index.html") {
   const pathname = window.location.pathname || "";
-  const ruta = pathname.split("/").filter(Boolean).pop() || "index.html";
+  const partes = pathname.split("/").filter(Boolean);
+  const archivo = partes.pop() || "index.html";
+  const carpeta = partes.pop() || "";
+  const ruta = carpeta === "empleados" ? `${carpeta}/${archivo}` : archivo;
   return RUTAS_AUTH_REDIRECT_PERMITIDAS.has(ruta) ? ruta : fallback;
 }
 

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal empleados - Woof & Wash</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <main class="portal-shell">
+    <header class="portal-topbar">
+      <a class="portal-brand" href="../index.html" aria-label="Woof and Wash">
+        <span class="portal-logo">W&amp;W</span>
+        <span>
+          <strong>Woof&amp;Wash</strong>
+          <small>Portal administrador</small>
+        </span>
+      </a>
+      <nav class="portal-actions" aria-label="Acciones principales">
+        <a class="portal-button portal-button-light" href="../index.html">Regresar al sitio</a>
+        <button id="logoutButton" class="portal-button portal-button-dark" type="button">Cerrar sesión</button>
+      </nav>
+    </header>
+
+    <section id="accessMessage" class="portal-message">Validando permisos...</section>
+
+    <section id="portalContent" class="portal-content hidden" aria-live="polite">
+      <section class="portal-hero">
+        <div class="portal-hero-copy">
+          <p class="portal-kicker">Administración segura</p>
+          <h1>Portal empleados</h1>
+          <p>Desde aquí puedes acceder al dashboard general de empleados o consultar el portal individual de cada empleado.</p>
+        </div>
+        <div class="portal-admin-chip" id="adminStatus">Sesión admin activa</div>
+      </section>
+
+      <section class="portal-card-grid" aria-label="Opciones del portal">
+        <article class="portal-card">
+          <span class="portal-card-tag">Equipo</span>
+          <h2>Dashboard empleados</h2>
+          <p>Ver métricas generales, desempeño y resumen completo del equipo.</p>
+          <a class="portal-card-action" href="../empleados.html">Abrir dashboard</a>
+        </article>
+
+        <article class="portal-card">
+          <span class="portal-card-tag">Vista individual</span>
+          <h2>Ver portal de un empleado</h2>
+          <p>Selecciona un empleado para consultar su portal individual en modo admin.</p>
+          <button id="showEmployeesButton" class="portal-card-action" type="button">Mostrar empleados</button>
+        </article>
+      </section>
+
+      <section id="employeesPanel" class="employees-panel" aria-label="Seleccion de empleado">
+        <div class="section-head">
+          <div>
+            <p class="portal-kicker">Empleados activos</p>
+            <h2>Selecciona un empleado</h2>
+          </div>
+          <label class="search-box" for="employeeSearch">
+            <span>Buscar</span>
+            <input id="employeeSearch" type="search" autocomplete="off" placeholder="Nombre, puesto o email">
+          </label>
+        </div>
+        <div id="employeeList" class="employee-list"></div>
+      </section>
+
+      <section id="employeePortalPanel" class="employee-portal-panel hidden" aria-label="Portal individual modo admin"></section>
+    </section>
+  </main>
+
+  <script src="portal.js"></script>
+</body>
+</html>
