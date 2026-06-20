@@ -668,17 +668,6 @@ h1, h2, h3 {
   justify-content: space-between;
 }
 
-.footer-main-layout {
-  display: flex;
-  align-items: center;
-  gap: 34px;
-}
-
-.footer-main-layout .footer-card {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 .footer-zone-carousel {
   position: relative;
   overflow: hidden;
@@ -742,21 +731,34 @@ h1, h2, h3 {
   text-overflow: ellipsis;
 }
 
-.footer-woofy-corner {
-  flex: 0 0 170px;
+.footer-social-area {
   display: flex;
-  align-self: stretch;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 0 0 4px;
-  margin-left: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 0;
+  height: 100%;
+  text-align: left;
+}
+
+.footer-social-content {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.footer-woofy-inline {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 46%;
   pointer-events: none;
 }
 
 .footer-woofy {
   display: block;
-  width: min(100%, 170px);
-  max-height: 230px;
+  width: clamp(130px, 12vw, 175px);
+  max-height: 215px;
   object-fit: contain;
   transform-origin: bottom center;
   filter: drop-shadow(0 20px 24px rgba(0, 0, 0, 0.28));
@@ -813,10 +815,16 @@ h1, h2, h3 {
 }
 
 @media (max-width: 767px) {
-  .footer-main-layout {
+  .footer-social-area {
     flex-direction: column;
     align-items: center;
-    gap: 24px;
+    justify-content: flex-start;
+    gap: 18px;
+    text-align: center;
+  }
+
+  .footer-social-content {
+    width: 100%;
   }
 
   .footer-zone-carousel {
@@ -836,26 +844,23 @@ h1, h2, h3 {
     font-size: 0.76rem;
   }
 
-  .footer-woofy-corner {
-    width: 100%;
-    flex-basis: auto;
-    align-self: center;
-    padding-top: 0;
-    margin-left: 0;
+  .footer-woofy-inline {
+    max-width: 100%;
+    justify-content: center;
   }
 
   .footer-woofy {
-    width: min(48vw, 150px);
-    max-height: 160px;
+    width: min(44vw, 130px);
+    max-height: 145px;
   }
 }
 
-#footer .text-center.md\:text-left .flex.md\:justify-start.justify-center.gap-6.mb-4 {
+#footer .footer-social-links {
   flex-wrap: wrap;
   gap: 14px;
 }
 
-#footer .text-center.md\:text-left .flex.md\:justify-start.justify-center.gap-6.mb-4 a {
+#footer .footer-social-links a {
   width: 46px;
   height: 46px;
   display: inline-flex;
@@ -867,7 +872,7 @@ h1, h2, h3 {
   transition: transform .25s ease, background .25s ease, border-color .25s ease;
 }
 
-#footer .text-center.md\:text-left .flex.md\:justify-start.justify-center.gap-6.mb-4 a:hover {
+#footer .footer-social-links a:hover {
   transform: translateY(-2px);
   background: rgba(140, 198, 63, 0.22);
   border-color: rgba(140, 198, 63, 0.4);
