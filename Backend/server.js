@@ -5245,6 +5245,10 @@ app.patch("/admin/orders/:id/status", auth, requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/favicon.ico", (req, res) => {
+  res.type("png").sendFile(path.join(__dirname, "..", "Frontend", "img", "favicon.png"));
+});
+
 app.use(express.static(path.join(__dirname, "..", "Frontend")));
 
 app.patch("/orders/:id/cancel", auth, customerActionLimiter, async (req, res) => {
