@@ -3564,6 +3564,39 @@ function construirResumenPerformanceEmpleado({
   };
 }
 
+function sumarVentasCitasUnicas(citas = []) {
+  const citasContadas = new Set();
+  return citas.reduce((total, cita) => {
+    const id = String(cita?._id || cita?.id || "");
+    if (!id || citasContadas.has(id)) {
+      return total;
+    }
+
+    citasContadas.add(id);
+    return total + (Number(cita.totalCobrado) || 0);
+  }, 0);
+}
+
+function construirMetaGlobalSemanal(citasSemana = []) {
+  const ventasGlobalesSemanales = sumarVentasCitasUnicas(citasSemana);
+  const metaGlobalSemanalMxn = META_SEMANAL_EMPLEADOS_MXN;
+  return {
+    ventasGlobalesSemanales,
+    metaGlobalSemanalMxn,
+    metaGlobalSemanalOk: ventasGlobalesSemanales >= metaGlobalSemanalMxn,
+    progresoMetaGlobal: Math.min(Math.round((ventasGlobalesSemanales / (metaGlobalSemanalMxn || 1)) * 100), 100)
+  };
+}
+
+async function obtenerMetaGlobalSemanal(semana) {
+  const citasSemana = await Appointment.find({
+    fecha: { $gte: semana.inicio, $lte: semana.fin },
+    estado: "completada"
+  }).select("_id totalCobrado");
+
+  return construirMetaGlobalSemanal(citasSemana);
+}
+
 function construirPortalEmpleadoRespuesta(empleado, user = null) {
   return {
     usuario: user ? {
@@ -3629,19 +3662,18 @@ async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options 
     metricKey: { $in: PERFORMANCE_PRIMARY_ATTENDANCE_KEYS },
     value: true
   });
+  const metaGlobalSemana = options.metaGlobalSemana || await obtenerMetaGlobalSemanal(semana);
 
-  const metricasBase = calcularMetricasEmpleado(citasSemana);
-  const cumplioMetaPersonal = metricasBase.ingresosGeneradosAproximados >= META_SEMANAL_EMPLEADOS_MXN;
   const resumen = construirResumenPerformanceEmpleado({
     empleado,
     citasSemana,
     asistenciaRegistros: asistenciaSemana,
     limpiezaOrdenRegistros: limpiezaOrdenSemana,
     eventosAsistenciaRegistros: eventosAsistenciaSemana,
-    metaGlobalSemanalOk: cumplioMetaPersonal,
-    metaGlobalSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
-    ventasGlobalesSemanales: metricasBase.ingresosGeneradosAproximados,
-    progresoMetaGlobal: Math.min(Math.round((metricasBase.ingresosGeneradosAproximados / (META_SEMANAL_EMPLEADOS_MXN || 1)) * 100), 100)
+    metaGlobalSemanalOk: metaGlobalSemana.metaGlobalSemanalOk,
+    metaGlobalSemanalMxn: metaGlobalSemana.metaGlobalSemanalMxn,
+    ventasGlobalesSemanales: metaGlobalSemana.ventasGlobalesSemanales,
+    progresoMetaGlobal: metaGlobalSemana.progresoMetaGlobal
   });
 
   return {
@@ -3658,6 +3690,10 @@ async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options 
       ventasSemanales: resumen.ventasSemanales,
       metaSemanal: resumen.metaSemanalMxn,
       cumplioMetaPersonal: resumen.cumplioMetaPersonal,
+      metaGlobalSemanalOk: resumen.metaGlobalSemanalOk,
+      metaGlobalSemanalMxn: resumen.metaGlobalSemanalMxn,
+      ventasGlobalesSemanales: resumen.ventasGlobalesSemanales,
+      progresoMetaGlobal: resumen.progresoMetaGlobal,
       promedioEstrellas: typeof resumen.promedioEstrellas === "number" ? resumen.promedioEstrellas : 0,
       retardosSemana: resumen.retardosSemana,
       faltasInjustificadas: resumen.faltasInjustificadas,
@@ -3813,10 +3849,12 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
       acc[key].push(registro);
       return acc;
     }, {});
-    const ventasGlobalesSemanales = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
-    const metaGlobalSemanalMxn = META_SEMANAL_EMPLEADOS_MXN;
-    const metaGlobalSemanalOk = ventasGlobalesSemanales >= metaGlobalSemanalMxn;
-    const progresoMetaGlobal = Math.min(Math.round((ventasGlobalesSemanales / (metaGlobalSemanalMxn || 1)) * 100), 100);
+    const {
+      ventasGlobalesSemanales,
+      metaGlobalSemanalMxn,
+      metaGlobalSemanalOk,
+      progresoMetaGlobal
+    } = construirMetaGlobalSemanal(citasSemana);
 
     const empleadosResumen = empleados.map((empleado) => {
       const resumen = construirResumenPerformanceEmpleado({
@@ -5101,7 +5139,7 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
   }
 });
 
-app.delete("/admin/appointments/:id", auth, requireAdmin, async (req, res) => {
+app.delete("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
 
@@ -5193,7 +5231,7 @@ app.get("/admin/orders/:id", auth, requireAdmin, async (req, res) => {
   }
 });
 
-app.patch("/admin/orders/:id/status", auth, requireAdmin, async (req, res) => {
+app.patch("/admin/orders/:id/status", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const orderId = typeof req.params.id === "string" ? req.params.id.trim() : "";
     const estado = typeof req.body?.estado === "string" ? req.body.estado.trim() : "";
