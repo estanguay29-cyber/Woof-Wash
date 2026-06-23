@@ -306,18 +306,6 @@
           <div id="attendanceHistoryList" style="display:grid; gap:1rem; margin-top:1.25rem;"></div>
         </section>
 
-        <section class="admin-employees-card performance-history-card" style="margin-top:1.5rem; padding:1.5rem;">
-          <div class="admin-orders-header">
-            <div>
-              <p class="admin-kicker">Historial</p>
-              <h3>Historial global</h3>
-              <p class="admin-panel-copy">Resumen semanal de ventas, meta, bonos, n&oacute;mina y asistencia del equipo.</p>
-            </div>
-          </div>
-          <div id="performanceHistoryList" class="performance-history-list"></div>
-          <div id="performanceHistoryEmpty" class="admin-empty-state hidden">No hay historial global disponible.</div>
-        </section>
-
         <section class="admin-employees-card" style="margin-top:1.5rem; padding:1.5rem;">
           <div class="admin-orders-header">
             <div>
@@ -462,6 +450,34 @@
             </div>
             <div id="payrollTableEmpty" class="admin-empty-state hidden">No hay datos de nómina para esta semana.</div>
           </div>
+        </section>
+
+        <section id="performanceHistoryPanel" class="admin-employees-card performance-history-card is-collapsed" style="margin-top:1.5rem; padding:1.5rem;">
+          <div class="admin-orders-header performance-history-header">
+            <div>
+              <p class="admin-kicker">Historial</p>
+              <h3>Historial global</h3>
+              <p class="admin-panel-copy">Consulta la evoluci&oacute;n semanal del equipo, bonos y desempe&ntilde;o.</p>
+            </div>
+            <div class="performance-history-controls" aria-label="Opciones de historial global">
+              <label>
+                <span>Periodo</span>
+                <select id="performanceHistoryWeeks">
+                  <option value="4">&Uacute;ltimas 4 semanas</option>
+                  <option value="8" selected>&Uacute;ltimas 8 semanas</option>
+                  <option value="12">&Uacute;ltimas 12 semanas</option>
+                </select>
+              </label>
+              <label>
+                <span>Fecha espec&iacute;fica</span>
+                <input id="performanceHistoryBaseDate" type="date" />
+              </label>
+              <button id="btnTogglePerformanceHistory" type="button" class="small-icon-btn performance-history-toggle" aria-expanded="false">Mostrar historial</button>
+            </div>
+          </div>
+          <p class="performance-history-note">Por ahora se muestran hasta 12 semanas.</p>
+          <div id="performanceHistoryList" class="performance-history-list hidden"></div>
+          <div id="performanceHistoryEmpty" class="admin-empty-state hidden">No hay historial global disponible.</div>
         </section>
       </section>
   </main>

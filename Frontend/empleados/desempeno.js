@@ -7,6 +7,9 @@ const ATTENDANCE_EVENT_KEYS = Object.freeze(["falta_justificada", "falta_injusti
 
 const performanceState = {
   fechaSemana: obtenerFechaLocalISO(),
+  historialVisible: false,
+  historialWeeks: 8,
+  historialFechaBase: obtenerFechaLocalISO(),
   dashboard: null,
   attendance: null,
   cleanliness: null,
@@ -28,6 +31,7 @@ async function cargarPanelDesempeno() {
   const attendanceDateInput = document.getElementById("attendanceDate");
   const attendanceEventDateInput = document.getElementById("attendanceEventDate");
   const cleanlinessDateInput = document.getElementById("cleanlinessDate");
+  const historyBaseDateInput = document.getElementById("performanceHistoryBaseDate");
 
   if (fechaInput) {
     fechaInput.value = performanceState.fechaSemana;
@@ -41,6 +45,9 @@ async function cargarPanelDesempeno() {
   if (cleanlinessDateInput) {
     cleanlinessDateInput.value = performanceState.fechaSemana;
   }
+  if (historyBaseDateInput) {
+    historyBaseDateInput.value = performanceState.historialFechaBase;
+  }
 
   renderAttendanceOptions(state.empleados);
   await actualizarDashboardDesempeno(performanceState.fechaSemana);
@@ -53,6 +60,27 @@ export async function iniciarDesempeno() {
   document.getElementById("btnPerformanceReload")?.addEventListener("click", async () => {
     const fecha = document.getElementById("performanceWeekDate")?.value || performanceState.fechaSemana;
     await actualizarDashboardDesempeno(fecha);
+    if (performanceState.historialVisible) {
+      await actualizarHistorialPerformance();
+    }
+  });
+
+  document.getElementById("btnTogglePerformanceHistory")?.addEventListener("click", async () => {
+    await alternarHistorialPerformance();
+  });
+
+  document.getElementById("performanceHistoryWeeks")?.addEventListener("change", async (event) => {
+    performanceState.historialWeeks = normalizarSemanasHistorial(event.target.value);
+    if (performanceState.historialVisible) {
+      await actualizarHistorialPerformance();
+    }
+  });
+
+  document.getElementById("performanceHistoryBaseDate")?.addEventListener("change", async (event) => {
+    performanceState.historialFechaBase = event.target.value || performanceState.fechaSemana;
+    if (performanceState.historialVisible) {
+      await actualizarHistorialPerformance();
+    }
   });
 
   document.getElementById("attendanceForm")?.addEventListener("submit", async (event) => {
@@ -96,10 +124,7 @@ async function actualizarDashboardDesempeno(fecha) {
   const fechaLimpia = String(fecha || obtenerFechaLocalISO()).trim();
   performanceState.fechaSemana = fechaLimpia;
   try {
-    const [datos, historial] = await Promise.all([
-      loadPerformanceDashboard(fechaLimpia),
-      loadPerformanceHistory(fechaLimpia, 8)
-    ]);
+    const datos = await loadPerformanceDashboard(fechaLimpia);
     performanceState.dashboard = datos;
     const empleadoResumen = {
       ventasSemanales: datos.ventasGlobalesSemanales ?? datos.ventasSemanales ?? 0,
@@ -119,9 +144,59 @@ async function actualizarDashboardDesempeno(fecha) {
     };
     renderPerformanceSummary(empleadoResumen);
     renderPerformanceTable(Array.isArray(datos.empleados) ? datos.empleados : []);
-    renderPerformanceHistory(Array.isArray(historial.historial) ? historial.historial : []);
   } catch (error) {
     showPerformanceFeedback(error.message || "No se pudo cargar el dashboard de desempeño.", "error");
+  }
+}
+
+function normalizarSemanasHistorial(value) {
+  const weeks = Number(value);
+  if (!Number.isFinite(weeks)) return 8;
+  return Math.max(1, Math.min(12, Math.round(weeks)));
+}
+
+function actualizarEstadoVisualHistorial() {
+  const panel = document.getElementById("performanceHistoryPanel");
+  const list = document.getElementById("performanceHistoryList");
+  const empty = document.getElementById("performanceHistoryEmpty");
+  const button = document.getElementById("btnTogglePerformanceHistory");
+
+  if (panel) panel.classList.toggle("is-collapsed", !performanceState.historialVisible);
+  if (list) list.classList.toggle("hidden", !performanceState.historialVisible);
+  if (!performanceState.historialVisible && empty) empty.classList.add("hidden");
+  if (button) {
+    button.textContent = performanceState.historialVisible ? "Ocultar historial" : "Mostrar historial";
+    button.setAttribute("aria-expanded", performanceState.historialVisible ? "true" : "false");
+  }
+}
+
+async function actualizarHistorialPerformance() {
+  const fechaInput = document.getElementById("performanceHistoryBaseDate");
+  const weeksInput = document.getElementById("performanceHistoryWeeks");
+  const fecha = fechaInput?.value || performanceState.historialFechaBase || performanceState.fechaSemana;
+  const weeks = normalizarSemanasHistorial(weeksInput?.value || performanceState.historialWeeks);
+  const list = document.getElementById("performanceHistoryList");
+  const empty = document.getElementById("performanceHistoryEmpty");
+
+  performanceState.historialFechaBase = fecha;
+  performanceState.historialWeeks = weeks;
+  if (list) list.innerHTML = `<div class="admin-empty-state">Cargando historial global...</div>`;
+  if (empty) empty.classList.add("hidden");
+
+  try {
+    const historial = await loadPerformanceHistory(fecha, weeks);
+    renderPerformanceHistory(Array.isArray(historial.historial) ? historial.historial : []);
+  } catch (error) {
+    renderPerformanceHistory([]);
+    showPerformanceFeedback(error.message || "No se pudo cargar el historial global.", "error");
+  }
+}
+
+async function alternarHistorialPerformance() {
+  performanceState.historialVisible = !performanceState.historialVisible;
+  actualizarEstadoVisualHistorial();
+  if (performanceState.historialVisible) {
+    await actualizarHistorialPerformance();
   }
 }
 
