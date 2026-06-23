@@ -307,9 +307,11 @@
       @media (min-width: 981px) {
         body.ww-admin-nav-mounted .admin-shell,
         body.ww-admin-nav-mounted .portal-shell {
-          width: min(1220px, calc(100% - var(--ww-admin-nav-width) - 54px));
-          margin-left: calc(var(--ww-admin-nav-width) + 36px);
-          margin-right: 18px;
+          box-sizing: border-box;
+          width: calc(100vw - var(--ww-admin-nav-width) - 72px) !important;
+          max-width: none;
+          margin-left: calc(var(--ww-admin-nav-width) + 54px) !important;
+          margin-right: 18px !important;
           transition: width 180ms ease, margin 180ms ease;
         }
 
@@ -503,10 +505,11 @@
     document.body.prepend(overlay);
     document.body.prepend(nav);
     document.body.prepend(toggle);
-    document.body.classList.add("ww-admin-nav-mounted");
+    document.body.classList.add("ww-admin-nav-mounted", "admin-sidebar-expanded");
 
     if (localStorage.getItem(COLLAPSE_KEY) === "true") {
-      document.body.classList.add("ww-admin-nav-collapsed");
+      document.body.classList.add("ww-admin-nav-collapsed", "admin-sidebar-collapsed");
+      document.body.classList.remove("admin-sidebar-expanded");
     }
 
     function closeDrawer() {
@@ -524,7 +527,10 @@
     nav.querySelector(".ww-admin-nav-logout")?.addEventListener("click", logout);
     nav.querySelector(".ww-admin-nav-collapse")?.addEventListener("click", () => {
       document.body.classList.toggle("ww-admin-nav-collapsed");
-      localStorage.setItem(COLLAPSE_KEY, document.body.classList.contains("ww-admin-nav-collapsed") ? "true" : "false");
+      const collapsed = document.body.classList.contains("ww-admin-nav-collapsed");
+      document.body.classList.toggle("admin-sidebar-collapsed", collapsed);
+      document.body.classList.toggle("admin-sidebar-expanded", !collapsed);
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? "true" : "false");
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") closeDrawer();

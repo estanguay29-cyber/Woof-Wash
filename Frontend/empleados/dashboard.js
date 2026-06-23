@@ -180,7 +180,11 @@ function estadoTexto(value) {
     en_proceso: "En proceso",
     finalizada: "Finalizada",
     pendiente: "Pendiente",
-    completada: "Completada"
+    confirmada: "Confirmada",
+    completada: "Completada",
+    calificada: "Calificada",
+    cancelada: "Cancelada",
+    no_asistio: "No asistio"
   };
   return estados[value] || value || "Pendiente";
 }
@@ -215,9 +219,9 @@ function textoEstado(value, positivo = "Cumple", negativo = "No cumple", neutro 
   return neutro;
 }
 
-function renderDetailItem(label, value, hint = "") {
+function renderDetailItem(label, value, hint = "", className = "") {
   return `
-    <article class="detail-item">
+    <article class="detail-item ${escapeHtml(className)}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
       ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
@@ -229,8 +233,14 @@ function renderMetricasCompletas(metricas = {}) {
   const operation = document.getElementById("operationMetricsList");
   const payroll = document.getElementById("payrollMetricsList");
   const reasons = document.getElementById("eligibilityReasons");
-  const limpiezaTexto = textoEstado(metricas.limpiezaOrdenOk, "Cumple", "No cumple", "Sin registro");
-  const limpiezaHint = `${formatoEntero(metricas.limpiezaOrdenEvaluaciones)} eval. / ${formatoEntero(metricas.limpiezaOrdenIncumplimientos)} inc.`;
+  const limpiezaEvaluaciones = toNumber(metricas.limpiezaOrdenEvaluaciones);
+  const limpiezaIncumplimientos = toNumber(metricas.limpiezaOrdenIncumplimientos);
+  const limpiezaTexto = limpiezaEvaluaciones > 0
+    ? textoEstado(metricas.limpiezaOrdenOk, "Cumple", "No cumple", "Sin registros")
+    : "Sin registros";
+  const limpiezaHint = limpiezaEvaluaciones > 0
+    ? `${formatoEntero(limpiezaEvaluaciones)} eval. / ${formatoEntero(limpiezaIncumplimientos)} inc.`
+    : "Sin evaluaciones registradas esta semana";
   const metaGlobalTexto = textoEstado(metricas.metaGlobalSemanalOk, "Cumplida", "No cumplida", "Sin datos");
   const metaPersonalTexto = textoEstado(metricas.cumplioMetaPersonal, "Cumplida", "No cumplida", "Sin datos");
   const puntualidadBaseTexto = textoEstado(metricas.puntualidadOkBase, "En regla", "Revisar", "Sin datos");
@@ -238,7 +248,7 @@ function renderMetricasCompletas(metricas = {}) {
 
   if (operation) {
     operation.innerHTML = [
-      renderDetailItem("Limpieza y orden", limpiezaTexto, limpiezaHint),
+      renderDetailItem("Orden y limpieza", limpiezaTexto, limpiezaHint, "detail-item-featured"),
       renderDetailItem("Faltas justificadas", formatoEntero(metricas.faltasJustificadas)),
       renderDetailItem("Faltas injustificadas", formatoEntero(metricas.faltasInjustificadas)),
       renderDetailItem("Vacaciones tomadas", formatoEntero(metricas.vacacionesDias)),
@@ -346,14 +356,17 @@ function renderMetricas(payload) {
   renderMetricasCompletas(metricas);
 }
 
-function renderCitas(citas = []) {
+function renderCitas(citas = [], fecha = fechaLocalISO()) {
   const container = document.getElementById("appointmentsList");
   const count = document.getElementById("appointmentsCount");
+  const title = document.getElementById("appointmentsTitle");
+  const esHoy = fecha === fechaLocalISO();
   if (count) count.textContent = `${citas.length} ${citas.length === 1 ? "cita" : "citas"}`;
+  if (title) title.textContent = esHoy ? "Citas de hoy" : `Citas del ${formatoFecha(fecha)}`;
   if (!container) return;
 
   if (!citas.length) {
-    container.innerHTML = `<div class="empty-state">Aun no tienes servicios registrados esta semana.</div>`;
+    container.innerHTML = `<div class="empty-state">${esHoy ? "No tienes citas asignadas para hoy." : "No tienes citas asignadas para esta fecha."}</div>`;
     return;
   }
 
@@ -463,39 +476,34 @@ function obtenerRangoSemanaLocal(fechaISO) {
   };
 }
 
-async function cargarCitasSemana(fecha) {
-  const semana = obtenerRangoSemanaLocal(fecha);
-  const fechas = [];
-  const cursor = new Date(`${semana.inicio}T00:00:00`);
-  const fin = new Date(`${semana.fin}T00:00:00`);
+function sumarDiasISO(fechaISO, dias) {
+  const date = new Date(`${fechaISO}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return fechaLocalISO();
+  date.setDate(date.getDate() + dias);
+  return fechaLocalISO(date);
+}
 
-  while (cursor <= fin) {
-    fechas.push(fechaLocalISO(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  const responses = await Promise.all(
-    fechas.map((dia) => empleadoFetch(`/empleados/appointments?fecha=${encodeURIComponent(dia)}`))
-  );
-
-  return responses.flatMap((item) => Array.isArray(item.citas) ? item.citas : []);
+async function cargarCitasFecha(fecha) {
+  const data = await empleadoFetch(`/empleados/appointments?fecha=${encodeURIComponent(fecha)}`);
+  return Array.isArray(data.citas) ? data.citas : [];
 }
 
 async function cargarPanelEmpleado() {
   const fecha = document.getElementById("weekDate")?.value || fechaLocalISO();
+  const fechaCitas = document.getElementById("appointmentsDate")?.value || fechaLocalISO();
   const query = `fecha=${encodeURIComponent(fecha)}`;
   mostrarCargando(true);
 
   const [perfil, performance, citas, historial] = await Promise.all([
     empleadoFetch("/empleados/me"),
     empleadoFetch(`/empleados/performance?${query}`),
-    cargarCitasSemana(fecha),
+    cargarCitasFecha(fechaCitas),
     empleadoFetch(`/empleados/performance/history?weeks=8&${query}`)
   ]);
 
   renderPerfil(perfil);
   renderMetricas(performance);
-  renderCitas(citas);
+  renderCitas(citas, fechaCitas);
   renderHistorialDesempeno(Array.isArray(historial?.historial) ? historial.historial : []);
   mostrarCargando(false);
 }
@@ -551,6 +559,8 @@ async function iniciarDashboardEmpleado() {
 document.addEventListener("DOMContentLoaded", () => {
   const dateInput = document.getElementById("weekDate");
   if (dateInput) dateInput.value = fechaLocalISO();
+  const appointmentsDate = document.getElementById("appointmentsDate");
+  if (appointmentsDate) appointmentsDate.value = fechaLocalISO();
   renderManuales();
 
   document.getElementById("logoutButton")?.addEventListener("click", () => {
@@ -569,6 +579,29 @@ document.addEventListener("DOMContentLoaded", () => {
         access.classList.remove("hidden");
       }
     }
+  });
+
+  appointmentsDate?.addEventListener("change", async () => {
+    try {
+      await cargarPanelEmpleado();
+    } catch (error) {
+      mostrarCargando(false);
+    }
+  });
+
+  document.getElementById("appointmentsToday")?.addEventListener("click", async () => {
+    if (appointmentsDate) appointmentsDate.value = fechaLocalISO();
+    await cargarPanelEmpleado();
+  });
+
+  document.getElementById("appointmentsPrevDay")?.addEventListener("click", async () => {
+    if (appointmentsDate) appointmentsDate.value = sumarDiasISO(appointmentsDate.value || fechaLocalISO(), -1);
+    await cargarPanelEmpleado();
+  });
+
+  document.getElementById("appointmentsNextDay")?.addEventListener("click", async () => {
+    if (appointmentsDate) appointmentsDate.value = sumarDiasISO(appointmentsDate.value || fechaLocalISO(), 1);
+    await cargarPanelEmpleado();
   });
 
   iniciarDashboardEmpleado();

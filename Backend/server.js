@@ -3335,8 +3335,7 @@ app.get("/admin/employees/:id/appointments", auth, requireAdmin, async (req, res
       $or: [
         { empleadoAsignadoId: empleado._id },
         { empleadosAsignados: empleado._id }
-      ],
-      estado: { $nin: ["cancelada", "no_asistio"] }
+      ]
     };
     const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
     const metricas = calcularMetricasEmpleado(await Appointment.find({
@@ -4534,8 +4533,7 @@ app.get("/empleados/appointments", auth, requireEmpleado, async (req, res) => {
       $or: [
         { empleadoAsignadoId: req.employeeProfile._id },
         { empleadosAsignados: req.employeeProfile._id }
-      ],
-      estado: { $nin: ["cancelada", "no_asistio"] }
+      ]
     };
     const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
     const metricas = calcularMetricasEmpleado(await Appointment.find({

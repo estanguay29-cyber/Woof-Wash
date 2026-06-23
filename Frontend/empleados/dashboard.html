@@ -234,9 +234,18 @@
           <div class="section-title">
             <div>
               <p class="eyebrow">Servicios</p>
-              <h2>Mis servicios de la semana</h2>
+              <h2 id="appointmentsTitle">Citas de hoy</h2>
             </div>
             <span id="appointmentsCount" class="summary-pill">0 citas</span>
+          </div>
+          <div class="appointment-date-controls" aria-label="Buscar citas por fecha">
+            <button id="appointmentsPrevDay" class="date-nav-button" type="button">Anterior</button>
+            <label for="appointmentsDate">
+              <span>Fecha</span>
+              <input id="appointmentsDate" type="date">
+            </label>
+            <button id="appointmentsToday" class="date-nav-button" type="button">Hoy</button>
+            <button id="appointmentsNextDay" class="date-nav-button" type="button">Siguiente</button>
           </div>
           <div id="appointmentsList" class="timeline-list"></div>
         </section>

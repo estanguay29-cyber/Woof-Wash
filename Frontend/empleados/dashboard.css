@@ -587,6 +587,12 @@ input {
   padding: 13px;
 }
 
+.detail-item-featured {
+  border-color: rgba(140, 198, 63, 0.38);
+  background:
+    linear-gradient(135deg, rgba(140, 198, 63, 0.16), rgba(255, 255, 255, 0.96));
+}
+
 .detail-item span {
   color: var(--muted);
   font-size: 0.72rem;
@@ -705,6 +711,46 @@ input {
   display: grid;
   grid-template-columns: minmax(0, 1.34fr) minmax(300px, 0.66fr);
   gap: 16px;
+}
+
+.appointment-date-controls {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.appointment-date-controls label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.appointment-date-controls input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  background: #fff;
+  color: var(--blue);
+  font-weight: 900;
+}
+
+.date-nav-button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 950;
 }
 
 .timeline-list {
@@ -973,6 +1019,7 @@ input {
   .history-metrics,
   .content-grid,
   .insight-grid,
+  .appointment-date-controls,
   .loading-panel {
     grid-template-columns: 1fr;
   }
@@ -993,7 +1040,8 @@ input {
 
   .logout-button,
   .refresh-button,
-  .control-panel input {
+  .control-panel input,
+  .date-nav-button {
     width: 100%;
   }
 

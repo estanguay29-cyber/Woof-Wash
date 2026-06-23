@@ -481,9 +481,9 @@ function textoEstado(value, positivo = "Cumple", negativo = "No cumple", neutro 
   return neutro;
 }
 
-function renderDetailItem(label, value, hint = "") {
+function renderDetailItem(label, value, hint = "", className = "") {
   return `
-    <article class="detail-item">
+    <article class="detail-item ${escapeHtml(className)}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
       ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
@@ -493,8 +493,14 @@ function renderDetailItem(label, value, hint = "") {
 
 function renderMetricasCompletasDashboard(detalle) {
   const metricas = detalle?.performance?.metricas || detalle?.metricas || {};
-  const limpiezaTexto = textoEstado(metricas.limpiezaOrdenOk, "Cumple", "No cumple", "Sin registro");
-  const limpiezaHint = `${formatoEntero(metricas.limpiezaOrdenEvaluaciones)} eval. / ${formatoEntero(metricas.limpiezaOrdenIncumplimientos)} inc.`;
+  const limpiezaEvaluaciones = toNumber(metricas.limpiezaOrdenEvaluaciones);
+  const limpiezaIncumplimientos = toNumber(metricas.limpiezaOrdenIncumplimientos);
+  const limpiezaTexto = limpiezaEvaluaciones > 0
+    ? textoEstado(metricas.limpiezaOrdenOk, "Cumple", "No cumple", "Sin registros")
+    : "Sin registros";
+  const limpiezaHint = limpiezaEvaluaciones > 0
+    ? `${formatoEntero(limpiezaEvaluaciones)} eval. / ${formatoEntero(limpiezaIncumplimientos)} inc.`
+    : "Sin evaluaciones registradas esta semana";
   const metaGlobalTexto = textoEstado(metricas.metaGlobalSemanalOk, "Cumplida", "No cumplida", "Sin datos");
   const metaPersonalTexto = textoEstado(metricas.cumplioMetaPersonal, "Cumplida", "No cumplida", "Sin datos");
   const puntualidadBaseTexto = textoEstado(metricas.puntualidadOkBase, "En regla", "Revisar", "Sin datos");
@@ -512,7 +518,7 @@ function renderMetricasCompletasDashboard(detalle) {
         </div>
         <div class="detail-grid">
           ${[
-            renderDetailItem("Limpieza y orden", limpiezaTexto, limpiezaHint),
+            renderDetailItem("Orden y limpieza", limpiezaTexto, limpiezaHint, "detail-item-featured"),
             renderDetailItem("Faltas justificadas", formatoEntero(metricas.faltasJustificadas)),
             renderDetailItem("Faltas injustificadas", formatoEntero(metricas.faltasInjustificadas)),
             renderDetailItem("Vacaciones tomadas", formatoEntero(metricas.vacacionesDias)),
@@ -603,13 +609,14 @@ function renderHistorialDesempenoDashboard(detalle = {}) {
   `;
 }
 
-function renderCitasDashboard(citas = []) {
-  const recientes = ordenarCitasRecientes(Array.isArray(citas) ? citas : []);
-  if (!recientes.length) {
-    return `<div class="empty-state">Sin datos disponibles</div>`;
+function renderCitasDashboard(citas = [], fecha = fechaLocalISO()) {
+  const items = Array.isArray(citas) ? citas : [];
+  const esHoy = fecha === fechaLocalISO();
+  if (!items.length) {
+    return `<div class="empty-state">${esHoy ? "No tienes citas asignadas para hoy." : "No tienes citas asignadas para esta fecha."}</div>`;
   }
 
-  return recientes.map((cita) => {
+  return items.map((cita) => {
     const servicios = serviciosCita(cita);
     const descripcion = cita.mascotaNombre || cita.vehiculoModelo || cita.direccion || "Servicio asignado";
     return `
@@ -664,6 +671,7 @@ function renderDetalleEmpleado(detalle) {
   const performance = detalle?.performance || {};
   const appointments = detalle?.appointments || {};
   const fecha = document.getElementById("adminWeekDate")?.value || appointments?.fecha || detalle?.fecha || fechaLocalISO();
+  const fechaCitas = document.getElementById("adminAppointmentsDate")?.value || appointments?.fecha || fechaLocalISO();
   const citas = Array.isArray(appointments?.citas) ? appointments.citas : [];
   const nombre = empleado?.nombre || performance?.empleado?.nombre || "Empleado";
   const puesto = empleado?.puesto || performance?.empleado?.puesto || "Sin datos disponibles";
@@ -739,11 +747,20 @@ function renderDetalleEmpleado(detalle) {
           <div class="section-title">
             <div>
               <p class="eyebrow">Servicios</p>
-              <h2>Servicios de la semana</h2>
+              <h2>${fechaCitas === fechaLocalISO() ? "Citas de hoy" : `Citas del ${escapeHtml(formatoFecha(fechaCitas))}`}</h2>
             </div>
             <span class="summary-pill">${citas.length} ${citas.length === 1 ? "cita" : "citas"}</span>
           </div>
-          <div class="timeline-list">${renderCitasDashboard(citas)}</div>
+          <div class="appointment-date-controls" aria-label="Buscar citas por fecha">
+            <button class="date-nav-button" type="button" data-action="appointments-prev-day">Anterior</button>
+            <label for="adminAppointmentsDate">
+              <span>Fecha</span>
+              <input id="adminAppointmentsDate" type="date" value="${escapeHtml(fechaCitas)}">
+            </label>
+            <button class="date-nav-button" type="button" data-action="appointments-today">Hoy</button>
+            <button class="date-nav-button" type="button" data-action="appointments-next-day">Siguiente</button>
+          </div>
+          <div class="timeline-list">${renderCitasDashboard(citas, fechaCitas)}</div>
         </section>
 
         <section class="panel training-panel">
@@ -765,6 +782,7 @@ function renderDetalleEmpleado(detalle) {
 
 async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalISO()) {
   if (!id) return;
+  const mismoEmpleado = state.empleadoSeleccionadoId === String(id);
   state.empleadoSeleccionadoId = String(id);
   const panel = document.getElementById("employeePortalPanel");
   if (panel) {
@@ -775,10 +793,11 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
   try {
     const employeeId = encodeURIComponent(String(id));
     const fechaSeleccionada = encodeURIComponent(fecha || fechaLocalISO());
+    const fechaCitas = mismoEmpleado ? (document.getElementById("adminAppointmentsDate")?.value || fechaLocalISO()) : fechaLocalISO();
     const [portal, performance, appointments, history] = await Promise.all([
       fetchAdmin(`/admin/employees/${employeeId}/portal`),
       fetchAdmin(`/admin/employees/${employeeId}/performance?fecha=${fechaSeleccionada}`),
-      cargarCitasSemanaAdmin(id, fecha || fechaLocalISO()),
+      cargarCitasDiaAdmin(id, fechaCitas),
       fetchAdmin(`/admin/employees/${employeeId}/performance/history?weeks=8&fecha=${fechaSeleccionada}`)
     ]);
     if (actualizarUrl) {
@@ -810,26 +829,21 @@ function volverALista() {
   document.getElementById("employeesPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-async function cargarCitasSemanaAdmin(id, fecha) {
-  const semana = obtenerRangoSemanaLocal(fecha);
-  const fechas = [];
-  const cursor = new Date(`${semana.inicio}T00:00:00`);
-  const fin = new Date(`${semana.fin}T00:00:00`);
+function sumarDiasISO(fechaISO, dias) {
+  const date = new Date(`${fechaISO}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return fechaLocalISO();
+  date.setDate(date.getDate() + dias);
+  return fechaLocalISO(date);
+}
 
-  while (cursor <= fin) {
-    fechas.push(fechaLocalISO(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
+async function cargarCitasDiaAdmin(id, fecha) {
   const employeeId = encodeURIComponent(String(id));
-  const responses = await Promise.all(
-    fechas.map((dia) => fetchAdmin(`/admin/employees/${employeeId}/appointments?fecha=${encodeURIComponent(dia)}`))
-  );
+  const data = await fetchAdmin(`/admin/employees/${employeeId}/appointments?fecha=${encodeURIComponent(fecha)}`);
 
   return {
     fecha,
-    empleado: responses.find((item) => item?.empleado)?.empleado || null,
-    citas: responses.flatMap((item) => Array.isArray(item?.citas) ? item.citas : [])
+    empleado: data?.empleado || null,
+    citas: Array.isArray(data?.citas) ? data.citas : []
   };
 }
 
@@ -903,6 +917,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const refresh = event.target.closest("button[data-action='refresh-admin-portal']");
     if (refresh && state.empleadoSeleccionadoId) {
+      const fecha = document.getElementById("adminWeekDate")?.value || fechaLocalISO();
+      abrirPortalEmpleado(state.empleadoSeleccionadoId, true, fecha);
+      return;
+    }
+
+    const appointmentsDate = document.getElementById("adminAppointmentsDate");
+    const previousDay = event.target.closest("button[data-action='appointments-prev-day']");
+    const today = event.target.closest("button[data-action='appointments-today']");
+    const nextDay = event.target.closest("button[data-action='appointments-next-day']");
+    if ((previousDay || today || nextDay) && state.empleadoSeleccionadoId) {
+      if (previousDay && appointmentsDate) appointmentsDate.value = sumarDiasISO(appointmentsDate.value || fechaLocalISO(), -1);
+      if (today && appointmentsDate) appointmentsDate.value = fechaLocalISO();
+      if (nextDay && appointmentsDate) appointmentsDate.value = sumarDiasISO(appointmentsDate.value || fechaLocalISO(), 1);
+      const fecha = document.getElementById("adminWeekDate")?.value || fechaLocalISO();
+      abrirPortalEmpleado(state.empleadoSeleccionadoId, true, fecha);
+    }
+  });
+
+  document.getElementById("employeePortalPanel")?.addEventListener("change", (event) => {
+    if (event.target?.id === "adminAppointmentsDate" && state.empleadoSeleccionadoId) {
       const fecha = document.getElementById("adminWeekDate")?.value || fechaLocalISO();
       abrirPortalEmpleado(state.empleadoSeleccionadoId, true, fecha);
     }
