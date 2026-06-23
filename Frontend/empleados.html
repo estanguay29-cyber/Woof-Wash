@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="empleados/employee-modal.css">
   <link rel="stylesheet" href="empleados.css">
 </head>
-<body class="admin-page employees-page" data-page="employees">
+<body class="admin-page employees-page" data-page="employees" data-admin-page="empleados">
   <main class="admin-shell">
     <header class="admin-topbar">
       <div class="admin-brand">
@@ -304,6 +304,18 @@
           </form>
 
           <div id="attendanceHistoryList" style="display:grid; gap:1rem; margin-top:1.25rem;"></div>
+        </section>
+
+        <section class="admin-employees-card performance-history-card" style="margin-top:1.5rem; padding:1.5rem;">
+          <div class="admin-orders-header">
+            <div>
+              <p class="admin-kicker">Historial</p>
+              <h3>Historial global</h3>
+              <p class="admin-panel-copy">Resumen semanal de ventas, meta, bonos, n&oacute;mina y asistencia del equipo.</p>
+            </div>
+          </div>
+          <div id="performanceHistoryList" class="performance-history-list"></div>
+          <div id="performanceHistoryEmpty" class="admin-empty-state hidden">No hay historial global disponible.</div>
         </section>
 
         <section class="admin-employees-card" style="margin-top:1.5rem; padding:1.5rem;">
@@ -617,6 +629,7 @@
     </div>
   </div>
 
+  <script src="admin-nav.js" defer></script>
   <script type="module" src="empleados/main.js"></script>
 </body>
 </html>

@@ -3293,6 +3293,26 @@ app.get("/admin/employees/:id/performance", auth, requireAdmin, async (req, res)
   }
 });
 
+app.get("/admin/employees/:id/performance/history", auth, requireAdmin, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Id de empleado no vÃ¡lido" });
+    }
+
+    const weeks = normalizarWeeksHistorial(req.query?.weeks);
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const historial = await construirHistorialPerformanceEmpleado(id, weeks, fecha, { requireActive: false });
+    res.json({ weeks, historial });
+  } catch (error) {
+    manejarErrorPortalEmpleado(res, error, "No se pudo obtener el historial del empleado");
+  }
+});
+
 app.get("/admin/employees/:id/appointments", auth, requireAdmin, async (req, res) => {
   try {
     const id = String(req.params.id || "").trim();
@@ -3482,6 +3502,7 @@ function construirResumenPerformanceEmpleado({
   const totalEvaluaciones = calificaciones.length;
   const sueldoBase = Number.isFinite(Number(empleado?.sueldoBase)) ? Number(empleado.sueldoBase) : 0;
   const comisionPorcentaje = Number.isFinite(Number(empleado?.comision)) ? Number(empleado.comision) : 0;
+  const descuentoAdministrativo = Number.isFinite(Number(empleado?.descuentoAdministrativo)) ? Number(empleado.descuentoAdministrativo) : 0;
   const metaSemanalOk = metaGlobalSemanalOk;
   const cumplioMetaPersonal = ventasSemanales >= META_SEMANAL_EMPLEADOS_MXN;
   const calificacionMinimaOk = typeof promedioEstrellas === "number" ? promedioEstrellas >= 4.0 : false;
@@ -3522,6 +3543,7 @@ function construirResumenPerformanceEmpleado({
     activo: Boolean(empleado?.activo),
     puesto: empleado?.puesto || "",
     sueldoBase,
+    descuentoAdministrativo,
     comisionPorcentaje,
     ventasSemanales,
     metaSemanalMxn: META_SEMANAL_EMPLEADOS_MXN,
@@ -3688,23 +3710,205 @@ async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options 
     },
     metricas: {
       ventasSemanales: resumen.ventasSemanales,
-      metaSemanal: resumen.metaSemanalMxn,
-      cumplioMetaPersonal: resumen.cumplioMetaPersonal,
-      metaGlobalSemanalOk: resumen.metaGlobalSemanalOk,
-      metaGlobalSemanalMxn: resumen.metaGlobalSemanalMxn,
       ventasGlobalesSemanales: resumen.ventasGlobalesSemanales,
+      metaSemanal: resumen.metaSemanalMxn,
+      metaSemanalMxn: resumen.metaSemanalMxn,
+      metaSemanalOk: resumen.metaSemanalOk,
+      cumplioMetaPersonal: resumen.cumplioMetaPersonal,
+      metaGlobalSemanalMxn: resumen.metaGlobalSemanalMxn,
+      metaGlobalSemanalOk: resumen.metaGlobalSemanalOk,
       progresoMetaGlobal: resumen.progresoMetaGlobal,
       promedioEstrellas: typeof resumen.promedioEstrellas === "number" ? resumen.promedioEstrellas : 0,
-      retardosSemana: resumen.retardosSemana,
-      faltasInjustificadas: resumen.faltasInjustificadas,
-      limpiezaOrdenOk: resumen.limpiezaOrdenOk,
-      elegibleBono: resumen.elegibleBono,
-      bonoCalculado: resumen.bonoCalculado,
-      totalAPagar: resumen.totalAPagar,
+      calificacionMinimaOk: resumen.calificacionMinimaOk,
       porcentajePuntualidad: typeof resumen.porcentajePuntualidad === "number" ? resumen.porcentajePuntualidad : 0,
-      totalServicios: resumen.totalServicios
+      puntualidadOk: resumen.puntualidadOk,
+      puntualidadOkBase: resumen.puntualidadOkBase,
+      retardosSemana: resumen.retardosSemana,
+      faltasJustificadas: resumen.faltasJustificadas,
+      faltasInjustificadas: resumen.faltasInjustificadas,
+      vacacionesDias: resumen.vacacionesDias,
+      limpiezaOrdenOk: resumen.limpiezaOrdenOk,
+      limpiezaOrdenEvaluaciones: resumen.limpiezaOrdenEvaluaciones,
+      limpiezaOrdenIncumplimientos: resumen.limpiezaOrdenIncumplimientos,
+      limpiezaOrdenBonoOk: resumen.limpiezaOrdenBonoOk,
+      totalEvaluaciones: resumen.totalEvaluaciones,
+      totalServicios: resumen.totalServicios,
+      elegibleBono: resumen.elegibleBono,
+      elegibleBonoBase: resumen.elegibleBonoBase,
+      elegibleBonoProyectado: resumen.elegibleBonoProyectado,
+      razonesNoElegible: resumen.razonesNoElegible,
+      bonoCalculado: resumen.bonoCalculado,
+      bonoCalculadoBase: resumen.bonoCalculadoBase,
+      bonoCalculadoProyectado: resumen.bonoCalculadoProyectado,
+      sueldoBase: resumen.sueldoBase,
+      sueldoDiario: resumen.sueldoDiario,
+      descuentoPorFaltas: resumen.descuentoPorFaltas,
+      descuentoAdministrativo: resumen.descuentoAdministrativo,
+      descuentoPorFaltasProyectado: resumen.descuentoPorFaltasProyectado,
+      totalAPagar: resumen.totalAPagar,
+      totalAPagarBase: resumen.totalAPagarBase,
+      totalAPagarProyectado: resumen.totalAPagarProyectado,
+      impactoAsistenciaProyectado: resumen.impactoAsistenciaProyectado
     }
   };
+}
+
+function normalizarWeeksHistorial(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 8;
+  return Math.min(Math.max(parsed, 1), 12);
+}
+
+function sumarDiasFechaISO(fecha, dias) {
+  const date = new Date(`${fecha}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return obtenerFechaLocalAgenda();
+  date.setDate(date.getDate() + dias);
+  return date.toISOString().slice(0, 10);
+}
+
+function construirSemanasHistorial(fechaBase, weeks) {
+  const semanas = [];
+  const vistos = new Set();
+  const base = validarFechaISOAgenda(fechaBase) ? fechaBase : obtenerFechaLocalAgenda();
+
+  for (let index = 0; semanas.length < weeks && index < weeks + 4; index += 1) {
+    const fechaSemana = sumarDiasFechaISO(base, index * -7);
+    const semana = obtenerRangoSemana(fechaSemana);
+    if (semana && !vistos.has(semana.inicio)) {
+      vistos.add(semana.inicio);
+      semanas.push(semana);
+    }
+  }
+
+  return semanas;
+}
+
+function construirItemHistorialEmpleado(respuesta = {}) {
+  const metricas = respuesta.metricas || {};
+  return {
+    semanaInicio: respuesta.semana?.inicio || null,
+    semanaFin: respuesta.semana?.fin || null,
+    ventasSemanales: Number(metricas.ventasSemanales) || 0,
+    ventasGlobalesSemanales: Number(metricas.ventasGlobalesSemanales) || 0,
+    metaGlobalSemanalOk: Boolean(metricas.metaGlobalSemanalOk),
+    cumplioMetaPersonal: Boolean(metricas.cumplioMetaPersonal),
+    promedioEstrellas: Number.isFinite(Number(metricas.promedioEstrellas)) ? Number(metricas.promedioEstrellas) : null,
+    porcentajePuntualidad: Number.isFinite(Number(metricas.porcentajePuntualidad)) ? Number(metricas.porcentajePuntualidad) : null,
+    retardosSemana: Number(metricas.retardosSemana) || 0,
+    faltasJustificadas: Number(metricas.faltasJustificadas) || 0,
+    faltasInjustificadas: Number(metricas.faltasInjustificadas) || 0,
+    vacacionesDias: Number(metricas.vacacionesDias) || 0,
+    limpiezaOrdenOk: typeof metricas.limpiezaOrdenOk === "boolean" ? metricas.limpiezaOrdenOk : null,
+    limpiezaOrdenEvaluaciones: Number(metricas.limpiezaOrdenEvaluaciones) || 0,
+    limpiezaOrdenIncumplimientos: Number(metricas.limpiezaOrdenIncumplimientos) || 0,
+    elegibleBono: Boolean(metricas.elegibleBono),
+    bonoCalculado: Number(metricas.bonoCalculado) || 0,
+    descuentoPorFaltas: Number(metricas.descuentoPorFaltas) || 0,
+    descuentoAdministrativo: Number(metricas.descuentoAdministrativo) || 0,
+    totalAPagar: Number(metricas.totalAPagar) || 0,
+    razonesNoElegible: Array.isArray(metricas.razonesNoElegible) ? metricas.razonesNoElegible : []
+  };
+}
+
+async function construirHistorialPerformanceEmpleado(employeeId, weeks, fechaBase, options = {}) {
+  const semanas = construirSemanasHistorial(fechaBase, weeks);
+  const historial = [];
+
+  for (const semana of semanas) {
+    const respuesta = await construirPerformanceEmpleadoRespuesta(employeeId, semana.inicio, options);
+    historial.push(construirItemHistorialEmpleado(respuesta));
+  }
+
+  return historial;
+}
+
+async function construirHistorialPerformanceGlobal(weeks, fechaBase) {
+  const semanas = construirSemanasHistorial(fechaBase, weeks);
+  const empleados = await Employee.find({}).sort({ nombreCompleto: 1 });
+  const historial = [];
+
+  for (const semana of semanas) {
+    const [citasSemana, asistenciaSemana, limpiezaOrdenSemana, eventosAsistenciaSemana] = await Promise.all([
+      Appointment.find({
+        fecha: { $gte: semana.inicio, $lte: semana.fin },
+        estado: "completada"
+      }),
+      PerformanceAttendance.find({
+        fecha: { $gte: semana.inicio, $lte: semana.fin }
+      }),
+      PerformanceMetricRecord.find({
+        fecha: { $gte: semana.inicio, $lte: semana.fin },
+        metricKey: "limpieza_orden"
+      }),
+      PerformanceMetricRecord.find({
+        fecha: { $gte: semana.inicio, $lte: semana.fin },
+        metricKey: { $in: PERFORMANCE_PRIMARY_ATTENDANCE_KEYS },
+        value: true
+      })
+    ]);
+
+    const asistenciaPorEmpleado = asistenciaSemana.reduce((acc, registro) => {
+      const key = String(registro.empleadoId);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(registro);
+      return acc;
+    }, {});
+    const limpiezaOrdenPorEmpleado = limpiezaOrdenSemana.reduce((acc, registro) => {
+      const key = String(registro.empleadoId);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(registro);
+      return acc;
+    }, {});
+    const eventosAsistenciaPorEmpleado = eventosAsistenciaSemana.reduce((acc, registro) => {
+      const key = String(registro.empleadoId);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(registro);
+      return acc;
+    }, {});
+
+    const metaGlobalSemana = construirMetaGlobalSemanal(citasSemana);
+    const resumenesEmpleado = empleados.map((empleado) => construirResumenPerformanceEmpleado({
+      empleado,
+      citasSemana,
+      asistenciaRegistros: asistenciaPorEmpleado[String(empleado._id)] || [],
+      limpiezaOrdenRegistros: limpiezaOrdenPorEmpleado[String(empleado._id)] || [],
+      eventosAsistenciaRegistros: eventosAsistenciaPorEmpleado[String(empleado._id)] || [],
+      metaGlobalSemanalOk: metaGlobalSemana.metaGlobalSemanalOk,
+      metaGlobalSemanalMxn: metaGlobalSemana.metaGlobalSemanalMxn,
+      ventasGlobalesSemanales: metaGlobalSemana.ventasGlobalesSemanales,
+      progresoMetaGlobal: metaGlobalSemana.progresoMetaGlobal
+    }));
+
+    const calificacionesGlobales = citasSemana
+      .map((cita) => (Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio))
+      .filter((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 5);
+    const promedioEstrellasEquipo = calificacionesGlobales.length
+      ? Math.round((calificacionesGlobales.reduce((total, valor) => total + valor, 0) / calificacionesGlobales.length) * 10) / 10
+      : null;
+    const faltasJustificadasEquipo = eventosAsistenciaSemana.filter((registro) => registro.metricKey === "falta_justificada").length;
+    const faltasInjustificadasEquipo = eventosAsistenciaSemana.filter((registro) => registro.metricKey === "falta_injustificada").length;
+
+    historial.push({
+      semanaInicio: semana.inicio,
+      semanaFin: semana.fin,
+      ventasGlobalesSemanales: metaGlobalSemana.ventasGlobalesSemanales,
+      metaGlobalSemanalMxn: metaGlobalSemana.metaGlobalSemanalMxn,
+      metaGlobalSemanalOk: metaGlobalSemana.metaGlobalSemanalOk,
+      progresoMetaGlobal: metaGlobalSemana.progresoMetaGlobal,
+      totalServicios: resumenesEmpleado.reduce((total, item) => total + (Number(item.totalServicios) || 0), 0),
+      totalBonos: resumenesEmpleado.reduce((total, item) => total + (Number(item.bonoCalculado) || 0), 0),
+      totalAPagar: resumenesEmpleado.reduce((total, item) => total + (Number(item.totalAPagar) || 0), 0),
+      empleadosElegibles: resumenesEmpleado.filter((item) => item.elegibleBono).length,
+      promedioEstrellasEquipo,
+      retardosEquipo: asistenciaSemana.filter((registro) => registro.puntual === false).length,
+      faltasEquipo: faltasJustificadasEquipo + faltasInjustificadasEquipo,
+      faltasJustificadasEquipo,
+      faltasInjustificadasEquipo,
+      vacacionesEquipo: eventosAsistenciaSemana.filter((registro) => registro.metricKey === "vacaciones").length
+    });
+  }
+
+  return historial;
 }
 
 function manejarErrorPortalEmpleado(res, error, fallbackMessage) {
@@ -3911,6 +4115,21 @@ app.get("/admin/performance/dashboard", auth, requireAdmin, async (req, res) => 
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo cargar el dashboard de desempeño" });
+  }
+});
+
+app.get("/admin/performance/history", auth, requireAdmin, async (req, res) => {
+  try {
+    const weeks = normalizarWeeksHistorial(req.query?.weeks);
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const historial = await construirHistorialPerformanceGlobal(weeks, fecha);
+    res.json({ weeks, historial });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el historial de desempeÃ±o" });
   }
 });
 
@@ -4285,6 +4504,21 @@ app.get("/empleados/performance", auth, requireEmpleado, async (req, res) => {
     res.json(respuesta);
   } catch (error) {
     manejarErrorPortalEmpleado(res, error, "No se pudieron obtener las metricas del empleado");
+  }
+});
+
+app.get("/empleados/performance/history", auth, requireEmpleado, async (req, res) => {
+  try {
+    const weeks = normalizarWeeksHistorial(req.query?.weeks);
+    const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
+    if (!validarFechaISOAgenda(fecha)) {
+      return res.status(400).json({ message: "fecha no valida" });
+    }
+
+    const historial = await construirHistorialPerformanceEmpleado(req.employeeProfile._id, weeks, fecha, { requireActive: true });
+    res.json({ weeks, historial });
+  } catch (error) {
+    manejarErrorPortalEmpleado(res, error, "No se pudo obtener el historial del empleado");
   }
 });
 

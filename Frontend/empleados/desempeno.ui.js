@@ -182,6 +182,48 @@ export function renderPerformanceTable(items = []) {
   }).join("");
 }
 
+export function renderPerformanceHistory(items = []) {
+  const container = getById("performanceHistoryList");
+  const empty = getById("performanceHistoryEmpty");
+  if (!container) return;
+
+  if (!items.length) {
+    container.innerHTML = "";
+    if (empty) empty.classList.remove("hidden");
+    return;
+  }
+
+  if (empty) empty.classList.add("hidden");
+
+  container.innerHTML = items.map((item) => {
+    const metaOk = item.metaGlobalSemanalOk
+      ? '<span class="admin-badge admin-badge-success">Cumple</span>'
+      : '<span class="admin-badge admin-badge-muted">No cumple</span>';
+    const estrellas = Number.isFinite(Number(item.promedioEstrellasEquipo))
+      ? Number(item.promedioEstrellasEquipo).toFixed(1)
+      : "-";
+
+    return `
+      <article class="performance-history-item">
+        <div class="performance-history-week">
+          <strong>${escapeHtml(formatDate(item.semanaInicio))} - ${escapeHtml(formatDate(item.semanaFin))}</strong>
+          ${metaOk}
+        </div>
+        <div class="performance-history-metrics">
+          <div><span>Ventas globales</span><strong>${formatCurrency(toNonNegativeNumber(item.ventasGlobalesSemanales, 0))}</strong></div>
+          <div><span>Total bonos</span><strong>${formatCurrency(toNonNegativeNumber(item.totalBonos, 0))}</strong></div>
+          <div><span>Total a pagar</span><strong>${formatCurrency(toNonNegativeNumber(item.totalAPagar, 0))}</strong></div>
+          <div><span>Elegibles</span><strong>${toCount(item.empleadosElegibles)}</strong></div>
+          <div><span>Estrellas</span><strong>${escapeHtml(estrellas)}</strong></div>
+          <div><span>Retardos</span><strong>${toCount(item.retardosEquipo)}</strong></div>
+          <div><span>Faltas</span><strong>${toCount(item.faltasEquipo)}</strong></div>
+          <div><span>Vacaciones</span><strong>${toCount(item.vacacionesEquipo)}</strong></div>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 export function renderAttendanceOptions(employees = []) {
   const select = getById("attendanceEmployeeId");
   const cleanlinessSelect = getById("cleanlinessEmployeeId");

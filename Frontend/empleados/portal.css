@@ -393,6 +393,18 @@ input {
 }
 
 @media (max-width: 860px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .portal-shell,
+  .portal-content,
+  .employee-portal-panel,
+  .employees-panel {
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .portal-topbar,
   .portal-hero,
   .section-head,
@@ -421,5 +433,31 @@ input {
   .admin-portal-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .portal-shell {
+    width: min(100% - 16px, 1220px);
+    padding-top: 12px;
+  }
+
+  .portal-hero,
+  .employees-panel,
+  .employee-portal-panel {
+    border-radius: 18px;
+  }
+
+  .portal-hero,
+  .employees-panel {
+    padding: 18px;
+  }
+
+  .employee-card {
+    padding: 14px;
+  }
+
+  .search-box input {
+    width: 100%;
   }
 }

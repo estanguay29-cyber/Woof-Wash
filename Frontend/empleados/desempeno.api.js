@@ -6,6 +6,13 @@ export async function loadPerformanceDashboard(fecha) {
   return fetchAdmin(`/admin/performance/dashboard?${params.toString()}`);
 }
 
+export async function loadPerformanceHistory(fecha, weeks = 8) {
+  const params = new URLSearchParams();
+  params.set("weeks", String(weeks));
+  if (fecha) params.set("fecha", fecha);
+  return fetchAdmin(`/admin/performance/history?${params.toString()}`);
+}
+
 export async function loadPerformanceAttendance(fecha) {
   const params = new URLSearchParams();
   if (fecha) params.set("fecha", fecha);

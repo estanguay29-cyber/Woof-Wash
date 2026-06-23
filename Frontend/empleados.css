@@ -890,6 +890,17 @@
 }
 
 @media (max-width: 860px) {
+  .employees-page {
+    overflow-x: hidden;
+  }
+
+  .employees-page .admin-shell,
+  .employees-page .admin-panel,
+  .employees-page .admin-employees-card {
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .employees-hero-card {
     grid-template-columns: 1fr;
   }
@@ -911,8 +922,17 @@
     grid-template-columns: 1fr;
   }
 
+  .admin-table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .admin-filter-group {
     justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 4px;
   }
 
   .performance-summary-grid {
@@ -925,9 +945,14 @@
 }
 
 @media (max-width: 640px) {
+  .employees-page .admin-shell {
+    width: min(100% - 16px, 1220px);
+  }
+
   .employees-page .admin-controls {
     align-items: stretch;
     width: 100%;
+    flex-direction: column;
   }
 
   .employees-page .admin-controls .admin-search-box {
@@ -940,6 +965,8 @@
   }
 
   .performance-dashboard-header {
+    align-items: stretch;
+    flex-direction: column;
     padding: 0.85rem;
   }
 
@@ -988,6 +1015,102 @@
 
   .admin-employees-table {
     min-width: 620px;
+  }
+
+  .admin-employees-card,
+  .performance-dashboard-card,
+  .performance-history-card {
+    padding: 0.9rem !important;
+    border-radius: 18px;
+  }
+
+  .admin-filter-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+
+  .admin-filter-group button {
+    width: 100%;
+  }
+}
+
+.performance-history-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.performance-history-item {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: 20px;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 0 14px 30px rgba(11, 42, 107, 0.07);
+}
+
+.performance-history-week {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.performance-history-week strong {
+  color: #0b2a6b;
+}
+
+.performance-history-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.performance-history-metrics div {
+  display: grid;
+  gap: 0.25rem;
+  border-radius: 16px;
+  background: rgba(11, 42, 107, 0.045);
+  padding: 0.75rem;
+}
+
+.performance-history-metrics span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.performance-history-metrics strong {
+  color: #0b2a6b;
+  font-size: 1rem;
+}
+
+@media (max-width: 860px) {
+  .performance-history-week {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .performance-history-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .performance-history-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-filter-group {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-history-item {
+    padding: 0.85rem;
+    border-radius: 16px;
   }
 }
 

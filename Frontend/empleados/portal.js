@@ -471,6 +471,138 @@ function renderProgressPanel(detalle) {
   `;
 }
 
+function formatoEntero(value) {
+  return String(Math.round(toNumber(value, 0)));
+}
+
+function textoEstado(value, positivo = "Cumple", negativo = "No cumple", neutro = "Sin registro") {
+  if (value === true) return positivo;
+  if (value === false) return negativo;
+  return neutro;
+}
+
+function renderDetailItem(label, value, hint = "") {
+  return `
+    <article class="detail-item">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
+    </article>
+  `;
+}
+
+function renderMetricasCompletasDashboard(detalle) {
+  const metricas = detalle?.performance?.metricas || detalle?.metricas || {};
+  const limpiezaTexto = textoEstado(metricas.limpiezaOrdenOk, "Cumple", "No cumple", "Sin registro");
+  const limpiezaHint = `${formatoEntero(metricas.limpiezaOrdenEvaluaciones)} eval. / ${formatoEntero(metricas.limpiezaOrdenIncumplimientos)} inc.`;
+  const metaGlobalTexto = textoEstado(metricas.metaGlobalSemanalOk, "Cumplida", "No cumplida", "Sin datos");
+  const metaPersonalTexto = textoEstado(metricas.cumplioMetaPersonal, "Cumplida", "No cumplida", "Sin datos");
+  const puntualidadBaseTexto = textoEstado(metricas.puntualidadOkBase, "En regla", "Revisar", "Sin datos");
+  const calificacionTexto = textoEstado(metricas.calificacionMinimaOk, "Cumple", "No cumple", "Sin datos");
+  const razones = Array.isArray(metricas.razonesNoElegible) ? metricas.razonesNoElegible.filter(Boolean) : [];
+
+  return `
+    <section class="insight-grid" aria-label="Metricas completas">
+      <section class="panel insight-panel">
+        <div class="section-title compact">
+          <div>
+            <p class="eyebrow">Evaluaciones</p>
+            <h2>Evaluaciones y operacion</h2>
+          </div>
+        </div>
+        <div class="detail-grid">
+          ${[
+            renderDetailItem("Limpieza y orden", limpiezaTexto, limpiezaHint),
+            renderDetailItem("Faltas justificadas", formatoEntero(metricas.faltasJustificadas)),
+            renderDetailItem("Faltas injustificadas", formatoEntero(metricas.faltasInjustificadas)),
+            renderDetailItem("Vacaciones tomadas", formatoEntero(metricas.vacacionesDias)),
+            renderDetailItem("Evaluaciones totales", formatoEntero(metricas.totalEvaluaciones)),
+            renderDetailItem("Meta global", metaGlobalTexto, `${formatoMoneda(metricas.ventasGlobalesSemanales)} de ${formatoMoneda(metricas.metaGlobalSemanalMxn)}`),
+            renderDetailItem("Meta personal", metaPersonalTexto, `${formatoMoneda(metricas.ventasSemanales)} de ${formatoMoneda(metricas.metaSemanal)}`),
+            renderDetailItem("Puntualidad base", puntualidadBaseTexto, `${formatoEntero(metricas.retardosSemana)} retardos`),
+            renderDetailItem("Calificacion minima", calificacionTexto, `${toNumber(metricas.promedioEstrellas).toFixed(1)} / 5`)
+          ].join("")}
+        </div>
+        <div class="reason-list">
+          ${razones.length
+            ? `<div class="reason-card is-warning"><strong>Razones de no elegibilidad</strong><ul>${razones.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>`
+            : `<div class="reason-card is-good"><strong>Elegibilidad</strong><p>${metricas.elegibleBono ? "Cumple las condiciones registradas para bono." : "Sin razones registradas por ahora."}</p></div>`
+          }
+        </div>
+      </section>
+
+      <section class="panel insight-panel">
+        <div class="section-title compact">
+          <div>
+            <p class="eyebrow">Pago</p>
+            <h2>Nomina estimada</h2>
+          </div>
+        </div>
+        <div class="detail-grid">
+          ${[
+            renderDetailItem("Sueldo base", formatoMoneda(metricas.sueldoBase)),
+            renderDetailItem("Sueldo diario", formatoMoneda(metricas.sueldoDiario)),
+            renderDetailItem("Descuento por faltas", formatoMoneda(metricas.descuentoPorFaltas)),
+            renderDetailItem("Descuento administrativo", formatoMoneda(metricas.descuentoAdministrativo)),
+            renderDetailItem("Bono calculado", formatoMoneda(metricas.bonoCalculado)),
+            renderDetailItem("Total a pagar", formatoMoneda(metricas.totalAPagar)),
+            renderDetailItem("Bono proyectado", formatoMoneda(metricas.bonoCalculadoProyectado)),
+            renderDetailItem("Total proyectado", formatoMoneda(metricas.totalAPagarProyectado))
+          ].join("")}
+        </div>
+      </section>
+    </section>
+  `;
+}
+
+function formatoSemanaHistorial(item = {}) {
+  const inicio = formatoFecha(item.semanaInicio);
+  const fin = formatoFecha(item.semanaFin);
+  return inicio === "-" && fin === "-" ? "Semana" : `${inicio} - ${fin}`;
+}
+
+function renderHistorialDesempenoDashboard(detalle = {}) {
+  const historial = Array.isArray(detalle?.history?.historial) ? detalle.history.historial : [];
+  const cards = historial.length
+    ? historial.map((item) => {
+      const faltas = toNumber(item.faltasJustificadas) + toNumber(item.faltasInjustificadas);
+      const estrellas = tieneDato(item.promedioEstrellas) ? toNumber(item.promedioEstrellas).toFixed(1) : "-";
+      const puntualidad = tieneDato(item.porcentajePuntualidad) ? `${clampPercent(item.porcentajePuntualidad)}%` : "-";
+      return `
+        <article class="history-card">
+          <div class="history-week">
+            <strong>${escapeHtml(formatoSemanaHistorial(item))}</strong>
+            <span class="${item.elegibleBono ? "is-good" : "is-muted"}">${item.elegibleBono ? "Elegible" : "No elegible"}</span>
+          </div>
+          <div class="history-metrics">
+            ${renderDetailItem("Ventas", formatoMoneda(item.ventasSemanales))}
+            ${renderDetailItem("Estrellas", `${estrellas} / 5`)}
+            ${renderDetailItem("Puntualidad", puntualidad)}
+            ${renderDetailItem("Retardos", formatoEntero(item.retardosSemana))}
+            ${renderDetailItem("Faltas", formatoEntero(faltas))}
+            ${renderDetailItem("Vacaciones", formatoEntero(item.vacacionesDias))}
+            ${renderDetailItem("Bono", formatoMoneda(item.bonoCalculado))}
+            ${renderDetailItem("Total", formatoMoneda(item.totalAPagar))}
+          </div>
+        </article>
+      `;
+    }).join("")
+    : `<div class="empty-state">Sin historial de desempeno disponible.</div>`;
+
+  return `
+    <section class="panel history-panel" aria-label="Historial de desempeno">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow">Historial</p>
+          <h2>Historial de desempeno</h2>
+        </div>
+        <span class="summary-pill">8 semanas</span>
+      </div>
+      <div class="history-list">${cards}</div>
+    </section>
+  `;
+}
+
 function renderCitasDashboard(citas = []) {
   const recientes = ordenarCitasRecientes(Array.isArray(citas) ? citas : []);
   if (!recientes.length) {
@@ -598,6 +730,10 @@ function renderDetalleEmpleado(detalle) {
 
       ${renderProgressPanel(detalle)}
 
+      ${renderMetricasCompletasDashboard(detalle)}
+
+      ${renderHistorialDesempenoDashboard(detalle)}
+
       <section class="content-grid">
         <section class="panel services-panel">
           <div class="section-title">
@@ -639,10 +775,11 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
   try {
     const employeeId = encodeURIComponent(String(id));
     const fechaSeleccionada = encodeURIComponent(fecha || fechaLocalISO());
-    const [portal, performance, appointments] = await Promise.all([
+    const [portal, performance, appointments, history] = await Promise.all([
       fetchAdmin(`/admin/employees/${employeeId}/portal`),
       fetchAdmin(`/admin/employees/${employeeId}/performance?fecha=${fechaSeleccionada}`),
-      cargarCitasSemanaAdmin(id, fecha || fechaLocalISO())
+      cargarCitasSemanaAdmin(id, fecha || fechaLocalISO()),
+      fetchAdmin(`/admin/employees/${employeeId}/performance/history?weeks=8&fecha=${fechaSeleccionada}`)
     ]);
     if (actualizarUrl) {
       const url = new URL(window.location.href);
@@ -653,7 +790,8 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
       fecha: fecha || fechaLocalISO(),
       portal,
       performance,
-      appointments
+      appointments,
+      history
     });
   } catch (error) {
     if (error.status === 401 || error.status === 403) return;

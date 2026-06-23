@@ -243,6 +243,34 @@ input.invalid, textarea.invalid { border-color: #b91c1c; box-shadow: 0 0 0 4px r
 }
 
 @media (max-width: 720px) {
+  .admin-modal {
+    padding: 10px;
+    align-items: flex-end;
+  }
+
+  .admin-modal-panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 20px);
+    overflow-y: auto;
+    border-radius: 18px;
+  }
+
+  .admin-form-grid,
+  .admin-form-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-actions {
+    display: grid;
+  }
+
+  .admin-form-actions button,
+  .admin-saving {
+    width: 100%;
+    margin-left: 0;
+  }
+
   .employee-access-header,
   .employee-access-credential,
   .employee-access-input-row {
@@ -264,6 +292,16 @@ input.invalid, textarea.invalid { border-color: #b91c1c; box-shadow: 0 0 0 4px r
 
   .employee-access-reset-actions {
     display: grid;
+  }
+}
+
+@media (max-width: 480px) {
+  .employee-access-admin,
+  .employee-access-existing,
+  .employee-access-form,
+  .employee-access-reset-form {
+    padding: 12px;
+    border-radius: 14px;
   }
 }
 

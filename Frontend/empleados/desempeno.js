@@ -1,6 +1,6 @@
 import { state } from "./empleados.state.js";
-import { loadPerformanceDashboard, loadPerformanceAttendance, loadPerformanceMetrics, saveAttendanceRecord, savePerformanceMetric } from "./desempeno.api.js";
-import { renderPerformanceSummary, renderPerformanceTable, renderAttendanceOptions, renderAttendanceHistory, renderAttendanceEventHistory, renderCleanlinessHistory, showPerformanceFeedback } from "./desempeno.ui.js";
+import { loadPerformanceDashboard, loadPerformanceHistory, loadPerformanceAttendance, loadPerformanceMetrics, saveAttendanceRecord, savePerformanceMetric } from "./desempeno.api.js";
+import { renderPerformanceSummary, renderPerformanceTable, renderPerformanceHistory, renderAttendanceOptions, renderAttendanceHistory, renderAttendanceEventHistory, renderCleanlinessHistory, showPerformanceFeedback } from "./desempeno.ui.js";
 import { META_SEMANAL_OFICIAL_MXN } from "./empleados.utils.js";
 
 const ATTENDANCE_EVENT_KEYS = Object.freeze(["falta_justificada", "falta_injustificada", "vacaciones"]);
@@ -96,7 +96,10 @@ async function actualizarDashboardDesempeno(fecha) {
   const fechaLimpia = String(fecha || obtenerFechaLocalISO()).trim();
   performanceState.fechaSemana = fechaLimpia;
   try {
-    const datos = await loadPerformanceDashboard(fechaLimpia);
+    const [datos, historial] = await Promise.all([
+      loadPerformanceDashboard(fechaLimpia),
+      loadPerformanceHistory(fechaLimpia, 8)
+    ]);
     performanceState.dashboard = datos;
     const empleadoResumen = {
       ventasSemanales: datos.ventasGlobalesSemanales ?? datos.ventasSemanales ?? 0,
@@ -116,6 +119,7 @@ async function actualizarDashboardDesempeno(fecha) {
     };
     renderPerformanceSummary(empleadoResumen);
     renderPerformanceTable(Array.isArray(datos.empleados) ? datos.empleados : []);
+    renderPerformanceHistory(Array.isArray(historial.historial) ? historial.historial : []);
   } catch (error) {
     showPerformanceFeedback(error.message || "No se pudo cargar el dashboard de desempeño.", "error");
   }
