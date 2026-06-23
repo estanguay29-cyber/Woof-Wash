@@ -656,6 +656,59 @@ input {
   overflow: hidden;
 }
 
+.history-title {
+  align-items: flex-start;
+}
+
+.history-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.history-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 170px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.history-controls select,
+.history-controls input {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  background: #fff;
+  color: var(--blue);
+  font-weight: 900;
+}
+
+.history-toggle-button {
+  align-self: end;
+  min-height: 42px;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0 15px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue), #0f4fb2);
+  box-shadow: 0 12px 24px rgba(11, 42, 107, 0.18);
+  cursor: pointer;
+  font-weight: 950;
+}
+
+.history-limit-note {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 780;
+}
+
 .history-list {
   display: grid;
   gap: 12px;
@@ -1041,8 +1094,19 @@ input {
   .logout-button,
   .refresh-button,
   .control-panel input,
-  .date-nav-button {
+  .date-nav-button,
+  .history-toggle-button {
     width: 100%;
+  }
+
+  .history-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .history-controls label {
+    min-width: 0;
   }
 
   .profile-card,

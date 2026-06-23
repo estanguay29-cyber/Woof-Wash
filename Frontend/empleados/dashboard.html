@@ -218,17 +218,6 @@
         </section>
       </section>
 
-      <section class="panel history-panel" aria-label="Historial de desempeno">
-        <div class="section-title">
-          <div>
-            <p class="eyebrow">Historial</p>
-            <h2>Historial de desempe&ntilde;o</h2>
-          </div>
-          <span class="summary-pill">8 semanas</span>
-        </div>
-        <div id="performanceHistoryList" class="history-list"></div>
-      </section>
-
       <section class="content-grid">
         <section class="panel services-panel">
           <div class="section-title">
@@ -259,6 +248,32 @@
           </div>
           <div id="manualsList" class="training-grid" aria-label="Recursos de capacitacion"></div>
         </section>
+      </section>
+
+      <section id="performanceHistoryPanel" class="panel history-panel is-collapsed" aria-label="Historial de desempeno">
+        <div class="section-title history-title">
+          <div>
+            <p class="eyebrow">Historial</p>
+            <h2>Historial de desempe&ntilde;o</h2>
+          </div>
+          <div class="history-controls" aria-label="Opciones de historial">
+            <label for="historyWeeks">
+              <span>Periodo</span>
+              <select id="historyWeeks">
+                <option value="4">&Uacute;ltimas 4 semanas</option>
+                <option value="8" selected>&Uacute;ltimas 8 semanas</option>
+                <option value="12">&Uacute;ltimas 12 semanas</option>
+              </select>
+            </label>
+            <label for="historyBaseDate">
+              <span>Fecha espec&iacute;fica</span>
+              <input id="historyBaseDate" type="date">
+            </label>
+            <button id="togglePerformanceHistory" class="history-toggle-button" type="button" aria-expanded="false">Mostrar historial</button>
+          </div>
+        </div>
+        <p class="history-limit-note">Por ahora se muestran hasta 12 semanas.</p>
+        <div id="performanceHistoryList" class="history-list hidden"></div>
       </section>
     </section>
   </main>

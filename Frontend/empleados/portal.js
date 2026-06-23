@@ -482,11 +482,12 @@ function textoEstado(value, positivo = "Cumple", negativo = "No cumple", neutro 
 }
 
 function renderDetailItem(label, value, hint = "", className = "") {
+  const hints = Array.isArray(hint) ? hint : [hint].filter(Boolean);
   return `
     <article class="detail-item ${escapeHtml(className)}">
       <span>${escapeHtml(label)}</span>
       <strong>${escapeHtml(value)}</strong>
-      ${hint ? `<small>${escapeHtml(hint)}</small>` : ""}
+      ${hints.map((item) => `<small>${escapeHtml(item)}</small>`).join("")}
     </article>
   `;
 }
@@ -498,9 +499,10 @@ function renderMetricasCompletasDashboard(detalle) {
   const limpiezaTexto = limpiezaEvaluaciones > 0
     ? textoEstado(metricas.limpiezaOrdenOk, "Cumple", "No cumple", "Sin registros")
     : "Sin registros";
-  const limpiezaHint = limpiezaEvaluaciones > 0
-    ? `${formatoEntero(limpiezaEvaluaciones)} eval. / ${formatoEntero(limpiezaIncumplimientos)} inc.`
-    : "Sin evaluaciones registradas esta semana";
+  const limpiezaHint = [
+    `Evaluaciones: ${formatoEntero(limpiezaEvaluaciones)}`,
+    `Incumplimientos: ${formatoEntero(limpiezaIncumplimientos)}`
+  ];
   const metaGlobalTexto = textoEstado(metricas.metaGlobalSemanalOk, "Cumplida", "No cumplida", "Sin datos");
   const metaPersonalTexto = textoEstado(metricas.cumplioMetaPersonal, "Cumplida", "No cumplida", "Sin datos");
   const puntualidadBaseTexto = textoEstado(metricas.puntualidadOkBase, "En regla", "Revisar", "Sin datos");
@@ -567,44 +569,62 @@ function formatoSemanaHistorial(item = {}) {
   return inicio === "-" && fin === "-" ? "Semana" : `${inicio} - ${fin}`;
 }
 
-function renderHistorialDesempenoDashboard(detalle = {}) {
-  const historial = Array.isArray(detalle?.history?.historial) ? detalle.history.historial : [];
-  const cards = historial.length
-    ? historial.map((item) => {
-      const faltas = toNumber(item.faltasJustificadas) + toNumber(item.faltasInjustificadas);
-      const estrellas = tieneDato(item.promedioEstrellas) ? toNumber(item.promedioEstrellas).toFixed(1) : "-";
-      const puntualidad = tieneDato(item.porcentajePuntualidad) ? `${clampPercent(item.porcentajePuntualidad)}%` : "-";
-      return `
-        <article class="history-card">
-          <div class="history-week">
-            <strong>${escapeHtml(formatoSemanaHistorial(item))}</strong>
-            <span class="${item.elegibleBono ? "is-good" : "is-muted"}">${item.elegibleBono ? "Elegible" : "No elegible"}</span>
-          </div>
-          <div class="history-metrics">
-            ${renderDetailItem("Ventas", formatoMoneda(item.ventasSemanales))}
-            ${renderDetailItem("Estrellas", `${estrellas} / 5`)}
-            ${renderDetailItem("Puntualidad", puntualidad)}
-            ${renderDetailItem("Retardos", formatoEntero(item.retardosSemana))}
-            ${renderDetailItem("Faltas", formatoEntero(faltas))}
-            ${renderDetailItem("Vacaciones", formatoEntero(item.vacacionesDias))}
-            ${renderDetailItem("Bono", formatoMoneda(item.bonoCalculado))}
-            ${renderDetailItem("Total", formatoMoneda(item.totalAPagar))}
-          </div>
-        </article>
-      `;
-    }).join("")
-    : `<div class="empty-state">Sin historial de desempeno disponible.</div>`;
+function renderHistorialItemsDashboard(historial = []) {
+  if (!historial.length) {
+    return `<div class="empty-state">Sin historial de desempeno disponible.</div>`;
+  }
 
+  return historial.map((item) => {
+    const faltas = toNumber(item.faltasJustificadas) + toNumber(item.faltasInjustificadas);
+    const estrellas = tieneDato(item.promedioEstrellas) ? toNumber(item.promedioEstrellas).toFixed(1) : "-";
+    const puntualidad = tieneDato(item.porcentajePuntualidad) ? `${clampPercent(item.porcentajePuntualidad)}%` : "-";
+    return `
+      <article class="history-card">
+        <div class="history-week">
+          <strong>${escapeHtml(formatoSemanaHistorial(item))}</strong>
+          <span class="${item.elegibleBono ? "is-good" : "is-muted"}">${item.elegibleBono ? "Elegible" : "No elegible"}</span>
+        </div>
+        <div class="history-metrics">
+          ${renderDetailItem("Ventas", formatoMoneda(item.ventasSemanales))}
+          ${renderDetailItem("Estrellas", `${estrellas} / 5`)}
+          ${renderDetailItem("Puntualidad", puntualidad)}
+          ${renderDetailItem("Retardos", formatoEntero(item.retardosSemana))}
+          ${renderDetailItem("Faltas", formatoEntero(faltas))}
+          ${renderDetailItem("Vacaciones", formatoEntero(item.vacacionesDias))}
+          ${renderDetailItem("Bono", formatoMoneda(item.bonoCalculado))}
+          ${renderDetailItem("Total", formatoMoneda(item.totalAPagar))}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderHistorialDesempenoDashboard(fecha = fechaLocalISO()) {
   return `
-    <section class="panel history-panel" aria-label="Historial de desempeno">
-      <div class="section-title">
+    <section class="panel history-panel is-collapsed" aria-label="Historial de desempeno">
+      <div class="section-title history-title">
         <div>
           <p class="eyebrow">Historial</p>
           <h2>Historial de desempeno</h2>
         </div>
-        <span class="summary-pill">8 semanas</span>
+        <div class="history-controls" aria-label="Opciones de historial">
+          <label for="adminHistoryWeeks">
+            <span>Periodo</span>
+            <select id="adminHistoryWeeks">
+              <option value="4">Ultimas 4 semanas</option>
+              <option value="8" selected>Ultimas 8 semanas</option>
+              <option value="12">Ultimas 12 semanas</option>
+            </select>
+          </label>
+          <label for="adminHistoryBaseDate">
+            <span>Fecha especifica</span>
+            <input id="adminHistoryBaseDate" type="date" value="${escapeHtml(fecha || fechaLocalISO())}">
+          </label>
+          <button class="history-toggle-button" type="button" data-action="toggle-performance-history" aria-expanded="false">Mostrar historial</button>
+        </div>
       </div>
-      <div class="history-list">${cards}</div>
+      <p class="history-limit-note">Por ahora se muestran hasta 12 semanas.</p>
+      <div id="adminPerformanceHistoryList" class="history-list hidden"></div>
     </section>
   `;
 }
@@ -740,8 +760,6 @@ function renderDetalleEmpleado(detalle) {
 
       ${renderMetricasCompletasDashboard(detalle)}
 
-      ${renderHistorialDesempenoDashboard(detalle)}
-
       <section class="content-grid">
         <section class="panel services-panel">
           <div class="section-title">
@@ -773,6 +791,8 @@ function renderDetalleEmpleado(detalle) {
           <div class="training-grid" aria-label="Recursos de capacitacion">${renderManualesDashboard()}</div>
         </section>
       </section>
+
+      ${renderHistorialDesempenoDashboard(fecha)}
     </section>
   `;
 
@@ -794,11 +814,10 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
     const employeeId = encodeURIComponent(String(id));
     const fechaSeleccionada = encodeURIComponent(fecha || fechaLocalISO());
     const fechaCitas = mismoEmpleado ? (document.getElementById("adminAppointmentsDate")?.value || fechaLocalISO()) : fechaLocalISO();
-    const [portal, performance, appointments, history] = await Promise.all([
+    const [portal, performance, appointments] = await Promise.all([
       fetchAdmin(`/admin/employees/${employeeId}/portal`),
       fetchAdmin(`/admin/employees/${employeeId}/performance?fecha=${fechaSeleccionada}`),
-      cargarCitasDiaAdmin(id, fechaCitas),
-      fetchAdmin(`/admin/employees/${employeeId}/performance/history?weeks=8&fecha=${fechaSeleccionada}`)
+      cargarCitasDiaAdmin(id, fechaCitas)
     ]);
     if (actualizarUrl) {
       const url = new URL(window.location.href);
@@ -809,8 +828,7 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
       fecha: fecha || fechaLocalISO(),
       portal,
       performance,
-      appointments,
-      history
+      appointments
     });
   } catch (error) {
     if (error.status === 401 || error.status === 403) return;
@@ -845,6 +863,46 @@ async function cargarCitasDiaAdmin(id, fecha) {
     empleado: data?.empleado || null,
     citas: Array.isArray(data?.citas) ? data.citas : []
   };
+}
+
+function historialAdminEstaAbierto() {
+  const panel = document.querySelector("#employeePortalPanel .history-panel");
+  return Boolean(panel && !panel.classList.contains("is-collapsed"));
+}
+
+function obtenerOpcionesHistorialAdmin() {
+  const weeks = Math.max(1, Math.min(12, toNumber(document.getElementById("adminHistoryWeeks")?.value, 8)));
+  const fecha = document.getElementById("adminHistoryBaseDate")?.value || document.getElementById("adminWeekDate")?.value || fechaLocalISO();
+  return { weeks, fecha };
+}
+
+async function cargarHistorialAdminIndividual() {
+  if (!state.empleadoSeleccionadoId) return;
+  const list = document.getElementById("adminPerformanceHistoryList");
+  if (list) list.innerHTML = `<div class="empty-state">Cargando historial...</div>`;
+  const { weeks, fecha } = obtenerOpcionesHistorialAdmin();
+  const employeeId = encodeURIComponent(String(state.empleadoSeleccionadoId));
+  const data = await fetchAdmin(`/admin/employees/${employeeId}/performance/history?weeks=${encodeURIComponent(weeks)}&fecha=${encodeURIComponent(fecha)}`);
+  if (list) {
+    list.innerHTML = renderHistorialItemsDashboard(Array.isArray(data?.historial) ? data.historial : []);
+  }
+}
+
+async function toggleHistorialAdminIndividual(forceOpen = null) {
+  const panel = document.querySelector("#employeePortalPanel .history-panel");
+  const list = document.getElementById("adminPerformanceHistoryList");
+  const button = document.querySelector("#employeePortalPanel button[data-action='toggle-performance-history']");
+  if (!panel || !list || !button) return;
+
+  const shouldOpen = forceOpen === null ? panel.classList.contains("is-collapsed") : Boolean(forceOpen);
+  panel.classList.toggle("is-collapsed", !shouldOpen);
+  list.classList.toggle("hidden", !shouldOpen);
+  button.textContent = shouldOpen ? "Ocultar historial" : "Mostrar historial";
+  button.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+
+  if (shouldOpen) {
+    await cargarHistorialAdminIndividual();
+  }
 }
 
 async function cargarEmpleados() {
@@ -932,6 +990,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (nextDay && appointmentsDate) appointmentsDate.value = sumarDiasISO(appointmentsDate.value || fechaLocalISO(), 1);
       const fecha = document.getElementById("adminWeekDate")?.value || fechaLocalISO();
       abrirPortalEmpleado(state.empleadoSeleccionadoId, true, fecha);
+      return;
+    }
+
+    const historyToggle = event.target.closest("button[data-action='toggle-performance-history']");
+    if (historyToggle) {
+      toggleHistorialAdminIndividual().catch(() => {
+        const list = document.getElementById("adminPerformanceHistoryList");
+        if (list) list.innerHTML = `<div class="empty-state">Sin historial de desempeno disponible.</div>`;
+      });
     }
   });
 
@@ -939,6 +1006,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (event.target?.id === "adminAppointmentsDate" && state.empleadoSeleccionadoId) {
       const fecha = document.getElementById("adminWeekDate")?.value || fechaLocalISO();
       abrirPortalEmpleado(state.empleadoSeleccionadoId, true, fecha);
+      return;
+    }
+
+    if ((event.target?.id === "adminHistoryWeeks" || event.target?.id === "adminHistoryBaseDate") && historialAdminEstaAbierto()) {
+      cargarHistorialAdminIndividual().catch(() => {
+        const list = document.getElementById("adminPerformanceHistoryList");
+        if (list) list.innerHTML = `<div class="empty-state">Sin historial de desempeno disponible.</div>`;
+      });
     }
   });
 

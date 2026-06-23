@@ -16,6 +16,47 @@
   max-width: 100%;
 }
 
+@media (min-width: 981px) {
+  body.ww-admin-nav-mounted.employees-page .admin-shell {
+    width: calc(100vw - var(--ww-admin-nav-width) - 72px) !important;
+    max-width: none !important;
+    min-width: 0;
+    margin-left: calc(var(--ww-admin-nav-width) + 54px) !important;
+    margin-right: 18px !important;
+  }
+
+  body.ww-admin-nav-mounted.employees-page .admin-panel,
+  body.ww-admin-nav-mounted.employees-page .admin-employees-card,
+  body.ww-admin-nav-mounted.employees-page .performance-dashboard-card,
+  body.ww-admin-nav-mounted.employees-page .performance-history-card,
+  body.ww-admin-nav-mounted.employees-page #adminPerformanceSection,
+  body.ww-admin-nav-mounted.employees-page #adminPayrollSection {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  body.ww-admin-nav-mounted.employees-page .performance-summary-grid,
+  body.ww-admin-nav-mounted.employees-page .performance-progress-deck,
+  body.ww-admin-nav-mounted.employees-page .admin-orders-header,
+  body.ww-admin-nav-mounted.employees-page .performance-toolbar {
+    min-width: 0;
+  }
+
+  body.ww-admin-nav-mounted.employees-page .admin-table-panel,
+  body.ww-admin-nav-mounted.employees-page .performance-table-panel {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  body.ww-admin-nav-mounted.employees-page .admin-table-scroll {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 .admin-button.is-active,
 .admin-button.admin-button-dark.is-active {
   background-color: #1f2937;
