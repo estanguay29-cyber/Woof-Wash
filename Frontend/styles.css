@@ -2811,6 +2811,10 @@ body {
   object-position: center 35%;
 }
 
+.service-grooming-carousel .carousel-img--vic {
+  object-position: center 30%;
+}
+
 .service-grooming-carousel img:nth-child(1) {
   animation-delay: 0s;
 }
