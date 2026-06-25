@@ -2807,6 +2807,10 @@ body {
   animation: groomingCarouselFade 10.5s infinite;
 }
 
+.service-grooming-carousel .carousel-img--carlos {
+  object-position: center 35%;
+}
+
 .service-grooming-carousel img:nth-child(1) {
   animation-delay: 0s;
 }
