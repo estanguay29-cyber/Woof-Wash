@@ -676,6 +676,100 @@ function toggleFAQ(btn) {
   }
 }
 
+function inicializarJingleWoofWash() {
+  const audio = document.getElementById("woofJingleAudio");
+  const button = document.getElementById("jingleToggleBtn");
+  const label = button?.querySelector(".jingle-toggle-text");
+  const dancePauseButton = document.getElementById("jingleDancePauseBtn");
+  const dance = document.getElementById("jingleDance");
+  const danceFrames = dance ? [...dance.querySelectorAll(".jingle-dance-img")] : [];
+  let danceIntervalId = null;
+  let danceFrameIndex = 0;
+
+  if (!audio || !button || !label) return;
+
+  const resetearBaile = () => {
+    if (danceIntervalId) {
+      clearInterval(danceIntervalId);
+      danceIntervalId = null;
+    }
+
+    danceFrameIndex = 0;
+    if (dance?.contains(document.activeElement)) {
+      button.focus({ preventScroll: true });
+    }
+
+    if (dance) {
+      dance.classList.remove("is-dancing");
+      dance.hidden = true;
+    }
+
+    danceFrames.forEach((frame, index) => {
+      frame.classList.toggle("active", index === 0);
+    });
+  };
+
+  const iniciarBaile = () => {
+    if (!dance || danceFrames.length === 0) return;
+
+    dance.hidden = false;
+    dance.classList.add("is-dancing");
+
+    if (danceIntervalId) return;
+
+    danceIntervalId = setInterval(() => {
+      danceFrameIndex = (danceFrameIndex + 1) % danceFrames.length;
+      danceFrames.forEach((frame, index) => {
+        frame.classList.toggle("active", index === danceFrameIndex);
+      });
+    }, 200);
+  };
+
+  const resetearBoton = () => {
+    button.classList.remove("is-playing");
+    button.setAttribute("aria-pressed", "false");
+    label.textContent = "Escucha nuestro jingle";
+    resetearBaile();
+  };
+
+  const activarBoton = () => {
+    button.classList.add("is-playing");
+    button.setAttribute("aria-pressed", "true");
+    label.textContent = "Pausar jingle";
+    iniciarBaile();
+  };
+
+  button.addEventListener("click", () => {
+    if (!audio.paused) {
+      audio.pause();
+      resetearBoton();
+      return;
+    }
+
+    const reproduccion = audio.play();
+
+    if (reproduccion && typeof reproduccion.then === "function") {
+      reproduccion.then(activarBoton).catch(() => {
+        audio.pause();
+        resetearBoton();
+      });
+      return;
+    }
+
+    activarBoton();
+  });
+
+  dancePauseButton?.addEventListener("click", () => {
+    audio.pause();
+    resetearBoton();
+  });
+
+  audio.addEventListener("ended", resetearBoton);
+  audio.addEventListener("error", resetearBoton);
+}
+
+inicializarJingleWoofWash();
+
 const truckBtns = document.querySelectorAll(".btn-truck");
 
 if (truckBtns.length > 0) {
@@ -868,6 +962,10 @@ function obtenerDiaActualPublico() {
 }
 
 async function cargarZonasServicioPublicas() {
+  if (window.location.protocol === "file:" || window.location.origin === "null") {
+    return;
+  }
+
   try {
     const res = await fetch(`${obtenerApiBase()}/service-zones`, { cache: "no-store" });
     if (!res.ok) throw new Error("No se pudo cargar zonas.");
