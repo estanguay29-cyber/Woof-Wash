@@ -1,24 +1,16 @@
-const PRODUCTOS_CATALOGO = Object.freeze({
-  "shampoo-premium": { id: "shampoo-premium", nombre: "Shampoo Premium", precio: 129, imagen: "img/shampoopremium.jpeg" },
-  "perfume-galan": { id: "perfume-galan", nombre: "Perfume Galán", precio: 99, imagen: "img/perfumepremium.jpeg" },
-  "cepillo-ergonomico": { id: "cepillo-ergonomico", nombre: "Cepillo Ergonómico", precio: 89, imagen: "img/Cepillopremium.jpeg" },
-  "cepillo-desenredante": { id: "cepillo-desenredante", nombre: "Cepillo Desenredante", precio: 119, imagen: "img/desenredante.jpeg" },
-  "toallas-humedas": { id: "toallas-humedas", nombre: "Toallas Húmedas", precio: 79, imagen: "img/toallitas.jpeg" },
-  "cortaunas-pro": { id: "cortaunas-pro", nombre: "Cortauñas Pro", precio: 109, imagen: "img/cortaunas.jpeg" },
-  "collar-antipulgas": { id: "collar-antipulgas", nombre: "Collar Antipulgas", precio: 149, imagen: "img/collaranti.jpeg" },
-  "shampoo-automotriz": { id: "shampoo-automotriz", nombre: "Shampoo Automotriz", precio: 149, imagen: "img/Shampooauto.jpeg" },
-  "cera-liquida": { id: "cera-liquida", nombre: "Cera Líquida", precio: 199, imagen: "img/ceraauto.jpeg" },
-  "aromatizante-premium": { id: "aromatizante-premium", nombre: "Aromatizante Premium", precio: 89, imagen: "img/aromatizante.jpeg" },
-  "limpiador-de-rines": { id: "limpiador-de-rines", nombre: "Limpiador de Rines", precio: 129, imagen: "img/limpiadorderin.jpeg" },
-  "limpiador-de-vidrios": { id: "limpiador-de-vidrios", nombre: "Limpiador de Vidrios", precio: 129, imagen: "img/Limpiadordevidrio.jpeg" },
-  "renovador-de-interiores": { id: "renovador-de-interiores", nombre: "Renovador de Interiores", precio: 139, imagen: "img/Renovadorinteriores.jpeg" },
-  "franelas-de-microfibra": { id: "franelas-de-microfibra", nombre: "Franelas de Microfibra", precio: 150, imagen: "img/Franelas.jpeg" }
-});
+const CATALOGO_PRODUCTOS_MASCOTAS = Object.freeze(window.WoofWashProductos?.mascotaGroups || []);
+const CATALOGO_PRODUCTOS_AUTO = Object.freeze(window.WoofWashProductos?.autoGroups || []);
+const PRODUCTOS_CATALOGO = Object.freeze(window.WoofWashProductos?.catalogo || {});
+const PRODUCTOS_POR_NOMBRE = Object.freeze(window.WoofWashProductos?.porNombre || {});
+const productoMascotaTimers = new Map();
+const productoMascotaResumeTimers = new Map();
+let selectorVarianteProductoState = null;
 
-const PRODUCTOS_POR_NOMBRE = Object.values(PRODUCTOS_CATALOGO).reduce((acc, producto) => {
-  acc[producto.nombre] = producto;
-  return acc;
-}, {});
+const ICONO_CARRITO_PRODUCTO = `
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+  </svg>
+`;
 
 function obtenerProductoPorId(id) {
   return typeof id === "string" ? PRODUCTOS_CATALOGO[id] || null : null;
@@ -26,6 +18,340 @@ function obtenerProductoPorId(id) {
 
 function obtenerProductoPorNombre(nombre) {
   return typeof nombre === "string" ? PRODUCTOS_POR_NOMBRE[nombre] || null : null;
+}
+
+function obtenerProductoPorIdentificador(valor) {
+  if (typeof valor !== "string") return null;
+  return obtenerProductoPorId(valor) || obtenerProductoPorNombre(valor);
+}
+
+function escaparHtmlProducto(valor) {
+  return String(valor ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function obtenerVariantesProductoMascota(producto) {
+  if (!producto) return [];
+
+  if (Array.isArray(producto.variantes) && producto.variantes.length) {
+    return producto.variantes.map((variante) => ({
+      ...producto,
+      ...variante,
+      productoBaseId: producto.id,
+      precio: producto.precio,
+      descripcion: producto.descripcion
+    }));
+  }
+
+  return [{ ...producto, productoBaseId: producto.id, etiqueta: producto.nombre }];
+}
+
+function obtenerColorVarianteProducto(variante) {
+  const etiqueta = (variante?.etiqueta || variante?.nombre || "").toLowerCase();
+
+  if (etiqueta.includes("rosa")) return "#f7a8c8";
+  if (etiqueta.includes("negra")) return "#111827";
+  if (etiqueta.includes("azul")) return "#2563eb";
+  if (etiqueta.includes("roja")) return "#dc2626";
+  if (etiqueta.includes("gris")) return "#9ca3af";
+  if (etiqueta.includes("amarilla")) return "#facc15";
+  if (etiqueta.includes("blanca")) return "#ffffff";
+  if (etiqueta.includes("caf")) return "#8b5e3c";
+  if (etiqueta.includes("verde")) return "#5aa832";
+
+  return "#8cc63f";
+}
+
+function seleccionarVarianteProductoMascota(card, variantId) {
+  if (!card) return;
+
+  const producto = CATALOGO_PRODUCTOS_MASCOTAS.find((item) => item.id === card.dataset.productGroup);
+  if (!producto) return;
+
+  const variantes = obtenerVariantesProductoMascota(producto);
+  const variante = variantes.find((item) => item.id === variantId) || variantes[0];
+  const imagen = card.querySelector("[data-product-image]");
+  const addButton = card.querySelector("[data-product-add]");
+
+  card.dataset.selectedProductId = variante.id;
+  if (imagen) {
+    imagen.src = variante.imagen;
+    imagen.alt = variante.nombre;
+  }
+  if (addButton) addButton.dataset.productId = variante.id;
+
+  card.querySelectorAll("[data-product-chip]").forEach((chip) => {
+    const activo = chip.dataset.productId === variante.id;
+    chip.classList.toggle("is-active", activo);
+    chip.setAttribute("aria-pressed", String(activo));
+  });
+}
+
+function seleccionarVarianteProductoMascotaManual(card, variantId) {
+  seleccionarVarianteProductoMascota(card, variantId);
+  pausarCarruselProductoMascota(card, 9000);
+}
+
+function limpiarCarruselesProductoMascota() {
+  productoMascotaTimers.forEach((timerId) => clearInterval(timerId));
+  productoMascotaResumeTimers.forEach((timerId) => clearTimeout(timerId));
+  productoMascotaTimers.clear();
+  productoMascotaResumeTimers.clear();
+}
+
+function iniciarCarruselProductoMascota(card) {
+  if (!card) return;
+
+  const groupId = card.dataset.productGroup;
+  const producto = CATALOGO_PRODUCTOS_MASCOTAS.find((item) => item.id === groupId);
+  const variantes = obtenerVariantesProductoMascota(producto);
+
+  if (!groupId || variantes.length <= 1 || productoMascotaTimers.has(groupId)) return;
+
+  const timerId = setInterval(() => {
+    const selectedId = card.dataset.selectedProductId;
+    const currentIndex = Math.max(0, variantes.findIndex((item) => item.id === selectedId));
+    const siguiente = variantes[(currentIndex + 1) % variantes.length];
+    seleccionarVarianteProductoMascota(card, siguiente.id);
+  }, 5000);
+
+  productoMascotaTimers.set(groupId, timerId);
+}
+
+function pausarCarruselProductoMascota(card, resumeDelay = 9000) {
+  if (!card) return;
+
+  const groupId = card.dataset.productGroup;
+  if (!groupId) return;
+
+  const timerId = productoMascotaTimers.get(groupId);
+  if (timerId) {
+    clearInterval(timerId);
+    productoMascotaTimers.delete(groupId);
+  }
+
+  const resumeTimerId = productoMascotaResumeTimers.get(groupId);
+  if (resumeTimerId) {
+    clearTimeout(resumeTimerId);
+  }
+
+  productoMascotaResumeTimers.set(groupId, setTimeout(() => {
+    productoMascotaResumeTimers.delete(groupId);
+    if (document.body.contains(card)) {
+      iniciarCarruselProductoMascota(card);
+    }
+  }, resumeDelay));
+}
+
+function crearChipsVariantesProducto(producto, variantes) {
+  if (!Array.isArray(producto.variantes) || variantes.length <= 1) return "";
+
+  return `
+    <div class="product-variant-picker" aria-label="Colores disponibles">
+      <span>Colores</span>
+      <div class="product-variant-chips">
+        ${variantes.map((variante, index) => `
+          <button type="button" class="product-variant-chip ${index === 0 ? "is-active" : ""}" style="--variant-color: ${escaparHtmlProducto(obtenerColorVarianteProducto(variante))}" data-product-chip data-product-id="${escaparHtmlProducto(variante.id)}" aria-label="Ver ${escaparHtmlProducto(variante.nombre)}" aria-pressed="${index === 0 ? "true" : "false"}" onclick="seleccionarVarianteProductoMascotaManual(this.closest('[data-product-card]'), '${escaparHtmlProducto(variante.id)}')"></button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function crearCardProductoMascota(producto, index) {
+  const variantes = obtenerVariantesProductoMascota(producto);
+  const inicial = variantes[0];
+  const badge = index === 0 ? `<div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">NUEVO</div>` : "";
+  const terminosBusqueda = [producto.nombre, ...variantes.map((variante) => variante.nombre), ...variantes.map((variante) => variante.etiqueta || "")]
+    .join(" ")
+    .toLowerCase();
+
+  return `
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white" data-product-card data-product-group="${escaparHtmlProducto(producto.id)}" data-selected-product-id="${escaparHtmlProducto(inicial.id)}" data-product-search="${escaparHtmlProducto(terminosBusqueda)}">
+      ${badge}
+      <div class="product-image-wrap">
+        <img src="${escaparHtmlProducto(inicial.imagen)}" alt="${escaparHtmlProducto(inicial.nombre)}" loading="lazy" decoding="async" class="product-img w-full h-64 object-contain transition duration-700" data-product-image>
+      </div>
+      <div class="product-hover-overlay absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4 leading-snug">${escaparHtmlProducto(producto.descripcion || "")}</p>
+        <button type="button" data-product-add data-product-group="${escaparHtmlProducto(producto.id)}" data-product-id="${escaparHtmlProducto(inicial.id)}" onclick="manejarAgregarProductoMascota(this)" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">${ICONO_CARRITO_PRODUCTO}Añadir al carrito</button>
+      </div>
+      <div class="product-card-body p-4 bg-white"><h3 class="product-name font-bold text-sm">${escaparHtmlProducto(producto.nombre)}</h3><p class="text-[#0b2a6b] font-extrabold mt-1">$${inicial.precio}.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p>${crearChipsVariantesProducto(producto, variantes)}</div>
+    </div>
+  `;
+}
+
+function renderizarProductosMascotas() {
+  const slider = document.getElementById("sliderProductos");
+  if (!slider) return;
+
+  limpiarCarruselesProductoMascota();
+  slider.innerHTML = CATALOGO_PRODUCTOS_MASCOTAS.map(crearCardProductoMascota).join("");
+  slider.querySelectorAll("[data-product-card]").forEach(iniciarCarruselProductoMascota);
+}
+
+function manejarAgregarProductoMascota(btn) {
+  const card = btn?.closest?.("[data-product-card]");
+  const groupId = btn?.dataset?.productGroup || card?.dataset?.productGroup;
+  const producto = CATALOGO_PRODUCTOS_MASCOTAS.find((item) => item.id === groupId);
+  const variantes = obtenerVariantesProductoMascota(producto);
+
+  if (producto && Array.isArray(producto.variantes) && variantes.length > 1) {
+    abrirSelectorVarianteProducto(producto, card, btn);
+    return;
+  }
+
+  const productoId = btn?.dataset?.productId || card?.dataset?.selectedProductId;
+  if (productoId) animarAlCarrito(btn, productoId);
+}
+
+function asegurarModalVarianteProducto() {
+  let modal = document.getElementById("productVariantModal");
+
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "productVariantModal";
+  modal.className = "product-variant-modal hidden";
+  modal.innerHTML = `
+    <div class="product-variant-backdrop" data-product-variant-close></div>
+    <div class="product-variant-dialog" role="dialog" aria-modal="true" aria-labelledby="productVariantTitle">
+      <button type="button" class="product-variant-close" aria-label="Cerrar selector de variante" data-product-variant-close>&times;</button>
+      <div class="product-variant-dialog-head">
+        <span>Elige una variante</span>
+        <h3 id="productVariantTitle"></h3>
+      </div>
+      <div class="product-variant-options" id="productVariantOptions"></div>
+      <div class="product-variant-actions">
+        <button type="button" class="product-variant-cancel" data-product-variant-close>Cancelar</button>
+        <button type="button" class="product-variant-confirm" onclick="confirmarSelectorVarianteProducto()">${ICONO_CARRITO_PRODUCTO}Agregar al carrito</button>
+      </div>
+    </div>
+  `;
+
+  modal.addEventListener("click", (event) => {
+    if (event.target.closest("[data-product-variant-close]")) {
+      cerrarSelectorVarianteProducto();
+    }
+  });
+
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function renderizarOpcionesSelectorVariante() {
+  const modal = document.getElementById("productVariantModal");
+  const options = document.getElementById("productVariantOptions");
+  if (!modal || !options || !selectorVarianteProductoState) return;
+
+  const { variantes, selectedId } = selectorVarianteProductoState;
+  options.innerHTML = variantes.map((variante) => {
+    const seleccionado = variante.id === selectedId;
+
+    return `
+      <button type="button" class="product-variant-option ${seleccionado ? "is-selected" : ""}" data-variant-id="${escaparHtmlProducto(variante.id)}" aria-pressed="${seleccionado ? "true" : "false"}" onclick="seleccionarVarianteEnModalProducto('${escaparHtmlProducto(variante.id)}')">
+        <span class="product-variant-option-image"><img src="${escaparHtmlProducto(variante.imagen || "img/Original.png")}" alt="${escaparHtmlProducto(variante.nombre)}"></span>
+        <span class="product-variant-option-copy">
+          <strong>${escaparHtmlProducto(variante.nombre)}</strong>
+          <small>$${escaparHtmlProducto(variante.precio)} MXN</small>
+        </span>
+        <span class="product-variant-swatch" style="--variant-color: ${escaparHtmlProducto(obtenerColorVarianteProducto(variante))}"></span>
+        <span class="product-variant-check" aria-hidden="true">✓</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function abrirSelectorVarianteProducto(producto, card, triggerBtn) {
+  const variantes = obtenerVariantesProductoMascota(producto);
+  if (!producto || variantes.length <= 1) return;
+
+  const selectedId = card?.dataset?.selectedProductId || variantes[0].id;
+  selectorVarianteProductoState = {
+    producto,
+    card,
+    triggerBtn,
+    variantes,
+    selectedId
+  };
+
+  const modal = asegurarModalVarianteProducto();
+  const title = document.getElementById("productVariantTitle");
+  if (title) title.textContent = producto.nombre;
+
+  renderizarOpcionesSelectorVariante();
+  modal.classList.remove("hidden");
+
+  const selectedOption = modal.querySelector(".product-variant-option.is-selected");
+  const firstOption = modal.querySelector(".product-variant-option");
+  (selectedOption || firstOption)?.focus({ preventScroll: true });
+}
+
+function cerrarSelectorVarianteProducto() {
+  const modal = document.getElementById("productVariantModal");
+  if (!modal) return;
+
+  if (modal.contains(document.activeElement)) {
+    selectorVarianteProductoState?.triggerBtn?.focus?.({ preventScroll: true });
+  }
+
+  modal.classList.add("hidden");
+  selectorVarianteProductoState = null;
+}
+
+function seleccionarVarianteEnModalProducto(variantId) {
+  if (!selectorVarianteProductoState) return;
+
+  selectorVarianteProductoState.selectedId = variantId;
+  if (selectorVarianteProductoState.card) {
+    seleccionarVarianteProductoMascota(selectorVarianteProductoState.card, variantId);
+    pausarCarruselProductoMascota(selectorVarianteProductoState.card, 9000);
+  }
+
+  renderizarOpcionesSelectorVariante();
+}
+
+function confirmarSelectorVarianteProducto() {
+  if (!selectorVarianteProductoState) return;
+
+  const { selectedId, triggerBtn } = selectorVarianteProductoState;
+  cerrarSelectorVarianteProducto();
+
+  if (selectedId) {
+    animarAlCarrito(triggerBtn, selectedId);
+  }
+}
+
+function crearCardProductoAuto(producto) {
+  const badge = producto.badge
+    ? `<div class="absolute top-3 right-3 z-10 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm" style="background:${escaparHtmlProducto(producto.badgeColor || "#0b2a6b")}">${escaparHtmlProducto(producto.badge)}</div>`
+    : "";
+
+  return `
+    <div class="min-w-full md:min-w-[48%] lg:min-w-[calc(25%-0.75rem)] snap-center group relative overflow-hidden rounded-2xl shadow-md hover:shadow-xl transition-all duration-500 bg-white" data-auto-product-card data-product-search="${escaparHtmlProducto([producto.nombre, producto.descripcion || ""].join(" ").toLowerCase())}">
+      ${badge}
+      <img src="${escaparHtmlProducto(producto.imagen)}" alt="${escaparHtmlProducto(producto.nombre)}" loading="lazy" decoding="async" class="product-img w-full h-64 object-cover transition duration-700 group-hover:scale-110">
+      <div class="absolute inset-0 bg-gradient-to-t from-[#0b2a6b] via-[#0b2a6b]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5 text-white">
+        <p class="text-xs italic mb-4 leading-snug">${escaparHtmlProducto(producto.descripcion || "")}</p>
+        <button type="button" onclick="animarAlCarrito(this, '${escaparHtmlProducto(producto.id)}')" class="bg-[#8cc63f] text-white text-xs font-bold py-2 rounded-full hover:scale-105 transition shadow-md flex items-center justify-center gap-2">${ICONO_CARRITO_PRODUCTO}Añadir al carrito</button>
+      </div>
+      <div class="p-4 bg-white">
+        <h3 class="product-name font-bold text-sm">${escaparHtmlProducto(producto.nombre)}</h3>
+        <p class="text-[#0b2a6b] font-extrabold mt-1">$${escaparHtmlProducto(producto.precio)}.00 <span class="text-[10px] text-gray-400 font-normal ml-1">MXN</span></p>
+      </div>
+    </div>
+  `;
+}
+
+function renderizarProductosAuto() {
+  const slider = document.getElementById("sliderAutos");
+  if (!slider) return;
+
+  slider.innerHTML = CATALOGO_PRODUCTOS_AUTO.map(crearCardProductoAuto).join("");
 }
 
 function normalizarCarritoLocal(items) {
@@ -41,9 +367,6 @@ function normalizarCarritoLocal(items) {
 
     acc.push({
       id: producto.id,
-      nombre: producto.nombre,
-      precio: producto.precio,
-      imagen: producto.imagen,
       cantidad
     });
 
@@ -61,18 +384,13 @@ const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
   "admin.html",
   "agenda.html",
   "empleados.html",
-  "empleados/portal.html",
-  "empleados/dashboard.html",
   "checkout.html",
   "perfil.html"
 ]);
 
 function obtenerRutaAuthRedirectSegura(fallback = "index.html") {
   const pathname = window.location.pathname || "";
-  const partes = pathname.split("/").filter(Boolean);
-  const archivo = partes.pop() || "index.html";
-  const carpeta = partes.pop() || "";
-  const ruta = carpeta === "empleados" ? `${carpeta}/${archivo}` : archivo;
+  const ruta = pathname.split("/").filter(Boolean).pop() || "index.html";
   return RUTAS_AUTH_REDIRECT_PERMITIDAS.has(ruta) ? ruta : fallback;
 }
 
@@ -85,10 +403,6 @@ function obtenerNombreGuardado() {
   return localStorage.getItem("usuario");
 }
 
-function obtenerRoleGuardado() {
-  return (localStorage.getItem("role") || localStorage.getItem("userRole") || "").trim().toLowerCase();
-}
-
 function guardarNombreUsuario(usuario) {
   if (usuario) {
     localStorage.setItem("usuario", usuario);
@@ -98,8 +412,6 @@ function guardarNombreUsuario(usuario) {
 function limpiarSesion() {
   localStorage.removeItem("token");
   localStorage.removeItem("usuario");
-  localStorage.removeItem("role");
-  localStorage.removeItem("userRole");
 }
 
 function manejarRespuestaAuthCliente(res, data = {}, options = {}) {
@@ -196,35 +508,10 @@ function renderizarAccesosAdmin(esAdmin) {
   adminAccountActions.classList.toggle("hidden", !esAdmin);
 }
 
-function renderizarAccesosEmpleado(esEmpleado) {
-  const employeeAccountActions = document.getElementById("employeeAccountActions");
-  if (!employeeAccountActions) return;
-
-  employeeAccountActions.classList.toggle("hidden", !esEmpleado);
-}
-
-function renderizarAccesosCuentaPorRole() {
-  const role = obtenerRoleGuardado();
-  renderizarAccesosEmpleado(role === "empleado");
-  if (role === "empleado") {
-    renderizarAccesosAdmin(false);
-  }
-}
-
 async function validarAccesosAdmin() {
   const token = obtenerTokenValido();
-  const role = obtenerRoleGuardado();
-
-  renderizarAccesosEmpleado(Boolean(token) && role === "empleado");
 
   if (!token) {
-    adminValidado = false;
-    tokenAdminValidado = null;
-    renderizarAccesosAdmin(false);
-    return false;
-  }
-
-  if (role === "empleado") {
     adminValidado = false;
     tokenAdminValidado = null;
     renderizarAccesosAdmin(false);
@@ -335,8 +622,8 @@ function animacionAgregar() {
 }
 
 // AGREGAR PRODUCTO
-function agregarCarrito(nombre, precio, btn) {
-  const producto = obtenerProductoPorNombre(nombre);
+function agregarCarrito(identificador, btn) {
+  const producto = obtenerProductoPorIdentificador(identificador);
 
   if (!producto) return;
 
@@ -347,9 +634,6 @@ function agregarCarrito(nombre, precio, btn) {
   } else {
     carrito.push({
       id: producto.id,
-      nombre: producto.nombre,
-      precio: producto.precio,
-      imagen: producto.imagen,
       cantidad: 1
     });
   }
@@ -360,14 +644,14 @@ function agregarCarrito(nombre, precio, btn) {
 
   // EFECTO VISUAL EN BOTÓN
   if (btn) {
-    const textoOriginal = btn.innerText;
+    const contenidoOriginal = btn.innerHTML;
 
-    btn.innerText = "✔ Agregado";
+    btn.innerHTML = "✓ Agregado";
     btn.classList.add("bg-green-400");
     btn.disabled = true;
 
     setTimeout(() => {
-      btn.innerText = textoOriginal;
+      btn.innerHTML = contenidoOriginal;
       btn.classList.remove("bg-green-400");
       btn.disabled = false;
     }, 1500);
@@ -492,9 +776,7 @@ if (!token) {
   adminValidado = false;
   tokenAdminValidado = null;
   renderizarAccesosAdmin(false);
-  renderizarAccesosEmpleado(false);
-} else {
-  renderizarAccesosCuentaPorRole();
+  renderizarTarjetaFidelidad(null);
 }
 
 if (menuCuentaUsuario && token) {
@@ -551,7 +833,10 @@ if (carrito.length === 0) {
   if (btnVaciar) btnVaciar.classList.remove("hidden");
 
   carrito.forEach(item => {
-    const subtotal = item.precio * item.cantidad;
+    const producto = obtenerProductoPorId(item.id);
+    if (!producto) return;
+
+    const subtotal = producto.precio * item.cantidad;
     total += subtotal;
 
     lista.innerHTML += `
@@ -559,11 +844,11 @@ if (carrito.length === 0) {
         <div class="flex justify-between items-start gap-3">
           <div class="flex min-w-0 items-center gap-3">
             <div class="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-[#0b2a6b]/10 bg-[#f8fbff] shadow-[0_8px_20px_rgba(11,42,107,0.08)]">
-              <img src="${item.imagen || "img/Original.png"}" alt="${item.nombre}" class="h-full w-full object-cover">
+              <img src="${producto.imagen || "img/Original.png"}" alt="${producto.nombre}" class="h-full w-full object-cover">
             </div>
             <div class="min-w-0">
-              <p class="truncate font-semibold text-[#0b2a6b]">${item.nombre}</p>
-              <p class="text-xs text-slate-500 mt-1">$${item.precio} MXN c/u</p>
+              <p class="truncate font-semibold text-[#0b2a6b]">${producto.nombre}</p>
+              <p class="text-xs text-slate-500 mt-1">$${producto.precio} MXN c/u</p>
             </div>
           </div>
           <span class="shrink-0 text-sm font-bold text-[#0b2a6b]">$${subtotal}</span>
@@ -580,7 +865,6 @@ if (carrito.length === 0) {
       </div>
     `;
   });
-
   totalHTML.innerText = total;
 
   const totalItems = carrito.reduce((acc, item) => acc + item.cantidad, 0);
@@ -676,100 +960,6 @@ function toggleFAQ(btn) {
   }
 }
 
-function inicializarJingleWoofWash() {
-  const audio = document.getElementById("woofJingleAudio");
-  const button = document.getElementById("jingleToggleBtn");
-  const label = button?.querySelector(".jingle-toggle-text");
-  const dancePauseButton = document.getElementById("jingleDancePauseBtn");
-  const dance = document.getElementById("jingleDance");
-  const danceFrames = dance ? [...dance.querySelectorAll(".jingle-dance-img")] : [];
-  let danceIntervalId = null;
-  let danceFrameIndex = 0;
-
-  if (!audio || !button || !label) return;
-
-  const resetearBaile = () => {
-    if (danceIntervalId) {
-      clearInterval(danceIntervalId);
-      danceIntervalId = null;
-    }
-
-    danceFrameIndex = 0;
-    if (dance?.contains(document.activeElement)) {
-      button.focus({ preventScroll: true });
-    }
-
-    if (dance) {
-      dance.classList.remove("is-dancing");
-      dance.hidden = true;
-    }
-
-    danceFrames.forEach((frame, index) => {
-      frame.classList.toggle("active", index === 0);
-    });
-  };
-
-  const iniciarBaile = () => {
-    if (!dance || danceFrames.length === 0) return;
-
-    dance.hidden = false;
-    dance.classList.add("is-dancing");
-
-    if (danceIntervalId) return;
-
-    danceIntervalId = setInterval(() => {
-      danceFrameIndex = (danceFrameIndex + 1) % danceFrames.length;
-      danceFrames.forEach((frame, index) => {
-        frame.classList.toggle("active", index === danceFrameIndex);
-      });
-    }, 200);
-  };
-
-  const resetearBoton = () => {
-    button.classList.remove("is-playing");
-    button.setAttribute("aria-pressed", "false");
-    label.textContent = "Escucha nuestro jingle";
-    resetearBaile();
-  };
-
-  const activarBoton = () => {
-    button.classList.add("is-playing");
-    button.setAttribute("aria-pressed", "true");
-    label.textContent = "Pausar jingle";
-    iniciarBaile();
-  };
-
-  button.addEventListener("click", () => {
-    if (!audio.paused) {
-      audio.pause();
-      resetearBoton();
-      return;
-    }
-
-    const reproduccion = audio.play();
-
-    if (reproduccion && typeof reproduccion.then === "function") {
-      reproduccion.then(activarBoton).catch(() => {
-        audio.pause();
-        resetearBoton();
-      });
-      return;
-    }
-
-    activarBoton();
-  });
-
-  dancePauseButton?.addEventListener("click", () => {
-    audio.pause();
-    resetearBoton();
-  });
-
-  audio.addEventListener("ended", resetearBoton);
-  audio.addEventListener("error", resetearBoton);
-}
-
-inicializarJingleWoofWash();
-
 const truckBtns = document.querySelectorAll(".btn-truck");
 
 if (truckBtns.length > 0) {
@@ -842,10 +1032,10 @@ function scrollProductos(direction) {
   });
 }
 
-function animarAlCarrito(btn, nombre, precio) {
-  // 1. Tu lógica de agregar producto
+function animarAlCarrito(btn, identificador) {
+  // 1. L?gica de agregar producto
   if (typeof agregarCarrito === "function") {
-    agregarCarrito(nombre, precio, btn);
+    agregarCarrito(identificador, btn);
   }
 
   // 2. Lógica de vuelo
@@ -956,13 +1146,12 @@ function obtenerReglaZonaPublica(dia = hoy) {
   return { ...regla, zone: zona };
 }
 
-function obtenerDiaActualPublico() {
-  const dia = new Date().toLocaleDateString("es-MX", { weekday: "long" });
-  return dia ? dia.charAt(0).toUpperCase() + dia.slice(1) : "";
-}
-
 async function cargarZonasServicioPublicas() {
-  if (window.location.protocol === "file:" || window.location.origin === "null") {
+  if (window.location.protocol === "file:") {
+    zonasServicioConfig = {
+      zones: zonasServicioFallback,
+      rulesByDay: zonasServicioConfig.rulesByDay
+    };
     return;
   }
 
@@ -986,18 +1175,20 @@ function crearImagenZonaPublica(zona) {
   return `
     <figure class="zone-card-preview">
       <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa de cobertura ${escapeHtmlPublico(label)} - ${escapeHtmlPublico(nombre)}" loading="lazy" decoding="async" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
+      <span class="zone-map-fallback">Mapa pendiente</span>
     </figure>
   `;
 }
 
 function crearImagenZonaGrandePublica(zona) {
   if (!zona?.mapImage) {
-    return `<div class="zones-map-empty" aria-hidden="true"></div>`;
+    return `<div class="zones-map-empty">Mapa pendiente</div>`;
   }
 
   return `
     <figure class="zones-map-figure">
       <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa ampliado de cobertura ${escapeHtmlPublico(zona.label || "Zona")} - ${escapeHtmlPublico(zona.nombre || "")}" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
+      <span class="zone-map-fallback">Mapa pendiente</span>
     </figure>
   `;
 }
@@ -1007,17 +1198,12 @@ function renderizarZonaHoyPublica() {
   if (!zonaHTML) return;
 
   const regla = obtenerReglaZonaPublica(hoy);
-  const diaActual = obtenerDiaActualPublico();
   if (regla.esDescanso) {
-    zonaHTML.innerHTML = `
-      <span class="block text-xs uppercase font-bold tracking-[0.14em] text-[#8cc63f]">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
-      Hoy descansamos. Consulta las zonas activas de lunes a sábado.
-    `;
+    zonaHTML.innerHTML = "Hoy descansamos. Consulta las zonas activas de lunes a sábado.";
     return;
   }
 
   zonaHTML.innerHTML = `
-    <span class="block text-xs uppercase font-bold tracking-[0.14em] text-[#8cc63f]">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
     Hoy atendemos <span class="text-[#0b2a6b] font-semibold">${escapeHtmlPublico(regla.zone?.label || regla.zona)}</span>
     <span class="block text-xs md:text-sm text-gray-500">${escapeHtmlPublico(regla.zone?.nombre || "")}</span>
     ${crearImagenZonaPublica(regla.zone)}
@@ -1068,11 +1254,10 @@ function renderizarZonaDestacadaPublica() {
   if (!destino) return;
 
   const item = obtenerReglaZonaPublica(hoy);
-  const diaActual = obtenerDiaActualPublico();
   if (item.esDescanso) {
     destino.innerHTML = `
       <section class="zones-today-panel is-rest">
-        <span class="zone-status">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
+        <span class="zone-status">Hoy</span>
         <h4>${escapeHtmlPublico(item.dia)} de descanso</h4>
         <p>Descanso - no hay servicio programado.</p>
       </section>
@@ -1084,7 +1269,7 @@ function renderizarZonaDestacadaPublica() {
   destino.innerHTML = `
     <section class="zones-today-panel">
       <div class="zones-today-copy">
-        <span class="zone-status">Zona de hoy &middot; ${escapeHtmlPublico(diaActual)}</span>
+        <span class="zone-status">Hoy</span>
         <h4>${escapeHtmlPublico(zona.label || item.zona)}</h4>
         <p>${escapeHtmlPublico(zona.nombre || "")}</p>
         <button type="button" class="zone-map-button is-primary" onclick="abrirMapaZonaPublica(${hoy})">Ver mapa</button>
@@ -1144,6 +1329,12 @@ function cerrarZonas() {
 }
 
 document.addEventListener("keydown", (event) => {
+  const variantModal = document.getElementById("productVariantModal");
+  if (event.key === "Escape" && variantModal && !variantModal.classList.contains("hidden")) {
+    cerrarSelectorVarianteProducto();
+    return;
+  }
+
   const modal = document.getElementById("modalZonas");
   if (event.key === "Escape" && modal && !modal.classList.contains("pointer-events-none")) {
     cerrarZonas();
@@ -1210,6 +1401,87 @@ function scrollProductosAutos(dir) {
   slider.scrollBy({ left: dir * 300, behavior: "smooth" });
 }
 
+function normalizarFidelidadItem(item = {}) {
+  const objetivo = Number(item.objetivo) || 8;
+  const completados = Math.max(0, Number(item.completados) || 0);
+  return {
+    completados,
+    objetivo,
+    restantes: Math.max(objetivo - completados, 0),
+    rewardEligible: Boolean(item.rewardEligible || completados >= objetivo)
+  };
+}
+
+function crearHuellasFidelidad(item) {
+  return Array.from({ length: item.objetivo }, (_, index) => (
+    `<span class="loyalty-paw ${index < item.completados ? "is-filled" : ""}" aria-hidden="true">●</span>`
+  )).join("");
+}
+
+function renderizarTarjetaFidelidad(loyalty = null) {
+  const section = document.getElementById("loyaltySection");
+  const content = document.getElementById("loyaltyContent");
+  const status = document.getElementById("loyaltyStatus");
+  if (!section || !content || !status) return;
+
+  if (!loyalty) {
+    section.classList.add("hidden");
+    content.innerHTML = "";
+    status.textContent = "0/8";
+    return;
+  }
+
+  const mascota = normalizarFidelidadItem(loyalty.mascota);
+  const auto = normalizarFidelidadItem(loyalty.auto);
+  const principal = mascota.rewardEligible ? mascota : auto.rewardEligible ? auto : (mascota.completados >= auto.completados ? mascota : auto);
+  status.textContent = `${Math.min(principal.completados, principal.objetivo)}/${principal.objetivo}`;
+
+  const renderItem = (titulo, item) => `
+    <article class="loyalty-progress ${item.rewardEligible ? "is-ready" : ""}">
+      <div class="loyalty-progress-title">
+        <strong>${titulo}</strong>
+        <span>${Math.min(item.completados, item.objetivo)}/${item.objetivo}</span>
+      </div>
+      <div class="loyalty-paws" aria-label="${item.completados} de ${item.objetivo} servicios">
+        ${crearHuellasFidelidad(item)}
+      </div>
+      <p>${item.rewardEligible ? "¡Tienes un servicio gratis disponible!" : `Te faltan ${item.restantes} servicios para tu recompensa.`}</p>
+    </article>
+  `;
+
+  content.innerHTML = [
+    renderItem("Mascota", mascota),
+    renderItem("Auto", auto)
+  ].join("");
+  section.classList.remove("hidden");
+}
+
+async function cargarFidelidadCliente() {
+  const token = obtenerTokenValido();
+  if (!token) {
+    renderizarTarjetaFidelidad(null);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${obtenerApiBase()}/cliente/loyalty`, {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      renderizarTarjetaFidelidad(null);
+      return;
+    }
+
+    renderizarTarjetaFidelidad(data);
+  } catch (err) {
+    renderizarTarjetaFidelidad(null);
+  }
+}
+
 function toggleSubmenu() {
   const submenu = document.getElementById("submenuMobile");
   if (submenu) {
@@ -1219,7 +1491,10 @@ function toggleSubmenu() {
 
 async function obtenerPerfil() {
   const token = obtenerTokenValido();
-  if (!token) return;
+  if (!token) {
+    renderizarTarjetaFidelidad(null);
+    return;
+  }
 
   try {
     const res = await fetch(`${obtenerApiBase()}/perfil`, {
@@ -1239,6 +1514,7 @@ async function obtenerPerfil() {
       guardarNombreUsuario(data.user.usuario);
       actualizarCarrito();
     }
+    cargarFidelidadCliente();
   } catch (err) {
     console.log("Backend no disponible (normal si no está prendido)");
   }
@@ -1658,7 +1934,7 @@ function renderizarPedidos(pedidos) {
   pedidosActuales = Array.isArray(pedidos) ? pedidos : [];
 
   if (!pedidosActuales.length) {
-    listaPedidos.innerHTML = "<p class='text-gray-500'>AÃºn no tienes pedidos registrados.</p>";
+    listaPedidos.innerHTML = "<p class='text-gray-500'>A?n no tienes pedidos registrados.</p>";
     return;
   }
 
@@ -1807,6 +2083,90 @@ async function cargarPedidos() {
   }
 }
 
+function inicializarJingleWoofWash() {
+  const audio = document.getElementById("woofJingleAudio");
+  const toggleBtn = document.getElementById("jingleToggleBtn");
+  const dance = document.getElementById("jingleDance");
+  const pauseBtn = document.getElementById("jingleDancePauseBtn");
+  const text = toggleBtn?.querySelector(".jingle-toggle-text");
+  const frames = dance ? Array.from(dance.querySelectorAll(".jingle-dance-img")) : [];
+  let frameTimer = null;
+  let frameIndex = 0;
+
+  if (!audio || !toggleBtn || toggleBtn.dataset.jingleReady === "true") return;
+
+  const detenerAnimacion = () => {
+    if (frameTimer) {
+      clearInterval(frameTimer);
+      frameTimer = null;
+    }
+  };
+
+  const activarFrame = (index) => {
+    frames.forEach((frame, framePosition) => {
+      frame.classList.toggle("active", framePosition === index);
+    });
+  };
+
+  const iniciarAnimacion = () => {
+    if (!dance) return;
+
+    dance.hidden = false;
+    dance.classList.add("is-dancing");
+    activarFrame(frameIndex);
+
+    detenerAnimacion();
+    frameTimer = setInterval(() => {
+      frameIndex = (frameIndex + 1) % Math.max(frames.length, 1);
+      activarFrame(frameIndex);
+    }, 180);
+  };
+
+  const sincronizarEstado = () => {
+    const reproduciendo = !audio.paused && !audio.ended;
+
+    toggleBtn.classList.toggle("is-playing", reproduciendo);
+    toggleBtn.setAttribute("aria-pressed", String(reproduciendo));
+    if (text) text.textContent = reproduciendo ? "Pausar jingle" : "Escucha nuestro jingle";
+
+    if (reproduciendo) {
+      iniciarAnimacion();
+      return;
+    }
+
+    detenerAnimacion();
+    if (dance) {
+      dance.classList.remove("is-dancing");
+      dance.hidden = true;
+    }
+  };
+
+  const pausarJingle = () => {
+    audio.pause();
+    sincronizarEstado();
+  };
+
+  toggleBtn.dataset.jingleReady = "true";
+  toggleBtn.addEventListener("click", () => {
+    if (!audio.paused && !audio.ended) {
+      pausarJingle();
+      return;
+    }
+
+    audio.play().then(sincronizarEstado).catch(sincronizarEstado);
+  });
+
+  pauseBtn?.addEventListener("click", pausarJingle);
+  audio.addEventListener("play", sincronizarEstado);
+  audio.addEventListener("pause", sincronizarEstado);
+  audio.addEventListener("ended", () => {
+    audio.currentTime = 0;
+    sincronizarEstado();
+  });
+
+  sincronizarEstado();
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const loader = document.getElementById("loader");
 
@@ -1820,6 +2180,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await cargarZonasServicioPublicas();
   renderizarZonaHoyPublica();
+  renderizarProductosMascotas();
+  renderizarProductosAuto();
+  inicializarJingleWoofWash();
 
   const inputProductos = document.getElementById("buscadorProductos");
 
@@ -1829,7 +2192,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const productos = document.querySelectorAll("#sliderProductos > div");
 
       productos.forEach(producto => {
-        const nombre = producto.querySelector(".product-name")?.innerText.toLowerCase() || "";
+        const nombre = producto.dataset.productSearch || producto.querySelector(".product-name")?.innerText.toLowerCase() || "";
 
         if (nombre.includes(filtro)) {
           producto.classList.remove("hidden");
@@ -1848,7 +2211,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       document.querySelectorAll("#sliderAutos > div")
         .forEach(producto => {
-          const nombre = producto.querySelector(".product-name")?.innerText.toLowerCase() || "";
+          const nombre = producto.dataset.productSearch || producto.querySelector(".product-name")?.innerText.toLowerCase() || "";
           producto.classList.toggle("hidden", !nombre.includes(filtro));
         });
     });
@@ -1901,7 +2264,6 @@ function toggleMenuCuenta() {
   const menu = document.getElementById("menuCuenta");
   if (!menu) return;
   menu.classList.toggle("hidden");
-  renderizarAccesosCuentaPorRole();
   validarAccesosAdmin();
 }
 

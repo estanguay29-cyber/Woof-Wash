@@ -67,13 +67,29 @@ const authAttempts = new Map();
 const sensitiveActionAttempts = new Map();
 let mailTransporterPromise = null;
 const PRODUCT_CATALOG = Object.freeze({
-  "shampoo-premium": { id: "shampoo-premium", nombre: "Shampoo Premium", precio: 12900 },
-  "perfume-galan": { id: "perfume-galan", nombre: "Perfume Galán", precio: 9900 },
-  "cepillo-ergonomico": { id: "cepillo-ergonomico", nombre: "Cepillo Ergonómico", precio: 8900 },
-  "cepillo-desenredante": { id: "cepillo-desenredante", nombre: "Cepillo Desenredante", precio: 11900 },
-  "toallas-humedas": { id: "toallas-humedas", nombre: "Toallas Húmedas", precio: 7900 },
-  "cortaunas-pro": { id: "cortaunas-pro", nombre: "Cortauñas Pro", precio: 10900 },
-  "collar-antipulgas": { id: "collar-antipulgas", nombre: "Collar Antipulgas", precio: 14900 },
+  "peluche-jirafa": { id: "peluche-jirafa", nombre: "Peluche jirafa", precio: 16000 },
+  "peluche-perro-cafe": { id: "peluche-perro-cafe", nombre: "Peluche perro café", precio: 16000 },
+  "peluche-burro-azul": { id: "peluche-burro-azul", nombre: "Peluche burro azul", precio: 16000 },
+  "peluche-burro-gris": { id: "peluche-burro-gris", nombre: "Peluche burro gris", precio: 16000 },
+  "peluche-perro-verde": { id: "peluche-perro-verde", nombre: "Peluche perro verde", precio: 16000 },
+  "bolsita-para-premios": { id: "bolsita-para-premios", nombre: "Bolsita para premios", precio: 13000 },
+  "peluche-mono-arcoiris": { id: "peluche-mono-arcoiris", nombre: "Peluche moño arcoíris", precio: 4400 },
+  "peluche-estrella-azul": { id: "peluche-estrella-azul", nombre: "Peluche estrella azul", precio: 4400 },
+  "peluche-estrella-amarilla": { id: "peluche-estrella-amarilla", nombre: "Peluche estrella amarilla", precio: 4400 },
+  "peluche-muslo-pollo": { id: "peluche-muslo-pollo", nombre: "Peluche muslo de pollo", precio: 4400 },
+  "peluche-fresa": { id: "peluche-fresa", nombre: "Peluche fresa", precio: 4400 },
+  "plato-extensible": { id: "plato-extensible", nombre: "Plato extensible", precio: 17000 },
+  "juguete-cuerda-larga": { id: "juguete-cuerda-larga", nombre: "Juguete cuerda larga", precio: 7400 },
+  "juguete-cuerda-mediana": { id: "juguete-cuerda-mediana", nombre: "Juguete cuerda mediana", precio: 7400 },
+  "juguete-cuerda-redonda": { id: "juguete-cuerda-redonda", nombre: "Juguete cuerda redonda", precio: 7400 },
+  "correa-rosa": { id: "correa-rosa", nombre: "Correa rosa", precio: 9000 },
+  "correa-negra": { id: "correa-negra", nombre: "Correa negra", precio: 9000 },
+  "correa-azul": { id: "correa-azul", nombre: "Correa azul", precio: 9000 },
+  "correa-roja": { id: "correa-roja", nombre: "Correa roja", precio: 9000 },
+  "peluche-hueso-arcoiris": { id: "peluche-hueso-arcoiris", nombre: "Peluche hueso arcoíris", precio: 4400 },
+  "peluche-nube-blanca": { id: "peluche-nube-blanca", nombre: "Peluche nube blanca", precio: 4400 },
+  "peluche-nube-rosa": { id: "peluche-nube-rosa", nombre: "Peluche nube rosa", precio: 4400 },
+  "peluche-corazon-rosa": { id: "peluche-corazon-rosa", nombre: "Peluche corazón rosa", precio: 4400 },
   "shampoo-automotriz": { id: "shampoo-automotriz", nombre: "Shampoo Automotriz", precio: 14900 },
   "cera-liquida": { id: "cera-liquida", nombre: "Cera Líquida", precio: 19900 },
   "aromatizante-premium": { id: "aromatizante-premium", nombre: "Aromatizante Premium", precio: 8900 },
@@ -631,7 +647,6 @@ function generarSugerenciasUsuario(baseUsuario) {
 function obtenerProductoCatalogo(productId) {
   if (typeof productId !== "string") return null;
   const id = productId.trim();
-  if (id === "spray-desenredante") return PRODUCT_CATALOG["cepillo-desenredante"] || null;
   return PRODUCT_CATALOG[id] || null;
 }
 
@@ -1259,7 +1274,7 @@ function normalizarZonaAgenda(value) {
     normalizarServicioKey(item.nombre) === zonaKey
   ));
   if (zonaOficial) return zonaOficial.value;
-  if (zona === "Tonalá" || zona === "TonalÃ¡" || zona === "Tonala") return "Tonala";
+  if (zona === "Tonalá" || zona === "Tonala¡" || zona === "Tonala") return "Tonala";
   return zona;
 }
 
@@ -1332,6 +1347,46 @@ function crearProgresoRecompensasAgenda(citas = []) {
   });
 
   return resumen;
+}
+
+function construirResumenFidelidad(progreso = {}) {
+  return ["mascota", "auto"].reduce((acc, tipo) => {
+    const item = progreso[tipo] || {};
+    const completados = Number(item.cantidad) || 0;
+    const objetivo = Number(item.objetivo) || 8;
+    acc[tipo] = {
+      completados,
+      objetivo,
+      restantes: Math.max(objetivo - completados, 0),
+      rewardEligible: completados >= objetivo
+    };
+    return acc;
+  }, {});
+}
+
+async function construirFidelidadClientePorEmail(email) {
+  const emailNormalizado = normalizarEmail(email);
+
+  if (!emailNormalizado || !validarEmail(emailNormalizado)) {
+    return {
+      email: "",
+      mascota: { completados: 0, objetivo: 8, restantes: 8, rewardEligible: false },
+      auto: { completados: 0, objetivo: 8, restantes: 8, rewardEligible: false }
+    };
+  }
+
+  const citasCompletadas = await Appointment.find({
+    clienteEmail: emailNormalizado,
+    estado: "completada",
+    rewardGratisAplicado: { $ne: true },
+    rewardConsumido: { $ne: true }
+  }).select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey");
+  const progreso = construirResumenFidelidad(crearProgresoRecompensasAgenda(citasCompletadas));
+
+  return {
+    email: emailNormalizado,
+    ...progreso
+  };
 }
 
 async function obtenerServiciosElegiblesRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
@@ -2259,6 +2314,10 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     errores.push("clienteEmail no es valido");
   }
 
+  if (datos.clienteEmail) {
+    datos.clienteEmail = normalizarEmail(datos.clienteEmail);
+  }
+
   if (datos.clienteTelefono) {
     datos.clienteTelefono = normalizarTelefonoAgenda(datos.clienteTelefono);
     if (!datos.clienteTelefono) {
@@ -2441,6 +2500,11 @@ function construirCitaEmpleado(cita) {
     finServicioAt: base.finServicioAt,
     puntualidadMinutos: base.puntualidadMinutos
   };
+}
+
+function obtenerPrimerNombre(nombreCompleto) {
+  const limpio = String(nombreCompleto || "").trim().replace(/\s+/g, " ");
+  return limpio ? limpio.split(" ")[0] : "";
 }
 
 function obtenerFechaLocalAgenda() {
@@ -2737,6 +2801,25 @@ app.post("/login", authRateLimit, async (req, res) => {
 // ============================
 app.get("/perfil", auth, (req, res) => {
   res.json({ message: "Acceso permitido", user: req.user });
+});
+
+app.get("/cliente/loyalty", auth, async (req, res) => {
+  try {
+    const userId = typeof req.user?.id === "string" ? req.user.id : "";
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Token invalido" });
+    }
+
+    const user = await User.findById(userId).select("email role");
+    if (!user || obtenerRolUsuario(user) !== "cliente") {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    const loyalty = await construirFidelidadClientePorEmail(user.email);
+    res.json(loyalty);
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener la tarjeta de fidelidad" });
+  }
 });
 
 app.post("/solicitar-eliminar-cuenta", auth, authRateLimit, async (req, res) => {
@@ -3297,7 +3380,7 @@ app.get("/admin/employees/:id/performance/history", auth, requireAdmin, async (r
   try {
     const id = String(req.params.id || "").trim();
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Id de empleado no vÃ¡lido" });
+      return res.status(400).json({ message: "Id de empleado no valido" });
     }
 
     const weeks = normalizarWeeksHistorial(req.query?.weeks);
@@ -3320,48 +3403,11 @@ app.get("/admin/employees/:id/appointments", auth, requireAdmin, async (req, res
       return res.status(400).json({ message: "Id de empleado no válido" });
     }
 
-    const empleado = await Employee.findById(id).select("_id nombreCompleto email activo");
-    if (!empleado) {
-      return res.status(404).json({ message: "Empleado no encontrado" });
-    }
-
     const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
-    if (!validarFechaISOAgenda(fecha)) {
-      return res.status(400).json({ message: "fecha no valida" });
-    }
-
-    const filtro = {
-      fecha,
-      $or: [
-        { empleadoAsignadoId: empleado._id },
-        { empleadosAsignados: empleado._id }
-      ]
-    };
-    const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
-    const metricas = calcularMetricasEmpleado(await Appointment.find({
-      $or: [
-        { empleadoAsignadoId: empleado._id },
-        { empleadosAsignados: empleado._id }
-      ]
-    }));
-
-    res.json({
-      fecha,
-      empleado: {
-        id: String(empleado._id),
-        nombre: empleado.nombreCompleto || "",
-        usuario: "",
-        email: empleado.email || "",
-        role: "empleado"
-      },
-      metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
-      actualDiaMxn: 0,
-      progresoMetaPorcentaje: 0,
-      metricas,
-      citas: citas.map(construirCitaEmpleado)
-    });
+    const respuesta = await construirAppointmentsEmpleadoRespuesta(id, fecha, { requireActive: false });
+    return res.json(respuesta);
   } catch (error) {
-    res.status(500).json({ message: "No se pudieron obtener las citas del empleado" });
+    manejarErrorPortalEmpleado(res, error, "No se pudieron obtener las citas del empleado");
   }
 });
 
@@ -3629,6 +3675,7 @@ function construirPortalEmpleadoRespuesta(empleado, user = null) {
     empleado: {
       id: String(empleado._id),
       nombre: empleado.nombreCompleto || "",
+      primerNombre: obtenerPrimerNombre(empleado.nombreCompleto),
       email: empleado.email || "",
       telefono: empleado.telefono || "",
       puesto: empleado.puesto || "",
@@ -3701,6 +3748,7 @@ async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options 
     empleado: {
       id: String(empleado._id),
       nombre: empleado.nombreCompleto || "",
+      primerNombre: obtenerPrimerNombre(empleado.nombreCompleto),
       puesto: empleado.puesto || ""
     },
     semana: {
@@ -3749,6 +3797,64 @@ async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options 
       totalAPagarProyectado: resumen.totalAPagarProyectado,
       impactoAsistenciaProyectado: resumen.impactoAsistenciaProyectado
     }
+  };
+}
+
+async function construirAppointmentsEmpleadoRespuesta(employeeId, fecha, options = {}) {
+  const requireActive = options.requireActive !== false;
+  const id = String(employeeId || "").trim();
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    const error = new Error("Id de empleado no valido");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!validarFechaISOAgenda(fecha)) {
+    const error = new Error("fecha no valida");
+    error.status = 400;
+    throw error;
+  }
+
+  const empleado = await Employee.findById(id).select("_id nombreCompleto email activo");
+  if (!empleado) {
+    const error = new Error("Empleado no encontrado");
+    error.status = 404;
+    throw error;
+  }
+  if (requireActive && empleado.activo === false) {
+    const error = new Error("No autorizado");
+    error.status = 403;
+    throw error;
+  }
+
+  const filtroEmpleado = {
+    $or: [
+      { empleadoAsignadoId: empleado._id },
+      { empleadosAsignados: empleado._id }
+    ]
+  };
+  const citas = await Appointment.find({
+    fecha,
+    ...filtroEmpleado
+  }).sort({ fecha: 1, hora: 1 });
+  const metricas = calcularMetricasEmpleado(await Appointment.find(filtroEmpleado));
+
+  return {
+    fecha,
+    empleado: {
+      id: String(empleado._id),
+      nombre: empleado.nombreCompleto || "",
+      primerNombre: obtenerPrimerNombre(empleado.nombreCompleto),
+      usuario: options.usuario || "",
+      email: options.email || empleado.email || "",
+      role: "empleado"
+    },
+    metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
+    actualDiaMxn: 0,
+    progresoMetaPorcentaje: 0,
+    metricas,
+    citas: citas.map(construirCitaEmpleado)
   };
 }
 
@@ -4128,7 +4234,7 @@ app.get("/admin/performance/history", auth, requireAdmin, async (req, res) => {
     const historial = await construirHistorialPerformanceGlobal(weeks, fecha);
     res.json({ weeks, historial });
   } catch (error) {
-    res.status(500).json({ message: "No se pudo obtener el historial de desempeÃ±o" });
+    res.status(500).json({ message: "No se pudo obtener el historial de desempeño" });
   }
 });
 
@@ -4185,7 +4291,7 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
     }
 
     if (fechaCumpleanosLimpia && !validarFechaISOAgenda(fechaCumpleanosLimpia)) {
-      return res.status(400).json({ message: "La fecha de cumpleanos no es valida." });
+      return res.status(400).json({ message: "La fecha de cumpleaños no es valida." });
     }
 
     const [emailEnUsuarios, emailEnEmpleados] = await Promise.all([
@@ -4524,42 +4630,14 @@ app.get("/empleados/performance/history", auth, requireEmpleado, async (req, res
 app.get("/empleados/appointments", auth, requireEmpleado, async (req, res) => {
   try {
     const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
-    if (!validarFechaISOAgenda(fecha)) {
-      return res.status(400).json({ message: "fecha no valida" });
-    }
-
-    const filtro = {
-      fecha,
-      $or: [
-        { empleadoAsignadoId: req.employeeProfile._id },
-        { empleadosAsignados: req.employeeProfile._id }
-      ]
-    };
-    const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1 });
-    const metricas = calcularMetricasEmpleado(await Appointment.find({
-      $or: [
-        { empleadoAsignadoId: req.employeeProfile._id },
-        { empleadosAsignados: req.employeeProfile._id }
-      ]
-    }));
-
-    res.json({
-      fecha,
-      empleado: {
-        id: String(req.employeeProfile._id),
-        nombre: req.employeeProfile.nombreCompleto || "",
-        usuario: req.empleado.usuario || "",
-        email: req.empleado.email || "",
-        role: req.empleadoRole
-      },
-      metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
-      actualDiaMxn: 0,
-      progresoMetaPorcentaje: 0,
-      metricas,
-      citas: citas.map(construirCitaEmpleado)
+    const respuesta = await construirAppointmentsEmpleadoRespuesta(req.employeeProfile._id, fecha, {
+      requireActive: true,
+      usuario: req.empleado.usuario || "",
+      email: req.empleado.email || ""
     });
+    return res.json(respuesta);
   } catch (error) {
-    res.status(500).json({ message: "No se pudieron obtener las citas del empleado" });
+    manejarErrorPortalEmpleado(res, error, "No se pudieron obtener las citas del empleado");
   }
 });
 
@@ -5601,5 +5679,3 @@ app.listen(PORT, () => {
   console.log(`Servidor en puerto ${PORT}`);
   console.log(`BACKEND VERSION ${BACKEND_VERSION}`);
 });
-
-

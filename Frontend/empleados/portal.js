@@ -53,6 +53,11 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+function obtenerPrimerNombre(nombreCompleto) {
+  const limpio = String(nombreCompleto || "").trim().replace(/\s+/g, " ");
+  return limpio ? limpio.split(" ")[0] : "";
+}
+
 function toNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -694,6 +699,7 @@ function renderDetalleEmpleado(detalle) {
   const fechaCitas = document.getElementById("adminAppointmentsDate")?.value || appointments?.fecha || fechaLocalISO();
   const citas = Array.isArray(appointments?.citas) ? appointments.citas : [];
   const nombre = empleado?.nombre || performance?.empleado?.nombre || "Empleado";
+  const primerNombre = empleado?.primerNombre || performance?.empleado?.primerNombre || obtenerPrimerNombre(nombre) || nombre;
   const puesto = empleado?.puesto || performance?.empleado?.puesto || "Sin datos disponibles";
   const status = empleado?.activo === false ? "Inactivo" : "Activo";
 
@@ -707,7 +713,7 @@ function renderDetalleEmpleado(detalle) {
       <section class="hero-panel">
         <div class="hero-copy">
           <p class="eyebrow">Panel del equipo</p>
-          <h1>Hola, ${escapeHtml(nombre.split(" ")[0] || "Empleado")}</h1>
+          <h1>Hola, ${escapeHtml(primerNombre || "Empleado")}</h1>
           <p>Este es el desempeño de la semana consultado por administración.</p>
           <div class="hero-badges" aria-label="Datos principales">
             <span class="hero-badge">${escapeHtml(puesto)}</span>
@@ -723,7 +729,7 @@ function renderDetalleEmpleado(detalle) {
           <dl>
             <div>
               <dt>Nombre</dt>
-              <dd>${escapeHtml(nombre)}</dd>
+              <dd>${escapeHtml(primerNombre || nombre)}</dd>
             </div>
             <div>
               <dt>Puesto</dt>

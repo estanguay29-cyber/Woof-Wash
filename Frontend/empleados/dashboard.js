@@ -86,6 +86,11 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+function obtenerPrimerNombre(nombreCompleto) {
+  const limpio = String(nombreCompleto || "").trim().replace(/\s+/g, " ");
+  return limpio ? limpio.split(" ")[0] : "";
+}
+
 function toNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -297,12 +302,13 @@ function renderPerfil(payload) {
   const usuario = payload?.usuario || {};
   const empleado = payload?.empleado || {};
   const nombre = empleado.nombre || usuario.usuario || "Empleado";
+  const primerNombre = empleado.primerNombre || obtenerPrimerNombre(nombre) || nombre;
   const puesto = empleado.puesto || "Equipo operativo";
 
   localStorage.setItem("role", usuario.role || "empleado");
-  setText("employeeGreeting", `Hola, ${nombre}`);
+  setText("employeeGreeting", `Hola, ${primerNombre}`);
   setText("employeeIntro", "Este es tu desempeno de la semana.");
-  setText("profileName", nombre);
+  setText("profileName", primerNombre);
   setText("profilePosition", puesto);
   setText("profileEmail", empleado.email || usuario.email || "-");
   setText("profilePhone", empleado.telefono || "-");

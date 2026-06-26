@@ -352,6 +352,7 @@ AppointmentSchema.index({ empleadoAsignadoId: 1, fecha: 1 });
 AppointmentSchema.index({ empleadosAsignados: 1 });
 AppointmentSchema.index({ estadoOperativo: 1 });
 AppointmentSchema.index({ clienteTelefono: 1, servicioTipo: 1, estado: 1, rewardConsumido: 1 });
+AppointmentSchema.index({ clienteEmail: 1, servicioTipo: 1, estado: 1, rewardConsumido: 1 });
 
 module.exports = mongoose.model("Appointment", AppointmentSchema);
 module.exports.ESTADOS_CITA = ESTADOS_CITA;

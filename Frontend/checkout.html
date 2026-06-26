@@ -1,10 +1,13 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Checkout - Woof & Wash</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="productos/productos-mascota.data.js"></script>
+  <script src="productos/productos-auto.data.js"></script>
+  <script src="productos/productos.shared.js"></script>
 </head>
 <body class="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(140,198,63,0.18),_transparent_34%),linear-gradient(180deg,_#fffdf4_0%,_#fff7db_100%)] text-slate-800">
   <div class="relative overflow-hidden">
@@ -159,26 +162,8 @@
 
 <script>
 const token = localStorage.getItem("token");
-const PRODUCTOS_CATALOGO = Object.freeze({
-  "shampoo-premium": { id: "shampoo-premium", nombre: "Shampoo Premium" },
-  "perfume-galan": { id: "perfume-galan", nombre: "Perfume Gal\u00e1n" },
-  "cepillo-ergonomico": { id: "cepillo-ergonomico", nombre: "Cepillo Ergon\u00f3mico" },
-  "cepillo-desenredante": { id: "cepillo-desenredante", nombre: "Cepillo Desenredante" },
-  "toallas-humedas": { id: "toallas-humedas", nombre: "Toallas H\u00famedas" },
-  "cortaunas-pro": { id: "cortaunas-pro", nombre: "Cortau\u00f1as Pro" },
-  "collar-antipulgas": { id: "collar-antipulgas", nombre: "Collar Antipulgas" },
-  "shampoo-automotriz": { id: "shampoo-automotriz", nombre: "Shampoo Automotriz" },
-  "cera-liquida": { id: "cera-liquida", nombre: "Cera L\u00edquida" },
-  "aromatizante-premium": { id: "aromatizante-premium", nombre: "Aromatizante Premium" },
-  "limpiador-de-rines": { id: "limpiador-de-rines", nombre: "Limpiador de Rines" },
-  "limpiador-de-vidrios": { id: "limpiador-de-vidrios", nombre: "Limpiador de Vidrios" },
-  "renovador-de-interiores": { id: "renovador-de-interiores", nombre: "Renovador de Interiores" },
-  "franelas-de-microfibra": { id: "franelas-de-microfibra", nombre: "Franelas de Microfibra" }
-});
-const PRODUCTOS_POR_NOMBRE = Object.values(PRODUCTOS_CATALOGO).reduce((acc, producto) => {
-  acc[producto.nombre] = producto;
-  return acc;
-}, {});
+const PRODUCTOS_CATALOGO = Object.freeze(window.WoofWashProductos?.catalogo || {});
+const PRODUCTOS_POR_NOMBRE = Object.freeze(window.WoofWashProductos?.porNombre || {});
 const carrito = (JSON.parse(localStorage.getItem("carrito")) || []).reduce((acc, item) => {
   const producto = PRODUCTOS_CATALOGO[item?.id] || PRODUCTOS_POR_NOMBRE[item?.nombre];
   const cantidad = Number(item?.cantidad);
@@ -192,6 +177,7 @@ const carrito = (JSON.parse(localStorage.getItem("carrito")) || []).reduce((acc,
 
   return acc;
 }, []);
+localStorage.setItem("carrito", JSON.stringify(carrito));
 const form = document.getElementById("checkoutForm");
 const mensaje = document.getElementById("mensaje");
 
