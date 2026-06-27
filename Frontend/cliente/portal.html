@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi portal | Woof & Wash</title>
+  <link rel="icon" type="image/png" href="../img/logo.png" />
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <header class="portal-header">
+    <a class="brand" href="../index.html" aria-label="Volver al inicio">
+      <img src="../img/logo.png" alt="Woof & Wash" />
+      <span>Woof & Wash</span>
+    </a>
+    <nav class="portal-nav" aria-label="Acciones de cuenta">
+      <a href="../index.html">Inicio</a>
+      <button type="button" id="btnLogout">Cerrar sesion</button>
+    </nav>
+  </header>
+
+  <main class="portal-shell">
+    <section class="welcome-band">
+      <div>
+        <p class="eyebrow">Portal cliente</p>
+        <h1 id="welcomeTitle">Hola, cliente</h1>
+        <p id="welcomeCopy">Aqui puedes revisar tu fidelidad, compras y citas.</p>
+      </div>
+      <div class="quick-summary" aria-label="Resumen rapido">
+        <div>
+          <strong id="summaryOrders">0</strong>
+          <span>Compras</span>
+        </div>
+        <div>
+          <strong id="summaryAppointments">0</strong>
+          <span>Citas</span>
+        </div>
+        <div>
+          <strong id="summaryRewards">0</strong>
+          <span>Premios</span>
+        </div>
+      </div>
+    </section>
+
+    <p id="portalMessage" class="portal-message" role="status"></p>
+
+    <section class="portal-grid">
+      <article class="panel loyalty-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Fidelidad</p>
+          <h2>Tarjeta de recompensas</h2>
+        </div>
+        <div id="loyaltyCards" class="loyalty-cards"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Tienda</p>
+          <h2>Historial de compras</h2>
+        </div>
+        <div id="ordersList" class="history-list"></div>
+      </article>
+
+      <article class="panel appointments-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Agenda</p>
+          <h2>Historial de citas</h2>
+        </div>
+        <div id="appointmentsList" class="history-list"></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="portal.js"></script>
+</body>
+</html>

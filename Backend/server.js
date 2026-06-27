@@ -1389,6 +1389,37 @@ async function construirFidelidadClientePorEmail(email) {
   };
 }
 
+function construirCitaClientePortal(cita) {
+  const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
+  const serviciosDetalle = construirServiciosDetalleCompatibles(obj);
+  const tipo = obtenerTipoGeneralServicioAgenda(obj);
+
+  return {
+    id: obj._id,
+    fecha: obj.fecha || "",
+    hora: obj.hora || "",
+    servicioTipo: tipo,
+    servicioNombre: obj.servicioNombre || "",
+    servicioCategoria: obj.servicioCategoria || "",
+    servicioPaquete: obj.servicioPaquete || "",
+    serviciosDetalle,
+    estado: obj.estado || "",
+    estadoOperativo: obj.estadoOperativo || "",
+    zona: obj.zona || "",
+    direccion: {
+      calle: obj.direccion?.calle || "",
+      numero: obj.direccion?.numero || "",
+      colonia: obj.direccion?.colonia || "",
+      municipio: obj.direccion?.municipio || "",
+      codigoPostal: obj.direccion?.codigoPostal || "",
+      referencias: obj.direccion?.referencias || ""
+    },
+    rewardGratisAplicado: obj.rewardGratisAplicado === true,
+    rewardTipo: obj.rewardTipo || "",
+    rewardConsumido: obj.rewardConsumido === true
+  };
+}
+
 async function obtenerServiciosElegiblesRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
   const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(clienteTelefono);
   const tipo = servicioTipo === "auto" ? "auto" : servicioTipo === "mascota" ? "mascota" : "";
@@ -2822,6 +2853,35 @@ app.get("/cliente/loyalty", auth, async (req, res) => {
   }
 });
 
+app.get("/cliente/appointments", auth, async (req, res) => {
+  try {
+    const userId = typeof req.user?.id === "string" ? req.user.id : "";
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Token invalido" });
+    }
+
+    const user = await User.findById(userId).select("email role");
+    if (!user || obtenerRolUsuario(user) !== "cliente") {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    const emailNormalizado = normalizarEmail(user.email);
+    if (!emailNormalizado || !validarEmail(emailNormalizado)) {
+      return res.status(400).json({ message: "Tu cuenta no tiene un correo valido" });
+    }
+
+    const citas = await Appointment.find({ clienteEmail: emailNormalizado })
+      .sort({ fecha: -1, hora: -1, createdAt: -1 });
+
+    res.json({
+      email: emailNormalizado,
+      citas: citas.map(construirCitaClientePortal)
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el historial de citas" });
+  }
+});
+
 app.post("/solicitar-eliminar-cuenta", auth, authRateLimit, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("+deleteAccountCodeHash +deleteAccountCodeExpires");
@@ -3024,8 +3084,17 @@ app.post("/create-checkout-session", auth, checkoutLimiter, async (req, res) => 
 
 app.get("/mis-pedidos", auth, async (req, res) => {
   try {
+    const userId = typeof req.user?.id === "string" ? req.user.id : "";
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Token invalido" });
+    }
+
+    const user = await User.findById(userId).select("email usuario role");
+    if (!user || obtenerRolUsuario(user) !== "cliente") {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
     const pedidos = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    const user = await User.findById(req.user.id).select("email usuario");
     const pedidosConCliente = pedidos.map((pedido) => construirPedidoCliente(pedido, user));
 
     res.json({ pedidos: pedidosConCliente });

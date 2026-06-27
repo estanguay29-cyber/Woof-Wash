@@ -384,6 +384,7 @@ const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
   "admin.html",
   "agenda.html",
   "empleados.html",
+  "cliente/portal.html",
   "checkout.html",
   "perfil.html"
 ]);
@@ -508,8 +509,30 @@ function renderizarAccesosAdmin(esAdmin) {
   adminAccountActions.classList.toggle("hidden", !esAdmin);
 }
 
+function obtenerRolSesion() {
+  const token = obtenerTokenValido();
+  const payload = decodificarPayloadJwt(token);
+  const rol = typeof payload?.role === "string" ? payload.role.trim().toLowerCase() : "";
+  return ["admin", "empleado", "cliente"].includes(rol) ? rol : "";
+}
+
+function renderizarAccesosCuenta() {
+  const rol = obtenerRolSesion();
+  const clientAccountActions = document.getElementById("clientAccountActions");
+  const employeeAccountActions = document.getElementById("employeeAccountActions");
+
+  if (clientAccountActions) {
+    clientAccountActions.classList.toggle("hidden", rol !== "cliente");
+  }
+
+  if (employeeAccountActions) {
+    employeeAccountActions.classList.toggle("hidden", rol !== "empleado");
+  }
+}
+
 async function validarAccesosAdmin() {
   const token = obtenerTokenValido();
+  renderizarAccesosCuenta();
 
   if (!token) {
     adminValidado = false;
@@ -1551,6 +1574,7 @@ function logout() {
   adminValidado = false;
   tokenAdminValidado = null;
   renderizarAccesosAdmin(false);
+  renderizarAccesosCuenta();
   localStorage.removeItem("direccion");
   actualizarCarrito();
   window.location.href = "index.html";
@@ -2220,6 +2244,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   actualizarCarrito();
   configurarEnlacesAuth();
   restaurarCarritoDespuesDeAuth();
+  renderizarAccesosCuenta();
   validarAccesosAdmin();
   sincronizarVisibilidadChat();
   configurarJuegoNosotros();

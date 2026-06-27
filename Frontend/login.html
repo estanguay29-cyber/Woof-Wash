@@ -157,6 +157,7 @@ const RUTAS_AUTH_REDIRECT_PERMITIDAS = new Set([
   "admin.html",
   "agenda.html",
   "empleados.html",
+  "cliente/portal.html",
   "empleados/portal.html",
   "empleados/dashboard.html",
   "checkout.html",
@@ -202,13 +203,16 @@ function obtenerDestinoPorRole(role) {
   const destinoSeguro = obtenerDestinoDespuesDeAuth();
 
   if (rol === "empleado") {
-    if (destinoSeguro === "admin.html" || destinoSeguro === "agenda.html" || destinoSeguro === "empleados.html" || destinoSeguro === "empleados/portal.html") {
+    if (destinoSeguro === "admin.html" || destinoSeguro === "agenda.html" || destinoSeguro === "empleados.html" || destinoSeguro === "empleados/portal.html" || destinoSeguro === "cliente/portal.html") {
       return "index.html";
     }
     return destinoSeguro;
   }
 
   if (rol === "admin") {
+    if (destinoSeguro === "cliente/portal.html") {
+      return "admin.html";
+    }
     return destinoSeguro === "empleados/dashboard.html" ? "admin.html" : destinoSeguro;
   }
 
