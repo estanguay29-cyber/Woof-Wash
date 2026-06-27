@@ -156,11 +156,11 @@ function escaparHtml(value) {
 
 function crearIconoPortal(nombre) {
   const iconos = {
-    auto: '<path d="M5 16h14l-1.5-5h-11L5 16Z"></path><path d="M7 16v2"></path><path d="M17 16v2"></path><path d="M7.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M16.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>',
+    auto: '<path d="M4.5 15.5h15l-1.8-5.2a2 2 0 0 0-1.9-1.3H8.2a2 2 0 0 0-1.9 1.3L4.5 15.5Z"></path><path d="M6 15.5v2.2"></path><path d="M18 15.5v2.2"></path><path d="M8 18a1.8 1.8 0 1 0 0-3.6A1.8 1.8 0 0 0 8 18Z"></path><path d="M16 18a1.8 1.8 0 1 0 0-3.6A1.8 1.8 0 0 0 16 18Z"></path><path d="M8.2 9 7 6.5h10L15.8 9"></path>',
     calendario: '<path d="M7 3v4"></path><path d="M17 3v4"></path><path d="M4 8h16"></path><path d="M5 5h14v15H5z"></path>',
     estado: '<path d="m5 12 4 4L19 6"></path>',
     info: '<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M12 11v5"></path><path d="M12 8h.01"></path>',
-    mascota: '<path d="M7 14c-1.5 0-3 1.1-3 2.6 0 1 .8 1.9 1.9 1.9.8 0 1.3-.4 2.1-.4s1.3.4 2.1.4c1.1 0 1.9-.9 1.9-1.9 0-1.5-1.5-2.6-3-2.6H7Z"></path><path d="M5.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M10.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M8 8a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>',
+    mascota: '<path d="M8.2 14.1c-2 0-3.8 1.4-3.8 3.2 0 1.3 1 2.3 2.4 2.3 1 0 1.7-.5 2.6-.5s1.6.5 2.6.5c1.4 0 2.4-1 2.4-2.3 0-1.8-1.8-3.2-3.8-3.2H8.2Z"></path><path d="M5.5 12.1a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"></path><path d="M12.9 12.1a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"></path><path d="M9.2 8.5a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8Z"></path><path d="M16.7 14.4c1.3-.2 2.3-1.3 2.3-2.7 0-1.5-1.2-2.8-2.8-2.8"></path>',
     paquete: '<path d="m3 7 9-4 9 4-9 4-9-4Z"></path><path d="M3 7v10l9 4 9-4V7"></path><path d="M12 11v10"></path>',
     recompensa: '<path d="M20 12v8H4v-8"></path><path d="M2 7h20v5H2z"></path><path d="M12 7v13"></path><path d="M12 7H8.5a2 2 0 1 1 2-2c0 1.5 1.5 2 1.5 2Z"></path><path d="M12 7h3.5a2 2 0 1 0-2-2c0 1.5-1.5 2-1.5 2Z"></path>',
     reloj: '<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M12 7v5l3 2"></path>',

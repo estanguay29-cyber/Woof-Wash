@@ -1,15 +1,18 @@
 :root {
   --navy: #0b2a6b;
   --navy-soft: #e8f0ff;
+  --blue-2: #123b8a;
+  --cream: #fffae8;
   --ink: #102033;
   --muted: #64748b;
-  --line: #dbe4ef;
+  --line: rgba(11, 42, 107, 0.12);
   --green: #8cc63f;
   --green-soft: #edf8df;
   --aqua: #38bdf8;
   --paper: #ffffff;
   --wash: #f6f9f2;
   --warn: #f59e0b;
+  --shadow: 0 22px 58px rgba(11, 42, 107, 0.13);
 }
 
 * {
@@ -21,9 +24,21 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(140, 198, 63, 0.16), transparent 34rem),
-    linear-gradient(180deg, #f2f8f1 0%, #f8fbff 46%, #ffffff 100%);
+    radial-gradient(circle at top left, rgba(140, 198, 63, 0.2), transparent 320px),
+    linear-gradient(135deg, var(--cream) 0%, #f6fbef 42%, #edf6ff 100%);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(11, 42, 107, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11, 42, 107, 0.035) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 70%);
 }
 
 a {
@@ -46,7 +61,7 @@ button {
   padding: 14px clamp(16px, 4vw, 48px);
   border-bottom: 1px solid rgba(11, 42, 107, 0.08);
   background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 8px 26px rgba(11, 42, 107, 0.05);
+  box-shadow: 0 8px 26px rgba(11, 42, 107, 0.06);
   backdrop-filter: blur(14px);
 }
 
@@ -58,9 +73,12 @@ button {
 }
 
 .brand img {
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 26px rgba(11, 42, 107, 0.12);
 }
 
 .brand span {
@@ -106,23 +124,98 @@ button {
 }
 
 .portal-shell {
+  position: relative;
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 28px 0 48px;
 }
 
 .welcome-band {
+  position: relative;
+  overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px) minmax(280px, 420px);
   gap: 24px;
-  align-items: end;
+  align-items: center;
   padding: clamp(24px, 4vw, 42px);
-  border: 1px solid rgba(11, 42, 107, 0.1);
+  min-height: 252px;
+  border: 1px solid var(--line);
   border-radius: 8px;
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 253, 242, 0.92)),
     var(--paper);
-  box-shadow: 0 22px 60px rgba(11, 42, 107, 0.1);
+  box-shadow: var(--shadow);
+}
+
+.welcome-band::after {
+  content: "";
+  position: absolute;
+  right: 26px;
+  top: 24px;
+  width: 130px;
+  height: 130px;
+  border: 1px solid rgba(140, 198, 63, 0.34);
+  border-radius: 999px;
+  opacity: 0.7;
+}
+
+.welcome-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-visual {
+  position: relative;
+  z-index: 1;
+  min-height: 178px;
+}
+
+.welcome-visual img {
+  display: block;
+  object-fit: cover;
+}
+
+.welcome-pet,
+.welcome-car {
+  position: absolute;
+  width: 142px;
+  height: 142px;
+  border: 5px solid #fff;
+  border-radius: 8px;
+  box-shadow: 0 18px 38px rgba(11, 42, 107, 0.16);
+}
+
+.welcome-pet {
+  left: 4px;
+  top: 0;
+}
+
+.welcome-car {
+  right: 4px;
+  bottom: 0;
+}
+
+.welcome-brand-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 92px;
+  min-height: 54px;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 28px rgba(11, 42, 107, 0.14);
+  transform: translate(-50%, -50%);
+}
+
+.welcome-brand-mark img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
 }
 
 .eyebrow {
@@ -143,8 +236,8 @@ p {
 h1 {
   margin-bottom: 10px;
   color: var(--navy);
-  font-size: clamp(2rem, 5vw, 3.4rem);
-  line-height: 1;
+  font-size: clamp(2.2rem, 6vw, 4.1rem);
+  line-height: 0.98;
 }
 
 h2 {
@@ -173,7 +266,7 @@ h2 {
   gap: 4px;
   border: 1px solid rgba(11, 42, 107, 0.08);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.82);
   text-align: center;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
@@ -230,15 +323,15 @@ h2 {
 .portal-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.95fr) minmax(0, 1.25fr);
-  gap: 20px;
+  gap: 22px;
 }
 
 .panel {
   border: 1px solid rgba(11, 42, 107, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
-  padding: clamp(18px, 3vw, 24px);
-  box-shadow: 0 18px 42px rgba(11, 42, 107, 0.08);
+  padding: clamp(20px, 3vw, 28px);
+  box-shadow: var(--shadow);
 }
 
 .appointments-panel {
@@ -273,7 +366,7 @@ h2 {
   overflow: hidden;
   border: 1px solid rgba(11, 42, 107, 0.11);
   border-radius: 8px;
-  padding: 18px;
+  padding: 20px;
   background: linear-gradient(135deg, #ffffff, #f8fbff);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
@@ -296,9 +389,15 @@ h2 {
   margin: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: var(--ink);
-  font-size: 1rem;
+  font-size: 1.08rem;
+}
+
+.loyalty-title h3 .portal-icon {
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
 }
 
 .loyalty-title span {
@@ -315,9 +414,9 @@ h2 {
 
 .stamp-grid {
   display: grid;
-  grid-template-columns: repeat(8, minmax(24px, 1fr));
-  gap: 6px;
-  margin-bottom: 12px;
+  grid-template-columns: repeat(8, minmax(34px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
 .stamp {
@@ -327,15 +426,16 @@ h2 {
   border: 1px solid transparent;
   border-radius: 8px;
   background: #ffffff;
-  font-size: 1.25rem;
+  min-height: 44px;
   font-weight: 900;
   line-height: 1;
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
 .stamp .portal-icon {
-  width: 19px;
-  height: 19px;
+  width: 28px;
+  height: 28px;
+  stroke-width: 1.9;
 }
 
 .stamp-paw {
@@ -395,6 +495,12 @@ h2 {
   font-weight: 700;
 }
 
+.loyalty-note .portal-icon {
+  width: 22px;
+  height: 22px;
+  flex-basis: 22px;
+}
+
 .loyalty-note .portal-icon,
 .loyalty-title .portal-icon {
   color: var(--navy);
@@ -408,7 +514,7 @@ h2 {
 .history-item {
   border: 1px solid rgba(11, 42, 107, 0.1);
   border-radius: 8px;
-  padding: 18px;
+  padding: 20px;
   background: rgba(251, 253, 255, 0.96);
   box-shadow: 0 10px 24px rgba(11, 42, 107, 0.05);
 }
@@ -521,6 +627,15 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .welcome-band {
+    align-items: start;
+  }
+
+  .welcome-visual {
+    min-height: 164px;
+    max-width: 330px;
+  }
+
   .portal-header {
     align-items: flex-start;
   }
@@ -554,7 +669,17 @@ h2 {
   }
 
   .stamp-grid {
-    grid-template-columns: repeat(4, minmax(28px, 1fr));
+    grid-template-columns: repeat(4, minmax(46px, 1fr));
+  }
+
+  .welcome-visual {
+    min-height: 142px;
+  }
+
+  .welcome-pet,
+  .welcome-car {
+    width: 120px;
+    height: 120px;
   }
 
   .history-toggle {
