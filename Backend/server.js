@@ -1393,12 +1393,17 @@ function construirCitaClientePortal(cita) {
   const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
   const serviciosDetalle = construirServiciosDetalleCompatibles(obj);
   const tipo = obtenerTipoGeneralServicioAgenda(obj);
+  const direccionTexto = typeof obj.direccion === "string" ? obj.direccion : "";
+  const empleadosAsignadosNombres = Array.isArray(obj.empleadosAsignadosNombres)
+    ? obj.empleadosAsignadosNombres.filter(Boolean)
+    : [];
 
   return {
     id: obj._id,
     fecha: obj.fecha || "",
     hora: obj.hora || "",
     servicioTipo: tipo,
+    mascotaNombre: obj.mascotaNombre || "",
     servicioNombre: obj.servicioNombre || "",
     servicioCategoria: obj.servicioCategoria || "",
     servicioPaquete: obj.servicioPaquete || "",
@@ -1407,13 +1412,17 @@ function construirCitaClientePortal(cita) {
     estadoOperativo: obj.estadoOperativo || "",
     zona: obj.zona || "",
     direccion: {
-      calle: obj.direccion?.calle || "",
+      texto: direccionTexto,
+      calle: obj.direccion?.calle || direccionTexto,
       numero: obj.direccion?.numero || "",
       colonia: obj.direccion?.colonia || "",
       municipio: obj.direccion?.municipio || "",
       codigoPostal: obj.direccion?.codigoPostal || "",
       referencias: obj.direccion?.referencias || ""
     },
+    atendidoPor: obj.atendidoPor || "",
+    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || empleadosAsignadosNombres[0] || "",
+    empleadosAsignadosNombres,
     rewardGratisAplicado: obj.rewardGratisAplicado === true,
     rewardTipo: obj.rewardTipo || "",
     rewardConsumido: obj.rewardConsumido === true

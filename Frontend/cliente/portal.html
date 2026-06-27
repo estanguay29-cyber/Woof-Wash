@@ -44,6 +44,17 @@
 
     <p id="portalMessage" class="portal-message" role="status"></p>
 
+    <section class="history-actions" aria-label="Historiales del portal">
+      <button type="button" id="toggleOrdersHistory" class="history-toggle" aria-expanded="false" aria-controls="ordersPanel">
+        <span aria-hidden="true">&#128230;</span>
+        Mostrar historial de compras
+      </button>
+      <button type="button" id="toggleAppointmentsHistory" class="history-toggle" aria-expanded="false" aria-controls="appointmentsPanel">
+        <span aria-hidden="true">&#128197;</span>
+        Mostrar historial de citas
+      </button>
+    </section>
+
     <section class="portal-grid">
       <article class="panel loyalty-panel">
         <div class="panel-heading">
@@ -53,7 +64,7 @@
         <div id="loyaltyCards" class="loyalty-cards"></div>
       </article>
 
-      <article class="panel">
+      <article id="ordersPanel" class="panel history-panel is-hidden">
         <div class="panel-heading">
           <p class="eyebrow">Tienda</p>
           <h2>Historial de compras</h2>
@@ -61,7 +72,7 @@
         <div id="ordersList" class="history-list"></div>
       </article>
 
-      <article class="panel appointments-panel">
+      <article id="appointmentsPanel" class="panel appointments-panel history-panel is-hidden">
         <div class="panel-heading">
           <p class="eyebrow">Agenda</p>
           <h2>Historial de citas</h2>

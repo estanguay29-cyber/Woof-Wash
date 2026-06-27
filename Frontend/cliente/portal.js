@@ -129,6 +129,11 @@ function formatearMoneda(value) {
   }).format(numero);
 }
 
+function formatearCentavosMXN(value) {
+  const centavos = Number(value) || 0;
+  return formatearMoneda(centavos / 100);
+}
+
 function formatearEstado(value) {
   const estado = normalizarTexto(value);
   if (!estado) return "Sin estado";
@@ -145,6 +150,13 @@ function escaparHtml(value) {
 }
 
 function construirDireccion(direccion = {}) {
+  if (typeof direccion === "string") {
+    return normalizarTexto(direccion) || "Sin direccion registrada";
+  }
+
+  const direccionTexto = normalizarTexto(direccion.texto || direccion.direccion);
+  if (direccionTexto) return direccionTexto;
+
   const partes = [
     direccion.calle,
     direccion.numero,
@@ -167,18 +179,38 @@ function obtenerNombreServicio(cita = {}) {
   return normalizarTexto(cita.servicioNombre || cita.servicioPaquete || cita.servicioCategoria) || "Servicio";
 }
 
+function obtenerMascotaOVehiculo(cita = {}) {
+  const nombresMascota = Array.isArray(cita.serviciosDetalle)
+    ? cita.serviciosDetalle.map((servicio) => normalizarTexto(servicio.mascotaNombre)).filter(Boolean)
+    : [];
+  const mascota = normalizarTexto(cita.mascotaNombre) || nombresMascota[0];
+
+  if (mascota) return mascota;
+  return cita.servicioTipo === "auto" ? "Vehiculo" : "Sin dato";
+}
+
+function obtenerEmpleadoCita(cita = {}) {
+  if (Array.isArray(cita.empleadosAsignadosNombres) && cita.empleadosAsignadosNombres.length) {
+    return cita.empleadosAsignadosNombres.map(normalizarTexto).filter(Boolean).join(", ");
+  }
+
+  return normalizarTexto(cita.empleadoAsignadoNombre || cita.atendidoPor) || "No asignado";
+}
+
 function renderizarBienvenida() {
   const nombre = obtenerPrimerNombre();
   document.getElementById("welcomeTitle").textContent = `Hola, ${nombre}`;
 }
 
-function crearEstampas(completados, objetivo) {
+function crearEstampas(completados, objetivo, tipo) {
   const total = Math.max(Number(objetivo) || 8, 1);
   const llenas = Math.min(Math.max(Number(completados) || 0, 0), total);
+  const iconoLleno = tipo === "auto" ? "&#128663;" : "&#128062;";
 
   return Array.from({ length: total }, (_, index) => {
     const clase = index < llenas ? "stamp is-filled" : "stamp";
-    return `<span class="${clase}" aria-label="Sello ${index + 1} de ${total}">${index < llenas ? "W" : ""}</span>`;
+    const icono = index < llenas ? iconoLleno : "&#9898;";
+    return `<span class="${clase}" aria-label="Sello ${index + 1} de ${total}">${icono}</span>`;
   }).join("");
 }
 
@@ -187,19 +219,19 @@ function renderizarTarjetaFidelidad(tipo, item = {}) {
   const objetivo = Math.max(Number(item.objetivo) || 8, 1);
   const restantes = Math.max(Number(item.restantes) || objetivo - completados, 0);
   const porcentaje = Math.min((completados / objetivo) * 100, 100);
-  const nombre = tipo === "auto" ? "Lavado de auto" : "Estetica canina";
+  const nombre = tipo === "auto" ? "Lavado Movil" : "Estetica Canina";
   const nota = item.rewardEligible
-    ? "Premio listo para aplicar en tu proxima cita elegible."
+    ? "Recompensa disponible para tu proxima cita elegible."
     : `Te faltan ${restantes} cita${restantes === 1 ? "" : "s"} para tu premio.`;
 
   return `
-    <section class="loyalty-card">
+    <section class="loyalty-card ${item.rewardEligible ? "is-ready" : ""}">
       <div class="loyalty-title">
         <h3>${nombre}</h3>
         <span>${completados}/${objetivo}</span>
       </div>
       <div class="stamp-grid" aria-label="Progreso de ${nombre}">
-        ${crearEstampas(completados, objetivo)}
+        ${crearEstampas(completados, objetivo, tipo)}
       </div>
       <div class="progress-track" aria-hidden="true">
         <div class="progress-bar" style="width: ${porcentaje}%"></div>
@@ -240,7 +272,7 @@ function renderizarCompras(pedidos = []) {
           <span class="status-pill">${escaparHtml(formatearEstado(pedido.estado))}</span>
         </div>
         <ul class="details">
-          <li><span>Total</span><strong>${formatearMoneda(pedido.total)}</strong></li>
+          <li><span>Total</span><strong>${formatearCentavosMXN(pedido.total)}</strong></li>
           <li><span>Productos</span><strong>${productos}</strong></li>
         </ul>
       </article>
@@ -262,7 +294,7 @@ function renderizarCitas(citas = []) {
       : "Sin recompensa aplicada";
 
     return `
-      <article class="history-item">
+      <article class="history-item appointment-card">
         <div class="history-top">
           <div>
             <p class="history-title">${escaparHtml(obtenerNombreServicio(cita))}</p>
@@ -271,14 +303,49 @@ function renderizarCitas(citas = []) {
           <span class="status-pill ${cita.estado === "cancelada" ? "is-warning" : ""}">${escaparHtml(formatearEstado(cita.estado))}</span>
         </div>
         <ul class="details">
-          <li><span>Tipo</span><strong>${escaparHtml(cita.servicioTipo || "servicio")}</strong></li>
-          <li><span>Zona</span><strong>${escaparHtml(cita.zona || "Sin zona")}</strong></li>
+          <li><span>Fecha</span><strong>${escaparHtml(formatearFecha(cita.fecha))}</strong></li>
+          <li><span>Hora</span><strong>${escaparHtml(cita.hora || "Sin hora")}</strong></li>
+          <li><span>Servicio</span><strong>${escaparHtml(obtenerNombreServicio(cita))}</strong></li>
+          <li><span>Mascota o vehiculo</span><strong>${escaparHtml(obtenerMascotaOVehiculo(cita))}</strong></li>
+          <li><span>Estado</span><strong>${escaparHtml(formatearEstado(cita.estado))}</strong></li>
           <li><span>Direccion</span><strong>${escaparHtml(construirDireccion(cita.direccion))}</strong></li>
+          <li><span>Empleado</span><strong>${escaparHtml(obtenerEmpleadoCita(cita))}</strong></li>
           <li><span>Recompensa</span><strong>${escaparHtml(recompensa)}</strong></li>
         </ul>
       </article>
     `;
   }).join("");
+}
+
+function alternarHistorial(tipo) {
+  const config = {
+    orders: {
+      panel: document.getElementById("ordersPanel"),
+      button: document.getElementById("toggleOrdersHistory"),
+      showText: "Mostrar historial de compras",
+      hideText: "Ocultar historial de compras"
+    },
+    appointments: {
+      panel: document.getElementById("appointmentsPanel"),
+      button: document.getElementById("toggleAppointmentsHistory"),
+      showText: "Mostrar historial de citas",
+      hideText: "Ocultar historial de citas"
+    }
+  };
+  const actual = config[tipo];
+  const otro = tipo === "orders" ? config.appointments : config.orders;
+  if (!actual?.panel || !actual?.button || !otro?.panel || !otro?.button) return;
+
+  const abrir = actual.panel.classList.contains("is-hidden");
+  actual.panel.classList.toggle("is-hidden", !abrir);
+  actual.button.setAttribute("aria-expanded", abrir ? "true" : "false");
+  actual.button.classList.toggle("is-active", abrir);
+  actual.button.lastChild.textContent = abrir ? ` ${actual.hideText}` : ` ${actual.showText}`;
+
+  otro.panel.classList.add("is-hidden");
+  otro.button.setAttribute("aria-expanded", "false");
+  otro.button.classList.remove("is-active");
+  otro.button.lastChild.textContent = ` ${otro.showText}`;
 }
 
 function actualizarResumen({ pedidos = [], citas = [], loyalty = {} }) {
@@ -334,6 +401,14 @@ async function cargarPortal() {
 document.getElementById("btnLogout").addEventListener("click", () => {
   limpiarSesion();
   window.location.href = REDIRECT_HOME;
+});
+
+document.getElementById("toggleOrdersHistory")?.addEventListener("click", () => {
+  alternarHistorial("orders");
+});
+
+document.getElementById("toggleAppointmentsHistory")?.addEventListener("click", () => {
+  alternarHistorial("appointments");
 });
 
 renderizarBienvenida();
