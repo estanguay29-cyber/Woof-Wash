@@ -1,12 +1,14 @@
 :root {
   --navy: #0b2a6b;
+  --navy-soft: #e8f0ff;
   --ink: #102033;
   --muted: #64748b;
   --line: #dbe4ef;
   --green: #8cc63f;
+  --green-soft: #edf8df;
   --aqua: #38bdf8;
   --paper: #ffffff;
-  --wash: #f4f8fb;
+  --wash: #f6f9f2;
   --warn: #f59e0b;
 }
 
@@ -18,7 +20,9 @@ body {
   margin: 0;
   min-height: 100vh;
   color: var(--ink);
-  background: linear-gradient(180deg, #eef7fb 0%, #f8fbff 44%, #ffffff 100%);
+  background:
+    radial-gradient(circle at top left, rgba(140, 198, 63, 0.16), transparent 34rem),
+    linear-gradient(180deg, #f2f8f1 0%, #f8fbff 46%, #ffffff 100%);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -40,9 +44,10 @@ button {
   justify-content: space-between;
   gap: 16px;
   padding: 14px clamp(16px, 4vw, 48px);
-  border-bottom: 1px solid rgba(11, 42, 107, 0.1);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(11, 42, 107, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 26px rgba(11, 42, 107, 0.05);
+  backdrop-filter: blur(14px);
 }
 
 .brand,
@@ -60,7 +65,8 @@ button {
 
 .brand span {
   color: var(--navy);
-  font-weight: 800;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .portal-nav a,
@@ -73,10 +79,19 @@ button {
   border: 1px solid rgba(11, 42, 107, 0.14);
   border-radius: 8px;
   padding: 10px 14px;
-  background: var(--paper);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--navy);
   font-weight: 700;
   cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.portal-nav a:hover,
+.portal-nav button:hover,
+.history-toggle:hover {
+  border-color: rgba(11, 42, 107, 0.28);
+  box-shadow: 0 12px 28px rgba(11, 42, 107, 0.09);
+  transform: translateY(-1px);
 }
 
 .portal-icon {
@@ -101,11 +116,13 @@ button {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
   gap: 24px;
   align-items: end;
-  padding: clamp(22px, 4vw, 38px);
-  border: 1px solid rgba(11, 42, 107, 0.12);
+  padding: clamp(24px, 4vw, 42px);
+  border: 1px solid rgba(11, 42, 107, 0.1);
   border-radius: 8px;
-  background: var(--paper);
-  box-shadow: 0 18px 50px rgba(11, 42, 107, 0.08);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 253, 242, 0.92)),
+    var(--paper);
+  box-shadow: 0 22px 60px rgba(11, 42, 107, 0.1);
 }
 
 .eyebrow {
@@ -154,10 +171,11 @@ h2 {
   display: grid;
   place-items: center;
   gap: 4px;
-  border: 1px solid rgba(11, 42, 107, 0.1);
+  border: 1px solid rgba(11, 42, 107, 0.08);
   border-radius: 8px;
-  background: #f8fbff;
+  background: rgba(255, 255, 255, 0.76);
   text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .quick-summary strong {
@@ -192,19 +210,20 @@ h2 {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border: 1px solid rgba(11, 42, 107, 0.16);
+  border: 1px solid rgba(11, 42, 107, 0.12);
   border-radius: 8px;
-  padding: 14px 18px;
-  background: var(--paper);
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.94);
   color: var(--navy);
-  box-shadow: 0 10px 28px rgba(11, 42, 107, 0.07);
+  box-shadow: 0 14px 34px rgba(11, 42, 107, 0.08);
   font-weight: 900;
   cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
 .history-toggle.is-active {
   border-color: rgba(140, 198, 63, 0.55);
-  background: #f7fff0;
+  background: linear-gradient(135deg, #ffffff, var(--green-soft));
   color: #244c08;
 }
 
@@ -215,11 +234,11 @@ h2 {
 }
 
 .panel {
-  border: 1px solid rgba(11, 42, 107, 0.12);
+  border: 1px solid rgba(11, 42, 107, 0.1);
   border-radius: 8px;
-  background: var(--paper);
+  background: rgba(255, 255, 255, 0.96);
   padding: clamp(18px, 3vw, 24px);
-  box-shadow: 0 14px 38px rgba(11, 42, 107, 0.07);
+  box-shadow: 0 18px 42px rgba(11, 42, 107, 0.08);
 }
 
 .appointments-panel {
@@ -246,19 +265,22 @@ h2 {
 
 .loyalty-cards {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .loyalty-card {
-  border: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(11, 42, 107, 0.11);
   border-radius: 8px;
-  padding: 16px;
-  background: #fbfdff;
+  padding: 18px;
+  background: linear-gradient(135deg, #ffffff, #f8fbff);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .loyalty-card.is-ready {
   border-color: rgba(140, 198, 63, 0.55);
-  background: #f7fff0;
+  background: linear-gradient(135deg, #ffffff, #f5ffe9);
   animation: rewardPulse 1.8s ease-in-out infinite;
 }
 
@@ -280,9 +302,15 @@ h2 {
 }
 
 .loyalty-title span {
-  color: var(--muted);
+  min-width: 54px;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #ffffff;
+  color: var(--navy);
   font-size: 0.84rem;
   font-weight: 800;
+  text-align: center;
 }
 
 .stamp-grid {
@@ -296,27 +324,44 @@ h2 {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  border: 1px dashed #aac2d8;
+  border: 1px solid transparent;
   border-radius: 8px;
-  color: #aac2d8;
+  background: #ffffff;
   font-size: 1.25rem;
   font-weight: 900;
   line-height: 1;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
-.stamp:not(.is-filled)::before {
-  width: 10px;
-  height: 10px;
-  border: 2px solid currentColor;
-  border-radius: 999px;
-  content: "";
+.stamp .portal-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.stamp-paw {
+  border-color: rgba(11, 42, 107, 0.18);
+  color: rgba(11, 42, 107, 0.34);
+}
+
+.stamp-auto {
+  border-color: rgba(140, 198, 63, 0.32);
+  color: rgba(71, 130, 19, 0.36);
 }
 
 .stamp.is-filled {
-  border-style: solid;
-  border-color: rgba(140, 198, 63, 0.4);
-  background: rgba(140, 198, 63, 0.18);
+  transform: translateY(-1px);
+}
+
+.stamp-paw.is-filled {
+  border-color: rgba(11, 42, 107, 0.38);
+  background: var(--navy-soft);
   color: var(--navy);
+}
+
+.stamp-auto.is-filled {
+  border-color: rgba(140, 198, 63, 0.55);
+  background: var(--green-soft);
+  color: #3f7d10;
 }
 
 .progress-track {
@@ -345,6 +390,8 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  border-top: 1px solid rgba(11, 42, 107, 0.08);
+  padding-top: 12px;
   font-weight: 700;
 }
 
@@ -355,14 +402,15 @@ h2 {
 
 .history-list {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .history-item {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(11, 42, 107, 0.1);
   border-radius: 8px;
-  padding: 16px;
-  background: #fbfdff;
+  padding: 18px;
+  background: rgba(251, 253, 255, 0.96);
+  box-shadow: 0 10px 24px rgba(11, 42, 107, 0.05);
 }
 
 .appointment-card {
@@ -405,8 +453,8 @@ h2 {
 
 .details {
   display: grid;
-  gap: 6px;
-  margin: 12px 0 0;
+  gap: 8px;
+  margin: 14px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -416,8 +464,15 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  border-top: 1px solid rgba(11, 42, 107, 0.06);
+  padding-top: 8px;
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.details li:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .detail-label {
@@ -440,10 +495,10 @@ h2 {
   min-height: 112px;
   display: grid;
   place-items: center;
-  border: 1px dashed #b6c6d8;
+  border: 1px dashed rgba(11, 42, 107, 0.22);
   border-radius: 8px;
-  padding: 18px;
-  background: #fbfdff;
+  padding: 22px;
+  background: linear-gradient(135deg, #ffffff, #f8fbff);
   text-align: center;
 }
 
@@ -500,6 +555,10 @@ h2 {
 
   .stamp-grid {
     grid-template-columns: repeat(4, minmax(28px, 1fr));
+  }
+
+  .history-toggle {
+    justify-content: flex-start;
   }
 
   .history-top,

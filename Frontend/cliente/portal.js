@@ -103,8 +103,13 @@ async function clienteFetch(path) {
 
 function obtenerPrimerNombre() {
   const usuario = normalizarTexto(localStorage.getItem("usuario"));
-  if (!usuario) return "cliente";
-  return usuario.split(/\s+/)[0] || "cliente";
+  return obtenerPrimerNombreTexto(usuario, "cliente");
+}
+
+function obtenerPrimerNombreTexto(value, fallback = "") {
+  const texto = normalizarTexto(value);
+  if (!texto) return fallback;
+  return texto.split(/\s+/).filter(Boolean)[0] || fallback;
 }
 
 function formatearFecha(value) {
@@ -216,13 +221,36 @@ function obtenerMascotaOVehiculo(cita = {}) {
   return cita.servicioTipo === "auto" ? "Vehiculo" : "Sin dato";
 }
 
+function obtenerNombreEmpleadoDesdeValor(value) {
+  if (typeof value === "string") return normalizarTexto(value);
+  if (!value || typeof value !== "object") return "";
+
+  return normalizarTexto(
+    value.primerNombre ||
+    value.nombreCompleto ||
+    value.nombre ||
+    value.empleadoAsignadoNombre ||
+    value.atendidoPor
+  );
+}
+
 function obtenerEmpleadoCita(cita = {}) {
+  const candidatos = [
+    cita.empleadoAsignadoNombre,
+    cita.atendidoPor,
+    cita.empleado
+  ];
+
   if (Array.isArray(cita.empleadosAsignadosNombres) && cita.empleadosAsignadosNombres.length) {
-    return obtenerPrimerNombre(cita.empleadosAsignadosNombres.map(normalizarTexto).find(Boolean));
+    candidatos.push(...cita.empleadosAsignadosNombres);
   }
 
-  const nombre = normalizarTexto(cita.empleadoAsignadoNombre || cita.atendidoPor);
-  return nombre ? obtenerPrimerNombre(nombre) : "No asignado";
+  if (Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.length) {
+    candidatos.push(...cita.empleadosAsignados);
+  }
+
+  const nombre = candidatos.map(obtenerNombreEmpleadoDesdeValor).find(Boolean);
+  return nombre ? obtenerPrimerNombreTexto(nombre, nombre) : "Sin asignar";
 }
 
 function renderizarBienvenida() {
@@ -233,11 +261,14 @@ function renderizarBienvenida() {
 function crearEstampas(completados, objetivo, tipo) {
   const total = Math.max(Number(objetivo) || 8, 1);
   const llenas = Math.min(Math.max(Number(completados) || 0, 0), total);
-  const iconoLleno = tipo === "auto" ? "&#128663;" : "&#128062;";
+  const icono = tipo === "auto" ? crearIconoPortal("auto") : crearIconoPortal("mascota");
 
   return Array.from({ length: total }, (_, index) => {
-    const clase = index < llenas ? "stamp is-filled" : "stamp";
-    const icono = index < llenas ? iconoLleno : "";
+    const clase = [
+      "stamp",
+      tipo === "auto" ? "stamp-auto" : "stamp-paw",
+      index < llenas ? "is-filled" : ""
+    ].filter(Boolean).join(" ");
     return `<span class="${clase}" aria-label="Sello ${index + 1} de ${total}">${icono}</span>`;
   }).join("");
 }
