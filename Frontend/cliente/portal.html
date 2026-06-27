@@ -14,8 +14,22 @@
       <span>Woof & Wash</span>
     </a>
     <nav class="portal-nav" aria-label="Acciones de cuenta">
-      <a href="../index.html">Inicio</a>
-      <button type="button" id="btnLogout">Cerrar sesion</button>
+      <a href="../index.html">
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 11.5 12 4l9 7.5"></path>
+          <path d="M5 10.5V20h14v-9.5"></path>
+          <path d="M9.5 20v-5h5v5"></path>
+        </svg>
+        Inicio
+      </a>
+      <button type="button" id="btnLogout">
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10 17l5-5-5-5"></path>
+          <path d="M15 12H4"></path>
+          <path d="M14 4h5v16h-5"></path>
+        </svg>
+        Cerrar sesion
+      </button>
     </nav>
   </header>
 
@@ -46,11 +60,20 @@
 
     <section class="history-actions" aria-label="Historiales del portal">
       <button type="button" id="toggleOrdersHistory" class="history-toggle" aria-expanded="false" aria-controls="ordersPanel">
-        <span aria-hidden="true">&#128230;</span>
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m3 7 9-4 9 4-9 4-9-4Z"></path>
+          <path d="M3 7v10l9 4 9-4V7"></path>
+          <path d="M12 11v10"></path>
+        </svg>
         Mostrar historial de compras
       </button>
       <button type="button" id="toggleAppointmentsHistory" class="history-toggle" aria-expanded="false" aria-controls="appointmentsPanel">
-        <span aria-hidden="true">&#128197;</span>
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 3v4"></path>
+          <path d="M17 3v4"></path>
+          <path d="M4 8h16"></path>
+          <path d="M5 5h14v15H5z"></path>
+        </svg>
         Mostrar historial de citas
       </button>
     </section>
@@ -59,7 +82,14 @@
       <article class="panel loyalty-panel">
         <div class="panel-heading">
           <p class="eyebrow">Fidelidad</p>
-          <h2>Tarjeta de recompensas</h2>
+          <div class="panel-title">
+            <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 4h12v16l-6-3-6 3V4Z"></path>
+              <path d="M9 9h6"></path>
+              <path d="M9 12h4"></path>
+            </svg>
+            <h2>Tarjeta de recompensas</h2>
+          </div>
         </div>
         <div id="loyaltyCards" class="loyalty-cards"></div>
       </article>
@@ -67,7 +97,14 @@
       <article id="ordersPanel" class="panel history-panel is-hidden">
         <div class="panel-heading">
           <p class="eyebrow">Tienda</p>
-          <h2>Historial de compras</h2>
+          <div class="panel-title">
+            <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6h15l-2 8H8L6 3H3"></path>
+              <path d="M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"></path>
+              <path d="M18 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"></path>
+            </svg>
+            <h2>Historial de compras</h2>
+          </div>
         </div>
         <div id="ordersList" class="history-list"></div>
       </article>
@@ -75,7 +112,16 @@
       <article id="appointmentsPanel" class="panel appointments-panel history-panel is-hidden">
         <div class="panel-heading">
           <p class="eyebrow">Agenda</p>
-          <h2>Historial de citas</h2>
+          <div class="panel-title">
+            <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 3v4"></path>
+              <path d="M17 3v4"></path>
+              <path d="M4 8h16"></path>
+              <path d="M5 5h14v15H5z"></path>
+              <path d="m9 14 2 2 4-5"></path>
+            </svg>
+            <h2>Historial de citas</h2>
+          </div>
         </div>
         <div id="appointmentsList" class="history-list"></div>
       </article>

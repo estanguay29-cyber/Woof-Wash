@@ -66,6 +66,10 @@ button {
 .portal-nav a,
 .portal-nav button {
   min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 1px solid rgba(11, 42, 107, 0.14);
   border-radius: 8px;
   padding: 10px 14px;
@@ -73,6 +77,17 @@ button {
   color: var(--navy);
   font-weight: 700;
   cursor: pointer;
+}
+
+.portal-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .portal-shell {
@@ -219,6 +234,16 @@ h2 {
   margin-bottom: 18px;
 }
 
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panel-title .portal-icon {
+  color: var(--navy);
+}
+
 .loyalty-cards {
   display: grid;
   gap: 14px;
@@ -274,6 +299,14 @@ h2 {
   font-size: 1.25rem;
   font-weight: 900;
   line-height: 1;
+}
+
+.stamp:not(.is-filled)::before {
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  content: "";
 }
 
 .stamp.is-filled {
@@ -369,10 +402,22 @@ h2 {
 
 .details li {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.detail-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.detail-label .portal-icon {
+  color: var(--navy);
 }
 
 .details strong {

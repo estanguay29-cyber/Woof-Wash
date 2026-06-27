@@ -149,6 +149,31 @@ function escaparHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+function crearIconoPortal(nombre) {
+  const iconos = {
+    auto: '<path d="M5 16h14l-1.5-5h-11L5 16Z"></path><path d="M7 16v2"></path><path d="M17 16v2"></path><path d="M7.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M16.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>',
+    calendario: '<path d="M7 3v4"></path><path d="M17 3v4"></path><path d="M4 8h16"></path><path d="M5 5h14v15H5z"></path>',
+    estado: '<path d="m5 12 4 4L19 6"></path>',
+    mascota: '<path d="M7 14c-1.5 0-3 1.1-3 2.6 0 1 .8 1.9 1.9 1.9.8 0 1.3-.4 2.1-.4s1.3.4 2.1.4c1.1 0 1.9-.9 1.9-1.9 0-1.5-1.5-2.6-3-2.6H7Z"></path><path d="M5.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M10.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M8 8a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>',
+    paquete: '<path d="m3 7 9-4 9 4-9 4-9-4Z"></path><path d="M3 7v10l9 4 9-4V7"></path><path d="M12 11v10"></path>',
+    reloj: '<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M12 7v5l3 2"></path>',
+    servicio: '<path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path>',
+    usuario: '<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path><path d="M4 20a8 8 0 0 1 16 0"></path>',
+    ubicacion: '<path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z"></path><path d="M12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"></path>'
+  };
+  const trazos = iconos[nombre] || iconos.servicio;
+  return `<svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">${trazos}</svg>`;
+}
+
+function crearDetallePortal(icono, etiqueta, valor) {
+  return `
+    <li>
+      <span class="detail-label">${crearIconoPortal(icono)}${escaparHtml(etiqueta)}</span>
+      <strong>${escaparHtml(valor)}</strong>
+    </li>
+  `;
+}
+
 function construirDireccion(direccion = {}) {
   if (typeof direccion === "string") {
     return normalizarTexto(direccion) || "Sin direccion registrada";
@@ -209,7 +234,7 @@ function crearEstampas(completados, objetivo, tipo) {
 
   return Array.from({ length: total }, (_, index) => {
     const clase = index < llenas ? "stamp is-filled" : "stamp";
-    const icono = index < llenas ? iconoLleno : "&#9898;";
+    const icono = index < llenas ? iconoLleno : "";
     return `<span class="${clase}" aria-label="Sello ${index + 1} de ${total}">${icono}</span>`;
   }).join("");
 }
@@ -272,8 +297,8 @@ function renderizarCompras(pedidos = []) {
           <span class="status-pill">${escaparHtml(formatearEstado(pedido.estado))}</span>
         </div>
         <ul class="details">
-          <li><span>Total</span><strong>${formatearCentavosMXN(pedido.total)}</strong></li>
-          <li><span>Productos</span><strong>${productos}</strong></li>
+          ${crearDetallePortal("paquete", "Total", formatearCentavosMXN(pedido.total))}
+          ${crearDetallePortal("servicio", "Productos", String(productos))}
         </ul>
       </article>
     `;
@@ -289,9 +314,8 @@ function renderizarCitas(citas = []) {
   }
 
   contenedor.innerHTML = citas.map((cita) => {
-    const recompensa = cita.rewardGratisAplicado
-      ? `Recompensa aplicada${cita.rewardTipo ? ` (${cita.rewardTipo})` : ""}`
-      : "Sin recompensa aplicada";
+    const tipo = cita.servicioTipo === "auto" ? "Auto" : "Mascota";
+    const iconoTipo = cita.servicioTipo === "auto" ? "auto" : "mascota";
 
     return `
       <article class="history-item appointment-card">
@@ -303,14 +327,14 @@ function renderizarCitas(citas = []) {
           <span class="status-pill ${cita.estado === "cancelada" ? "is-warning" : ""}">${escaparHtml(formatearEstado(cita.estado))}</span>
         </div>
         <ul class="details">
-          <li><span>Fecha</span><strong>${escaparHtml(formatearFecha(cita.fecha))}</strong></li>
-          <li><span>Hora</span><strong>${escaparHtml(cita.hora || "Sin hora")}</strong></li>
-          <li><span>Servicio</span><strong>${escaparHtml(obtenerNombreServicio(cita))}</strong></li>
-          <li><span>Mascota o vehiculo</span><strong>${escaparHtml(obtenerMascotaOVehiculo(cita))}</strong></li>
-          <li><span>Estado</span><strong>${escaparHtml(formatearEstado(cita.estado))}</strong></li>
-          <li><span>Direccion</span><strong>${escaparHtml(construirDireccion(cita.direccion))}</strong></li>
-          <li><span>Empleado</span><strong>${escaparHtml(obtenerEmpleadoCita(cita))}</strong></li>
-          <li><span>Recompensa</span><strong>${escaparHtml(recompensa)}</strong></li>
+          ${crearDetallePortal("calendario", "Fecha", formatearFecha(cita.fecha))}
+          ${crearDetallePortal("reloj", "Hora", cita.hora || "Sin hora")}
+          ${crearDetallePortal("servicio", "Servicio", obtenerNombreServicio(cita))}
+          ${crearDetallePortal(iconoTipo, "Tipo", tipo)}
+          ${crearDetallePortal(iconoTipo, "Mascota o vehiculo", obtenerMascotaOVehiculo(cita))}
+          ${crearDetallePortal("estado", "Estado", formatearEstado(cita.estado))}
+          ${crearDetallePortal("ubicacion", "Direccion", construirDireccion(cita.direccion))}
+          ${crearDetallePortal("usuario", "Empleado", obtenerEmpleadoCita(cita))}
         </ul>
       </article>
     `;
