@@ -154,8 +154,10 @@ function crearIconoPortal(nombre) {
     auto: '<path d="M5 16h14l-1.5-5h-11L5 16Z"></path><path d="M7 16v2"></path><path d="M17 16v2"></path><path d="M7.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M16.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>',
     calendario: '<path d="M7 3v4"></path><path d="M17 3v4"></path><path d="M4 8h16"></path><path d="M5 5h14v15H5z"></path>',
     estado: '<path d="m5 12 4 4L19 6"></path>',
+    info: '<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M12 11v5"></path><path d="M12 8h.01"></path>',
     mascota: '<path d="M7 14c-1.5 0-3 1.1-3 2.6 0 1 .8 1.9 1.9 1.9.8 0 1.3-.4 2.1-.4s1.3.4 2.1.4c1.1 0 1.9-.9 1.9-1.9 0-1.5-1.5-2.6-3-2.6H7Z"></path><path d="M5.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M10.5 11.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path><path d="M8 8a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path>',
     paquete: '<path d="m3 7 9-4 9 4-9 4-9-4Z"></path><path d="M3 7v10l9 4 9-4V7"></path><path d="M12 11v10"></path>',
+    recompensa: '<path d="M20 12v8H4v-8"></path><path d="M2 7h20v5H2z"></path><path d="M12 7v13"></path><path d="M12 7H8.5a2 2 0 1 1 2-2c0 1.5 1.5 2 1.5 2Z"></path><path d="M12 7h3.5a2 2 0 1 0-2-2c0 1.5-1.5 2-1.5 2Z"></path>',
     reloj: '<path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"></path><path d="M12 7v5l3 2"></path>',
     servicio: '<path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h10"></path>',
     usuario: '<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path><path d="M4 20a8 8 0 0 1 16 0"></path>',
@@ -216,10 +218,11 @@ function obtenerMascotaOVehiculo(cita = {}) {
 
 function obtenerEmpleadoCita(cita = {}) {
   if (Array.isArray(cita.empleadosAsignadosNombres) && cita.empleadosAsignadosNombres.length) {
-    return cita.empleadosAsignadosNombres.map(normalizarTexto).filter(Boolean).join(", ");
+    return obtenerPrimerNombre(cita.empleadosAsignadosNombres.map(normalizarTexto).find(Boolean));
   }
 
-  return normalizarTexto(cita.empleadoAsignadoNombre || cita.atendidoPor) || "No asignado";
+  const nombre = normalizarTexto(cita.empleadoAsignadoNombre || cita.atendidoPor);
+  return nombre ? obtenerPrimerNombre(nombre) : "No asignado";
 }
 
 function renderizarBienvenida() {
@@ -245,6 +248,8 @@ function renderizarTarjetaFidelidad(tipo, item = {}) {
   const restantes = Math.max(Number(item.restantes) || objetivo - completados, 0);
   const porcentaje = Math.min((completados / objetivo) * 100, 100);
   const nombre = tipo === "auto" ? "Lavado Movil" : "Estetica Canina";
+  const icono = tipo === "auto" ? "auto" : "mascota";
+  const iconoNota = item.rewardEligible ? "recompensa" : "info";
   const nota = item.rewardEligible
     ? "Recompensa disponible para tu proxima cita elegible."
     : `Te faltan ${restantes} cita${restantes === 1 ? "" : "s"} para tu premio.`;
@@ -252,7 +257,7 @@ function renderizarTarjetaFidelidad(tipo, item = {}) {
   return `
     <section class="loyalty-card ${item.rewardEligible ? "is-ready" : ""}">
       <div class="loyalty-title">
-        <h3>${nombre}</h3>
+        <h3>${crearIconoPortal(icono)}${nombre}</h3>
         <span>${completados}/${objetivo}</span>
       </div>
       <div class="stamp-grid" aria-label="Progreso de ${nombre}">
@@ -261,7 +266,7 @@ function renderizarTarjetaFidelidad(tipo, item = {}) {
       <div class="progress-track" aria-hidden="true">
         <div class="progress-bar" style="width: ${porcentaje}%"></div>
       </div>
-      <p class="loyalty-note">${nota}</p>
+      <p class="loyalty-note">${crearIconoPortal(iconoNota)}${nota}</p>
     </section>
   `;
 }
