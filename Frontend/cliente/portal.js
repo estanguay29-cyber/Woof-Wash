@@ -471,6 +471,14 @@ document.getElementById("toggleAppointmentsHistory")?.addEventListener("click", 
   alternarHistorial("appointments");
 });
 
+document.getElementById("heroOrdersAction")?.addEventListener("click", () => {
+  const ordersPanel = document.getElementById("ordersPanel");
+  if (ordersPanel?.classList.contains("is-hidden")) {
+    alternarHistorial("orders");
+  }
+  ordersPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 renderizarBienvenida();
 
 if (protegerPortalCliente()) {

@@ -37,24 +37,65 @@
   </header>
 
   <main class="portal-shell">
-    <section class="welcome-band">
-      <div class="welcome-copy">
-        <p class="eyebrow">Portal cliente</p>
+    <section class="welcome-band client-hero">
+      <div class="client-hero__content">
+        <p class="eyebrow client-hero__eyebrow">Portal cliente</p>
         <h1 id="welcomeTitle">Hola, cliente</h1>
-        <p id="welcomeCopy">Aqui puedes revisar tu fidelidad, compras y citas.</p>
+        <h2>Tu espacio Woof & Wash</h2>
+        <p id="welcomeCopy">Consulta tus citas, pedidos, puntos y beneficios en un solo lugar.</p>
+        <div class="client-hero__actions" aria-label="Acciones rapidas">
+          <a class="client-hero__action client-hero__action--primary" href="../agenda.html">
+            <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 3v4"></path>
+              <path d="M17 3v4"></path>
+              <path d="M4 8h16"></path>
+              <path d="M5 5h14v15H5z"></path>
+              <path d="m9 14 2 2 4-5"></path>
+            </svg>
+            Agendar servicio
+          </a>
+          <button type="button" id="heroOrdersAction" class="client-hero__action client-hero__action--secondary">
+            <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m3 7 9-4 9 4-9 4-9-4Z"></path>
+              <path d="M3 7v10l9 4 9-4V7"></path>
+              <path d="M12 11v10"></path>
+            </svg>
+            Ver mis pedidos
+          </button>
+        </div>
+        <div class="quick-summary" aria-label="Resumen rapido">
+          <div>
+            <strong id="summaryOrders">0</strong>
+            <span>Compras</span>
+          </div>
+          <div>
+            <strong id="summaryAppointments">0</strong>
+            <span>Citas</span>
+          </div>
+          <div>
+            <strong id="summaryRewards">0</strong>
+            <span>Premios</span>
+          </div>
+        </div>
       </div>
-      <div class="quick-summary" aria-label="Resumen rapido">
-        <div>
-          <strong id="summaryOrders">0</strong>
-          <span>Compras</span>
+      <div class="client-hero__visual" aria-hidden="true">
+        <span class="client-hero__bubble client-hero__bubble--one"></span>
+        <span class="client-hero__bubble client-hero__bubble--two"></span>
+        <span class="client-hero__bubble client-hero__bubble--three"></span>
+        <div class="client-hero__badge">Servicio a domicilio</div>
+        <div class="client-hero__van">
+          <div class="client-hero__van-roof"></div>
+          <div class="client-hero__van-body">
+            <span>W&W</span>
+          </div>
+          <div class="client-hero__van-window"></div>
+          <div class="client-hero__van-wheel client-hero__van-wheel--left"></div>
+          <div class="client-hero__van-wheel client-hero__van-wheel--right"></div>
         </div>
-        <div>
-          <strong id="summaryAppointments">0</strong>
-          <span>Citas</span>
-        </div>
-        <div>
-          <strong id="summaryRewards">0</strong>
-          <span>Premios</span>
+        <div class="client-hero__paws">
+          <span></span>
+          <span></span>
+          <span></span>
         </div>
       </div>
     </section>
