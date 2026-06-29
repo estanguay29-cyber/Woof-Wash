@@ -61,6 +61,30 @@
       descripcion: "El clásico juguete con un diseño divertido que despierta la curiosidad de cualquier perrito."
     },
     {
+      id: "peluche-pollo",
+      nombre: "Peluche Pollo",
+      precio: 200,
+      imagen: "img/Peluche-pollo.png",
+      descripcion: "Peluche suave tipo pollo, ideal para juego y mordida ligera de mascotas."
+    },
+    {
+      id: "pechera-mezclilla",
+      nombre: "Pechera Mezclilla",
+      precio: 330,
+      descripcion: "Pechera de mezclilla para mascota, comoda, resistente y con estilo.",
+      tipoVariante: "talla",
+      variantes: [
+        { id: "pechera-mezclilla-mediana", nombre: "Pechera Mezclilla Mediana", etiqueta: "Mediana", imagen: "img/Peluche-pechera.png" }
+      ]
+    },
+    {
+      id: "peluche-leon",
+      nombre: "Peluche Leon",
+      precio: 150,
+      imagen: "img/Peluche-leon.png",
+      descripcion: "Peluche suave tipo leon, ideal para juego, compania y mordida ligera."
+    },
+    {
       id: "peluche-fresa",
       nombre: "Peluche fresa",
       precio: 44,

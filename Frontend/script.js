@@ -12,12 +12,32 @@ const ICONO_CARRITO_PRODUCTO = `
   </svg>
 `;
 
+function obtenerCatalogoMascotasActual() {
+  return Array.isArray(window.WoofWashProductos?.mascotaGroups)
+    ? window.WoofWashProductos.mascotaGroups
+    : CATALOGO_PRODUCTOS_MASCOTAS;
+}
+
+function obtenerCatalogoAutoActual() {
+  return Array.isArray(window.WoofWashProductos?.autoGroups)
+    ? window.WoofWashProductos.autoGroups
+    : CATALOGO_PRODUCTOS_AUTO;
+}
+
+function obtenerProductosCatalogoActual() {
+  return window.WoofWashProductos?.catalogo || PRODUCTOS_CATALOGO;
+}
+
+function obtenerProductosPorNombreActual() {
+  return window.WoofWashProductos?.porNombre || PRODUCTOS_POR_NOMBRE;
+}
+
 function obtenerProductoPorId(id) {
-  return typeof id === "string" ? PRODUCTOS_CATALOGO[id] || null : null;
+  return typeof id === "string" ? obtenerProductosCatalogoActual()[id] || null : null;
 }
 
 function obtenerProductoPorNombre(nombre) {
-  return typeof nombre === "string" ? PRODUCTOS_POR_NOMBRE[nombre] || null : null;
+  return typeof nombre === "string" ? obtenerProductosPorNombreActual()[nombre] || null : null;
 }
 
 function obtenerProductoPorIdentificador(valor) {
@@ -69,7 +89,7 @@ function obtenerColorVarianteProducto(variante) {
 function seleccionarVarianteProductoMascota(card, variantId) {
   if (!card) return;
 
-  const producto = CATALOGO_PRODUCTOS_MASCOTAS.find((item) => item.id === card.dataset.productGroup);
+  const producto = obtenerCatalogoMascotasActual().find((item) => item.id === card.dataset.productGroup);
   if (!producto) return;
 
   const variantes = obtenerVariantesProductoMascota(producto);
@@ -107,7 +127,7 @@ function iniciarCarruselProductoMascota(card) {
   if (!card) return;
 
   const groupId = card.dataset.productGroup;
-  const producto = CATALOGO_PRODUCTOS_MASCOTAS.find((item) => item.id === groupId);
+  const producto = obtenerCatalogoMascotasActual().find((item) => item.id === groupId);
   const variantes = obtenerVariantesProductoMascota(producto);
 
   if (!groupId || variantes.length <= 1 || productoMascotaTimers.has(groupId)) return;
@@ -148,14 +168,16 @@ function pausarCarruselProductoMascota(card, resumeDelay = 9000) {
 }
 
 function crearChipsVariantesProducto(producto, variantes) {
-  if (!Array.isArray(producto.variantes) || variantes.length <= 1) return "";
+  const tipoVariante = producto.tipoVariante === "talla" ? "talla" : "color";
+  if (!Array.isArray(producto.variantes) || (variantes.length <= 1 && tipoVariante !== "talla")) return "";
+  const etiquetaSelector = tipoVariante === "talla" ? "Talla" : "Colores";
 
   return `
-    <div class="product-variant-picker" aria-label="Colores disponibles">
-      <span>Colores</span>
+    <div class="product-variant-picker" aria-label="${etiquetaSelector} disponibles">
+      <span>${etiquetaSelector}</span>
       <div class="product-variant-chips">
         ${variantes.map((variante, index) => `
-          <button type="button" class="product-variant-chip ${index === 0 ? "is-active" : ""}" style="--variant-color: ${escaparHtmlProducto(obtenerColorVarianteProducto(variante))}" data-product-chip data-product-id="${escaparHtmlProducto(variante.id)}" aria-label="Ver ${escaparHtmlProducto(variante.nombre)}" aria-pressed="${index === 0 ? "true" : "false"}" onclick="seleccionarVarianteProductoMascotaManual(this.closest('[data-product-card]'), '${escaparHtmlProducto(variante.id)}')"></button>
+          <button type="button" class="product-variant-chip ${tipoVariante === "talla" ? "is-size" : ""} ${index === 0 ? "is-active" : ""}" style="--variant-color: ${escaparHtmlProducto(obtenerColorVarianteProducto(variante))}" data-product-chip data-product-id="${escaparHtmlProducto(variante.id)}" aria-label="Ver ${escaparHtmlProducto(variante.nombre)}" aria-pressed="${index === 0 ? "true" : "false"}" onclick="seleccionarVarianteProductoMascotaManual(this.closest('[data-product-card]'), '${escaparHtmlProducto(variante.id)}')">${tipoVariante === "talla" ? escaparHtmlProducto(variante.etiqueta || variante.nombre) : ""}</button>
         `).join("")}
       </div>
     </div>
@@ -190,14 +212,14 @@ function renderizarProductosMascotas() {
   if (!slider) return;
 
   limpiarCarruselesProductoMascota();
-  slider.innerHTML = CATALOGO_PRODUCTOS_MASCOTAS.map(crearCardProductoMascota).join("");
+  slider.innerHTML = obtenerCatalogoMascotasActual().map(crearCardProductoMascota).join("");
   slider.querySelectorAll("[data-product-card]").forEach(iniciarCarruselProductoMascota);
 }
 
 function manejarAgregarProductoMascota(btn) {
   const card = btn?.closest?.("[data-product-card]");
   const groupId = btn?.dataset?.productGroup || card?.dataset?.productGroup;
-  const producto = CATALOGO_PRODUCTOS_MASCOTAS.find((item) => item.id === groupId);
+  const producto = obtenerCatalogoMascotasActual().find((item) => item.id === groupId);
   const variantes = obtenerVariantesProductoMascota(producto);
 
   if (producto && Array.isArray(producto.variantes) && variantes.length > 1) {
@@ -351,7 +373,7 @@ function renderizarProductosAuto() {
   const slider = document.getElementById("sliderAutos");
   if (!slider) return;
 
-  slider.innerHTML = CATALOGO_PRODUCTOS_AUTO.map(crearCardProductoAuto).join("");
+  slider.innerHTML = obtenerCatalogoAutoActual().map(crearCardProductoAuto).join("");
 }
 
 function normalizarCarritoLocal(items) {
@@ -812,6 +834,10 @@ if (menuCuentaUsuario && token) {
 
   if (pedidosSection) {
     pedidosSection.classList.toggle("hidden", !token);
+  }
+
+  if (!token) {
+    actualizarEstadoDesplegablePedidos(false);
   }
 
   if (nombreUsuario) {
@@ -1998,6 +2024,24 @@ function renderizarPedidos(pedidos) {
   }).join("");
 }
 
+function actualizarEstadoDesplegablePedidos(abierto) {
+  const contenedor = document.getElementById("pedidosListaWrapper");
+  const boton = document.getElementById("btnTogglePedidos");
+  if (!contenedor || !boton) return;
+
+  contenedor.classList.toggle("is-open", abierto);
+  boton.setAttribute("aria-expanded", abierto ? "true" : "false");
+  boton.innerHTML = abierto ? "<span>▲ Ocultar pedidos</span>" : "<span>Ver pedidos ▼</span>";
+}
+
+function togglePedidosCarrito() {
+  const contenedor = document.getElementById("pedidosListaWrapper");
+  if (!contenedor) return;
+
+  const abrir = !contenedor.classList.contains("is-open");
+  actualizarEstadoDesplegablePedidos(abrir);
+}
+
 async function confirmarCancelacionPedido() {
   const token = obtenerTokenValido();
   const pedido = pedidoSeleccionadoParaCancelar;
@@ -2202,11 +2246,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, 700);
   }
 
-  await cargarZonasServicioPublicas();
-  renderizarZonaHoyPublica();
   renderizarProductosMascotas();
   renderizarProductosAuto();
   inicializarJingleWoofWash();
+  await cargarZonasServicioPublicas();
+  renderizarZonaHoyPublica();
+  renderizarZonaDestacadaPublica();
 
   const inputProductos = document.getElementById("buscadorProductos");
 
@@ -2250,11 +2295,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   configurarJuegoNosotros();
 
   const btnActualizarPedidos = document.getElementById("btnActualizarPedidos");
+  const btnTogglePedidos = document.getElementById("btnTogglePedidos");
   const btnConfirmarEliminarCuenta = document.getElementById("btnConfirmarEliminarCuenta");
   const btnCancelarEliminarCuenta = document.getElementById("btnCancelarEliminarCuenta");
 
   if (btnActualizarPedidos) {
     btnActualizarPedidos.addEventListener("click", cargarPedidos);
+  }
+
+  if (btnTogglePedidos) {
+    btnTogglePedidos.addEventListener("click", togglePedidosCarrito);
   }
 
   if (btnConfirmarEliminarCuenta) {
@@ -2280,6 +2330,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         pedidosSection.classList.remove("hidden");
       }
 
+      actualizarEstadoDesplegablePedidos(true);
       pedidosSection?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 300);
   }

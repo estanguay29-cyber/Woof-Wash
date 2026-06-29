@@ -61,6 +61,21 @@
 
     <p id="portalMessage" class="portal-message" role="status"></p>
 
+    <article class="panel loyalty-panel loyalty-panel-featured">
+      <div class="panel-heading">
+        <p class="eyebrow">Fidelidad</p>
+        <div class="panel-title">
+          <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 4h12v16l-6-3-6 3V4Z"></path>
+            <path d="M9 9h6"></path>
+            <path d="M9 12h4"></path>
+          </svg>
+          <h2>Tarjeta de recompensas</h2>
+        </div>
+      </div>
+      <div id="loyaltyCards" class="loyalty-cards"></div>
+    </article>
+
     <section class="history-actions" aria-label="Historiales del portal">
       <button type="button" id="toggleOrdersHistory" class="history-toggle" aria-expanded="false" aria-controls="ordersPanel">
         <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -82,21 +97,6 @@
     </section>
 
     <section class="portal-grid">
-      <article class="panel loyalty-panel">
-        <div class="panel-heading">
-          <p class="eyebrow">Fidelidad</p>
-          <div class="panel-title">
-            <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M6 4h12v16l-6-3-6 3V4Z"></path>
-              <path d="M9 9h6"></path>
-              <path d="M9 12h4"></path>
-            </svg>
-            <h2>Tarjeta de recompensas</h2>
-          </div>
-        </div>
-        <div id="loyaltyCards" class="loyalty-cards"></div>
-      </article>
-
       <article id="ordersPanel" class="panel history-panel is-hidden">
         <div class="panel-heading">
           <p class="eyebrow">Tienda</p>

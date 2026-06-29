@@ -1214,17 +1214,6 @@ class="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-[#fffdf7] shadow-[0_20p
 </div>
     </section>
 
-    <section id="loyaltySection" class="cart-shell loyalty-card hidden">
-      <div class="loyalty-card-head">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#8cc63f]">Tarjeta de fidelidad</p>
-          <h3>Recompensas Woof & Wash</h3>
-        </div>
-        <span id="loyaltyStatus" class="loyalty-status">0/8</span>
-      </div>
-      <div id="loyaltyContent" class="loyalty-content"></div>
-    </section>
-
     <section class="cart-shell cart-shell-soft">
       <div class="flex items-center justify-between gap-3 mb-4">
         <div>
@@ -1238,16 +1227,25 @@ class="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-[#fffdf7] shadow-[0_20p
     </section>
 
     <section id="pedidosSection" class="cart-shell hidden">
-      <div class="flex items-center justify-between gap-3 mb-4">
+      <div class="mb-4">
         <div>
-          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#8cc63f]">Historial</p>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-[#8cc63f]">Mis pedidos</p>
           <p class="text-sm text-slate-500">Tus pedidos recientes.</p>
         </div>
-        <button id="btnActualizarPedidos" type="button" class="rounded-full border border-[#0b2a6b]/15 px-3 py-1.5 text-xs font-semibold text-[#0b2a6b] transition hover:border-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white">
-          Actualizar
-        </button>
       </div>
-      <div id="listaPedidos" class="space-y-3"></div>
+      <button id="btnTogglePedidos" type="button" class="cart-orders-toggle" aria-expanded="false" aria-controls="pedidosListaWrapper">
+        <span>Ver pedidos ▼</span>
+      </button>
+      <div id="pedidosListaWrapper" class="cart-orders-collapse">
+        <div class="cart-orders-inner">
+          <div class="flex justify-end mb-3">
+            <button id="btnActualizarPedidos" type="button" class="rounded-full border border-[#0b2a6b]/15 px-3 py-1.5 text-xs font-semibold text-[#0b2a6b] transition hover:border-[#0b2a6b] hover:bg-[#0b2a6b] hover:text-white">
+              Actualizar
+            </button>
+          </div>
+          <div id="listaPedidos" class="space-y-3"></div>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -1322,5 +1320,4 @@ class="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-[#fffdf7] shadow-[0_20p
 </body>
 
 </html>
-
 
