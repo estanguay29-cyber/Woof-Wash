@@ -1,6 +1,11 @@
 const API_URL = obtenerApiBase();
 const REDIRECT_LOGIN = "../login.html";
 const REDIRECT_HOME = "../index.html";
+const HERO_ANIMATION_FRAMES = Array.from(
+  { length: 8 },
+  (_, index) => `../img/Vanimacion${index + 1}.png`
+);
+const HERO_ANIMATION_FRAME_MS = 700;
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -258,6 +263,99 @@ function renderizarBienvenida() {
   document.getElementById("welcomeTitle").textContent = `Hola, ${nombre}`;
 }
 
+function inicializarHeroClienteAnimado() {
+  const stage = document.querySelector(".client-hero__animation-stage");
+  const layers = Array.from(document.querySelectorAll(".client-hero__animation-frame"));
+  if (!stage || layers.length < 2) return;
+
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let frameIndex = 0;
+  let activeLayer = 0;
+  let timer = null;
+  let isVisible = true;
+  let framesReady = false;
+
+  function stopLoop() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  }
+
+  function showFrame(index) {
+    const src = HERO_ANIMATION_FRAMES[index];
+    const nextLayer = activeLayer === 0 ? 1 : 0;
+    layers[nextLayer].src = src;
+    layers[nextLayer].classList.add("is-active");
+    layers[activeLayer].classList.remove("is-active");
+    activeLayer = nextLayer;
+  }
+
+  function showStaticFrame() {
+    stopLoop();
+    frameIndex = 0;
+    layers[activeLayer].src = HERO_ANIMATION_FRAMES[0];
+    layers.forEach((layer, index) => {
+      layer.classList.toggle("is-active", index === activeLayer);
+    });
+  }
+
+  function startLoop() {
+    if (timer || !framesReady || reducedMotion.matches || !isVisible || document.hidden) return;
+    timer = setInterval(() => {
+      frameIndex = (frameIndex + 1) % HERO_ANIMATION_FRAMES.length;
+      showFrame(frameIndex);
+    }, HERO_ANIMATION_FRAME_MS);
+  }
+
+  function applyMotionPreference() {
+    stage.classList.toggle("is-reduced-motion", reducedMotion.matches);
+    if (reducedMotion.matches) {
+      showStaticFrame();
+      return;
+    }
+    startLoop();
+  }
+
+  const preloads = HERO_ANIMATION_FRAMES.map((src) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.src = src;
+    return typeof image.decode === "function" ? image.decode().catch(() => undefined) : Promise.resolve();
+  });
+
+  Promise.allSettled(preloads).then(() => {
+    framesReady = true;
+    applyMotionPreference();
+  });
+
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver((entries) => {
+      isVisible = entries.some((entry) => entry.isIntersecting);
+      if (isVisible) {
+        startLoop();
+      } else {
+        stopLoop();
+      }
+    }, { threshold: 0.16 });
+    observer.observe(stage);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopLoop();
+    } else {
+      startLoop();
+    }
+  });
+
+  if (typeof reducedMotion.addEventListener === "function") {
+    reducedMotion.addEventListener("change", applyMotionPreference);
+  } else if (typeof reducedMotion.addListener === "function") {
+    reducedMotion.addListener(applyMotionPreference);
+  }
+}
+
 function crearEstampas(completados, objetivo, tipo) {
   const total = Math.max(Number(objetivo) || 8, 1);
   const llenas = Math.min(Math.max(Number(completados) || 0, 0), total);
@@ -480,6 +578,7 @@ document.getElementById("heroOrdersAction")?.addEventListener("click", () => {
 });
 
 renderizarBienvenida();
+inicializarHeroClienteAnimado();
 
 if (protegerPortalCliente()) {
   cargarPortal().catch((error) => {
