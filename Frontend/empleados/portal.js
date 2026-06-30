@@ -287,6 +287,13 @@ function estadoTexto(value) {
   return estados[value] || value || "Pendiente";
 }
 
+function estadoVisibleCita(cita = {}) {
+  if (cita.estadoVisible) return cita.estadoVisible;
+  if (["completada", "cancelada", "no_asistio"].includes(cita.estado)) return cita.estado;
+  if (cita.estadoOperativo && cita.estadoOperativo !== "pendiente") return cita.estadoOperativo;
+  return cita.estado || cita.estadoOperativo || "pendiente";
+}
+
 function textoServicio(servicio, index) {
   const tipo = servicio?.tipo === "auto" ? "Auto" : "Mascota";
   const nombre = servicio?.nombre || [servicio?.categoria, servicio?.paquete].filter(Boolean).join(" ") || "Servicio";
@@ -648,7 +655,7 @@ function renderCitasDashboard(citas = [], fecha = fechaLocalISO()) {
       <article class="appointment-card">
         <div class="appointment-head">
           <strong>${escapeHtml(formatoFecha(cita.fecha))} - ${escapeHtml(cita.hora || "-")}</strong>
-          <span>${escapeHtml(estadoTexto(cita.estadoOperativo || cita.estado))}</span>
+          <span>${escapeHtml(estadoTexto(estadoVisibleCita(cita)))}</span>
         </div>
         <h3>${escapeHtml(cita.clienteNombre || "Cliente")}</h3>
         <p>${escapeHtml(descripcion)}</p>

@@ -2511,6 +2511,15 @@ function construirCitaAdmin(cita) {
   };
 }
 
+function obtenerEstadoVisibleCita(cita = {}) {
+  const estado = normalizarTextoPlano(cita.estado, 30) || "pendiente";
+  const estadoOperativo = normalizarTextoPlano(cita.estadoOperativo, 30) || "pendiente";
+
+  if (["completada", "cancelada", "no_asistio"].includes(estado)) return estado;
+  if (estadoOperativo && estadoOperativo !== "pendiente") return estadoOperativo;
+  return estado || estadoOperativo || "pendiente";
+}
+
 // Employee metric functions moved to Backend/services/employeeService.js
 
 // Metric and payment helpers moved to Backend/services/employeeService.js
@@ -2524,7 +2533,10 @@ function construirCitaEmpleado(cita) {
     clienteTelefono: base.clienteTelefono,
     servicioTipo: base.servicioTipo,
     servicioNombre: base.servicioNombre,
+    servicioCategoria: base.servicioCategoria,
+    servicioPaquete: base.servicioPaquete,
     serviciosDetalle: base.serviciosDetalle,
+    mascotaNombre: base.mascotaNombre,
     fecha: base.fecha,
     hora: base.hora,
     zona: base.zona,
@@ -2533,7 +2545,10 @@ function construirCitaEmpleado(cita) {
     empleadoAsignadoNombre: base.empleadoAsignadoNombre,
     estado: base.estado,
     estadoOperativo: base.estadoOperativo,
+    estadoVisible: obtenerEstadoVisibleCita(base),
+    totalCobrado: base.totalCobrado,
     rewardGratisAplicado: base.rewardGratisAplicado,
+    calificacionServicio: base.calificacionServicio,
     calificacionCliente: base.calificacionCliente,
     comentarioCliente: base.comentarioCliente,
     inicioServicioAt: base.inicioServicioAt,

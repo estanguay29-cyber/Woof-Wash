@@ -141,6 +141,13 @@
         box-shadow: inset 0 0 0 2px rgba(140, 198, 63, 0.3);
       }
 
+      .ww-admin-nav-logo img {
+        width: 78%;
+        height: 78%;
+        display: block;
+        object-fit: contain;
+      }
+
       .ww-admin-nav-brand strong,
       .ww-admin-nav-brand small,
       .ww-admin-nav-link span:last-child,
@@ -470,7 +477,9 @@
       <div class="ww-admin-nav-inner">
         <button class="ww-admin-nav-close" type="button" aria-label="Cerrar menu administrador">x</button>
         <a class="ww-admin-nav-brand" href="${prefix}admin.html" aria-label="Woof and Wash Admin">
-          <span class="ww-admin-nav-logo">W&amp;W</span>
+          <span class="ww-admin-nav-logo">
+            <img src="${prefix}img/favicon.png" alt="Woof & Wash">
+          </span>
           <span>
             <strong>Woof&amp;Wash</strong>
             <small>Ecosistema admin</small>
