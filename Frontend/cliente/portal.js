@@ -5,7 +5,7 @@ const HERO_ANIMATION_FRAMES = Array.from(
   { length: 8 },
   (_, index) => `../img/Vanimacion${index + 1}.png`
 );
-const HERO_ANIMATION_FRAME_MS = 700;
+const HERO_ANIMATION_FRAME_MS = 280;
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -265,45 +265,52 @@ function renderizarBienvenida() {
 
 function inicializarHeroClienteAnimado() {
   const stage = document.querySelector(".client-hero__animation-stage");
-  const layers = Array.from(document.querySelectorAll(".client-hero__animation-frame"));
-  if (!stage || layers.length < 2) return;
+  const frame = document.querySelector(".client-hero__animation-frame");
+  if (!stage || !frame) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let frameIndex = 0;
-  let activeLayer = 0;
   let timer = null;
   let isVisible = true;
   let framesReady = false;
+  let switchTimer = null;
+  let loadedFrames = [HERO_ANIMATION_FRAMES[0]];
 
   function stopLoop() {
     if (timer) {
       clearInterval(timer);
       timer = null;
     }
+    if (switchTimer) {
+      clearTimeout(switchTimer);
+      switchTimer = null;
+    }
   }
 
   function showFrame(index) {
-    const src = HERO_ANIMATION_FRAMES[index];
-    const nextLayer = activeLayer === 0 ? 1 : 0;
-    layers[nextLayer].src = src;
-    layers[nextLayer].classList.add("is-active");
-    layers[activeLayer].classList.remove("is-active");
-    activeLayer = nextLayer;
+    const src = loadedFrames[index] || HERO_ANIMATION_FRAMES[0];
+    if (frame.getAttribute("src") === src) return;
+
+    frame.classList.add("is-switching");
+    frame.src = src;
+    if (switchTimer) clearTimeout(switchTimer);
+    switchTimer = setTimeout(() => {
+      frame.classList.remove("is-switching");
+      switchTimer = null;
+    }, 120);
   }
 
   function showStaticFrame() {
     stopLoop();
     frameIndex = 0;
-    layers[activeLayer].src = HERO_ANIMATION_FRAMES[0];
-    layers.forEach((layer, index) => {
-      layer.classList.toggle("is-active", index === activeLayer);
-    });
+    frame.src = HERO_ANIMATION_FRAMES[0];
+    frame.classList.remove("is-switching");
   }
 
   function startLoop() {
     if (timer || !framesReady || reducedMotion.matches || !isVisible || document.hidden) return;
     timer = setInterval(() => {
-      frameIndex = (frameIndex + 1) % HERO_ANIMATION_FRAMES.length;
+      frameIndex = (frameIndex + 1) % loadedFrames.length;
       showFrame(frameIndex);
     }, HERO_ANIMATION_FRAME_MS);
   }
@@ -317,14 +324,17 @@ function inicializarHeroClienteAnimado() {
     startLoop();
   }
 
-  const preloads = HERO_ANIMATION_FRAMES.map((src) => {
+  const preloads = HERO_ANIMATION_FRAMES.map((src) => new Promise((resolve) => {
     const image = new Image();
     image.decoding = "async";
+    image.onload = () => resolve(src);
+    image.onerror = () => resolve(null);
     image.src = src;
-    return typeof image.decode === "function" ? image.decode().catch(() => undefined) : Promise.resolve();
-  });
+  }));
 
-  Promise.allSettled(preloads).then(() => {
+  Promise.all(preloads).then((results) => {
+    loadedFrames = results.filter(Boolean);
+    if (!loadedFrames.length) loadedFrames = [HERO_ANIMATION_FRAMES[0]];
     framesReady = true;
     applyMotionPreference();
   });

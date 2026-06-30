@@ -343,34 +343,38 @@ h2 {
   min-height: 245px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.82);
+  padding: clamp(12px, 2.6vw, 20px);
+  border: 1px solid rgba(11, 42, 107, 0.08);
   border-radius: var(--radius);
   background:
-    radial-gradient(circle at 28% 20%, rgba(255, 255, 255, 0.95), transparent 24%),
-    linear-gradient(145deg, rgba(11, 42, 107, 0.94), rgba(15, 78, 172, 0.88));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 22px 48px rgba(11, 42, 107, 0.18);
+    radial-gradient(circle at 18% 14%, rgba(140, 198, 63, 0.16), transparent 28%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(247, 251, 255, 0.84));
+  box-shadow: 0 22px 42px rgba(11, 42, 107, 0.11);
 }
 
 .client-hero__badge {
   position: absolute;
-  top: 18px;
-  left: 18px;
+  z-index: 4;
+  top: 12px;
+  left: 12px;
   border-radius: 999px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.9);
   color: var(--blue);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 950;
-  box-shadow: 0 12px 26px rgba(11, 42, 107, 0.14);
+  box-shadow: 0 10px 22px rgba(11, 42, 107, 0.12);
 }
 
 .client-hero__animation {
   position: relative;
-  width: min(100%, 430px);
-  aspect-ratio: 1.5;
-  overflow: hidden;
+  width: min(100%, 440px);
+  aspect-ratio: 4 / 3;
+  margin-top: 34px;
+  overflow: visible;
   border-radius: var(--radius);
-  filter: drop-shadow(0 24px 24px rgba(0, 0, 0, 0.18));
+  filter: drop-shadow(0 20px 24px rgba(11, 42, 107, 0.18));
+  animation: clientHeroFrameMotion 2.24s ease-in-out infinite;
 }
 
 .client-hero__animation-stage {
@@ -378,123 +382,34 @@ h2 {
   inset: 0;
   overflow: hidden;
   border-radius: inherit;
-  background:
-    radial-gradient(circle at 22% 20%, rgba(255, 255, 255, 0.95), transparent 17%),
-    linear-gradient(180deg, rgba(232, 240, 255, 0.22) 0%, rgba(232, 240, 255, 0.08) 48%, rgba(16, 35, 63, 0.18) 49%, rgba(16, 35, 63, 0.32) 100%);
-}
-
-.client-hero__animation-stage::before {
-  content: "";
-  position: absolute;
-  left: -12%;
-  right: -12%;
-  bottom: 22%;
-  height: 58px;
-  background:
-    linear-gradient(90deg, transparent 0 16%, rgba(255, 255, 255, 0.34) 16% 17%, transparent 17% 44%, rgba(255, 255, 255, 0.28) 44% 45%, transparent 45% 100%),
-    linear-gradient(180deg, rgba(140, 198, 63, 0.52), rgba(140, 198, 63, 0.18));
-  transform: skewY(-3deg);
-  animation: clientHeroScenery 6s linear infinite;
-}
-
-.client-hero__animation-clouds {
-  position: absolute;
-  inset: 12% -25% auto;
-  height: 44px;
-  background:
-    radial-gradient(circle at 8% 55%, rgba(255, 255, 255, 0.55) 0 14px, transparent 15px),
-    radial-gradient(circle at 38% 30%, rgba(255, 255, 255, 0.42) 0 10px, transparent 11px),
-    radial-gradient(circle at 68% 62%, rgba(255, 255, 255, 0.36) 0 12px, transparent 13px),
-    radial-gradient(circle at 92% 36%, rgba(255, 255, 255, 0.46) 0 9px, transparent 10px);
-  opacity: 0.86;
-  animation: clientHeroClouds 12s linear infinite;
-}
-
-.client-hero__animation-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background:
-    linear-gradient(90deg, rgba(11, 42, 107, 0.16), transparent 34%, rgba(255, 255, 255, 0.08)),
-    radial-gradient(circle at 50% 50%, transparent 45%, rgba(11, 42, 107, 0.18));
-  pointer-events: none;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75);
 }
 
 .client-hero__animation-frame {
   position: absolute;
-  z-index: 3;
-  left: 50%;
-  bottom: 8%;
-  width: min(108%, 470px);
-  max-width: none;
-  transform: translateX(-50%) translateY(0);
-  opacity: 0;
-  object-fit: contain;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
   user-select: none;
-  transition: opacity 170ms ease;
-  animation: clientHeroVanDrive 5.8s ease-in-out infinite;
+  transform: scale(1.004);
+  transition: filter 120ms ease;
 }
 
-.client-hero__animation-frame.is-active {
-  opacity: 1;
+.client-hero__animation-frame.is-switching {
+  filter: saturate(1.03) blur(0.2px);
 }
 
-.client-hero__animation-shadow {
+.client-hero__animation-sheen {
   position: absolute;
-  z-index: 2;
-  left: 19%;
-  right: 16%;
-  bottom: 12%;
-  height: 24px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.28), transparent 68%);
-  filter: blur(4px);
-  animation: clientHeroShadow 5.8s ease-in-out infinite;
-}
-
-.client-hero__animation-road {
-  position: absolute;
-  z-index: 2;
-  left: -25%;
-  right: -25%;
-  bottom: 0;
-  height: 31%;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 58px, rgba(255, 255, 255, 0.92) 58px 96px, transparent 96px 150px),
-    linear-gradient(180deg, rgba(16, 35, 63, 0.86), rgba(9, 24, 48, 0.92));
-  clip-path: polygon(0 30%, 100% 4%, 100% 100%, 0 100%);
-  animation: clientHeroRoad 780ms linear infinite;
-}
-
-.client-hero__animation-road::before {
-  content: "";
-  position: absolute;
-  inset: 12px 0 auto;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.client-hero__animation-speed {
-  position: absolute;
-  z-index: 2;
-  right: 8%;
-  width: 68px;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62));
-  opacity: 0.5;
-  animation: clientHeroSpeed 1.4s ease-in-out infinite;
-}
-
-.client-hero__animation-speed--one {
-  top: 42%;
-}
-
-.client-hero__animation-speed--two {
-  top: 57%;
-  right: 14%;
-  width: 44px;
-  animation-delay: 420ms;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 0 34%, rgba(255, 255, 255, 0.18) 45%, transparent 56% 100%);
+  opacity: 0.56;
+  transform: translateX(-70%);
+  animation: clientHeroSheen 4.4s ease-in-out infinite;
 }
 
 .client-hero__bubble {
@@ -926,70 +841,31 @@ h2 {
   }
 }
 
-@keyframes clientHeroVanDrive {
+@keyframes clientHeroFrameMotion {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0) rotate(-0.2deg);
+    transform: translateY(0) scale(1);
   }
-  35% {
-    transform: translateX(-49.4%) translateY(-4px) rotate(0.25deg);
+  28% {
+    transform: translateY(-1px) scale(1.006);
   }
-  68% {
-    transform: translateX(-50.6%) translateY(-1px) rotate(-0.12deg);
-  }
-}
-
-@keyframes clientHeroShadow {
-  0%,
-  100% {
-    opacity: 0.72;
-    transform: scaleX(1);
-  }
-  45% {
-    opacity: 0.52;
-    transform: scaleX(0.88);
+  58% {
+    transform: translateY(1px) scale(1.002);
   }
 }
 
-@keyframes clientHeroRoad {
-  from {
-    background-position: 0 0, 0 0;
-  }
-  to {
-    background-position: -150px 0, 0 0;
-  }
-}
-
-@keyframes clientHeroScenery {
-  from {
-    background-position: 0 0, 0 0;
-  }
-  to {
-    background-position: -260px 0, 0 0;
-  }
-}
-
-@keyframes clientHeroClouds {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-26%);
-  }
-}
-
-@keyframes clientHeroSpeed {
+@keyframes clientHeroSheen {
   0% {
     opacity: 0;
-    transform: translateX(0);
+    transform: translateX(-70%);
   }
-  30%,
-  70% {
-    opacity: 0.55;
+  34%,
+  54% {
+    opacity: 0.5;
   }
   100% {
     opacity: 0;
-    transform: translateX(-52px);
+    transform: translateX(70%);
   }
 }
 
@@ -1014,7 +890,7 @@ h2 {
   }
 
   .client-hero__animation {
-    width: min(100%, 390px);
+    width: min(100%, 380px);
   }
 
   .portal-header {
@@ -1071,13 +947,11 @@ h2 {
   }
 
   .client-hero__animation {
-    width: min(100%, 320px);
-    aspect-ratio: 1.42;
+    width: min(100%, 310px);
   }
 
   .client-hero__animation-frame {
-    width: 114%;
-    bottom: 7%;
+    transform: scale(1.002);
   }
 
   .stamp-grid {
@@ -1102,18 +976,15 @@ h2 {
   .client-hero,
   .client-hero__bubble,
   .client-hero__paws span,
+  .client-hero__animation,
   .client-hero__animation-frame,
-  .client-hero__animation-road,
-  .client-hero__animation-stage::before,
-  .client-hero__animation-clouds,
-  .client-hero__animation-shadow,
-  .client-hero__animation-speed,
+  .client-hero__animation-sheen,
   .client-hero__action {
     animation: none;
     transition: none;
   }
 
-  .client-hero__animation-speed {
+  .client-hero__animation-sheen {
     display: none;
   }
 }
