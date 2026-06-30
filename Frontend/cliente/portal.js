@@ -265,52 +265,44 @@ function renderizarBienvenida() {
 
 function inicializarHeroClienteAnimado() {
   const stage = document.querySelector(".client-hero__animation-stage");
-  const frame = document.querySelector(".client-hero__animation-frame");
-  if (!stage || !frame) return;
+  const fallbackFrame = document.querySelector(".client-hero__animation-frame");
+  if (!stage || !fallbackFrame) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   let frameIndex = 0;
   let timer = null;
   let isVisible = true;
   let framesReady = false;
-  let switchTimer = null;
-  let loadedFrames = [HERO_ANIMATION_FRAMES[0]];
+  let frameElements = [fallbackFrame];
 
   function stopLoop() {
     if (timer) {
       clearInterval(timer);
       timer = null;
     }
-    if (switchTimer) {
-      clearTimeout(switchTimer);
-      switchTimer = null;
-    }
   }
 
   function showFrame(index) {
-    const src = loadedFrames[index] || HERO_ANIMATION_FRAMES[0];
-    if (frame.getAttribute("src") === src) return;
+    const nextFrame = frameElements[index] || frameElements[0];
+    const currentFrame = frameElements.find((item) => item.classList.contains("is-active"));
+    if (!nextFrame || nextFrame === currentFrame) return;
 
-    frame.classList.add("is-switching");
-    frame.src = src;
-    if (switchTimer) clearTimeout(switchTimer);
-    switchTimer = setTimeout(() => {
-      frame.classList.remove("is-switching");
-      switchTimer = null;
-    }, 120);
+    nextFrame.classList.add("is-active");
+    if (currentFrame) currentFrame.classList.remove("is-active");
   }
 
   function showStaticFrame() {
     stopLoop();
     frameIndex = 0;
-    frame.src = HERO_ANIMATION_FRAMES[0];
-    frame.classList.remove("is-switching");
+    frameElements.forEach((item, index) => {
+      item.classList.toggle("is-active", index === 0);
+    });
   }
 
   function startLoop() {
     if (timer || !framesReady || reducedMotion.matches || !isVisible || document.hidden) return;
     timer = setInterval(() => {
-      frameIndex = (frameIndex + 1) % loadedFrames.length;
+      frameIndex = (frameIndex + 1) % frameElements.length;
       showFrame(frameIndex);
     }, HERO_ANIMATION_FRAME_MS);
   }
@@ -324,6 +316,27 @@ function inicializarHeroClienteAnimado() {
     startLoop();
   }
 
+  function buildFrames(loadedFrames) {
+    const sheen = stage.querySelector(".client-hero__animation-sheen");
+    const fragment = document.createDocumentFragment();
+
+    frameElements = loadedFrames.map((src, index) => {
+      const image = index === 0 ? fallbackFrame : document.createElement("img");
+      image.className = "client-hero__animation-frame";
+      image.src = src;
+      image.alt = "";
+      image.decoding = "async";
+      image.draggable = false;
+      image.classList.toggle("is-active", index === 0);
+      if (index > 0) fragment.appendChild(image);
+      return image;
+    });
+
+    if (fragment.childNodes.length) {
+      stage.insertBefore(fragment, sheen || null);
+    }
+  }
+
   const preloads = HERO_ANIMATION_FRAMES.map((src) => new Promise((resolve) => {
     const image = new Image();
     image.decoding = "async";
@@ -333,8 +346,8 @@ function inicializarHeroClienteAnimado() {
   }));
 
   Promise.all(preloads).then((results) => {
-    loadedFrames = results.filter(Boolean);
-    if (!loadedFrames.length) loadedFrames = [HERO_ANIMATION_FRAMES[0]];
+    const loadedFrames = results.filter(Boolean);
+    buildFrames(loadedFrames.length ? loadedFrames : [HERO_ANIMATION_FRAMES[0]]);
     framesReady = true;
     applyMotionPreference();
   });

@@ -393,13 +393,16 @@ h2 {
   height: 100%;
   display: block;
   object-fit: cover;
+  opacity: 0;
   user-select: none;
   transform: scale(1.004);
-  transition: filter 120ms ease;
+  visibility: hidden;
+  will-change: opacity;
 }
 
-.client-hero__animation-frame.is-switching {
-  filter: saturate(1.03) blur(0.2px);
+.client-hero__animation-frame.is-active {
+  opacity: 1;
+  visibility: visible;
 }
 
 .client-hero__animation-sheen {
