@@ -20,7 +20,16 @@
           <small>Portal privado</small>
         </span>
       </a>
-      <button id="logoutButton" class="logout-button" type="button">Cerrar sesion</button>
+      <nav class="employee-actions" aria-label="Acciones del portal">
+        <a class="site-return-button" href="../index.html" aria-label="Volver al sitio" title="Volver al sitio">
+          <span class="action-icon" aria-hidden="true">&#8962;</span>
+          <span class="action-text">Volver al sitio</span>
+        </a>
+        <button id="logoutButton" class="logout-button" type="button" aria-label="Cerrar sesi&oacute;n" title="Cerrar sesi&oacute;n">
+          <span class="action-icon" aria-hidden="true">&#8634;</span>
+          <span class="action-text">Cerrar sesion</span>
+        </button>
+      </nav>
     </header>
 
     <section id="employeeAccessMessage" class="employee-message">Validando acceso...</section>
@@ -78,6 +87,8 @@
           </dl>
         </aside>
       </section>
+
+      <section id="employeeBirthdayCard" class="birthday-card hidden" aria-live="polite"></section>
 
       <section class="control-panel" aria-label="Controles de semana">
         <label for="weekDate">

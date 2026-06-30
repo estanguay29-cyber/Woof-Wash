@@ -126,6 +126,7 @@ input {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .portal-button,
@@ -142,6 +143,13 @@ input {
   cursor: pointer;
   font-weight: 900;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .portal-button:hover,
@@ -412,7 +420,6 @@ input {
     min-width: 0;
   }
 
-  .portal-topbar,
   .portal-hero,
   .section-head,
   .employee-card,
@@ -422,11 +429,36 @@ input {
     flex-direction: column;
   }
 
-  .portal-actions {
-    justify-content: stretch;
+  .portal-topbar {
+    align-items: center;
+    gap: 10px;
   }
 
-  .portal-button,
+  .portal-brand {
+    flex: 1 1 auto;
+  }
+
+  .portal-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+
+  .portal-actions .portal-button {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+  }
+
+  .portal-actions .action-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
   .portal-card-action,
   .employee-action,
   .back-button {

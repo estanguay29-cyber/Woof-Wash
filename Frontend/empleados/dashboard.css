@@ -114,6 +114,15 @@ input {
   text-transform: uppercase;
 }
 
+.employee-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.site-return-button,
 .logout-button,
 .refresh-button {
   display: inline-flex;
@@ -129,9 +138,21 @@ input {
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
+.site-return-button,
 .logout-button {
   background: rgba(255, 255, 255, 0.72);
   color: var(--blue);
+}
+
+.site-return-button {
+  border-color: rgba(140, 198, 63, 0.34);
+}
+
+.action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .refresh-button {
@@ -141,6 +162,7 @@ input {
   box-shadow: 0 14px 26px rgba(11, 42, 107, 0.2);
 }
 
+.site-return-button:hover,
 .logout-button:hover,
 .refresh-button:hover {
   transform: translateY(-1px);
@@ -281,6 +303,109 @@ input {
 .profile-card {
   position: relative;
   z-index: 1;
+}
+
+.birthday-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(140, 198, 63, 0.32);
+  border-radius: var(--radius);
+  padding: clamp(18px, 3vw, 28px);
+  background:
+    radial-gradient(circle at 12% 20%, rgba(140, 198, 63, 0.22), transparent 170px),
+    radial-gradient(circle at 92% 10%, rgba(11, 42, 107, 0.13), transparent 140px),
+    linear-gradient(135deg, #fffae8 0%, #fffdf5 48%, #f4fbec 100%);
+  box-shadow: 0 20px 44px rgba(11, 42, 107, 0.13);
+  animation: birthdayCardIn 460ms ease both, birthdayCardGlow 5200ms ease-in-out infinite;
+}
+
+.birthday-card::before,
+.birthday-card::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.birthday-card::before {
+  inset: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.birthday-card::after {
+  right: 28px;
+  top: 18px;
+  width: 96px;
+  height: 96px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34px 26px, rgba(140, 198, 63, 0.58) 0 5px, transparent 6px),
+    radial-gradient(circle at 60px 42px, rgba(11, 42, 107, 0.22) 0 4px, transparent 5px),
+    radial-gradient(circle at 28px 66px, rgba(11, 42, 107, 0.18) 0 3px, transparent 4px),
+    radial-gradient(circle at 72px 72px, rgba(140, 198, 63, 0.38) 0 4px, transparent 5px);
+  opacity: 0.75;
+  animation: birthdayConfettiDrift 4200ms ease-in-out infinite;
+}
+
+.birthday-card-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+}
+
+.birthday-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  padding: 0 11px;
+  color: var(--blue);
+  background: rgba(140, 198, 63, 0.2);
+  font-size: 0.75rem;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.birthday-card h2 {
+  margin: 0 0 8px;
+  color: var(--blue);
+  font-size: clamp(1.45rem, 3vw, 2.25rem);
+  line-height: 1.05;
+}
+
+.birthday-card p {
+  margin: 0;
+  color: #40516f;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.birthday-button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  white-space: nowrap;
+  border-radius: var(--radius);
+  padding: 0 16px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--blue), #0f4fb2);
+  box-shadow: 0 14px 26px rgba(11, 42, 107, 0.2);
+  font-weight: 950;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.birthday-card:hover .birthday-button {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 32px rgba(11, 42, 107, 0.24);
 }
 
 .hero-copy .eyebrow {
@@ -1025,6 +1150,37 @@ input {
   color: var(--muted);
 }
 
+@keyframes birthdayCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes birthdayCardGlow {
+  0%,
+  100% {
+    box-shadow: 0 20px 44px rgba(11, 42, 107, 0.13);
+  }
+  50% {
+    box-shadow: 0 24px 52px rgba(140, 198, 63, 0.2);
+  }
+}
+
+@keyframes birthdayConfettiDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-6px, 5px, 0);
+  }
+}
+
 @media (max-width: 980px) {
   body {
     overflow-x: hidden;
@@ -1035,6 +1191,7 @@ input {
   }
 
   .hero-panel,
+  .birthday-card,
   .content-grid,
   .insight-grid {
     grid-template-columns: 1fr;
@@ -1055,7 +1212,6 @@ input {
     padding-top: 10px;
   }
 
-  .employee-topbar,
   .control-panel,
   .section-title,
   .appointment-head,
@@ -1065,8 +1221,47 @@ input {
     flex-direction: column;
   }
 
+  .employee-topbar {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .employee-brand {
+    flex: 1 1 auto;
+  }
+
+  .employee-actions {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .site-return-button,
+  .logout-button {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+  }
+
+  .action-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
   .hero-panel {
     padding: 20px;
+  }
+
+  .birthday-card {
+    align-items: stretch;
+  }
+
+  .birthday-button {
+    width: 100%;
   }
 
   .hero-copy h1 {
@@ -1098,7 +1293,6 @@ input {
     width: 100%;
   }
 
-  .logout-button,
   .refresh-button,
   .control-panel input,
   .date-nav-button,

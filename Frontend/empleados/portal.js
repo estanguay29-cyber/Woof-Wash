@@ -58,6 +58,18 @@ function obtenerPrimerNombre(nombreCompleto) {
   return limpio ? limpio.split(" ")[0] : "";
 }
 
+function obtenerMesDiaCumpleanos(value) {
+  const texto = String(value || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto.slice(5);
+  if (/^\d{2}-\d{2}$/.test(texto)) return texto;
+  return "";
+}
+
+function esCumpleanosHoy(value, hoy = fechaLocalISO()) {
+  const mesDia = obtenerMesDiaCumpleanos(value);
+  return Boolean(mesDia && mesDia === String(hoy).slice(5));
+}
+
 function toNumber(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -696,6 +708,22 @@ function renderManualesDashboard() {
   }).join("");
 }
 
+function renderFelicitacionCumpleanosAdmin(empleado = {}, nombreFallback = "Empleado") {
+  if (!esCumpleanosHoy(empleado.fechaCumpleanos)) return "";
+  const nombre = empleado.primerNombre || obtenerPrimerNombre(empleado.nombre) || nombreFallback || "Empleado";
+
+  return `
+      <section class="birthday-card" aria-live="polite">
+        <div class="birthday-card-copy">
+          <span class="birthday-kicker">Detalle especial de Woof &amp; Wash</span>
+          <h2>&#127881; Feliz cumplea&ntilde;os, ${escapeHtml(nombre)}!</h2>
+          <p>De parte de todo el equipo de Woof &amp; Wash, te deseamos un d&iacute;a lleno de alegr&iacute;a, apapachos y muchas cosas bonitas. Gracias por ser parte de esta familia. &#128062;</p>
+        </div>
+        <span class="birthday-button" aria-hidden="true">Celebrar hoy &#127874;</span>
+      </section>
+  `;
+}
+
 function renderDetalleEmpleado(detalle) {
   const panel = document.getElementById("employeePortalPanel");
   if (!panel) return;
@@ -753,6 +781,8 @@ function renderDetalleEmpleado(detalle) {
           </dl>
         </aside>
       </section>
+
+      ${renderFelicitacionCumpleanosAdmin(empleado, primerNombre)}
 
       <section class="control-panel" aria-label="Controles de semana">
         <label for="adminWeekDate">
