@@ -2,6 +2,7 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const express = require("express");
+const https = require("https");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
@@ -63,6 +64,12 @@ const MAIL_CODE_TTL_MINUTES = 10;
 const META_DIARIA_EMPLEADOS_MXN = 2000;
 const META_SEMANAL_EMPLEADOS_MXN = 22000;
 const BACKEND_VERSION = "fecha-cumpleanos-persistencia-v2";
+const CLOUDINARY_UPLOAD_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "woofwash/client-items";
+const CLIENT_ITEM_PHOTO_TYPES = Object.freeze({
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp"
+});
 const authAttempts = new Map();
 const sensitiveActionAttempts = new Map();
 let mailTransporterPromise = null;
@@ -766,7 +773,7 @@ async function requireEmpleado(req, res, next) {
       return res.status(403).json({ message: "No autorizado" });
     }
 
-    const employee = await Employee.findById(user.employeeId).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos");
+    const employee = await Employee.findById(user.employeeId).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos fotoPerfilUrl");
     if (!employee || employee.activo === false) {
       return res.status(403).json({ message: "No autorizado" });
     }
@@ -1187,6 +1194,7 @@ function construirEmpleadoAdminRespuesta(empleado) {
     telefono: empleado.telefono || "",
     email: empleado.email || "",
     puesto: empleado.puesto || "",
+    fotoPerfilUrl: empleado.fotoPerfilUrl || "",
     activo: empleado.activo !== false,
     fechaIngreso: empleado.fechaIngreso || "",
     fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos),
@@ -2573,6 +2581,112 @@ function obtenerFechaLocalAgenda() {
   return formatter.format(now);
 }
 
+function obtenerConfigCloudinary() {
+  const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || "").trim();
+  const apiKey = String(process.env.CLOUDINARY_API_KEY || "").trim();
+  const apiSecret = String(process.env.CLOUDINARY_API_SECRET || "").trim();
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    return null;
+  }
+
+  return { cloudName, apiKey, apiSecret };
+}
+
+function firmarParametrosCloudinary(params = {}, apiSecret = "") {
+  const payload = Object.keys(params)
+    .filter((key) => typeof params[key] !== "undefined" && params[key] !== "")
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join("&");
+  return crypto.createHash("sha1").update(`${payload}${apiSecret}`).digest("hex");
+}
+
+function crearCampoMultipart(boundary, name, value) {
+  return Buffer.from(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="${name}"\r\n\r\n` +
+    `${value}\r\n`
+  );
+}
+
+function crearArchivoMultipart(boundary, name, fileName, contentType, bytes) {
+  return Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="${name}"; filename="${fileName}"\r\n` +
+      `Content-Type: ${contentType}\r\n\r\n`
+    ),
+    bytes,
+    Buffer.from("\r\n")
+  ]);
+}
+
+function subirFotoCloudinary({ bytes, contentType, fileName }) {
+  const config = obtenerConfigCloudinary();
+  if (!config) {
+    const error = new Error("Cloudinary no esta configurado.");
+    error.status = 500;
+    throw error;
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const paramsFirmados = {
+    folder: CLOUDINARY_UPLOAD_FOLDER,
+    timestamp
+  };
+  const signature = firmarParametrosCloudinary(paramsFirmados, config.apiSecret);
+  const boundary = `----woofwash-${crypto.randomBytes(12).toString("hex")}`;
+  const body = Buffer.concat([
+    crearCampoMultipart(boundary, "api_key", config.apiKey),
+    crearCampoMultipart(boundary, "timestamp", String(timestamp)),
+    crearCampoMultipart(boundary, "folder", CLOUDINARY_UPLOAD_FOLDER),
+    crearCampoMultipart(boundary, "signature", signature),
+    crearArchivoMultipart(boundary, "file", fileName, contentType, bytes),
+    Buffer.from(`--${boundary}--\r\n`)
+  ]);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      method: "POST",
+      hostname: "api.cloudinary.com",
+      path: `/v1_1/${encodeURIComponent(config.cloudName)}/image/upload`,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": body.length
+      },
+      timeout: 15000
+    }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        const text = Buffer.concat(chunks).toString("utf8");
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch (error) {
+          data = {};
+        }
+
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          const error = new Error(data?.error?.message || "Cloudinary no pudo guardar la foto.");
+          error.status = response.statusCode || 502;
+          reject(error);
+          return;
+        }
+
+        resolve(data);
+      });
+    });
+
+    req.on("timeout", () => {
+      req.destroy(new Error("Tiempo agotado al guardar la foto en Cloudinary."));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
 // ============================
 // MIDDLEWARES
 // ============================
@@ -2634,6 +2748,10 @@ app.use((req, res, next) => {
 app.use(cors(corsOptions));
 
 app.use("/webhook", express.raw({ type: "application/json" }));
+app.use("/cliente/items/photo", express.raw({
+  type: Object.keys(CLIENT_ITEM_PHOTO_TYPES),
+  limit: "5mb"
+}));
 app.use(express.json({ limit: "100kb" }));
 
 // ============================
@@ -2653,6 +2771,50 @@ app.get("/service-zones", (req, res) => {
     legacyZones: LEGACY_APPOINTMENT_ZONES,
     todayRule: obtenerReglaZonaAgenda(obtenerFechaLocalAgenda())
   });
+});
+
+app.post("/cliente/items/photo", auth, async (req, res) => {
+  try {
+    const userId = typeof req.user?.id === "string" ? req.user.id : "";
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Token invalido" });
+    }
+
+    const user = await User.findById(userId).select("role");
+    if (!user || obtenerRolUsuario(user) !== "cliente") {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    const contentType = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+    const extension = CLIENT_ITEM_PHOTO_TYPES[contentType];
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+
+    if (!extension) {
+      return res.status(400).json({ message: "Formato de imagen no permitido. Usa JPG, PNG o WebP." });
+    }
+
+    if (!bytes.length) {
+      return res.status(400).json({ message: "No se recibio imagen para guardar." });
+    }
+
+    const fileName = `${userId}-${Date.now()}-${crypto.randomBytes(8).toString("hex")}${extension}`;
+    const cloudinaryResult = await subirFotoCloudinary({
+      bytes,
+      contentType,
+      fileName
+    });
+    const fotoUrl = cloudinaryResult.secure_url || cloudinaryResult.url || "";
+    if (!fotoUrl) {
+      return res.status(502).json({ message: "Cloudinary no devolvio URL de la foto." });
+    }
+
+    res.status(201).json({
+      fotoUrl,
+      publicId: cloudinaryResult.public_id || ""
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.message || "No se pudo guardar la foto." });
+  }
 });
 
 mongoose.connect(process.env.MONGO_URI)
@@ -3252,7 +3414,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
 
     const semana = obtenerRangoSemana(fecha);
     const empleados = await Employee.find()
-      .select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos sueldoBase comision bonoManual descuentoAdministrativo notas")
+      .select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos fotoPerfilUrl sueldoBase comision bonoManual descuentoAdministrativo notas")
       .sort({ nombreCompleto: 1 });
 
     const empleadoIds = empleados.map((empleado) => empleado._id);
@@ -3304,6 +3466,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
           telefono: empleado.telefono || "",
           puesto: empleado.puesto || "",
           especialidad: empleado.puesto || "",
+          fotoPerfilUrl: empleado.fotoPerfilUrl || "",
           activo: Boolean(empleado.activo),
           fechaIngreso: empleado.fechaIngreso || "",
           fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos),
@@ -3386,6 +3549,7 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
       puesto: empleado.puesto || "",
       especialidad: empleado.puesto || "",
       role: "empleado",
+      fotoPerfilUrl: empleado.fotoPerfilUrl || "",
       fechaIngreso: empleado.fechaIngreso || "",
       fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos),
       activo: Boolean(empleado.activo),
@@ -3438,7 +3602,7 @@ app.get("/admin/employees/:id/portal", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: "Id de empleado no válido" });
     }
 
-    const empleado = await Employee.findById(id).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos");
+    const empleado = await Employee.findById(id).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos fotoPerfilUrl");
     if (!empleado) {
       return res.status(404).json({ message: "Empleado no encontrado" });
     }
@@ -3680,6 +3844,7 @@ function construirResumenPerformanceEmpleado({
     email: empleado?.email || "",
     activo: Boolean(empleado?.activo),
     puesto: empleado?.puesto || "",
+    fotoPerfilUrl: empleado?.fotoPerfilUrl || "",
     sueldoBase,
     descuentoAdministrativo,
     comisionPorcentaje,
@@ -3772,6 +3937,7 @@ function construirPortalEmpleadoRespuesta(empleado, user = null) {
       email: empleado.email || "",
       telefono: empleado.telefono || "",
       puesto: empleado.puesto || "",
+      fotoPerfilUrl: empleado.fotoPerfilUrl || "",
       activo: empleado.activo !== false,
       fechaIngreso: empleado.fechaIngreso || "",
       fechaCumpleanos: normalizarFechaCumpleanosEmpleadoSalida(empleado.fechaCumpleanos)
@@ -3788,7 +3954,7 @@ async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options 
     throw error;
   }
 
-  const empleado = await Employee.findById(employeeId).select("nombreCompleto puesto activo sueldoBase comision bonoManual descuentoAdministrativo");
+  const empleado = await Employee.findById(employeeId).select("nombreCompleto puesto activo fotoPerfilUrl sueldoBase comision bonoManual descuentoAdministrativo");
   if (!empleado) {
     const error = new Error("Empleado no encontrado");
     error.status = 404;
@@ -3842,7 +4008,8 @@ async function construirPerformanceEmpleadoRespuesta(employeeId, fecha, options 
       id: String(empleado._id),
       nombre: empleado.nombreCompleto || "",
       primerNombre: obtenerPrimerNombre(empleado.nombreCompleto),
-      puesto: empleado.puesto || ""
+      puesto: empleado.puesto || "",
+      fotoPerfilUrl: empleado.fotoPerfilUrl || ""
     },
     semana: {
       inicio: semana.inicio,
@@ -3909,7 +4076,7 @@ async function construirAppointmentsEmpleadoRespuesta(employeeId, fecha, options
     throw error;
   }
 
-  const empleado = await Employee.findById(id).select("_id nombreCompleto email activo");
+  const empleado = await Employee.findById(id).select("_id nombreCompleto email activo fotoPerfilUrl");
   if (!empleado) {
     const error = new Error("Empleado no encontrado");
     error.status = 404;
@@ -3941,6 +4108,7 @@ async function construirAppointmentsEmpleadoRespuesta(employeeId, fecha, options
       primerNombre: obtenerPrimerNombre(empleado.nombreCompleto),
       usuario: options.usuario || "",
       email: options.email || empleado.email || "",
+      fotoPerfilUrl: empleado.fotoPerfilUrl || "",
       role: "empleado"
     },
     metaDiariaMxn: META_DIARIA_EMPLEADOS_MXN,
@@ -4346,6 +4514,7 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
       bonoManual,
       descuentoAdministrativo,
       notasAdministrativas,
+      fotoPerfilUrl,
       activo
     } = req.body;
 
@@ -4364,6 +4533,7 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
     const bonoManualValidado = normalizarMontoEmpleado(bonoManual, { campo: "bonoManual", max: 50000 });
     const descuentoValidado = normalizarMontoEmpleado(descuentoAdministrativo, { campo: "descuentoAdministrativo", max: 50000 });
     const notas = String(notasAdministrativas || "").trim();
+    const fotoPerfilUrlLimpia = String(fotoPerfilUrl || "").trim().slice(0, 500);
 
     for (const validacionMonto of [sueldoBaseValidado, comisionValidada, bonoManualValidado, descuentoValidado]) {
       if (!validacionMonto.ok) {
@@ -4403,6 +4573,7 @@ app.post("/admin/employees", auth, requireAdmin, adminWriteLimiter, async (req, 
       puesto: puestoLimpio,
       fechaIngreso: fechaIngresoLimpia,
       fechaCumpleanos: fechaCumpleanosLimpia,
+      fotoPerfilUrl: fotoPerfilUrlLimpia,
       activo: activo !== false,
       sueldoBase: sueldoBaseValidado.value,
       comision: comisionValidada.value,
@@ -4579,6 +4750,7 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
       descuentoAdministrativo,
       notasAdministrativas,
       notas,
+      fotoPerfilUrl,
       activo
     } = req.body;
 
@@ -4658,6 +4830,9 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
     }
     if (typeof notas === "string") {
       empleado.notas = notas.trim().slice(0, 500);
+    }
+    if (typeof fotoPerfilUrl === "string") {
+      empleado.fotoPerfilUrl = fotoPerfilUrl.trim().slice(0, 500);
     }
     if (typeof activo === "boolean") {
       empleado.activo = activo;

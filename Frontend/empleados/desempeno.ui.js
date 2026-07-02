@@ -23,6 +23,26 @@ function clampPercent(value) {
   return Math.max(0, Math.min(100, Math.round(toFiniteNumber(value, 0))));
 }
 
+function getEmployeeInitials(empleado = {}) {
+  const nombre = String(empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado").trim();
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
+}
+
+function renderEmployeeAvatar(empleado = {}, size = "sm") {
+  const nombre = empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado";
+  const foto = String(empleado.fotoPerfilUrl || "").trim();
+  const sizeClass = size === "md" ? "employee-avatar-md" : "employee-avatar-sm";
+  if (foto) {
+    return `<span class="employee-avatar ${sizeClass}"><img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}"></span>`;
+  }
+  return `<span class="employee-avatar ${sizeClass}" aria-hidden="true">${escapeHtml(getEmployeeInitials(empleado))}</span>`;
+}
+
 export function renderPerformanceSummary(summary = {}) {
   const ventasResumen = summary.ventasGlobalesSemanales ?? summary.ventasSemanales;
   const metaResumen = summary.metaGlobalSemanalMxn ?? summary.metaSemanalMxn;
@@ -166,7 +186,7 @@ export function renderPerformanceTable(items = []) {
 
     return `
     <tr ${tooltip}>
-      <td>${escapeHtml(item.nombreCompleto || "Sin nombre")}</td>
+      <td><div class="employee-name-cell">${renderEmployeeAvatar(item, "sm")}<span>${escapeHtml(item.nombreCompleto || "Sin nombre")}</span></div></td>
       <td>${formatCurrency(toNonNegativeNumber(item.ventasSemanales, 0))}</td>
       <td>${metaBadge}</td>
       <td><span class="stars">${starsHtml}</span> <span style="margin-left:8px">${escapeHtml(promedioEstrellasTexto)}</span> ${califBadge}</td>

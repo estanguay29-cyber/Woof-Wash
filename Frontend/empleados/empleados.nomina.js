@@ -29,6 +29,25 @@ function mostrarNominaFeedback(message, type = "success") {
   }, 4200);
 }
 
+function getEmployeeInitials(empleado = {}) {
+  const nombre = String(empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado").trim();
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
+}
+
+function renderEmployeeAvatar(empleado = {}) {
+  const nombre = empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado";
+  const foto = String(empleado.fotoPerfilUrl || "").trim();
+  if (foto) {
+    return `<span class="employee-avatar employee-avatar-sm"><img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}"></span>`;
+  }
+  return `<span class="employee-avatar employee-avatar-sm" aria-hidden="true">${escapeHtml(getEmployeeInitials(empleado))}</span>`;
+}
+
 function calcularNominaEmpleado(item = {}) {
   const sueldoBase = Number.isFinite(Number(item.sueldoBase)) ? Number(item.sueldoBase) : 0;
   const bonoCalculado = Number.isFinite(Number(item.bonoCalculado)) ? Number(item.bonoCalculado) : 0;
@@ -142,7 +161,7 @@ function renderPayrollTable(items = []) {
 
     return `
       <tr>
-        <td>${escapeHtml(item.nombreCompleto || item.email || "Sin nombre")}</td>
+        <td><div class="employee-name-cell">${renderEmployeeAvatar(item)}<span>${escapeHtml(item.nombreCompleto || item.email || "Sin nombre")}</span></div></td>
         <td>${formatCurrency(sueldoBase)}</td>
         <td>${formatCurrency(Number.isFinite(Number(item.ventasSemanales)) ? Number(item.ventasSemanales) : 0)}</td>
         <td><span class="stars">${Array.from({length:5}).map((_,i)=> i < Math.round(Number(item.promedioEstrellas)||0) ? '★' : '<span class="star-empty">★</span>').join('')}</span> <span style="margin-left:8px">${escapeHtml(promedioEstrellas)}</span></td>

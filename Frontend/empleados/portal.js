@@ -251,6 +251,26 @@ function empleadoCoincideFiltro(empleado) {
   ].some((value) => String(value || "").toLowerCase().includes(filtro));
 }
 
+function obtenerInicialesEmpleado(empleado = {}) {
+  const nombre = String(empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado").trim();
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
+}
+
+function renderAvatarEmpleado(empleado = {}, size = "sm") {
+  const nombre = empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado";
+  const foto = String(empleado.fotoPerfilUrl || "").trim();
+  const sizeClass = size === "lg" ? "portal-employee-avatar-lg" : size === "md" ? "portal-employee-avatar-md" : "portal-employee-avatar-sm";
+  if (foto) {
+    return `<span class="portal-employee-avatar ${sizeClass}"><img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}"></span>`;
+  }
+  return `<span class="portal-employee-avatar ${sizeClass}" aria-hidden="true">${escapeHtml(obtenerInicialesEmpleado(empleado))}</span>`;
+}
+
 function renderEmployeeList() {
   const list = document.getElementById("employeeList");
   if (!list) return;
@@ -260,17 +280,20 @@ function renderEmployeeList() {
     .filter(empleadoCoincideFiltro);
 
   if (!empleados.length) {
-    list.innerHTML = `<div class="empty-state">No hay empleados activos que coincidan con la búsqueda.</div>`;
+    list.innerHTML = `<div class="empty-state">No hay empleados activos que coincidan con la busqueda.</div>`;
     return;
   }
 
   list.innerHTML = empleados.map((empleado) => `
     <article class="employee-card">
-      <div>
-        <strong>${escapeHtml(empleado.nombreCompleto || "Empleado")}</strong>
-        <div class="employee-meta">
-          ${escapeHtml(empleado.puesto || "Puesto no registrado")}
-          ${empleado.email ? ` · ${escapeHtml(empleado.email)}` : ""}
+      <div class="employee-card-main">
+        ${renderAvatarEmpleado(empleado, "sm")}
+        <div>
+          <strong>${escapeHtml(empleado.nombreCompleto || "Empleado")}</strong>
+          <div class="employee-meta">
+            ${escapeHtml(empleado.puesto || "Puesto no registrado")}
+            ${empleado.email ? ` - ${escapeHtml(empleado.email)}` : ""}
+          </div>
         </div>
       </div>
       <button class="employee-action" type="button" data-action="view-portal" data-id="${escapeHtml(empleado.id)}">Ver portal</button>
@@ -757,6 +780,9 @@ function renderDetalleEmpleado(detalle) {
         </div>
 
         <aside class="profile-card" aria-label="Datos del empleado">
+          <div class="profile-avatar-wrap">
+            ${renderAvatarEmpleado(empleado, "lg")}
+          </div>
           <div class="profile-card-head">
             <span class="status-pill">${escapeHtml(status)}</span>
             <span class="profile-chip">Vista admin</span>

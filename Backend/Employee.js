@@ -49,6 +49,12 @@ const EmployeeSchema = new mongoose.Schema({
     },
     default: ""
   },
+  fotoPerfilUrl: {
+    type: String,
+    trim: true,
+    maxlength: 500,
+    default: ""
+  },
   notas: {
     type: String,
     trim: true,

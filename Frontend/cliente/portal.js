@@ -6,6 +6,10 @@ const HERO_ANIMATION_FRAMES = Array.from(
   (_, index) => `../img/Vanimacion${index + 1}.png`
 );
 const HERO_ANIMATION_FRAME_MS = 280;
+const CLIENT_ITEMS_STORAGE_KEY = "woofwash_cliente_items_v1";
+const WHATSAPP_AGENDA_URL = "https://wa.me/523337276934?text=";
+const WHATSAPP_CONFIRMATION_TEXT = "Entiendo que el horario solicitado est\u00e1 sujeto a disponibilidad y confirmaci\u00f3n por parte de Woof & Wash.";
+const clientItemPhotoUrls = new Map();
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -157,6 +161,15 @@ function escaparHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function obtenerIniciales(value) {
+  return normalizarTexto(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
 }
 
 function crearIconoPortal(nombre) {
@@ -431,6 +444,405 @@ function renderizarFidelidad(loyalty = {}) {
   ].join("");
 }
 
+function obtenerClienteItems() {
+  try {
+    const raw = localStorage.getItem(CLIENT_ITEMS_STORAGE_KEY);
+    const items = raw ? JSON.parse(raw) : [];
+    return Array.isArray(items) ? items : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function guardarClienteItems(items = []) {
+  localStorage.setItem(CLIENT_ITEMS_STORAGE_KEY, JSON.stringify(items));
+}
+
+async function subirFotoClientItem(file) {
+  if (!file) return "";
+
+  const tiposPermitidos = ["image/jpeg", "image/png", "image/webp"];
+  if (!tiposPermitidos.includes(file.type)) {
+    throw new Error("La foto debe ser JPG, PNG o WebP.");
+  }
+
+  const maxBytes = 5 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    throw new Error("La foto no debe pesar mas de 5 MB.");
+  }
+
+  const res = await fetch(`${API_URL}/cliente/items/photo`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${obtenerToken()}`,
+      "Content-Type": file.type
+    },
+    body: file
+  });
+
+  let data = {};
+  try {
+    data = await res.json();
+  } catch (error) {
+    data = {};
+  }
+
+  if (res.status === 401) {
+    limpiarSesion();
+    redirigirALogin();
+    throw new Error(data.message || "Sesion expirada");
+  }
+
+  if (res.status === 403) {
+    window.location.href = REDIRECT_HOME;
+    throw new Error(data.message || "No autorizado");
+  }
+
+  if (!res.ok) {
+    throw new Error(data.message || "No se pudo guardar la foto.");
+  }
+
+  return data.absoluteUrl || data.fotoUrl || "";
+}
+
+function obtenerTipoClientItem() {
+  return document.querySelector("input[name='clientItemType']:checked")?.value === "auto" ? "auto" : "mascota";
+}
+
+function actualizarCamposClientItem() {
+  const tipo = obtenerTipoClientItem();
+  document.querySelector(".client-item-fields--pet")?.classList.toggle("hidden", tipo !== "mascota");
+  document.querySelector(".client-item-fields--car")?.classList.toggle("hidden", tipo !== "auto");
+}
+
+function valorInput(id) {
+  return normalizarTexto(document.getElementById(id)?.value || "");
+}
+
+function setValorInput(id, value) {
+  const control = document.getElementById(id);
+  if (control) control.value = value || "";
+}
+
+function obtenerNombreClientItem(item = {}) {
+  if (item.tipo === "auto") {
+    return [item.marca, item.modelo].map(normalizarTexto).filter(Boolean).join(" ") || "Auto";
+  }
+  return item.nombre || "Mascota";
+}
+
+function obtenerFotoClientItem(item = {}) {
+  return item.fotoUrl || clientItemPhotoUrls.get(item.id) || "";
+}
+
+function renderFotoClientItem(item = {}) {
+  const foto = obtenerFotoClientItem(item);
+  const nombre = obtenerNombreClientItem(item);
+  if (foto) {
+    return `<img src="${escaparHtml(foto)}" alt="${escaparHtml(nombre)}">`;
+  }
+  return `<span>${escaparHtml(obtenerIniciales(nombre))}</span>`;
+}
+
+function construirMensajeWhatsApp(item = {}) {
+  const foto = item.fotoUrl || "[Sin foto guardada]";
+
+  if (item.tipo === "auto") {
+    return [
+      "Hola, Woof & Wash",
+      "",
+      "Quiero agendar una cita para:",
+      "",
+      `Vehiculo: ${obtenerNombreClientItem(item)}`,
+      `A\u00f1o: ${item.anio || "-"}`,
+      `Color: ${item.color || "-"}`,
+      `Tipo de vehiculo: ${item.tipoVehiculo || "-"}`,
+      `Servicio solicitado: ${item.servicio || "-"}`,
+      `Zona: ${item.zona || "-"}`,
+      `Fecha deseada: ${item.fecha || "-"}`,
+      `Horario deseado: ${item.horario || "-"}`,
+      `Comentarios: ${item.comentarios || "-"}`,
+      "",
+      `Foto: ${foto}`,
+      "",
+      WHATSAPP_CONFIRMATION_TEXT
+    ].join("\n");
+  }
+
+  return [
+    "Hola, Woof & Wash",
+    "",
+    "Quiero agendar una cita para:",
+    "",
+    `Nombre: ${item.nombre || "-"}`,
+    "Tipo: Mascota",
+    `Especie: ${item.especie || "-"}`,
+    `Raza: ${item.raza || "-"}`,
+    `Edad: ${item.edad || "-"}`,
+    `Tama\u00f1o: ${item.tamano || "-"}`,
+    `Tipo de pelo: ${item.tipoPelo || "-"}`,
+    `Paquete solicitado: ${item.paquete || "-"}`,
+    `Zona: ${item.zona || "-"}`,
+    `Fecha deseada: ${item.fecha || "-"}`,
+    `Horario deseado: ${item.horario || "-"}`,
+    `Cuidados especiales: ${item.cuidados || "-"}`,
+    `Comentarios: ${item.comentarios || "-"}`,
+    "",
+    `Foto: ${foto}`,
+    "",
+    WHATSAPP_CONFIRMATION_TEXT
+  ].join("\n");
+}
+
+function abrirWhatsAppClientItem(id) {
+  const item = obtenerClienteItems().find((actual) => actual.id === id);
+  if (!item) return;
+  window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item))}`, "_blank", "noopener,noreferrer");
+}
+
+function renderizarClientItems() {
+  const list = document.getElementById("clientItemsList");
+  if (!list) return;
+  const items = obtenerClienteItems();
+
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state">Aun no tienes cards guardadas.</div>';
+    return;
+  }
+
+  list.innerHTML = items.map((item) => {
+    const nombre = obtenerNombreClientItem(item);
+    const subtitulo = item.tipo === "auto"
+      ? `${item.tipoVehiculo || "Vehiculo"} - ${item.servicio || "Servicio pendiente"}`
+      : `${item.especie || "Mascota"} - ${item.paquete || "Paquete pendiente"}`;
+    const detalles = item.tipo === "auto"
+      ? [
+          ["Tipo", item.tipoVehiculo],
+          ["Servicio", item.servicio],
+          ["Color", item.color],
+          ["Zona", item.zona],
+          ["Fecha", item.fecha],
+          ["Horario", item.horario]
+        ]
+      : [
+          ["Especie", item.especie],
+          ["Raza", item.raza],
+          ["Tama\u00f1o", item.tamano],
+          ["Pelo", item.tipoPelo],
+          ["Zona", item.zona],
+          ["Fecha", item.fecha],
+          ["Horario", item.horario]
+        ];
+
+    return `
+      <article class="client-item-card" data-id="${escaparHtml(item.id)}">
+        <div class="client-item-photo">${renderFotoClientItem(item)}</div>
+        <div class="client-item-card-body">
+          <span class="client-item-tag">${item.tipo === "auto" ? "Auto" : "Mascota"}</span>
+          <h3>${escaparHtml(nombre)}</h3>
+          <p>${escaparHtml(subtitulo)}</p>
+          <dl>
+            ${detalles.filter(([, value]) => normalizarTexto(value)).map(([label, value]) => `
+              <div><dt>${escaparHtml(label)}</dt><dd>${escaparHtml(value)}</dd></div>
+            `).join("")}
+          </dl>
+          <div class="client-item-card-actions">
+            <button type="button" class="client-item-whatsapp" data-action="whatsapp" data-id="${escaparHtml(item.id)}">Agendar cita para ${escaparHtml(nombre)}</button>
+            <button type="button" class="client-item-secondary" data-action="edit" data-id="${escaparHtml(item.id)}">Editar datos</button>
+            <button type="button" class="client-item-danger" data-action="delete" data-id="${escaparHtml(item.id)}">Eliminar</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function limpiarFormularioClientItem() {
+  document.getElementById("clientItemForm")?.reset();
+  setValorInput("clientItemId", "");
+  const mascotaRadio = document.querySelector("input[name='clientItemType'][value='mascota']");
+  if (mascotaRadio) mascotaRadio.checked = true;
+  document.getElementById("clientItemCancel")?.classList.add("hidden");
+  const saveButton = document.getElementById("clientItemSave");
+  if (saveButton) saveButton.textContent = "Guardar card";
+  actualizarCamposClientItem();
+}
+
+function leerFormularioClientItem() {
+  const tipo = obtenerTipoClientItem();
+  const idExistente = valorInput("clientItemId");
+  const foto = document.getElementById("itemPhoto")?.files?.[0] || null;
+  const base = {
+    id: idExistente || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    tipo,
+    zona: valorInput("itemZone"),
+    fecha: valorInput("itemDate"),
+    horario: valorInput("itemTime"),
+    comentarios: valorInput("itemComments"),
+    fotoFile: foto,
+    fotoNombre: foto?.name || ""
+  };
+
+  if (foto) {
+    const previous = clientItemPhotoUrls.get(base.id);
+    if (previous) URL.revokeObjectURL(previous);
+    clientItemPhotoUrls.set(base.id, URL.createObjectURL(foto));
+  }
+
+  if (tipo === "auto") {
+    return {
+      ...base,
+      marca: valorInput("carBrand"),
+      modelo: valorInput("carModel"),
+      anio: valorInput("carYear"),
+      color: valorInput("carColor"),
+      tipoVehiculo: valorInput("carSize"),
+      servicio: valorInput("carService")
+    };
+  }
+
+  return {
+    ...base,
+    nombre: valorInput("petName"),
+    especie: valorInput("petSpecies"),
+    raza: valorInput("petBreed"),
+    edad: valorInput("petAge"),
+    tamano: valorInput("petSize"),
+    tipoPelo: valorInput("petHair"),
+    paquete: valorInput("petPackage"),
+    cuidados: valorInput("petCare")
+  };
+}
+
+function validarClientItem(item = {}) {
+  if (item.tipo === "auto") {
+    return Boolean(item.marca && item.modelo && item.tipoVehiculo && item.servicio && item.zona && item.fecha && item.horario);
+  }
+  return Boolean(item.nombre && item.especie && item.tamano && item.tipoPelo && item.paquete && item.zona && item.fecha && item.horario);
+}
+
+async function guardarClientItem(event) {
+  event.preventDefault();
+  const item = leerFormularioClientItem();
+  if (!validarClientItem(item)) {
+    document.getElementById("portalMessage").textContent = "Completa nombre/datos principales, servicio, zona, fecha y horario.";
+    return;
+  }
+
+  const items = obtenerClienteItems();
+  const index = items.findIndex((actual) => actual.id === item.id);
+  const itemPrevio = index >= 0 ? items[index] : {};
+  const mensaje = document.getElementById("portalMessage");
+
+  if (mensaje) {
+    mensaje.textContent = item.fotoFile ? "Guardando foto..." : "Guardando card...";
+  }
+
+  let fotoUrl = itemPrevio.fotoUrl || "";
+  try {
+    if (item.fotoFile) {
+      fotoUrl = await subirFotoClientItem(item.fotoFile);
+      const previewUrl = clientItemPhotoUrls.get(item.id);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        clientItemPhotoUrls.delete(item.id);
+      }
+    }
+  } catch (error) {
+    if (mensaje) {
+      mensaje.textContent = error.message || "No se pudo guardar la foto.";
+    }
+    return;
+  }
+
+  const { fotoFile, ...itemSinArchivo } = item;
+  const itemFinal = {
+    ...itemPrevio,
+    ...itemSinArchivo,
+    fotoUrl,
+    fotoNombre: item.fotoNombre || itemPrevio.fotoNombre || "",
+    updatedAt: new Date().toISOString(),
+    createdAt: itemPrevio.createdAt || new Date().toISOString()
+  };
+
+  if (index >= 0) {
+    items[index] = itemFinal;
+  } else {
+    items.unshift(itemFinal);
+  }
+
+  guardarClienteItems(items);
+  limpiarFormularioClientItem();
+  renderizarClientItems();
+  if (mensaje) {
+    mensaje.textContent = "Card guardada. Puedes solicitar la cita por WhatsApp.";
+  }
+}
+
+function editarClientItem(id) {
+  const item = obtenerClienteItems().find((actual) => actual.id === id);
+  if (!item) return;
+  setValorInput("clientItemId", item.id);
+  const radio = document.querySelector(`input[name='clientItemType'][value='${item.tipo}']`);
+  if (radio) radio.checked = true;
+  actualizarCamposClientItem();
+
+  setValorInput("petName", item.nombre);
+  setValorInput("petSpecies", item.especie);
+  setValorInput("petBreed", item.raza);
+  setValorInput("petAge", item.edad);
+  setValorInput("petSize", item.tamano);
+  setValorInput("petHair", item.tipoPelo);
+  setValorInput("petPackage", item.paquete);
+  setValorInput("petCare", item.cuidados);
+
+  setValorInput("carBrand", item.marca);
+  setValorInput("carModel", item.modelo);
+  setValorInput("carYear", item.anio);
+  setValorInput("carColor", item.color);
+  setValorInput("carSize", item.tipoVehiculo);
+  setValorInput("carService", item.servicio);
+
+  setValorInput("itemZone", item.zona);
+  setValorInput("itemDate", item.fecha);
+  setValorInput("itemTime", item.horario);
+  setValorInput("itemComments", item.comentarios);
+  document.getElementById("clientItemCancel")?.classList.remove("hidden");
+  const saveButton = document.getElementById("clientItemSave");
+  if (saveButton) saveButton.textContent = "Actualizar card";
+  document.getElementById("clientItemForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function eliminarClientItem(id) {
+  const item = obtenerClienteItems().find((actual) => actual.id === id);
+  const nombre = obtenerNombreClientItem(item);
+  if (!item || !window.confirm(`Eliminar card de ${nombre}?`)) return;
+  const photoUrl = clientItemPhotoUrls.get(id);
+  if (photoUrl) URL.revokeObjectURL(photoUrl);
+  clientItemPhotoUrls.delete(id);
+  guardarClienteItems(obtenerClienteItems().filter((actual) => actual.id !== id));
+  limpiarFormularioClientItem();
+  renderizarClientItems();
+}
+
+function inicializarClientItems() {
+  document.querySelectorAll("input[name='clientItemType']").forEach((input) => {
+    input.addEventListener("change", actualizarCamposClientItem);
+  });
+  document.getElementById("clientItemForm")?.addEventListener("submit", guardarClientItem);
+  document.getElementById("clientItemCancel")?.addEventListener("click", limpiarFormularioClientItem);
+  document.getElementById("clientItemsList")?.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const id = button.dataset.id || "";
+    if (button.dataset.action === "whatsapp") abrirWhatsAppClientItem(id);
+    if (button.dataset.action === "edit") editarClientItem(id);
+    if (button.dataset.action === "delete") eliminarClientItem(id);
+  });
+  actualizarCamposClientItem();
+  renderizarClientItems();
+}
+
 function renderizarCompras(pedidos = []) {
   const contenedor = document.getElementById("ordersList");
 
@@ -602,6 +1014,7 @@ document.getElementById("heroOrdersAction")?.addEventListener("click", () => {
 
 renderizarBienvenida();
 inicializarHeroClienteAnimado();
+inicializarClientItems();
 
 if (protegerPortalCliente()) {
   cargarPortal().catch((error) => {

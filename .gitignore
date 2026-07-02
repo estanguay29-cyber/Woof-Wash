@@ -5,6 +5,8 @@
 .env.*
 *.env
 **/.env
+**/.env.*
+**/*.env
 Backend/.env
 Frontend/.env
 *.env.backup
@@ -12,6 +14,19 @@ Frontend/.env
 *.env.local
 *.env.production
 *.env.development
+*.env.test
+*.env.staging
+
+# Secretos locales / credenciales
+secrets/
+secret/
+credentials/
+*.secret
+*.secrets
+*.credentials
+service-account*.json
+firebase-service-account*.json
+google-credentials*.json
 
 # Permitir ejemplos (sin secretos)
 !.env.example
@@ -34,6 +49,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+
+############################
+# ARCHIVOS SUBIDOS POR USUARIOS
+############################
+Backend/uploads/
+Backend/uploads/**
+uploads/
+uploads/**
+tmp/uploads/
+temp/uploads/
 
 ############################
 # 🛠️ IDE / EDITORES
@@ -63,6 +88,8 @@ coverage/
 out/
 .tmp/
 .temp/
+*.cache
+*.tsbuildinfo
 
 ############################
 # 🚀 DEPLOY / HOSTING
@@ -128,6 +155,12 @@ temp/
 *.seed
 *.pid
 *.pid.lock
+*.test-output
+test-output/
+test-results/
+playwright-report/
+codex-*.log
+codex-*.tmp
 
 ############################
 # ⚙️ CONFIG LOCAL (NO SUBIR)

@@ -76,6 +76,26 @@ export function renderEmployeeBirthdayNotice() {
   notice.classList.remove("hidden");
 }
 
+export function getEmployeeInitials(empleado = {}) {
+  const nombre = String(empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado").trim();
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
+}
+
+export function renderEmployeeAvatar(empleado = {}, size = "sm") {
+  const nombre = empleado.nombreCompleto || empleado.nombre || empleado.email || "Empleado";
+  const foto = String(empleado.fotoPerfilUrl || "").trim();
+  const sizeClass = size === "lg" ? "employee-avatar-lg" : size === "md" ? "employee-avatar-md" : "employee-avatar-sm";
+  if (foto) {
+    return `<span class="employee-avatar ${sizeClass}"><img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}"></span>`;
+  }
+  return `<span class="employee-avatar ${sizeClass}" aria-hidden="true">${escapeHtml(getEmployeeInitials(empleado))}</span>`;
+}
+
 export function renderEmployeeTable() {
   const lista = getById("adminEmployeesList");
   const estadoVacio = getById("adminEmployeesEmpty");
@@ -110,7 +130,12 @@ export function renderEmployeeTable() {
     const badge = getStatusBadge(activo);
     return `
       <tr>
-        <td>${escapeHtml(empleado.nombreCompleto || "Sin nombre")}</td>
+        <td>
+          <div class="employee-name-cell">
+            ${renderEmployeeAvatar(empleado, "sm")}
+            <span>${escapeHtml(empleado.nombreCompleto || "Sin nombre")}</span>
+          </div>
+        </td>
         <td>${escapeHtml(empleado.telefono || "-")}</td>
         <td>${escapeHtml(empleado.email || "-")}</td>
         <td>${escapeHtml(empleado.puesto || "Sin puesto")}</td>

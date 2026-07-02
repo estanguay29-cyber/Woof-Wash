@@ -114,6 +114,106 @@
       <div id="loyaltyCards" class="loyalty-cards"></div>
     </article>
 
+    <section class="panel client-items-panel" aria-labelledby="clientItemsTitle">
+      <div class="panel-heading client-items-heading">
+        <div>
+          <p class="eyebrow">Mis servicios</p>
+          <div class="panel-title">
+            <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8.2 14.1c-2 0-3.8 1.4-3.8 3.2 0 1.3 1 2.3 2.4 2.3 1 0 1.7-.5 2.6-.5s1.6.5 2.6.5c1.4 0 2.4-1 2.4-2.3 0-1.8-1.8-3.2-3.8-3.2H8.2Z"></path>
+              <path d="M16.7 14.4c1.3-.2 2.3-1.3 2.3-2.7 0-1.5-1.2-2.8-2.8-2.8"></path>
+            </svg>
+            <h2 id="clientItemsTitle">Mascotas y autos</h2>
+          </div>
+          <p class="client-items-copy">Guarda una card y solicita tu cita por WhatsApp. El horario queda sujeto a confirmacion.</p>
+        </div>
+      </div>
+
+      <form id="clientItemForm" class="client-item-form" novalidate>
+        <input type="hidden" id="clientItemId">
+        <div class="client-item-type" role="group" aria-label="Tipo de registro">
+          <label>
+            <input type="radio" name="clientItemType" value="mascota" checked>
+            Mascota
+          </label>
+          <label>
+            <input type="radio" name="clientItemType" value="auto">
+            Auto
+          </label>
+        </div>
+
+        <div class="client-item-fields client-item-fields--pet">
+          <label>Nombre de la mascota<input id="petName" type="text" autocomplete="off"></label>
+          <label>Especie<input id="petSpecies" type="text" placeholder="Perro, gato..."></label>
+          <label>Raza<input id="petBreed" type="text"></label>
+          <label>Edad<input id="petAge" type="text" placeholder="3 anos"></label>
+          <label>Tama&ntilde;o
+            <select id="petSize">
+              <option value="">Selecciona tama&ntilde;o</option>
+              <option>Chico: hasta 10 kg</option>
+              <option>Mediano: 11 kg a 25 kg</option>
+              <option>Grande: 26 kg a 39 kg</option>
+              <option>Gigante/Jumbo: +40 kg</option>
+            </select>
+          </label>
+          <label>Tipo de pelo
+            <select id="petHair">
+              <option value="">Selecciona tipo de pelo</option>
+              <option>Pelo corto</option>
+              <option>Pelo medio</option>
+              <option>Pelo largo</option>
+            </select>
+          </label>
+          <label>Paquete solicitado
+            <select id="petPackage">
+              <option value="">Selecciona paquete</option>
+              <option>Esencial</option>
+              <option>SPA</option>
+            </select>
+          </label>
+          <label>Comportamiento o cuidados especiales<textarea id="petCare" rows="3"></textarea></label>
+        </div>
+
+        <div class="client-item-fields client-item-fields--car hidden">
+          <label>Marca<input id="carBrand" type="text" autocomplete="off"></label>
+          <label>Modelo<input id="carModel" type="text"></label>
+          <label>A&ntilde;o<input id="carYear" type="number" min="1950" max="2100"></label>
+          <label>Color<input id="carColor" type="text"></label>
+          <label>Tipo de vehiculo
+            <select id="carSize">
+              <option value="">Selecciona tipo</option>
+              <option>Auto chico</option>
+              <option>Auto mediano</option>
+              <option>Camioneta/SUV</option>
+              <option>Pick Up</option>
+            </select>
+          </label>
+          <label>Servicio solicitado
+            <select id="carService">
+              <option value="">Selecciona servicio</option>
+              <option>Lavado b&aacute;sico</option>
+              <option>Lavado completo</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="client-item-fields client-item-fields--shared">
+          <label>Foto<input id="itemPhoto" type="file" accept="image/*"></label>
+          <label>Zona o colonia<input id="itemZone" type="text"></label>
+          <label>Fecha deseada<input id="itemDate" type="text" placeholder="Viernes, sabado..."></label>
+          <label>Horario deseado<input id="itemTime" type="text" placeholder="11:00 a.m."></label>
+          <label>Comentarios adicionales<textarea id="itemComments" rows="3"></textarea></label>
+        </div>
+
+        <div class="client-item-actions">
+          <button type="submit" class="client-item-primary" id="clientItemSave">Guardar card</button>
+          <button type="button" class="client-item-secondary hidden" id="clientItemCancel">Cancelar edicion</button>
+        </div>
+      </form>
+
+      <div id="clientItemsList" class="client-items-list" aria-live="polite"></div>
+    </section>
+
     <section class="history-actions" aria-label="Historiales del portal">
       <button type="button" id="toggleOrdersHistory" class="history-toggle" aria-expanded="false" aria-controls="ordersPanel">
         <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">

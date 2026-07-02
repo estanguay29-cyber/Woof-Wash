@@ -8,6 +8,7 @@ function getEmployeeFormValues() {
   const telefonoInput = getById("emp_telefono");
   const emailInput = getById("emp_email");
   const puestoInput = getById("emp_puesto");
+  const fotoPerfilInput = getById("emp_fotoPerfilUrl");
   const fechaInput = getById("emp_fechaIngreso");
   const fechaCumpleanosInput = getById("emp_fechaCumpleanos");
   const sueldoInput = getById("emp_sueldoBase");
@@ -22,6 +23,7 @@ function getEmployeeFormValues() {
     telefono: telefonoInput?.value.trim() || "",
     email: emailInput?.value.trim() || "",
     puesto: puestoInput?.value.trim() || "",
+    fotoPerfilUrl: fotoPerfilInput?.value.trim() || "",
     fechaIngreso: fechaInput?.value.trim() || "",
     fechaCumpleanos: fechaCumpleanosInput?.value.trim() || "",
     sueldoBase: Number(sueldoInput?.value) || 0,
@@ -77,6 +79,7 @@ function setFormValues(values = {}) {
   const telefonoInput = getById("emp_telefono");
   const emailInput = getById("emp_email");
   const puestoInput = getById("emp_puesto");
+  const fotoPerfilInput = getById("emp_fotoPerfilUrl");
   const fechaInput = getById("emp_fechaIngreso");
   const fechaCumpleanosInput = getById("emp_fechaCumpleanos");
   const sueldoInput = getById("emp_sueldoBase");
@@ -90,6 +93,7 @@ function setFormValues(values = {}) {
   if (telefonoInput) telefonoInput.value = values.telefono || "";
   if (emailInput) emailInput.value = values.email || "";
   if (puestoInput) puestoInput.value = values.puesto || values.especialidad || "";
+  if (fotoPerfilInput) fotoPerfilInput.value = values.fotoPerfilUrl || "";
   if (fechaInput) fechaInput.value = values.fechaIngreso || "";
   if (fechaCumpleanosInput) {
     const fechaNormalizada = normalizarFechaParaInputDate(values.fechaCumpleanos);
@@ -600,6 +604,7 @@ export async function saveEmployee() {
     email: payload.email,
     telefono: payload.telefono,
     puesto: payload.puesto,
+    fotoPerfilUrl: payload.fotoPerfilUrl,
     fechaIngreso: payload.fechaIngreso,
     fechaCumpleanos: payload.fechaCumpleanos,
     sueldoBase: payload.sueldoBase,
