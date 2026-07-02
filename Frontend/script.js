@@ -554,6 +554,7 @@ function renderizarAccesosCuenta() {
 
 async function validarAccesosAdmin() {
   const token = obtenerTokenValido();
+  const rolLocal = obtenerRolSesion();
   renderizarAccesosCuenta();
 
   if (!token) {
@@ -568,9 +569,9 @@ async function validarAccesosAdmin() {
     return adminValidado;
   }
 
-  adminValidado = false;
+  adminValidado = rolLocal === "admin";
   tokenAdminValidado = token;
-  renderizarAccesosAdmin(false);
+  renderizarAccesosAdmin(adminValidado);
 
   try {
     const res = await fetch(`${obtenerApiBase()}/admin/me`, {
@@ -1163,6 +1164,9 @@ const zonasServicioFallback = [
   { value: "zona_6", label: "Zona 6", nombre: "Expo Guadalajara", mapImage: "img/Zona6.jpg" }
 ];
 
+const ZONAS_SERVICIO_CACHE_KEY = "woofwash_service_zones_cache_v1";
+const ZONAS_SERVICIO_CACHE_TTL_MS = 1000 * 60 * 60 * 6;
+
 let zonasServicioConfig = {
   zones: zonasServicioFallback,
   rulesByDay: {
@@ -1195,26 +1199,67 @@ function obtenerReglaZonaPublica(dia = hoy) {
   return { ...regla, zone: zona };
 }
 
+function normalizarConfigZonasPublicas(data = {}) {
+  return {
+    zones: Array.isArray(data.zones) && data.zones.length ? data.zones : zonasServicioFallback,
+    rulesByDay: data.rulesByDay || zonasServicioConfig.rulesByDay
+  };
+}
+
+function guardarCacheZonasServicioPublicas(config) {
+  try {
+    localStorage.setItem(ZONAS_SERVICIO_CACHE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      config
+    }));
+  } catch (error) {
+    // El sitio publico debe seguir funcionando aunque el navegador bloquee storage.
+  }
+}
+
+function cargarCacheZonasServicioPublicas() {
+  try {
+    const raw = localStorage.getItem(ZONAS_SERVICIO_CACHE_KEY);
+    if (!raw) return false;
+
+    const cache = JSON.parse(raw);
+    const esReciente = Number(cache?.savedAt) > Date.now() - ZONAS_SERVICIO_CACHE_TTL_MS;
+    if (!esReciente || !cache?.config) return false;
+
+    zonasServicioConfig = normalizarConfigZonasPublicas(cache.config);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function renderizarZonasServicioPublicas() {
+  renderizarZonaHoyPublica();
+  renderizarZonaDestacadaPublica();
+}
+
 async function cargarZonasServicioPublicas() {
   if (window.location.protocol === "file:") {
     zonasServicioConfig = {
       zones: zonasServicioFallback,
       rulesByDay: zonasServicioConfig.rulesByDay
     };
-    return;
+    renderizarZonasServicioPublicas();
+    return zonasServicioConfig;
   }
 
   try {
     const res = await fetch(`${obtenerApiBase()}/service-zones`, { cache: "no-store" });
     if (!res.ok) throw new Error("No se pudo cargar zonas.");
     const data = await res.json();
-    zonasServicioConfig = {
-      zones: Array.isArray(data.zones) && data.zones.length ? data.zones : zonasServicioFallback,
-      rulesByDay: data.rulesByDay || zonasServicioConfig.rulesByDay
-    };
+    zonasServicioConfig = normalizarConfigZonasPublicas(data);
+    guardarCacheZonasServicioPublicas(zonasServicioConfig);
   } catch (error) {
     // Fallback local para que el sitio publico no dependa del deploy del backend.
   }
+
+  renderizarZonasServicioPublicas();
+  return zonasServicioConfig;
 }
 
 function crearImagenZonaPublica(zona) {
@@ -1245,6 +1290,7 @@ function crearImagenZonaGrandePublica(zona) {
 function renderizarZonaHoyPublica() {
   const zonaHTML = document.getElementById("zonaHoy");
   if (!zonaHTML) return;
+  zonaHTML.closest(".hero-zone-card")?.classList.remove("is-loading");
 
   const regla = obtenerReglaZonaPublica(hoy);
   if (regla.esDescanso) {
@@ -2249,9 +2295,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderizarProductosMascotas();
   renderizarProductosAuto();
   inicializarJingleWoofWash();
-  await cargarZonasServicioPublicas();
-  renderizarZonaHoyPublica();
-  renderizarZonaDestacadaPublica();
+  cargarCacheZonasServicioPublicas();
+  renderizarZonasServicioPublicas();
 
   const inputProductos = document.getElementById("buscadorProductos");
 
@@ -2290,9 +2335,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   configurarEnlacesAuth();
   restaurarCarritoDespuesDeAuth();
   renderizarAccesosCuenta();
-  validarAccesosAdmin();
   sincronizarVisibilidadChat();
   configurarJuegoNosotros();
+  cargarZonasServicioPublicas();
+  validarAccesosAdmin();
 
   const btnActualizarPedidos = document.getElementById("btnActualizarPedidos");
   const btnTogglePedidos = document.getElementById("btnTogglePedidos");

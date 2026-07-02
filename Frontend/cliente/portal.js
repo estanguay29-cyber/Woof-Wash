@@ -448,14 +448,68 @@ function obtenerClienteItems() {
   try {
     const raw = localStorage.getItem(CLIENT_ITEMS_STORAGE_KEY);
     const items = raw ? JSON.parse(raw) : [];
-    return Array.isArray(items) ? items : [];
+    return Array.isArray(items) ? items.map(normalizarClientItem).filter(Boolean) : [];
   } catch (error) {
     return [];
   }
 }
 
 function guardarClienteItems(items = []) {
-  localStorage.setItem(CLIENT_ITEMS_STORAGE_KEY, JSON.stringify(items));
+  localStorage.setItem(CLIENT_ITEMS_STORAGE_KEY, JSON.stringify(items.map(normalizarClientItem).filter(Boolean)));
+}
+
+let clientItemTipoActivo = "mascota";
+
+const CLIENT_SCHEDULE_SERVICES = {
+  mascota: [
+    { value: "Esencial", label: "Esencial", description: "Shampoo, secado, corte de u\u00f1as, limpieza de o\u00eddos, higienicos, cepillado basico, terminado y fragancia." },
+    { value: "SPA", label: "SPA", description: "Shampoo premium, hidratacion, spray bucal, secado, corte de u\u00f1as, limpieza de o\u00eddos, higienicos, cepillado profundo, terminado y fragancia." }
+  ],
+  auto: [
+    { value: "Lavado b\u00e1sico", label: "Lavado b\u00e1sico", description: "Solo exterior. Auto chico $159, auto mediano $199, camioneta/SUV $229, Pick Up $259." },
+    { value: "Lavado completo", label: "Lavado completo", description: "Exterior + aspirado + tablero + llantas. Auto chico $209, auto mediano $249, camioneta/SUV $279, Pick Up $309." }
+  ]
+};
+
+function normalizarClientItem(item = {}) {
+  if (!item || typeof item !== "object") return null;
+  const tipo = item.tipo === "auto" ? "auto" : "mascota";
+  const id = normalizarTexto(item.id) || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  if (tipo === "auto") {
+    const nombre = normalizarTexto(item.nombre || item.apodo || [item.marca, item.modelo].map(normalizarTexto).filter(Boolean).join(" "));
+    return {
+      ...item,
+      id,
+      tipo,
+      nombre,
+      marca: normalizarTexto(item.marca),
+      modelo: normalizarTexto(item.modelo),
+      anio: normalizarTexto(item.anio),
+      color: normalizarTexto(item.color),
+      tipoVehiculo: normalizarTexto(item.tipoVehiculo),
+      fotoUrl: normalizarTexto(item.fotoUrl),
+      fotoNombre: normalizarTexto(item.fotoNombre),
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || item.createdAt || new Date().toISOString()
+    };
+  }
+
+  return {
+    ...item,
+    id,
+    tipo,
+    nombre: normalizarTexto(item.nombre),
+    especie: "Perro",
+    raza: normalizarTexto(item.raza),
+    edad: normalizarTexto(item.edad),
+    tamano: normalizarTexto(item.tamano),
+    tipoPelo: normalizarTexto(item.tipoPelo),
+    cuidados: normalizarTexto(item.cuidados),
+    fotoUrl: normalizarTexto(item.fotoUrl),
+    fotoNombre: normalizarTexto(item.fotoNombre),
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || item.createdAt || new Date().toISOString()
+  };
 }
 
 async function subirFotoClientItem(file) {
@@ -506,13 +560,26 @@ async function subirFotoClientItem(file) {
 }
 
 function obtenerTipoClientItem() {
-  return document.querySelector("input[name='clientItemType']:checked")?.value === "auto" ? "auto" : "mascota";
+  const radio = document.querySelector("input[name='clientItemType']:checked")?.value;
+  return radio === "auto" || clientItemTipoActivo === "auto" ? "auto" : "mascota";
 }
 
 function actualizarCamposClientItem() {
   const tipo = obtenerTipoClientItem();
+  clientItemTipoActivo = tipo;
   document.querySelector(".client-item-fields--pet")?.classList.toggle("hidden", tipo !== "mascota");
   document.querySelector(".client-item-fields--car")?.classList.toggle("hidden", tipo !== "auto");
+  const title = document.getElementById("clientItemFormTitle");
+  const copy = document.getElementById("clientItemFormCopy");
+  const saveButton = document.getElementById("clientItemSave");
+  const hasId = Boolean(valorInput("clientItemId"));
+  if (title) title.textContent = `${hasId ? "Editar" : "Registrar"} ${tipo === "auto" ? "auto" : "perrito"}`;
+  if (copy) {
+    copy.textContent = tipo === "auto"
+      ? "Guarda los datos del vehiculo. El servicio y horario se eligen al agendar."
+      : "Guarda los datos base de tu perrito. El servicio y horario se eligen al agendar.";
+  }
+  if (saveButton) saveButton.textContent = hasId ? "Actualizar registro" : "Guardar registro";
 }
 
 function valorInput(id) {
@@ -526,9 +593,9 @@ function setValorInput(id, value) {
 
 function obtenerNombreClientItem(item = {}) {
   if (item.tipo === "auto") {
-    return [item.marca, item.modelo].map(normalizarTexto).filter(Boolean).join(" ") || "Auto";
+    return item.nombre || [item.marca, item.modelo].map(normalizarTexto).filter(Boolean).join(" ") || "Auto";
   }
-  return item.nombre || "Mascota";
+  return item.nombre || "Perrito";
 }
 
 function obtenerFotoClientItem(item = {}) {
@@ -544,7 +611,7 @@ function renderFotoClientItem(item = {}) {
   return `<span>${escaparHtml(obtenerIniciales(nombre))}</span>`;
 }
 
-function construirMensajeWhatsApp(item = {}) {
+function construirMensajeWhatsApp(item = {}, cita = {}) {
   const foto = item.fotoUrl || "[Sin foto guardada]";
 
   if (item.tipo === "auto") {
@@ -554,14 +621,16 @@ function construirMensajeWhatsApp(item = {}) {
       "Quiero agendar una cita para:",
       "",
       `Vehiculo: ${obtenerNombreClientItem(item)}`,
+      `Marca: ${item.marca || "-"}`,
+      `Modelo: ${item.modelo || "-"}`,
       `A\u00f1o: ${item.anio || "-"}`,
       `Color: ${item.color || "-"}`,
       `Tipo de vehiculo: ${item.tipoVehiculo || "-"}`,
-      `Servicio solicitado: ${item.servicio || "-"}`,
-      `Zona: ${item.zona || "-"}`,
-      `Fecha deseada: ${item.fecha || "-"}`,
-      `Horario deseado: ${item.horario || "-"}`,
-      `Comentarios: ${item.comentarios || "-"}`,
+      `Servicio solicitado: ${cita.servicio || item.servicio || "-"}`,
+      `Fecha deseada: ${cita.fecha || item.fecha || "-"}`,
+      `Horario deseado: ${cita.horario || item.horario || "-"}`,
+      `Zona: ${cita.zona || item.zona || "-"}`,
+      `Comentarios de la cita: ${cita.comentarios || item.comentarios || "-"}`,
       "",
       `Foto: ${foto}`,
       "",
@@ -573,22 +642,21 @@ function construirMensajeWhatsApp(item = {}) {
     "Hola, Woof & Wash",
     "",
     "Quiero agendar una cita para:",
-    "",
-    `Nombre: ${item.nombre || "-"}`,
-    "Tipo: Mascota",
-    `Especie: ${item.especie || "-"}`,
-    `Raza: ${item.raza || "-"}`,
-    `Edad: ${item.edad || "-"}`,
-    `Tama\u00f1o: ${item.tamano || "-"}`,
-    `Tipo de pelo: ${item.tipoPelo || "-"}`,
-    `Paquete solicitado: ${item.paquete || "-"}`,
-    `Zona: ${item.zona || "-"}`,
-    `Fecha deseada: ${item.fecha || "-"}`,
-    `Horario deseado: ${item.horario || "-"}`,
-    `Cuidados especiales: ${item.cuidados || "-"}`,
-    `Comentarios: ${item.comentarios || "-"}`,
-    "",
-    `Foto: ${foto}`,
+      "",
+      `Nombre: ${item.nombre || "-"}`,
+      "Tipo: Perrito",
+      `Raza: ${item.raza || "-"}`,
+      `Edad: ${item.edad || "-"}`,
+      `Tama\u00f1o: ${item.tamano || "-"}`,
+      `Tipo de pelo: ${item.tipoPelo || "-"}`,
+      `Cuidados especiales generales: ${item.cuidados || "-"}`,
+      `Servicio solicitado: ${cita.servicio || item.paquete || "-"}`,
+      `Fecha deseada: ${cita.fecha || item.fecha || "-"}`,
+      `Horario deseado: ${cita.horario || item.horario || "-"}`,
+      `Zona: ${cita.zona || item.zona || "-"}`,
+      `Comentarios de la cita: ${cita.comentarios || item.comentarios || "-"}`,
+      "",
+      `Foto: ${foto}`,
     "",
     WHATSAPP_CONFIRMATION_TEXT
   ].join("\n");
@@ -600,38 +668,32 @@ function abrirWhatsAppClientItem(id) {
   window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item))}`, "_blank", "noopener,noreferrer");
 }
 
-function renderizarClientItems() {
-  const list = document.getElementById("clientItemsList");
+function renderizarGrupoClientItems(list, items, emptyText) {
   if (!list) return;
-  const items = obtenerClienteItems();
-
   if (!items.length) {
-    list.innerHTML = '<div class="empty-state">Aun no tienes cards guardadas.</div>';
+    list.innerHTML = `<div class="empty-state">${escaparHtml(emptyText)}</div>`;
     return;
   }
 
   list.innerHTML = items.map((item) => {
     const nombre = obtenerNombreClientItem(item);
     const subtitulo = item.tipo === "auto"
-      ? `${item.tipoVehiculo || "Vehiculo"} - ${item.servicio || "Servicio pendiente"}`
-      : `${item.especie || "Mascota"} - ${item.paquete || "Paquete pendiente"}`;
+      ? `${item.tipoVehiculo || "Vehiculo"} - ${item.color || "Color pendiente"}`
+      : `${item.raza || "Perrito"} - ${item.tipoPelo || "Pelo pendiente"}`;
     const detalles = item.tipo === "auto"
       ? [
           ["Tipo", item.tipoVehiculo],
-          ["Servicio", item.servicio],
+          ["Marca", item.marca],
+          ["Modelo", item.modelo],
+          ["A\u00f1o", item.anio],
           ["Color", item.color],
-          ["Zona", item.zona],
-          ["Fecha", item.fecha],
-          ["Horario", item.horario]
         ]
       : [
-          ["Especie", item.especie],
+          ["Tipo", "Perrito"],
           ["Raza", item.raza],
+          ["Edad", item.edad],
           ["Tama\u00f1o", item.tamano],
           ["Pelo", item.tipoPelo],
-          ["Zona", item.zona],
-          ["Fecha", item.fecha],
-          ["Horario", item.horario]
         ];
 
     return `
@@ -647,7 +709,7 @@ function renderizarClientItems() {
             `).join("")}
           </dl>
           <div class="client-item-card-actions">
-            <button type="button" class="client-item-whatsapp" data-action="whatsapp" data-id="${escaparHtml(item.id)}">Agendar cita para ${escaparHtml(nombre)}</button>
+            <button type="button" class="client-item-whatsapp" data-action="schedule" data-id="${escaparHtml(item.id)}">Agendar cita para ${escaparHtml(nombre)}</button>
             <button type="button" class="client-item-secondary" data-action="edit" data-id="${escaparHtml(item.id)}">Editar datos</button>
             <button type="button" class="client-item-danger" data-action="delete" data-id="${escaparHtml(item.id)}">Eliminar</button>
           </div>
@@ -657,15 +719,42 @@ function renderizarClientItems() {
   }).join("");
 }
 
+function renderizarClientItems() {
+  const items = obtenerClienteItems();
+  renderizarGrupoClientItems(
+    document.getElementById("clientPetsList"),
+    items.filter((item) => item.tipo !== "auto"),
+    "Aun no has registrado ningun perrito."
+  );
+  renderizarGrupoClientItems(
+    document.getElementById("clientCarsList"),
+    items.filter((item) => item.tipo === "auto"),
+    "Aun no has registrado ningun auto."
+  );
+}
+
+function abrirFormularioClientItem(tipo = "mascota") {
+  clientItemTipoActivo = tipo === "auto" ? "auto" : "mascota";
+  const radio = document.querySelector(`input[name='clientItemType'][value='${clientItemTipoActivo}']`);
+  if (radio) radio.checked = true;
+  actualizarCamposClientItem();
+  document.getElementById("clientItemForm")?.classList.remove("hidden");
+  document.getElementById("clientItemForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function limpiarFormularioClientItem() {
   document.getElementById("clientItemForm")?.reset();
   setValorInput("clientItemId", "");
+  setValorInput("petSpecies", "Perro");
   const mascotaRadio = document.querySelector("input[name='clientItemType'][value='mascota']");
   if (mascotaRadio) mascotaRadio.checked = true;
+  clientItemTipoActivo = "mascota";
   document.getElementById("clientItemCancel")?.classList.add("hidden");
   const saveButton = document.getElementById("clientItemSave");
-  if (saveButton) saveButton.textContent = "Guardar card";
+  if (saveButton) saveButton.textContent = "Guardar registro";
+  document.getElementById("clientItemForm")?.classList.add("hidden");
   actualizarCamposClientItem();
+  document.getElementById("clientItemForm")?.classList.add("hidden");
 }
 
 function leerFormularioClientItem() {
@@ -675,10 +764,6 @@ function leerFormularioClientItem() {
   const base = {
     id: idExistente || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     tipo,
-    zona: valorInput("itemZone"),
-    fecha: valorInput("itemDate"),
-    horario: valorInput("itemTime"),
-    comentarios: valorInput("itemComments"),
     fotoFile: foto,
     fotoNombre: foto?.name || ""
   };
@@ -692,40 +777,41 @@ function leerFormularioClientItem() {
   if (tipo === "auto") {
     return {
       ...base,
+      nombre: valorInput("carName"),
       marca: valorInput("carBrand"),
       modelo: valorInput("carModel"),
       anio: valorInput("carYear"),
       color: valorInput("carColor"),
-      tipoVehiculo: valorInput("carSize"),
-      servicio: valorInput("carService")
+      tipoVehiculo: valorInput("carSize")
     };
   }
 
   return {
     ...base,
     nombre: valorInput("petName"),
-    especie: valorInput("petSpecies"),
+    especie: "Perro",
     raza: valorInput("petBreed"),
     edad: valorInput("petAge"),
     tamano: valorInput("petSize"),
     tipoPelo: valorInput("petHair"),
-    paquete: valorInput("petPackage"),
     cuidados: valorInput("petCare")
   };
 }
 
 function validarClientItem(item = {}) {
   if (item.tipo === "auto") {
-    return Boolean(item.marca && item.modelo && item.tipoVehiculo && item.servicio && item.zona && item.fecha && item.horario);
+    return Boolean(item.nombre && item.marca && item.modelo && item.tipoVehiculo);
   }
-  return Boolean(item.nombre && item.especie && item.tamano && item.tipoPelo && item.paquete && item.zona && item.fecha && item.horario);
+  return Boolean(item.nombre && item.raza && item.edad && item.tamano && item.tipoPelo);
 }
 
 async function guardarClientItem(event) {
   event.preventDefault();
   const item = leerFormularioClientItem();
   if (!validarClientItem(item)) {
-    document.getElementById("portalMessage").textContent = "Completa nombre/datos principales, servicio, zona, fecha y horario.";
+    document.getElementById("portalMessage").textContent = item.tipo === "auto"
+      ? "Completa nombre, marca, modelo y tipo de vehiculo."
+      : "Completa nombre, raza, edad, tamano y tipo de pelo.";
     return;
   }
 
@@ -735,7 +821,7 @@ async function guardarClientItem(event) {
   const mensaje = document.getElementById("portalMessage");
 
   if (mensaje) {
-    mensaje.textContent = item.fotoFile ? "Guardando foto..." : "Guardando card...";
+    mensaje.textContent = item.fotoFile ? "Guardando foto..." : "Guardando registro...";
   }
 
   let fotoUrl = itemPrevio.fotoUrl || "";
@@ -775,7 +861,7 @@ async function guardarClientItem(event) {
   limpiarFormularioClientItem();
   renderizarClientItems();
   if (mensaje) {
-    mensaje.textContent = "Card guardada. Puedes solicitar la cita por WhatsApp.";
+    mensaje.textContent = "Registro guardado. Puedes solicitar la cita desde su card.";
   }
 }
 
@@ -785,31 +871,27 @@ function editarClientItem(id) {
   setValorInput("clientItemId", item.id);
   const radio = document.querySelector(`input[name='clientItemType'][value='${item.tipo}']`);
   if (radio) radio.checked = true;
+  clientItemTipoActivo = item.tipo === "auto" ? "auto" : "mascota";
   actualizarCamposClientItem();
+  document.getElementById("clientItemForm")?.classList.remove("hidden");
 
   setValorInput("petName", item.nombre);
-  setValorInput("petSpecies", item.especie);
+  setValorInput("petSpecies", "Perro");
   setValorInput("petBreed", item.raza);
   setValorInput("petAge", item.edad);
   setValorInput("petSize", item.tamano);
   setValorInput("petHair", item.tipoPelo);
-  setValorInput("petPackage", item.paquete);
   setValorInput("petCare", item.cuidados);
 
+  setValorInput("carName", item.nombre);
   setValorInput("carBrand", item.marca);
   setValorInput("carModel", item.modelo);
   setValorInput("carYear", item.anio);
   setValorInput("carColor", item.color);
   setValorInput("carSize", item.tipoVehiculo);
-  setValorInput("carService", item.servicio);
-
-  setValorInput("itemZone", item.zona);
-  setValorInput("itemDate", item.fecha);
-  setValorInput("itemTime", item.horario);
-  setValorInput("itemComments", item.comentarios);
   document.getElementById("clientItemCancel")?.classList.remove("hidden");
   const saveButton = document.getElementById("clientItemSave");
-  if (saveButton) saveButton.textContent = "Actualizar card";
+  if (saveButton) saveButton.textContent = "Actualizar registro";
   document.getElementById("clientItemForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -825,17 +907,80 @@ function eliminarClientItem(id) {
   renderizarClientItems();
 }
 
+function cerrarAgendaClientItem() {
+  document.getElementById("clientScheduleModal")?.classList.add("hidden");
+  document.getElementById("clientScheduleForm")?.reset();
+  setValorInput("clientScheduleItemId", "");
+}
+
+function abrirAgendaClientItem(id) {
+  const item = obtenerClienteItems().find((actual) => actual.id === id);
+  if (!item) return;
+  const modal = document.getElementById("clientScheduleModal");
+  const select = document.getElementById("scheduleService");
+  const title = document.getElementById("clientScheduleTitle");
+  const copy = document.getElementById("clientScheduleCopy");
+  if (!modal || !select) return;
+
+  const servicios = CLIENT_SCHEDULE_SERVICES[item.tipo === "auto" ? "auto" : "mascota"];
+  select.innerHTML = '<option value="">Selecciona servicio</option>' + servicios.map((servicio) => (
+    `<option value="${escaparHtml(servicio.value)}">${escaparHtml(servicio.label)} - ${escaparHtml(servicio.description)}</option>`
+  )).join("");
+  setValorInput("clientScheduleItemId", item.id);
+  if (title) title.textContent = `Agendar cita para ${obtenerNombreClientItem(item)}`;
+  if (copy) {
+    copy.textContent = item.tipo === "auto"
+      ? "Elige el lavado y los datos de esta cita para enviarlo por WhatsApp."
+      : "Elige el servicio de estetica canina y los datos de esta cita para enviarlo por WhatsApp.";
+  }
+  modal.classList.remove("hidden");
+}
+
+function leerAgendaClientItem() {
+  return {
+    servicio: valorInput("scheduleService"),
+    fecha: valorInput("scheduleDate"),
+    horario: valorInput("scheduleTime"),
+    zona: valorInput("scheduleZone"),
+    comentarios: valorInput("scheduleComments")
+  };
+}
+
+function enviarAgendaClientItem(event) {
+  event.preventDefault();
+  const id = valorInput("clientScheduleItemId");
+  const item = obtenerClienteItems().find((actual) => actual.id === id);
+  const cita = leerAgendaClientItem();
+  const mensaje = document.getElementById("portalMessage");
+  if (!item) return;
+  if (!cita.servicio || !cita.fecha || !cita.horario || !cita.zona) {
+    if (mensaje) mensaje.textContent = "Completa servicio, fecha, horario y zona para agendar.";
+    return;
+  }
+  window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item, cita))}`, "_blank", "noopener,noreferrer");
+  cerrarAgendaClientItem();
+}
+
 function inicializarClientItems() {
+  document.querySelectorAll("[data-client-item-start]").forEach((button) => {
+    button.addEventListener("click", () => abrirFormularioClientItem(button.dataset.clientItemStart));
+  });
   document.querySelectorAll("input[name='clientItemType']").forEach((input) => {
     input.addEventListener("change", actualizarCamposClientItem);
   });
   document.getElementById("clientItemForm")?.addEventListener("submit", guardarClientItem);
   document.getElementById("clientItemCancel")?.addEventListener("click", limpiarFormularioClientItem);
-  document.getElementById("clientItemsList")?.addEventListener("click", (event) => {
+  document.getElementById("clientScheduleForm")?.addEventListener("submit", enviarAgendaClientItem);
+  document.getElementById("clientScheduleClose")?.addEventListener("click", cerrarAgendaClientItem);
+  document.getElementById("clientScheduleCancel")?.addEventListener("click", cerrarAgendaClientItem);
+  document.getElementById("clientScheduleModal")?.addEventListener("click", (event) => {
+    if (event.target.id === "clientScheduleModal") cerrarAgendaClientItem();
+  });
+  document.querySelector(".client-item-sections")?.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
     const id = button.dataset.id || "";
-    if (button.dataset.action === "whatsapp") abrirWhatsAppClientItem(id);
+    if (button.dataset.action === "schedule" || button.dataset.action === "whatsapp") abrirAgendaClientItem(id);
     if (button.dataset.action === "edit") editarClientItem(id);
     if (button.dataset.action === "delete") eliminarClientItem(id);
   });

@@ -737,6 +737,60 @@ h2 {
   line-height: 1.45;
 }
 
+.client-item-launchers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.client-item-launcher {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: var(--radius);
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(140, 198, 63, 0.18), transparent 34%),
+    linear-gradient(135deg, #ffffff, #fffae8);
+  box-shadow: 0 16px 34px rgba(11, 42, 107, 0.09);
+}
+
+.client-item-launcher-icon {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: rgba(140, 198, 63, 0.16);
+  color: var(--blue);
+}
+
+.client-item-launcher-icon .portal-icon {
+  width: 34px;
+  height: 34px;
+  stroke-width: 1.8;
+}
+
+.client-item-launcher h3,
+.client-item-group-heading h3,
+.client-item-form-heading h3 {
+  margin: 0;
+  color: var(--blue);
+  font-size: 1.35rem;
+  line-height: 1.12;
+}
+
+.client-item-launcher p,
+.client-item-group-heading p,
+.client-item-form-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 760;
+  line-height: 1.45;
+}
+
 .client-item-form {
   display: grid;
   gap: 14px;
@@ -746,8 +800,31 @@ h2 {
   background: rgba(255, 250, 232, 0.58);
 }
 
+.client-item-form.hidden {
+  display: none;
+}
+
+.client-item-fields.hidden,
+.client-item-actions .hidden,
+.client-item-card-actions .hidden {
+  display: none;
+}
+
+.client-item-form-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.client-item-form-heading span {
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .client-item-type {
-  display: inline-grid;
+  display: none;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   width: min(100%, 360px);
@@ -778,7 +855,11 @@ h2 {
 }
 
 .client-item-fields--shared {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.client-schedule-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .client-item-fields label {
@@ -852,6 +933,24 @@ h2 {
   border-color: rgba(185, 28, 28, 0.18);
   background: #fff5f5;
   color: #b91c1c;
+}
+
+.client-item-sections {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.client-item-group {
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.client-item-group-heading {
+  display: grid;
+  gap: 5px;
 }
 
 .client-items-list {
@@ -953,6 +1052,48 @@ h2 {
 .history-list {
   display: grid;
   gap: 14px;
+}
+
+.client-schedule-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(11, 42, 107, 0.46);
+  backdrop-filter: blur(8px);
+}
+
+.client-schedule-modal.hidden {
+  display: none;
+}
+
+.client-schedule-dialog {
+  position: relative;
+  width: min(100%, 720px);
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  border: 1px solid rgba(11, 42, 107, 0.12);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  background: #fffdf7;
+  box-shadow: 0 30px 80px rgba(11, 42, 107, 0.22);
+}
+
+.client-schedule-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--blue);
+  cursor: pointer;
+  font-size: 1.35rem;
+  font-weight: 900;
 }
 
 .history-item {
@@ -1116,9 +1257,11 @@ h2 {
   .history-actions,
   .portal-grid,
   .loyalty-cards,
+  .client-item-launchers,
   .client-items-list,
   .client-item-fields,
-  .client-item-fields--shared {
+  .client-item-fields--shared,
+  .client-schedule-fields {
     grid-template-columns: 1fr;
   }
 
@@ -1208,6 +1351,9 @@ h2 {
   }
 
   .client-item-form,
+  .client-item-launcher,
+  .client-item-group,
+  .client-schedule-dialog,
   .client-item-card-body {
     padding: 14px;
   }

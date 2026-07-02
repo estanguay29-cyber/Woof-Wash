@@ -1777,6 +1777,38 @@ h1, h2, h3 {
   background: #123f89;
 }
 
+.hero-zone-card.is-loading .hero-zone-status,
+.hero-zone-card.is-loading .hero-zone-text {
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-zone-card.is-loading .hero-zone-text {
+  display: inline-flex;
+  min-height: 1.9em;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(140, 198, 63, 0.12);
+  padding: 2px 12px;
+  color: rgba(11, 42, 107, 0.72);
+}
+
+.hero-zone-card.is-loading .hero-zone-status::after,
+.hero-zone-card.is-loading .hero-zone-text::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  animation: zoneLoadingShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes zoneLoadingShimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 .hero-visual {
   display: flex;
   justify-content: center;
