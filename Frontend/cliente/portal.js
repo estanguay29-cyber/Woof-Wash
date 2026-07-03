@@ -8,7 +8,7 @@ const HERO_ANIMATION_FRAMES = Array.from(
 const HERO_ANIMATION_FRAME_MS = 280;
 const CLIENT_ITEMS_STORAGE_KEY = "woofwash_cliente_items_v1";
 const WHATSAPP_AGENDA_URL = "https://wa.me/523337276934?text=";
-const WHATSAPP_CONFIRMATION_TEXT = "Entiendo que el horario solicitado est\u00e1 sujeto a disponibilidad y confirmaci\u00f3n por parte de Woof & Wash.";
+const WHATSAPP_CONFIRMATION_TEXT = "Entiendo que la fecha, horario y zona solicitados est\u00e1n sujetos a disponibilidad. Woof & Wash me confirmar\u00e1 por WhatsApp si es posible atenderme en ese momento o me compartir\u00e1 una opci\u00f3n cercana para coordinar la cita.";
 const clientItemPhotoUrls = new Map();
 
 function obtenerApiBase() {
@@ -462,8 +462,8 @@ let clientItemTipoActivo = "mascota";
 
 const CLIENT_SCHEDULE_SERVICES = {
   mascota: [
-    { value: "Esencial", label: "Esencial", description: "Shampoo, secado, corte de u\u00f1as, limpieza de o\u00eddos, higienicos, cepillado basico, terminado y fragancia." },
-    { value: "SPA", label: "SPA", description: "Shampoo premium, hidratacion, spray bucal, secado, corte de u\u00f1as, limpieza de o\u00eddos, higienicos, cepillado profundo, terminado y fragancia." }
+    { value: "Esencial", label: "Esencial", description: "Shampoo, secado, corte de u\u00f1as, limpieza de o\u00eddos, higi\u00e9nicos, cepillado b\u00e1sico, terminado y fragancia." },
+    { value: "SPA", label: "SPA", description: "Shampoo premium, hidrataci\u00f3n, spray bucal, secado, corte de u\u00f1as, limpieza de o\u00eddos, higi\u00e9nicos, cepillado profundo, terminado y fragancia." }
   ],
   auto: [
     { value: "Lavado b\u00e1sico", label: "Lavado b\u00e1sico", description: "Solo exterior. Auto chico $159, auto mediano $199, camioneta/SUV $229, Pick Up $259." },
@@ -576,7 +576,7 @@ function actualizarCamposClientItem() {
   if (title) title.textContent = `${hasId ? "Editar" : "Registrar"} ${tipo === "auto" ? "auto" : "perrito"}`;
   if (copy) {
     copy.textContent = tipo === "auto"
-      ? "Guarda los datos del vehiculo. El servicio y horario se eligen al agendar."
+      ? "Guarda los datos del veh\u00edculo. El servicio y horario se eligen al agendar."
       : "Guarda los datos base de tu perrito. El servicio y horario se eligen al agendar.";
   }
   if (saveButton) saveButton.textContent = hasId ? "Actualizar registro" : "Guardar registro";
@@ -625,7 +625,7 @@ function construirMensajeWhatsApp(item = {}, cita = {}) {
       `Modelo: ${item.modelo || "-"}`,
       `A\u00f1o: ${item.anio || "-"}`,
       `Color: ${item.color || "-"}`,
-      `Tipo de vehiculo: ${item.tipoVehiculo || "-"}`,
+      `Tipo de veh\u00edculo: ${item.tipoVehiculo || "-"}`,
       `Servicio solicitado: ${cita.servicio || item.servicio || "-"}`,
       `Fecha deseada: ${cita.fecha || item.fecha || "-"}`,
       `Horario deseado: ${cita.horario || item.horario || "-"}`,
@@ -724,12 +724,12 @@ function renderizarClientItems() {
   renderizarGrupoClientItems(
     document.getElementById("clientPetsList"),
     items.filter((item) => item.tipo !== "auto"),
-    "Aun no has registrado ningun perrito."
+    "A\u00fan no has registrado ning\u00fan perrito."
   );
   renderizarGrupoClientItems(
     document.getElementById("clientCarsList"),
     items.filter((item) => item.tipo === "auto"),
-    "Aun no has registrado ningun auto."
+    "A\u00fan no has registrado ning\u00fan auto."
   );
 }
 
@@ -810,8 +810,8 @@ async function guardarClientItem(event) {
   const item = leerFormularioClientItem();
   if (!validarClientItem(item)) {
     document.getElementById("portalMessage").textContent = item.tipo === "auto"
-      ? "Completa nombre, marca, modelo y tipo de vehiculo."
-      : "Completa nombre, raza, edad, tamano y tipo de pelo.";
+      ? "Completa nombre, marca, modelo y tipo de veh\u00edculo."
+      : "Completa nombre, raza, edad, tama\u00f1o y tipo de pelo.";
     return;
   }
 
@@ -930,8 +930,8 @@ function abrirAgendaClientItem(id) {
   if (title) title.textContent = `Agendar cita para ${obtenerNombreClientItem(item)}`;
   if (copy) {
     copy.textContent = item.tipo === "auto"
-      ? "Elige el lavado y los datos de esta cita para enviarlo por WhatsApp."
-      : "Elige el servicio de estetica canina y los datos de esta cita para enviarlo por WhatsApp.";
+      ? "Elige el lavado y los datos de esta solicitud para enviarla por WhatsApp. Te confirmaremos disponibilidad por ese medio."
+      : "Elige el servicio de est\u00e9tica canina y los datos de esta solicitud para enviarla por WhatsApp. Te confirmaremos disponibilidad por ese medio.";
   }
   modal.classList.remove("hidden");
 }
@@ -992,7 +992,7 @@ function renderizarCompras(pedidos = []) {
   const contenedor = document.getElementById("ordersList");
 
   if (!pedidos.length) {
-    contenedor.innerHTML = '<div class="empty-state">Aun no hay compras registradas.</div>';
+    contenedor.innerHTML = '<div class="empty-state">A\u00fan no hay compras registradas.</div>';
     return;
   }
 
@@ -1023,7 +1023,7 @@ function renderizarCitas(citas = []) {
   const contenedor = document.getElementById("appointmentsList");
 
   if (!citas.length) {
-    contenedor.innerHTML = '<div class="empty-state">Aun no hay citas registradas.</div>';
+    contenedor.innerHTML = '<div class="empty-state">A\u00fan no hay citas registradas.</div>';
     return;
   }
 
@@ -1045,7 +1045,7 @@ function renderizarCitas(citas = []) {
           ${crearDetallePortal("reloj", "Hora", cita.hora || "Sin hora")}
           ${crearDetallePortal("servicio", "Servicio", obtenerNombreServicio(cita))}
           ${crearDetallePortal(iconoTipo, "Tipo", tipo)}
-          ${crearDetallePortal(iconoTipo, "Mascota o vehiculo", obtenerMascotaOVehiculo(cita))}
+          ${crearDetallePortal(iconoTipo, "Mascota o veh\u00edculo", obtenerMascotaOVehiculo(cita))}
           ${crearDetallePortal("estado", "Estado", formatearEstado(cita.estado))}
           ${crearDetallePortal("ubicacion", "Direccion", construirDireccion(cita.direccion))}
           ${crearDetallePortal("usuario", "Empleado", obtenerEmpleadoCita(cita))}

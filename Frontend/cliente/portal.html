@@ -125,7 +125,7 @@
             </svg>
             <h2 id="clientItemsTitle">Registra a quien quieres consentir</h2>
           </div>
-          <p class="client-items-copy">Guarda los datos de tu perrito o tu auto para agendar mas rapido por WhatsApp.</p>
+          <p class="client-items-copy">Guarda los datos de tu perrito o tu auto para agendar m&aacute;s r&aacute;pido por WhatsApp.</p>
         </div>
       </div>
 
@@ -140,7 +140,7 @@
             </svg>
           </div>
           <h3>Dar de alta un perrito</h3>
-          <p>Guarda sus datos para futuras citas de estetica canina.</p>
+          <p>Guarda sus datos para futuras citas de est&eacute;tica canina.</p>
           <button type="button" class="client-item-primary" data-client-item-start="mascota">Registrar perrito</button>
         </article>
 
@@ -155,7 +155,7 @@
             </svg>
           </div>
           <h3>Dar de alta un auto</h3>
-          <p>Guarda los datos de tu vehiculo para lavados a domicilio.</p>
+          <p>Guarda los datos de tu veh&iacute;culo para lavados a domicilio.</p>
           <button type="button" class="client-item-primary" data-client-item-start="auto">Registrar auto</button>
         </article>
       </div>
@@ -183,7 +183,7 @@
         <div class="client-item-fields client-item-fields--pet">
           <label>Nombre del perrito<input id="petName" type="text" autocomplete="off"></label>
           <label>Raza<input id="petBreed" type="text"></label>
-          <label>Edad<input id="petAge" type="text" placeholder="3 anos"></label>
+          <label>Edad<input id="petAge" type="text" placeholder="3 a&ntilde;os"></label>
           <label>Tama&ntilde;o
             <select id="petSize">
               <option value="">Selecciona tama&ntilde;o</option>
@@ -210,7 +210,7 @@
           <label>Modelo<input id="carModel" type="text"></label>
           <label>A&ntilde;o<input id="carYear" type="number" min="1950" max="2100"></label>
           <label>Color<input id="carColor" type="text"></label>
-          <label>Tipo de vehiculo
+          <label>Tipo de veh&iacute;culo
             <select id="carSize">
               <option value="">Selecciona tipo</option>
               <option>Auto chico</option>
@@ -227,7 +227,7 @@
 
         <div class="client-item-actions">
           <button type="submit" class="client-item-primary" id="clientItemSave">Guardar registro</button>
-          <button type="button" class="client-item-secondary hidden" id="clientItemCancel">Cancelar edicion</button>
+          <button type="button" class="client-item-secondary hidden" id="clientItemCancel">Cancelar edici&oacute;n</button>
         </div>
       </form>
 
@@ -235,7 +235,7 @@
         <section class="client-item-group" aria-labelledby="clientPetsTitle">
           <div class="client-item-group-heading">
             <h3 id="clientPetsTitle">Mis mascotas</h3>
-            <p>Perritos guardados para agendar estetica canina.</p>
+            <p>Perritos guardados para agendar est&eacute;tica canina.</p>
           </div>
           <div id="clientPetsList" class="client-items-list" aria-live="polite"></div>
         </section>
@@ -243,7 +243,7 @@
         <section class="client-item-group" aria-labelledby="clientCarsTitle">
           <div class="client-item-group-heading">
             <h3 id="clientCarsTitle">Mis autos</h3>
-            <p>Vehiculos guardados para lavados a domicilio.</p>
+            <p>Veh&iacute;culos guardados para lavados a domicilio.</p>
           </div>
           <div id="clientCarsList" class="client-items-list" aria-live="polite"></div>
         </section>
@@ -256,7 +256,7 @@
         <div class="client-item-form-heading">
           <span id="clientScheduleEyebrow">Agendar por WhatsApp</span>
           <h3 id="clientScheduleTitle">Agendar cita</h3>
-          <p id="clientScheduleCopy">Elige el servicio y los datos de esta cita. El horario queda sujeto a confirmacion.</p>
+          <p id="clientScheduleCopy">Elige el servicio y los datos de esta solicitud para enviarla por WhatsApp.</p>
         </div>
         <form id="clientScheduleForm" class="client-item-form" novalidate>
           <input type="hidden" id="clientScheduleItemId">
@@ -268,6 +268,9 @@
             <label>Horario deseado<input id="scheduleTime" type="text" placeholder="11:00 a.m."></label>
             <label>Zona o colonia<input id="scheduleZone" type="text"></label>
             <label>Comentarios de esta cita<textarea id="scheduleComments" rows="3"></textarea></label>
+          </div>
+          <div class="client-schedule-notice" role="note">
+            <strong>Importante:</strong> la fecha, horario y zona solicitados est&aacute;n sujetos a disponibilidad. Por WhatsApp te confirmaremos si podemos atenderte en ese momento o te propondremos una opci&oacute;n cercana para adaptarnos a tu agenda.
           </div>
           <div class="client-item-actions">
             <button type="submit" class="client-item-primary">Generar WhatsApp</button>

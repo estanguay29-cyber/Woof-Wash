@@ -862,6 +862,25 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.client-schedule-notice {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 4px;
+  border: 1px solid rgba(72, 148, 18, 0.22);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(244, 255, 235, 0.96), rgba(255, 250, 232, 0.92));
+  color: #27415f;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  box-shadow: 0 10px 24px rgba(72, 148, 18, 0.08);
+}
+
+.client-schedule-notice strong {
+  color: #3f7d10;
+  font-weight: 950;
+}
+
 .client-item-fields label {
   display: grid;
   gap: 6px;
