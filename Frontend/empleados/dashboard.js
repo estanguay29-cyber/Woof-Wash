@@ -67,6 +67,7 @@ function cerrarSesionEmpleado() {
 }
 
 function redirigirLogin() {
+  document.body.classList.remove("employee-dashboard-ready");
   cerrarSesionEmpleado();
   localStorage.setItem("authRedirect", "empleados/dashboard.html");
   window.location.href = "../login.html";
@@ -89,6 +90,35 @@ function escapeHtml(value) {
 function obtenerPrimerNombre(nombreCompleto) {
   const limpio = String(nombreCompleto || "").trim().replace(/\s+/g, " ");
   return limpio ? limpio.split(" ")[0] : "";
+}
+
+function obtenerInicialesEmpleado(empleado = {}) {
+  const nombre = String(empleado.nombre || empleado.nombreCompleto || empleado.email || "Empleado").trim();
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
+}
+
+function renderAvatarPerfilEmpleado(empleado = {}) {
+  const avatar = document.getElementById("employeeProfileAvatar");
+  const status = document.getElementById("employeePhotoStatus");
+  if (!avatar) return;
+
+  const nombre = empleado.nombre || empleado.nombreCompleto || empleado.email || "Empleado";
+  const foto = String(empleado.fotoPerfilUrl || "").trim();
+  if (foto) {
+    avatar.innerHTML = `<img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}">`;
+    avatar.setAttribute("aria-hidden", "false");
+    if (status) status.textContent = "Foto de perfil";
+    return;
+  }
+
+  avatar.textContent = obtenerInicialesEmpleado(empleado);
+  avatar.setAttribute("aria-hidden", "true");
+  if (status) status.textContent = "Sin foto de perfil";
 }
 
 function obtenerMesDiaCumpleanos(value) {
@@ -346,15 +376,17 @@ function renderPerfil(payload) {
   const primerNombre = empleado.primerNombre || obtenerPrimerNombre(nombre) || nombre;
   const puesto = empleado.puesto || "Equipo operativo";
 
+  document.body.classList.add("employee-dashboard-ready");
   localStorage.setItem("role", usuario.role || "empleado");
   setText("employeeGreeting", `Hola, ${primerNombre}`);
-  setText("employeeIntro", "Este es tu desempeno de la semana.");
+  setText("employeeIntro", "Este es tu desempe\u00f1o de la semana.");
   setText("profileName", primerNombre);
   setText("profilePosition", puesto);
   setText("profileEmail", empleado.email || usuario.email || "-");
   setText("profilePhone", empleado.telefono || "-");
   setText("employeeStatus", empleado.activo === false ? "Inactivo" : "Activo");
   setText("heroPositionBadge", puesto);
+  renderAvatarPerfilEmpleado(empleado);
   renderFelicitacionCumpleanos(empleado, primerNombre);
 }
 

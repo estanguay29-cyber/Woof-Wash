@@ -39,7 +39,7 @@
   </header>
 
   <main class="portal-shell">
-    <section class="welcome-band client-hero">
+    <section id="clientHome" class="welcome-band client-hero">
       <div class="client-hero__content">
         <p class="eyebrow client-hero__eyebrow">Portal cliente</p>
         <h1 id="welcomeTitle">Hola, cliente</h1>
@@ -99,7 +99,49 @@
 
     <p id="portalMessage" class="portal-message" role="status"></p>
 
-    <article class="panel loyalty-panel loyalty-panel-featured">
+    <nav class="client-internal-nav" aria-label="Navegaci&oacute;n del portal cliente">
+      <p>Mi portal</p>
+      <a href="#clientHome">
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 11.5 12 4l9 7.5"></path>
+          <path d="M5 10.5V20h14v-9.5"></path>
+        </svg>
+        Inicio
+      </a>
+      <a href="#clientItems">
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8.2 14.1c-2 0-3.8 1.4-3.8 3.2 0 1.3 1 2.3 2.4 2.3 1 0 1.7-.5 2.6-.5s1.6.5 2.6.5c1.4 0 2.4-1 2.4-2.3 0-1.8-1.8-3.2-3.8-3.2H8.2Z"></path>
+          <path d="M16.7 14.4c1.3-.2 2.3-1.3 2.3-2.7 0-1.5-1.2-2.8-2.8-2.8"></path>
+        </svg>
+        Mascotas y autos
+      </a>
+      <a href="#clientPetsTitle">
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8.2 14.1c-2 0-3.8 1.4-3.8 3.2 0 1.3 1 2.3 2.4 2.3 1 0 1.7-.5 2.6-.5s1.6.5 2.6.5c1.4 0 2.4-1 2.4-2.3 0-1.8-1.8-3.2-3.8-3.2H8.2Z"></path>
+          <path d="M5.5 12.1a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"></path>
+        </svg>
+        Mis mascotas
+      </a>
+      <a href="#clientCarsTitle">
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4.5 15.5h15l-1.8-5.2a2 2 0 0 0-1.9-1.3H8.2a2 2 0 0 0-1.9 1.3L4.5 15.5Z"></path>
+          <path d="M8 18a1.8 1.8 0 1 0 0-3.6A1.8 1.8 0 0 0 8 18Z"></path>
+          <path d="M16 18a1.8 1.8 0 1 0 0-3.6A1.8 1.8 0 0 0 16 18Z"></path>
+        </svg>
+        Mis autos
+      </a>
+      <a href="#appointmentsPanel">
+        <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 3v4"></path>
+          <path d="M17 3v4"></path>
+          <path d="M4 8h16"></path>
+          <path d="M5 5h14v15H5z"></path>
+        </svg>
+        Citas
+      </a>
+    </nav>
+
+    <article id="clientRewards" class="panel loyalty-panel loyalty-panel-featured">
       <div class="panel-heading">
         <p class="eyebrow">Fidelidad</p>
         <div class="panel-title">
@@ -114,7 +156,7 @@
       <div id="loyaltyCards" class="loyalty-cards"></div>
     </article>
 
-    <section class="panel client-items-panel" aria-labelledby="clientItemsTitle">
+    <section id="clientItems" class="panel client-items-panel" aria-labelledby="clientItemsTitle">
       <div class="panel-heading client-items-heading">
         <div>
           <p class="eyebrow">Mis servicios</p>
@@ -264,19 +306,35 @@
             <label>Servicio solicitado
               <select id="scheduleService"></select>
             </label>
-            <label>Fecha deseada<input id="scheduleDate" type="text" placeholder="Viernes"></label>
+            <label>Fecha deseada<input id="scheduleDate" type="date"></label>
             <label>Horario deseado<input id="scheduleTime" type="text" placeholder="11:00 a.m."></label>
-            <label>Zona o colonia<input id="scheduleZone" type="text"></label>
+            <label>Zona o colonia<input id="scheduleZone" type="text" autocomplete="off"></label>
             <label>Comentarios de esta cita<textarea id="scheduleComments" rows="3"></textarea></label>
           </div>
+          <div id="clientScheduleZoneGuide" class="client-schedule-zone-guide" role="status" aria-live="polite">
+            Selecciona una fecha para ver la zona correspondiente.
+          </div>
+          <button type="button" class="client-zones-link" id="clientZonesOpen">Ver zonas por d&iacute;a</button>
           <div class="client-schedule-notice" role="note">
             <strong>Importante:</strong> la fecha, horario y zona solicitados est&aacute;n sujetos a disponibilidad. Por WhatsApp te confirmaremos si podemos atenderte en ese momento o te propondremos una opci&oacute;n cercana para adaptarnos a tu agenda.
           </div>
           <div class="client-item-actions">
-            <button type="submit" class="client-item-primary">Generar WhatsApp</button>
+            <button type="submit" class="client-item-primary" id="clientScheduleSubmit">Generar WhatsApp</button>
             <button type="button" class="client-item-secondary" id="clientScheduleCancel">Cancelar</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <div id="clientZonesModal" class="client-schedule-modal client-zones-modal hidden" role="dialog" aria-modal="true" aria-labelledby="clientZonesTitle">
+      <div class="client-schedule-dialog client-zones-dialog">
+        <button type="button" class="client-schedule-close" id="clientZonesClose" aria-label="Cerrar zonas">&times;</button>
+        <div class="client-item-form-heading">
+          <span>Zonas programadas</span>
+          <h3 id="clientZonesTitle">Zonas por d&iacute;a</h3>
+          <p>Consulta la zona disponible para cada d&iacute;a antes de solicitar tu cita por WhatsApp.</p>
+        </div>
+        <div id="clientZonesList" class="client-zones-list" aria-live="polite"></div>
       </div>
     </div>
 
@@ -334,6 +392,47 @@
       </article>
     </section>
   </main>
+
+  <nav class="client-bottom-nav" aria-label="Navegaci&oacute;n r&aacute;pida del portal cliente">
+    <a href="#clientHome" aria-label="Ir a inicio">
+      <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 11.5 12 4l9 7.5"></path>
+        <path d="M5 10.5V20h14v-9.5"></path>
+      </svg>
+      <span>Inicio</span>
+    </a>
+    <a href="#clientItems" aria-label="Ir a mascotas y autos">
+      <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8.2 14.1c-2 0-3.8 1.4-3.8 3.2 0 1.3 1 2.3 2.4 2.3 1 0 1.7-.5 2.6-.5s1.6.5 2.6.5c1.4 0 2.4-1 2.4-2.3 0-1.8-1.8-3.2-3.8-3.2H8.2Z"></path>
+        <path d="M16.7 14.4c1.3-.2 2.3-1.3 2.3-2.7 0-1.5-1.2-2.8-2.8-2.8"></path>
+      </svg>
+      <span>Cards</span>
+    </a>
+    <a href="#clientPetsTitle" aria-label="Ir a mis mascotas">
+      <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8.2 14.1c-2 0-3.8 1.4-3.8 3.2 0 1.3 1 2.3 2.4 2.3 1 0 1.7-.5 2.6-.5s1.6.5 2.6.5c1.4 0 2.4-1 2.4-2.3 0-1.8-1.8-3.2-3.8-3.2H8.2Z"></path>
+        <path d="M5.5 12.1a1.8 1.8 0 1 0 0-3.6 1.8 1.8 0 0 0 0 3.6Z"></path>
+      </svg>
+      <span>Mascotas</span>
+    </a>
+    <a href="#clientCarsTitle" aria-label="Ir a mis autos">
+      <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4.5 15.5h15l-1.8-5.2a2 2 0 0 0-1.9-1.3H8.2a2 2 0 0 0-1.9 1.3L4.5 15.5Z"></path>
+        <path d="M8 18a1.8 1.8 0 1 0 0-3.6A1.8 1.8 0 0 0 8 18Z"></path>
+        <path d="M16 18a1.8 1.8 0 1 0 0-3.6A1.8 1.8 0 0 0 16 18Z"></path>
+      </svg>
+      <span>Autos</span>
+    </a>
+    <a href="#appointmentsPanel" aria-label="Ir a citas">
+      <svg class="portal-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 3v4"></path>
+        <path d="M17 3v4"></path>
+        <path d="M4 8h16"></path>
+        <path d="M5 5h14v15H5z"></path>
+      </svg>
+      <span>Citas</span>
+    </a>
+  </nav>
 
   <script src="portal.js"></script>
 </body>

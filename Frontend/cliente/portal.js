@@ -9,7 +9,28 @@ const HERO_ANIMATION_FRAME_MS = 280;
 const CLIENT_ITEMS_STORAGE_KEY = "woofwash_cliente_items_v1";
 const WHATSAPP_AGENDA_URL = "https://wa.me/523337276934?text=";
 const WHATSAPP_CONFIRMATION_TEXT = "Entiendo que la fecha, horario y zona solicitados est\u00e1n sujetos a disponibilidad. Woof & Wash me confirmar\u00e1 por WhatsApp si es posible atenderme en ese momento o me compartir\u00e1 una opci\u00f3n cercana para coordinar la cita.";
+const CLIENT_SERVICE_ZONES_FALLBACK = Object.freeze({
+  zones: [
+    { value: "zona_1", label: "Zona 1", nombre: "Valle Real - Solares" },
+    { value: "zona_2", label: "Zona 2", nombre: "Jard\u00edn Real" },
+    { value: "zona_3", label: "Zona 3", nombre: "Puerta de Hierro - Rinconada del Bosque" },
+    { value: "zona_4", label: "Zona 4", nombre: "San Javier" },
+    { value: "zona_5", label: "Zona 5", nombre: "Guadalupe - Paseos del Sol" },
+    { value: "zona_6", label: "Zona 6", nombre: "Expo Guadalajara" }
+  ],
+  rulesByDay: {
+    0: { dia: "Domingo", zona: "Descanso", esDescanso: true, permiteTodasLasZonas: false },
+    1: { dia: "Lunes", zona: "zona_1", esDescanso: false, permiteTodasLasZonas: false },
+    2: { dia: "Martes", zona: "zona_2", esDescanso: false, permiteTodasLasZonas: false },
+    3: { dia: "Mi\u00e9rcoles", zona: "zona_3", esDescanso: false, permiteTodasLasZonas: false },
+    4: { dia: "Jueves", zona: "zona_4", esDescanso: false, permiteTodasLasZonas: false },
+    5: { dia: "Viernes", zona: "zona_5", esDescanso: false, permiteTodasLasZonas: false },
+    6: { dia: "S\u00e1bado", zona: "zona_6", esDescanso: false, permiteTodasLasZonas: false }
+  }
+});
 const clientItemPhotoUrls = new Map();
+let clientServiceZonesConfig = normalizarConfigZonasCliente(CLIENT_SERVICE_ZONES_FALLBACK);
+let clientServiceZonesPromise = null;
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -19,6 +40,162 @@ function obtenerApiBase() {
 
 function normalizarTexto(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizarClaveZonaCliente(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizarConfigZonasCliente(data = {}) {
+  const fallback = CLIENT_SERVICE_ZONES_FALLBACK;
+  return {
+    zones: Array.isArray(data.zones) && data.zones.length ? data.zones : fallback.zones,
+    rulesByDay: data.rulesByDay && typeof data.rulesByDay === "object" ? data.rulesByDay : fallback.rulesByDay
+  };
+}
+
+function obtenerZonaCliente(value) {
+  const clave = normalizarClaveZonaCliente(value);
+  return (clientServiceZonesConfig.zones || []).find((zona) => (
+    zona.value === value ||
+    normalizarClaveZonaCliente(zona.value) === clave ||
+    normalizarClaveZonaCliente(zona.label) === clave ||
+    normalizarClaveZonaCliente(zona.nombre) === clave ||
+    (clave.length >= 4 && normalizarClaveZonaCliente(zona.nombre).includes(clave))
+  )) || null;
+}
+
+function obtenerFechaAgendaCliente(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return null;
+  const fecha = new Date(`${value}T12:00:00`);
+  return Number.isNaN(fecha.getTime()) ? null : fecha;
+}
+
+function obtenerReglaZonaCliente(fechaISO) {
+  const fecha = obtenerFechaAgendaCliente(fechaISO);
+  if (!fecha) return null;
+  return clientServiceZonesConfig.rulesByDay[String(fecha.getDay())] || clientServiceZonesConfig.rulesByDay[fecha.getDay()] || null;
+}
+
+function describirZonaCliente(regla = {}) {
+  if (regla.esDescanso) return "No disponible";
+  const zona = obtenerZonaCliente(regla.zona);
+  if (!zona) return regla.zona || "Zona no disponible";
+  return [zona.label, zona.nombre].filter(Boolean).join(": ");
+}
+
+async function cargarZonasServicioCliente() {
+  if (clientServiceZonesPromise) return clientServiceZonesPromise;
+
+  clientServiceZonesPromise = (async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    try {
+      const res = await fetch(`${API_URL}/service-zones`, { cache: "no-store", signal: controller.signal });
+      if (!res.ok) throw new Error("No se pudo cargar zonas.");
+      clientServiceZonesConfig = normalizarConfigZonasCliente(await res.json());
+    } catch (error) {
+      clientServiceZonesConfig = normalizarConfigZonasCliente(CLIENT_SERVICE_ZONES_FALLBACK);
+    } finally {
+      clearTimeout(timeout);
+    }
+    renderizarZonasCliente();
+    actualizarGuiaZonaAgenda();
+    return clientServiceZonesConfig;
+  })();
+
+  return clientServiceZonesPromise;
+}
+
+function validarZonaAgendaCliente(cita = {}) {
+  const regla = obtenerReglaZonaCliente(cita.fecha);
+  if (!regla) {
+    return { ok: false, message: "Selecciona una fecha valida para calcular la zona del d\u00eda." };
+  }
+  if (regla.esDescanso) {
+    return { ok: false, message: `${regla.dia || "Ese d\u00eda"} no est\u00e1 disponible para agendar.` };
+  }
+  if (regla.permiteTodasLasZonas) return { ok: true, regla };
+
+  const zonaIngresada = obtenerZonaCliente(cita.zona);
+  const zonaEsperada = obtenerZonaCliente(regla.zona);
+  if (!zonaIngresada || !zonaEsperada || zonaIngresada.value !== zonaEsperada.value) {
+    return {
+      ok: false,
+      regla,
+      message: `Ese d\u00eda corresponde a la zona: ${describirZonaCliente(regla)}. Ajusta la zona para continuar.`
+    };
+  }
+  return { ok: true, regla };
+}
+
+function actualizarGuiaZonaAgenda() {
+  const guide = document.getElementById("clientScheduleZoneGuide");
+  const zoneInput = document.getElementById("scheduleZone");
+  const submit = document.getElementById("clientScheduleSubmit");
+  if (!guide) return;
+
+  const fecha = valorInput("scheduleDate");
+  const zona = valorInput("scheduleZone");
+  guide.classList.remove("is-ok", "is-warning", "is-error");
+  if (submit) submit.disabled = false;
+
+  const regla = obtenerReglaZonaCliente(fecha);
+  if (!fecha) {
+    guide.textContent = "Selecciona una fecha para ver la zona correspondiente.";
+    if (zoneInput) zoneInput.placeholder = "Primero elige fecha";
+    return;
+  }
+  if (!regla) {
+    guide.textContent = "No pudimos calcular la zona de esa fecha. Revisa el formato de fecha.";
+    guide.classList.add("is-warning");
+    return;
+  }
+  const zonaTexto = describirZonaCliente(regla);
+  if (zoneInput && !regla.esDescanso) zoneInput.placeholder = zonaTexto;
+
+  if (regla.esDescanso) {
+    guide.textContent = `${regla.dia || "Ese d\u00eda"} no est\u00e1 disponible para solicitudes de cita.`;
+    guide.classList.add("is-error");
+    if (submit) submit.disabled = true;
+    return;
+  }
+
+  if (!zona) {
+    guide.textContent = `Ese d\u00eda corresponde a la zona: ${zonaTexto}.`;
+    guide.classList.add("is-ok");
+    return;
+  }
+
+  const validacion = validarZonaAgendaCliente({ fecha, zona });
+  if (validacion.ok) {
+    guide.textContent = `Zona correcta para ${regla.dia}: ${zonaTexto}.`;
+    guide.classList.add("is-ok");
+  } else {
+    guide.textContent = validacion.message;
+    guide.classList.add("is-error");
+    if (submit) submit.disabled = true;
+  }
+}
+
+function renderizarZonasCliente() {
+  const list = document.getElementById("clientZonesList");
+  if (!list) return;
+  const dias = [1, 2, 3, 4, 5, 6, 0];
+  list.innerHTML = dias.map((dia) => {
+    const regla = clientServiceZonesConfig.rulesByDay[String(dia)] || clientServiceZonesConfig.rulesByDay[dia] || {};
+    return `
+      <div class="client-zone-day ${regla.esDescanso ? "is-rest" : ""}">
+        <strong>${escaparHtml(regla.dia || "-")}</strong>
+        <span>${escaparHtml(describirZonaCliente(regla))}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 function obtenerToken() {
@@ -911,6 +1088,7 @@ function cerrarAgendaClientItem() {
   document.getElementById("clientScheduleModal")?.classList.add("hidden");
   document.getElementById("clientScheduleForm")?.reset();
   setValorInput("clientScheduleItemId", "");
+  actualizarGuiaZonaAgenda();
 }
 
 function abrirAgendaClientItem(id) {
@@ -934,6 +1112,8 @@ function abrirAgendaClientItem(id) {
       : "Elige el servicio de est\u00e9tica canina y los datos de esta solicitud para enviarla por WhatsApp. Te confirmaremos disponibilidad por ese medio.";
   }
   modal.classList.remove("hidden");
+  actualizarGuiaZonaAgenda();
+  cargarZonasServicioCliente();
 }
 
 function leerAgendaClientItem() {
@@ -957,8 +1137,24 @@ function enviarAgendaClientItem(event) {
     if (mensaje) mensaje.textContent = "Completa servicio, fecha, horario y zona para agendar.";
     return;
   }
+  const validacionZona = validarZonaAgendaCliente(cita);
+  if (!validacionZona.ok) {
+    actualizarGuiaZonaAgenda();
+    if (mensaje) mensaje.textContent = validacionZona.message || "La zona no corresponde a la fecha seleccionada.";
+    return;
+  }
   window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item, cita))}`, "_blank", "noopener,noreferrer");
   cerrarAgendaClientItem();
+}
+
+function abrirZonasCliente() {
+  renderizarZonasCliente();
+  document.getElementById("clientZonesModal")?.classList.remove("hidden");
+  cargarZonasServicioCliente();
+}
+
+function cerrarZonasCliente() {
+  document.getElementById("clientZonesModal")?.classList.add("hidden");
 }
 
 function inicializarClientItems() {
@@ -971,10 +1167,17 @@ function inicializarClientItems() {
   document.getElementById("clientItemForm")?.addEventListener("submit", guardarClientItem);
   document.getElementById("clientItemCancel")?.addEventListener("click", limpiarFormularioClientItem);
   document.getElementById("clientScheduleForm")?.addEventListener("submit", enviarAgendaClientItem);
+  document.getElementById("scheduleDate")?.addEventListener("change", actualizarGuiaZonaAgenda);
+  document.getElementById("scheduleZone")?.addEventListener("input", actualizarGuiaZonaAgenda);
   document.getElementById("clientScheduleClose")?.addEventListener("click", cerrarAgendaClientItem);
   document.getElementById("clientScheduleCancel")?.addEventListener("click", cerrarAgendaClientItem);
+  document.getElementById("clientZonesOpen")?.addEventListener("click", abrirZonasCliente);
+  document.getElementById("clientZonesClose")?.addEventListener("click", cerrarZonasCliente);
   document.getElementById("clientScheduleModal")?.addEventListener("click", (event) => {
     if (event.target.id === "clientScheduleModal") cerrarAgendaClientItem();
+  });
+  document.getElementById("clientZonesModal")?.addEventListener("click", (event) => {
+    if (event.target.id === "clientZonesModal") cerrarZonasCliente();
   });
   document.querySelector(".client-item-sections")?.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
@@ -984,6 +1187,8 @@ function inicializarClientItems() {
     if (button.dataset.action === "edit") editarClientItem(id);
     if (button.dataset.action === "delete") eliminarClientItem(id);
   });
+  renderizarZonasCliente();
+  cargarZonasServicioCliente();
   actualizarCamposClientItem();
   renderizarClientItems();
 }

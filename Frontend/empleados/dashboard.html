@@ -51,19 +51,33 @@
     </section>
 
     <section id="employeeDashboard" class="employee-dashboard hidden" aria-live="polite">
-      <section class="hero-panel">
+      <nav class="employee-internal-nav" aria-label="Navegaci&oacute;n del portal empleado">
+        <p>Mi panel</p>
+        <a href="#employeeSummary"><span aria-hidden="true">⌂</span> Resumen</a>
+        <a href="#employeeAppointments"><span aria-hidden="true">▦</span> Citas</a>
+        <a href="#employeePerformance"><span aria-hidden="true">◇</span> Desempe&ntilde;o</a>
+        <a href="#employeePayroll"><span aria-hidden="true">$</span> N&oacute;mina</a>
+        <a href="#employeeManuals"><span aria-hidden="true">□</span> Manuales</a>
+        <a href="#employeeProfile"><span aria-hidden="true">○</span> Perfil</a>
+      </nav>
+
+      <section id="employeeSummary" class="hero-panel">
         <div class="hero-copy">
           <p class="eyebrow">Panel del equipo</p>
           <h1 id="employeeGreeting">Hola</h1>
-          <p id="employeeIntro">Este es tu desempeno de la semana.</p>
+          <p id="employeeIntro">Este es tu desempe&ntilde;o de la semana.</p>
           <div class="hero-badges" aria-label="Datos principales">
             <span id="heroPositionBadge" class="hero-badge">Puesto</span>
             <span id="heroWeekBadge" class="hero-badge hero-badge-light">Semana actual</span>
           </div>
         </div>
 
-        <aside class="profile-card" aria-label="Datos del empleado">
+        <aside id="employeeProfile" class="profile-card" aria-label="Datos del empleado">
           <div class="profile-card-head">
+            <div class="employee-profile-identity">
+              <span id="employeeProfileAvatar" class="employee-profile-avatar" aria-hidden="true">WW</span>
+              <small id="employeePhotoStatus">Sin foto de perfil</small>
+            </div>
             <span id="employeeStatus" class="status-pill">Activo</span>
             <span class="profile-chip">Cuenta segura</span>
           </div>
@@ -107,7 +121,7 @@
         <div></div>
       </section>
 
-      <section class="metric-grid" aria-label="Metricas personales">
+      <section id="employeePerformance" class="metric-grid" aria-label="Metricas personales">
         <article class="metric-card metric-neutral" id="cardSales">
           <span class="metric-icon">💰</span>
           <div>
@@ -209,7 +223,7 @@
       </section>
 
       <section class="insight-grid" aria-label="Metricas completas">
-        <section class="panel insight-panel">
+        <section id="employeePayroll" class="panel insight-panel">
           <div class="section-title compact">
             <div>
               <p class="eyebrow">Evaluaciones</p>
@@ -232,7 +246,7 @@
       </section>
 
       <section class="content-grid">
-        <section class="panel services-panel">
+        <section id="employeeAppointments" class="panel services-panel">
           <div class="section-title">
             <div>
               <p class="eyebrow">Servicios</p>
@@ -252,18 +266,18 @@
           <div id="appointmentsList" class="timeline-list"></div>
         </section>
 
-        <section class="panel training-panel">
+        <section id="employeeManuals" class="panel training-panel">
           <div class="section-title compact">
             <div>
               <p class="eyebrow">Crecimiento</p>
-              <h2>Manuales y capacitacion</h2>
+              <h2>Manuales y capacitaci&oacute;n</h2>
             </div>
           </div>
-          <div id="manualsList" class="training-grid" aria-label="Recursos de capacitacion"></div>
+          <div id="manualsList" class="training-grid" aria-label="Recursos de capacitaci&oacute;n"></div>
         </section>
       </section>
 
-      <section id="performanceHistoryPanel" class="panel history-panel is-collapsed" aria-label="Historial de desempeno">
+      <section id="performanceHistoryPanel" class="panel history-panel is-collapsed" aria-label="Historial de desempe&ntilde;o">
         <div class="section-title history-title">
           <div>
             <p class="eyebrow">Historial</p>
@@ -290,6 +304,14 @@
       </section>
     </section>
   </main>
+
+  <nav class="employee-bottom-nav" aria-label="Navegaci&oacute;n r&aacute;pida del portal empleado">
+    <a href="#employeeSummary" aria-label="Ir al resumen"><span aria-hidden="true">⌂</span><small>Inicio</small></a>
+    <a href="#employeeAppointments" aria-label="Ir a citas"><span aria-hidden="true">▦</span><small>Citas</small></a>
+    <a href="#employeePerformance" aria-label="Ir a desempe&ntilde;o"><span aria-hidden="true">◇</span><small>Desempe&ntilde;o</small></a>
+    <a href="#employeePayroll" aria-label="Ir a n&oacute;mina"><span aria-hidden="true">$</span><small>N&oacute;mina</small></a>
+    <a href="#employeeManuals" aria-label="Ir a manuales"><span aria-hidden="true">□</span><small>Manuales</small></a>
+  </nav>
 
   <script src="dashboard.js"></script>
 </body>

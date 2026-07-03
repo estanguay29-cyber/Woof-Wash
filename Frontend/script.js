@@ -573,6 +573,12 @@ async function validarAccesosAdmin() {
   tokenAdminValidado = token;
   renderizarAccesosAdmin(adminValidado);
 
+  if (rolLocal !== "admin") {
+    adminValidado = false;
+    renderizarAccesosAdmin(false);
+    return false;
+  }
+
   try {
     const res = await fetch(`${obtenerApiBase()}/admin/me`, {
       headers: {
@@ -582,7 +588,9 @@ async function validarAccesosAdmin() {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      manejarRespuestaAuthCliente(res, data, { silencioso: true });
+      if (res.status !== 403) {
+        manejarRespuestaAuthCliente(res, data, { silencioso: true });
+      }
       adminValidado = false;
       renderizarAccesosAdmin(false);
       return false;

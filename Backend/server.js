@@ -254,9 +254,18 @@ function obtenerMailConfig() {
   };
 }
 
+function crearErrorCorreoNoConfigurado() {
+  const error = new Error("Servicio de correo no configurado");
+  error.status = 503;
+  return error;
+}
+
 async function obtenerTransporterCorreo() {
   if (!mailTransporterPromise) {
     const mailConfig = obtenerMailConfig();
+    if (!mailConfig) {
+      throw crearErrorCorreoNoConfigurado();
+    }
 
     mailTransporterPromise = (async () => {
       const transporter = nodemailer.createTransport({
@@ -284,7 +293,7 @@ async function enviarCorreo({ to, subject, text, html }) {
   const mailConfig = obtenerMailConfig();
 
   if (!mailConfig) {
-    throw new Error("Servicio de correo no configurado");
+    throw crearErrorCorreoNoConfigurado();
   }
 
   const transporter = await obtenerTransporterCorreo();
@@ -2924,6 +2933,9 @@ app.post("/forgot-password", authRateLimit, async (req, res) => {
 
     res.json({ message: "Si el correo existe, te enviaremos un codigo de recuperacion." });
   } catch (error) {
+    if (error.status === 503) {
+      return res.status(503).json({ message: "Servicio de correo no configurado. Revisa las variables SMTP del servidor." });
+    }
     res.status(500).json({ message: "No se pudo enviar el codigo de recuperacion." });
   }
 });
@@ -3089,6 +3101,9 @@ app.post("/solicitar-eliminar-cuenta", auth, authRateLimit, async (req, res) => 
 
     res.json({ message: "Te enviamos un código para confirmar la eliminación de tu cuenta." });
   } catch (error) {
+    if (error.status === 503) {
+      return res.status(503).json({ message: "Servicio de correo no configurado. Revisa las variables SMTP del servidor." });
+    }
     res.status(500).json({ message: "No se pudo enviar el código para eliminar la cuenta" });
   }
 });
