@@ -845,14 +845,29 @@ function abrirWhatsAppClientItem(id) {
   window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item))}`, "_blank", "noopener,noreferrer");
 }
 
-function renderizarGrupoClientItems(list, items, emptyText) {
+function crearBotonRegistroClientItem(tipo, label) {
+  return `
+    <button type="button" class="client-item-add-button" data-client-item-start="${escaparHtml(tipo)}">
+      <span aria-hidden="true">+</span>
+      ${escaparHtml(label)}
+    </button>
+  `;
+}
+
+function renderizarGrupoClientItems(list, items, emptyText, tipo) {
   if (!list) return;
+  const esAuto = tipo === "auto";
   if (!items.length) {
-    list.innerHTML = `<div class="empty-state">${escaparHtml(emptyText)}</div>`;
+    list.innerHTML = `
+      <div class="client-item-empty-state">
+        <p>${escaparHtml(emptyText)}</p>
+        ${crearBotonRegistroClientItem(esAuto ? "auto" : "mascota", esAuto ? "Registrar auto" : "Registrar perrito")}
+      </div>
+    `;
     return;
   }
 
-  list.innerHTML = items.map((item) => {
+  const cards = items.map((item) => {
     const nombre = obtenerNombreClientItem(item);
     const subtitulo = item.tipo === "auto"
       ? `${item.tipoVehiculo || "Vehiculo"} - ${item.color || "Color pendiente"}`
@@ -894,6 +909,13 @@ function renderizarGrupoClientItems(list, items, emptyText) {
       </article>
     `;
   }).join("");
+
+  list.innerHTML = `
+    ${cards}
+    <div class="client-item-add-row">
+      ${crearBotonRegistroClientItem(esAuto ? "auto" : "mascota", esAuto ? "Agregar otro auto" : "Agregar otro perrito")}
+    </div>
+  `;
 }
 
 function renderizarClientItems() {
@@ -901,12 +923,14 @@ function renderizarClientItems() {
   renderizarGrupoClientItems(
     document.getElementById("clientPetsList"),
     items.filter((item) => item.tipo !== "auto"),
-    "A\u00fan no has registrado ning\u00fan perrito."
+    "A\u00fan no has registrado ning\u00fan perrito.",
+    "mascota"
   );
   renderizarGrupoClientItems(
     document.getElementById("clientCarsList"),
     items.filter((item) => item.tipo === "auto"),
-    "A\u00fan no has registrado ning\u00fan auto."
+    "A\u00fan no has registrado ning\u00fan auto.",
+    "auto"
   );
 }
 
@@ -1158,8 +1182,10 @@ function cerrarZonasCliente() {
 }
 
 function inicializarClientItems() {
-  document.querySelectorAll("[data-client-item-start]").forEach((button) => {
-    button.addEventListener("click", () => abrirFormularioClientItem(button.dataset.clientItemStart));
+  document.getElementById("clientItems")?.addEventListener("click", (event) => {
+    const startButton = event.target.closest("[data-client-item-start]");
+    if (!startButton) return;
+    abrirFormularioClientItem(startButton.dataset.clientItemStart);
   });
   document.querySelectorAll("input[name='clientItemType']").forEach((input) => {
     input.addEventListener("change", actualizarCamposClientItem);
@@ -1341,10 +1367,13 @@ async function cargarPortal() {
   mensaje.textContent = "";
 }
 
-document.getElementById("btnLogout").addEventListener("click", () => {
+function cerrarSesionCliente() {
   limpiarSesion();
   window.location.href = REDIRECT_HOME;
-});
+}
+
+document.getElementById("btnLogout")?.addEventListener("click", cerrarSesionCliente);
+document.getElementById("clientInternalLogout")?.addEventListener("click", cerrarSesionCliente);
 
 document.getElementById("toggleOrdersHistory")?.addEventListener("click", () => {
   alternarHistorial("orders");

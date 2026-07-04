@@ -1441,6 +1441,7 @@ function renderizarSelectorEmpleadosAgenda(target, selectedValue = []) {
       <label class="employee-selector-item" role="checkbox" aria-checked="${checked ? "true" : "false"}">
         <input data-employee-selector type="checkbox" value="${escapeHtml(id)}" ${checked}>
         <span class="employee-selector-check" aria-hidden="true"></span>
+        ${renderizarAvatarEmpleadoAgenda(empleado, "sm")}
         <span class="employee-selector-copy">
           <strong>${escapeHtml(nombre)}</strong>
           <small>${escapeHtml(puesto)}</small>
@@ -1454,6 +1455,26 @@ function renderizarSelectorEmpleadosAgenda(target, selectedValue = []) {
   });
 
   actualizarSelectorEmpleadosAgenda(container);
+}
+
+function obtenerInicialesEmpleadoAgenda(empleado = {}) {
+  const nombre = String(empleado.nombreCompleto || empleado.nombre || empleado.usuario || empleado.email || "Empleado").trim();
+  return nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
+}
+
+function renderizarAvatarEmpleadoAgenda(empleado = {}, size = "md") {
+  const nombre = empleado.nombreCompleto || empleado.nombre || empleado.usuario || empleado.email || "Empleado";
+  const foto = String(empleado.fotoPerfilUrl || "").trim();
+  const sizeClass = size === "sm" ? "agenda-employee-avatar-sm" : "agenda-employee-avatar-md";
+  if (foto) {
+    return `<span class="agenda-employee-avatar ${sizeClass}"><img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}"></span>`;
+  }
+  return `<span class="agenda-employee-avatar ${sizeClass}" aria-hidden="true">${escapeHtml(obtenerInicialesEmpleadoAgenda(empleado))}</span>`;
 }
 
 async function cargarEmpleadosAgenda() {
@@ -1559,6 +1580,7 @@ function renderizarEmpleadoCard(empleado) {
   return `
     <article class="empleado-card is-${color}" data-id="${escapeHtml(empleado.id)}">
       <header class="empleado-header">
+        ${renderizarAvatarEmpleadoAgenda(empleado)}
         <div class="empleado-title">
           <strong>${escapeHtml(nombre)}</strong>
           <small>${escapeHtml(empleado.usuario || empleado.email || "")}</small>

@@ -176,7 +176,8 @@ button {
   white-space: nowrap;
 }
 
-.client-internal-nav a {
+.client-internal-nav a,
+.client-nav-button {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
@@ -188,7 +189,13 @@ button {
   color: var(--blue);
   font-size: 0.86rem;
   font-weight: 950;
+  font-family: inherit;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.client-nav-button {
+  appearance: none;
 }
 
 .client-bottom-nav {
@@ -1075,6 +1082,65 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.client-item-empty-state,
+.client-item-add-row {
+  grid-column: 1 / -1;
+}
+
+.client-item-empty-state {
+  min-height: 118px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px dashed rgba(11, 42, 107, 0.18);
+  border-radius: var(--radius);
+  padding: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 250, 232, 0.86)),
+    rgba(255, 255, 255, 0.9);
+}
+
+.client-item-empty-state p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 850;
+}
+
+.client-item-add-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.client-item-add-button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0 15px;
+  background: linear-gradient(135deg, var(--green), #b9e96c);
+  color: #17380e;
+  font: inherit;
+  font-weight: 950;
+  box-shadow: 0 12px 26px rgba(140, 198, 63, 0.22);
+  cursor: pointer;
+}
+
+.client-item-add-button span {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.48);
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .client-item-card {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -1521,6 +1587,7 @@ h2 {
   .client-item-actions,
   .client-item-card-actions,
   .client-item-primary,
+  .client-item-add-button,
   .client-item-whatsapp,
   .client-item-secondary,
   .client-item-danger,

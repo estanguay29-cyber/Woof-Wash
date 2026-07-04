@@ -65,6 +65,7 @@ const META_DIARIA_EMPLEADOS_MXN = 2000;
 const META_SEMANAL_EMPLEADOS_MXN = 22000;
 const BACKEND_VERSION = "fecha-cumpleanos-persistencia-v2";
 const CLOUDINARY_UPLOAD_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "woofwash/client-items";
+const EMPLOYEE_PROFILE_UPLOAD_FOLDER = process.env.CLOUDINARY_EMPLOYEE_PROFILE_FOLDER || "woofwash/employee-profiles";
 const CLIENT_ITEM_PHOTO_TYPES = Object.freeze({
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -782,7 +783,7 @@ async function requireEmpleado(req, res, next) {
       return res.status(403).json({ message: "No autorizado" });
     }
 
-    const employee = await Employee.findById(user.employeeId).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos fotoPerfilUrl");
+    const employee = await Employee.findById(user.employeeId).select("nombreCompleto email telefono puesto activo fechaIngreso fechaCumpleanos fotoPerfilUrl fotoPerfilPublicId");
     if (!employee || employee.activo === false) {
       return res.status(403).json({ message: "No autorizado" });
     }
@@ -2631,7 +2632,7 @@ function crearArchivoMultipart(boundary, name, fileName, contentType, bytes) {
   ]);
 }
 
-function subirFotoCloudinary({ bytes, contentType, fileName }) {
+function subirFotoCloudinary({ bytes, contentType, fileName, folder = CLOUDINARY_UPLOAD_FOLDER }) {
   const config = obtenerConfigCloudinary();
   if (!config) {
     const error = new Error("Cloudinary no esta configurado.");
@@ -2641,7 +2642,7 @@ function subirFotoCloudinary({ bytes, contentType, fileName }) {
 
   const timestamp = Math.floor(Date.now() / 1000);
   const paramsFirmados = {
-    folder: CLOUDINARY_UPLOAD_FOLDER,
+    folder,
     timestamp
   };
   const signature = firmarParametrosCloudinary(paramsFirmados, config.apiSecret);
@@ -2649,7 +2650,7 @@ function subirFotoCloudinary({ bytes, contentType, fileName }) {
   const body = Buffer.concat([
     crearCampoMultipart(boundary, "api_key", config.apiKey),
     crearCampoMultipart(boundary, "timestamp", String(timestamp)),
-    crearCampoMultipart(boundary, "folder", CLOUDINARY_UPLOAD_FOLDER),
+    crearCampoMultipart(boundary, "folder", folder),
     crearCampoMultipart(boundary, "signature", signature),
     crearArchivoMultipart(boundary, "file", fileName, contentType, bytes),
     Buffer.from(`--${boundary}--\r\n`)
@@ -2690,6 +2691,65 @@ function subirFotoCloudinary({ bytes, contentType, fileName }) {
 
     req.on("timeout", () => {
       req.destroy(new Error("Tiempo agotado al guardar la foto en Cloudinary."));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
+function eliminarFotoCloudinary(publicId = "") {
+  const config = obtenerConfigCloudinary();
+  const id = String(publicId || "").trim();
+  if (!config || !id) return Promise.resolve(false);
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const paramsFirmados = {
+    public_id: id,
+    timestamp
+  };
+  const signature = firmarParametrosCloudinary(paramsFirmados, config.apiSecret);
+  const body = new URLSearchParams({
+    api_key: config.apiKey,
+    public_id: id,
+    timestamp: String(timestamp),
+    signature
+  }).toString();
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      method: "POST",
+      hostname: "api.cloudinary.com",
+      path: `/v1_1/${encodeURIComponent(config.cloudName)}/image/destroy`,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body)
+      },
+      timeout: 10000
+    }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        const text = Buffer.concat(chunks).toString("utf8");
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch (error) {
+          data = {};
+        }
+
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          const error = new Error(data?.error?.message || "Cloudinary no pudo eliminar la foto anterior.");
+          error.status = response.statusCode || 502;
+          reject(error);
+          return;
+        }
+
+        resolve(data?.result === "ok" || data?.result === "not found");
+      });
+    });
+
+    req.on("timeout", () => {
+      req.destroy(new Error("Tiempo agotado al eliminar la foto anterior en Cloudinary."));
     });
     req.on("error", reject);
     req.end(body);
@@ -2758,6 +2818,10 @@ app.use(cors(corsOptions));
 
 app.use("/webhook", express.raw({ type: "application/json" }));
 app.use("/cliente/items/photo", express.raw({
+  type: Object.keys(CLIENT_ITEM_PHOTO_TYPES),
+  limit: "5mb"
+}));
+app.use("/empleados/me/foto", express.raw({
   type: Object.keys(CLIENT_ITEM_PHOTO_TYPES),
   limit: "5mb"
 }));
@@ -4879,6 +4943,58 @@ app.patch("/admin/employees/:id", auth, requireAdmin, adminWriteLimiter, async (
 
 app.get("/empleados/me", auth, requireEmpleado, (req, res) => {
   res.json(construirPortalEmpleadoRespuesta(req.employeeProfile, req.empleado));
+});
+
+app.post("/empleados/me/foto", auth, requireEmpleado, async (req, res) => {
+  try {
+    const empleado = await Employee.findById(req.employeeProfile._id).select("fotoPerfilUrl fotoPerfilPublicId activo");
+    if (!empleado || empleado.activo === false) {
+      return res.status(403).json({ message: "No autorizado" });
+    }
+
+    const contentType = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+    const extension = CLIENT_ITEM_PHOTO_TYPES[contentType];
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+
+    if (!extension) {
+      return res.status(400).json({ message: "Formato de imagen no permitido. Usa JPG, PNG o WebP." });
+    }
+
+    if (!bytes.length) {
+      return res.status(400).json({ message: "No se recibio imagen para guardar." });
+    }
+
+    const publicIdAnterior = String(empleado.fotoPerfilPublicId || "").trim();
+    const fileName = `${empleado._id}-${Date.now()}-${crypto.randomBytes(8).toString("hex")}${extension}`;
+    const cloudinaryResult = await subirFotoCloudinary({
+      bytes,
+      contentType,
+      fileName,
+      folder: EMPLOYEE_PROFILE_UPLOAD_FOLDER
+    });
+    const fotoPerfilUrl = cloudinaryResult.secure_url || cloudinaryResult.url || "";
+    const fotoPerfilPublicId = cloudinaryResult.public_id || "";
+
+    if (!fotoPerfilUrl) {
+      return res.status(502).json({ message: "Cloudinary no devolvio URL de la foto." });
+    }
+
+    empleado.fotoPerfilUrl = fotoPerfilUrl;
+    empleado.fotoPerfilPublicId = fotoPerfilPublicId;
+    await empleado.save();
+
+    if (publicIdAnterior && publicIdAnterior !== fotoPerfilPublicId) {
+      eliminarFotoCloudinary(publicIdAnterior).catch((error) => {
+        console.warn("No se pudo eliminar la foto de perfil anterior de Cloudinary:", error.message);
+      });
+    }
+
+    res.status(201).json({
+      fotoPerfilUrl
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.message || "No se pudo guardar la foto de perfil." });
+  }
 });
 
 app.get("/empleados/performance", auth, requireEmpleado, async (req, res) => {

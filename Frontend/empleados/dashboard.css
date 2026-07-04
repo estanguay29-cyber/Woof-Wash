@@ -84,7 +84,8 @@ input {
   white-space: nowrap;
 }
 
-.employee-internal-nav a {
+.employee-internal-nav a,
+.employee-nav-button {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
@@ -96,55 +97,24 @@ input {
   color: var(--blue);
   font-size: 0.86rem;
   font-weight: 950;
+  font-family: inherit;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.employee-internal-nav a span[aria-hidden="true"],
-.employee-bottom-nav a span[aria-hidden="true"] {
-  display: none;
+.employee-nav-button {
+  appearance: none;
 }
 
-.employee-internal-nav a::before,
-.employee-bottom-nav a::before {
+.employee-nav-icon {
   width: 18px;
   height: 18px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: rgba(140, 198, 63, 0.22);
-  color: var(--blue);
-  font-size: 0.68rem;
-  font-weight: 950;
-  line-height: 1;
-}
-
-.employee-internal-nav a:nth-of-type(1)::before,
-.employee-bottom-nav a:nth-of-type(1)::before {
-  content: "I";
-}
-
-.employee-internal-nav a:nth-of-type(2)::before,
-.employee-bottom-nav a:nth-of-type(2)::before {
-  content: "C";
-}
-
-.employee-internal-nav a:nth-of-type(3)::before,
-.employee-bottom-nav a:nth-of-type(3)::before {
-  content: "D";
-}
-
-.employee-internal-nav a:nth-of-type(4)::before,
-.employee-bottom-nav a:nth-of-type(4)::before {
-  content: "$";
-}
-
-.employee-internal-nav a:nth-of-type(5)::before,
-.employee-bottom-nav a:nth-of-type(5)::before {
-  content: "M";
-}
-
-.employee-internal-nav a:nth-of-type(6)::before {
-  content: "P";
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.9;
 }
 
 .employee-bottom-nav {
@@ -575,9 +545,46 @@ input {
   flex: 1 1 100%;
 }
 
+.employee-photo-copy {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
 .employee-profile-identity small {
   color: rgba(255, 255, 255, 0.72);
   font-weight: 850;
+}
+
+.employee-profile-identity small.is-error {
+  color: #ffe2d8;
+}
+
+.employee-photo-button {
+  min-height: 36px;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--radius);
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.employee-photo-button:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.employee-photo-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.employee-photo-input {
+  display: none;
 }
 
 .employee-profile-avatar {
@@ -1471,7 +1478,7 @@ input {
     bottom: 10px;
     z-index: 70;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 4px;
     border: 1px solid rgba(11, 42, 107, 0.12);
     border-radius: var(--radius);
@@ -1492,9 +1499,9 @@ input {
     font-weight: 950;
   }
 
-  .employee-bottom-nav span {
-    font-size: 1.05rem;
-    line-height: 1;
+  .employee-bottom-nav .employee-nav-icon {
+    width: 19px;
+    height: 19px;
   }
 
   .employee-bottom-nav small {

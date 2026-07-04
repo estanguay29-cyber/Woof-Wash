@@ -53,12 +53,13 @@
     <section id="employeeDashboard" class="employee-dashboard hidden" aria-live="polite">
       <nav class="employee-internal-nav" aria-label="Navegaci&oacute;n del portal empleado">
         <p>Mi panel</p>
-        <a href="#employeeSummary"><span aria-hidden="true">⌂</span> Resumen</a>
-        <a href="#employeeAppointments"><span aria-hidden="true">▦</span> Citas</a>
-        <a href="#employeePerformance"><span aria-hidden="true">◇</span> Desempe&ntilde;o</a>
-        <a href="#employeePayroll"><span aria-hidden="true">$</span> N&oacute;mina</a>
-        <a href="#employeeManuals"><span aria-hidden="true">□</span> Manuales</a>
-        <a href="#employeeProfile"><span aria-hidden="true">○</span> Perfil</a>
+        <a href="#employeeSummary"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10.5V20h14v-9.5"></path></svg>Resumen</a>
+        <a href="#employeeAppointments"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v4"></path><path d="M17 3v4"></path><path d="M4 8h16"></path><path d="M5 5h14v15H5z"></path></svg>Citas</a>
+        <a href="#employeePerformance"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9"></path><path d="M10 19V5"></path><path d="M16 19v-7"></path><path d="M21 19H3"></path></svg>Desempe&ntilde;o</a>
+        <a href="#employeePayroll"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"></path><path d="M17 7.5c-1-1-2.7-1.5-5-1.5-2.8 0-4.5 1.1-4.5 2.8S9 11.2 12 12c3 .8 4.5 1.6 4.5 3.2S14.8 18 12 18c-2.2 0-4-.6-5.2-1.8"></path></svg>N&oacute;mina</a>
+        <a href="#employeeManuals"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 0-4-4V4Z"></path><path d="M9 8h6"></path><path d="M9 12h5"></path></svg>Manuales</a>
+        <a href="#employeeProfile"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Perfil</a>
+        <button type="button" id="employeeInternalLogout" class="employee-nav-button"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5H5v14h4"></path><path d="M14 8l4 4-4 4"></path><path d="M18 12H9"></path></svg>Cerrar sesi&oacute;n</button>
       </nav>
 
       <section id="employeeSummary" class="hero-panel">
@@ -76,7 +77,11 @@
           <div class="profile-card-head">
             <div class="employee-profile-identity">
               <span id="employeeProfileAvatar" class="employee-profile-avatar" aria-hidden="true">WW</span>
-              <small id="employeePhotoStatus">Sin foto de perfil</small>
+              <div class="employee-photo-copy">
+                <small id="employeePhotoStatus">Sin foto de perfil</small>
+                <button type="button" id="employeePhotoButton" class="employee-photo-button">Cambiar foto de perfil</button>
+                <input id="employeePhotoInput" class="employee-photo-input" type="file" accept="image/jpeg,image/png,image/webp">
+              </div>
             </div>
             <span id="employeeStatus" class="status-pill">Activo</span>
             <span class="profile-chip">Cuenta segura</span>
@@ -306,11 +311,12 @@
   </main>
 
   <nav class="employee-bottom-nav" aria-label="Navegaci&oacute;n r&aacute;pida del portal empleado">
-    <a href="#employeeSummary" aria-label="Ir al resumen"><span aria-hidden="true">⌂</span><small>Inicio</small></a>
-    <a href="#employeeAppointments" aria-label="Ir a citas"><span aria-hidden="true">▦</span><small>Citas</small></a>
-    <a href="#employeePerformance" aria-label="Ir a desempe&ntilde;o"><span aria-hidden="true">◇</span><small>Desempe&ntilde;o</small></a>
-    <a href="#employeePayroll" aria-label="Ir a n&oacute;mina"><span aria-hidden="true">$</span><small>N&oacute;mina</small></a>
-    <a href="#employeeManuals" aria-label="Ir a manuales"><span aria-hidden="true">□</span><small>Manuales</small></a>
+    <a href="#employeeSummary" aria-label="Ir al resumen"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10.5V20h14v-9.5"></path></svg><small>Inicio</small></a>
+    <a href="#employeeAppointments" aria-label="Ir a citas"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v4"></path><path d="M17 3v4"></path><path d="M4 8h16"></path><path d="M5 5h14v15H5z"></path></svg><small>Citas</small></a>
+    <a href="#employeePerformance" aria-label="Ir a desempe&ntilde;o"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V9"></path><path d="M10 19V5"></path><path d="M16 19v-7"></path><path d="M21 19H3"></path></svg><small>Desempe&ntilde;o</small></a>
+    <a href="#employeePayroll" aria-label="Ir a n&oacute;mina"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"></path><path d="M17 7.5c-1-1-2.7-1.5-5-1.5-2.8 0-4.5 1.1-4.5 2.8S9 11.2 12 12c3 .8 4.5 1.6 4.5 3.2S14.8 18 12 18c-2.2 0-4-.6-5.2-1.8"></path></svg><small>N&oacute;mina</small></a>
+    <a href="#employeeManuals" aria-label="Ir a manuales"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10a4 4 0 0 1 4 4v12H9a4 4 0 0 0-4-4V4Z"></path><path d="M9 8h6"></path><path d="M9 12h5"></path></svg><small>Manuales</small></a>
+    <a href="#employeeProfile" aria-label="Ir a perfil"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path><path d="M4 21a8 8 0 0 1 16 0"></path></svg><small>Perfil</small></a>
   </nav>
 
   <script src="dashboard.js"></script>

@@ -29,6 +29,9 @@ const MANUALES_EMPLEADO = [
     estado: "Próximamente"
   }
 ];
+const EMPLOYEE_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const EMPLOYEE_PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+let empleadoPerfilActual = null;
 
 function obtenerApiBaseEmpleado() {
   const hostname = window.location.hostname;
@@ -112,13 +115,69 @@ function renderAvatarPerfilEmpleado(empleado = {}) {
   if (foto) {
     avatar.innerHTML = `<img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}">`;
     avatar.setAttribute("aria-hidden", "false");
-    if (status) status.textContent = "Foto de perfil";
+    if (status) {
+      status.textContent = "Foto de perfil";
+      status.classList.remove("is-error");
+    }
     return;
   }
 
   avatar.textContent = obtenerInicialesEmpleado(empleado);
   avatar.setAttribute("aria-hidden", "true");
-  if (status) status.textContent = "Sin foto de perfil";
+  if (status) {
+    status.textContent = "Sin foto de perfil";
+    status.classList.remove("is-error");
+  }
+}
+
+function setEstadoFotoEmpleado(message, isError = false) {
+  const status = document.getElementById("employeePhotoStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("is-error", Boolean(isError));
+}
+
+async function subirFotoPerfilEmpleado(file) {
+  if (!file) return;
+  const boton = document.getElementById("employeePhotoButton");
+
+  if (!EMPLOYEE_PROFILE_PHOTO_TYPES.has(file.type)) {
+    setEstadoFotoEmpleado("Usa una imagen JPG, PNG o WebP.", true);
+    return;
+  }
+
+  if (file.size > EMPLOYEE_PROFILE_PHOTO_MAX_BYTES) {
+    setEstadoFotoEmpleado("La foto no debe superar 5 MB.", true);
+    return;
+  }
+
+  try {
+    if (boton) boton.disabled = true;
+    setEstadoFotoEmpleado("Subiendo foto...");
+    const data = await empleadoFetch("/empleados/me/foto", {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type
+      },
+      body: file
+    });
+
+    const fotoPerfilUrl = String(data.fotoPerfilUrl || "").trim();
+    if (!fotoPerfilUrl) {
+      throw new Error("No se recibio la nueva foto de perfil.");
+    }
+
+    empleadoPerfilActual = {
+      ...(empleadoPerfilActual || {}),
+      fotoPerfilUrl
+    };
+    renderAvatarPerfilEmpleado(empleadoPerfilActual);
+    setEstadoFotoEmpleado("Foto de perfil actualizada");
+  } catch (error) {
+    setEstadoFotoEmpleado(error.message || "No pudimos subir la foto.", true);
+  } finally {
+    if (boton) boton.disabled = false;
+  }
 }
 
 function obtenerMesDiaCumpleanos(value) {
@@ -376,6 +435,7 @@ function renderPerfil(payload) {
   const primerNombre = empleado.primerNombre || obtenerPrimerNombre(nombre) || nombre;
   const puesto = empleado.puesto || "Equipo operativo";
 
+  empleadoPerfilActual = empleado;
   document.body.classList.add("employee-dashboard-ready");
   localStorage.setItem("role", usuario.role || "empleado");
   setText("employeeGreeting", `Hola, ${primerNombre}`);
@@ -684,9 +744,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if (historyBaseDate) historyBaseDate.value = fechaLocalISO();
   renderManuales();
 
-  document.getElementById("logoutButton")?.addEventListener("click", () => {
+  const cerrarSesionDesdePortal = () => {
     cerrarSesionEmpleado();
     window.location.href = "../login.html";
+  };
+
+  document.getElementById("logoutButton")?.addEventListener("click", cerrarSesionDesdePortal);
+  document.getElementById("employeeInternalLogout")?.addEventListener("click", cerrarSesionDesdePortal);
+
+  document.getElementById("employeePhotoButton")?.addEventListener("click", () => {
+    document.getElementById("employeePhotoInput")?.click();
+  });
+  document.getElementById("employeePhotoInput")?.addEventListener("change", async (event) => {
+    const input = event.currentTarget;
+    await subirFotoPerfilEmpleado(input.files?.[0] || null);
+    input.value = "";
   });
 
   document.getElementById("refreshButton")?.addEventListener("click", async () => {

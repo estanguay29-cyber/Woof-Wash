@@ -55,6 +55,12 @@ const EmployeeSchema = new mongoose.Schema({
     maxlength: 500,
     default: ""
   },
+  fotoPerfilPublicId: {
+    type: String,
+    trim: true,
+    maxlength: 220,
+    default: ""
+  },
   notas: {
     type: String,
     trim: true,
