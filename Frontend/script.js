@@ -1522,12 +1522,34 @@ function crearImagenZonaGrandePublica(zona) {
   `;
 }
 
+function actualizarImagenZonaHeroPublica(regla) {
+  const imagen = document.getElementById("zonaHoyImagen");
+  const contenedor = imagen?.closest(".hero-zone-visual");
+  if (!imagen || !contenedor) return;
+
+  if (!regla?.zone?.mapImage) {
+    imagen.hidden = true;
+    imagen.removeAttribute("src");
+    imagen.alt = "";
+    contenedor.classList.add("is-missing");
+    return;
+  }
+
+  const label = regla.zone.label || "Zona";
+  const nombre = regla.zone.nombre || "";
+  imagen.hidden = false;
+  imagen.src = regla.zone.mapImage;
+  imagen.alt = `Mapa de cobertura ${label} - ${nombre}`.trim();
+  contenedor.classList.remove("is-missing");
+}
+
 function renderizarZonaHoyPublica() {
   const zonaHTML = document.getElementById("zonaHoy");
   if (!zonaHTML) return;
   zonaHTML.closest(".hero-zone-card")?.classList.remove("is-loading");
 
   const regla = obtenerReglaZonaPublica(hoy);
+  actualizarImagenZonaHeroPublica(regla);
   if (regla.esDescanso) {
     zonaHTML.innerHTML = `
       <span class="hero-zone-day">Zona de hoy &middot; ${escapeHtmlPublico(regla.dia || "Domingo")}</span>
@@ -1541,7 +1563,7 @@ function renderizarZonaHoyPublica() {
     <span class="hero-zone-day">Zona de hoy &middot; ${escapeHtmlPublico(regla.dia || "")}</span>
     <span class="hero-zone-main">Atendemos: ${escapeHtmlPublico(regla.zone?.label || regla.zona)}</span>
     <span class="hero-zone-area">${escapeHtmlPublico(regla.zone?.nombre || "")}</span>
-    <span class="hero-zone-note">Agenda tu servicio segun la zona disponible de hoy.</span>
+    <span class="hero-zone-note">Agenda tu servicio seg\u00fan la zona disponible de hoy.</span>
   `;
 }
 
