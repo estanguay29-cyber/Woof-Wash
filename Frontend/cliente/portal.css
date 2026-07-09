@@ -117,6 +117,7 @@ button {
 
 .portal-nav a,
 .portal-nav button {
+  flex: 0 0 auto;
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -130,6 +131,10 @@ button {
   font-weight: 900;
   cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.portal-return-text--mobile {
+  display: none;
 }
 
 .portal-nav a:hover,
@@ -159,15 +164,15 @@ button {
 .client-internal-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  margin: 2px 0 20px;
+  margin: 6px 0 22px;
   border: 1px solid rgba(11, 42, 107, 0.1);
   border-radius: var(--radius);
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 10px 26px rgba(11, 42, 107, 0.06);
-  overflow-x: auto;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 14px 34px rgba(11, 42, 107, 0.08);
+  overflow: visible;
   position: relative;
   z-index: 2;
 }
@@ -183,9 +188,12 @@ button {
 
 .client-internal-nav a,
 .client-nav-button {
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 40px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
   border: 1px solid rgba(11, 42, 107, 0.1);
   border-radius: var(--radius);
@@ -195,6 +203,7 @@ button {
   font-size: 0.86rem;
   font-weight: 950;
   font-family: inherit;
+  text-align: center;
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1656,6 +1665,19 @@ h2 {
   }
 }
 
+@media (max-width: 1040px) {
+  .client-internal-nav p {
+    display: none;
+  }
+
+  .client-internal-nav a,
+  .client-nav-button {
+    gap: 6px;
+    padding: 0 8px;
+    font-size: 0.78rem;
+  }
+}
+
 @media (max-width: 860px) {
   .welcome-band,
   .history-actions,
@@ -1686,10 +1708,13 @@ h2 {
   }
 
   .portal-header {
+    flex-wrap: wrap;
     align-items: flex-start;
   }
 
   .portal-nav {
+    flex: 1 1 auto;
+    min-width: 280px;
     flex-wrap: wrap;
     justify-content: flex-end;
   }
@@ -1710,13 +1735,18 @@ h2 {
 
   .portal-shell {
     width: min(100% - 20px, 1180px);
-    padding-top: 16px;
+    padding-top: 10px;
   }
 
   .portal-header {
+    width: min(100% - 20px, 1180px);
     padding: 12px 10px;
     align-items: center;
     gap: 10px;
+  }
+
+  .brand {
+    flex: 0 0 auto;
   }
 
   .brand > span:not(.brand-logo) {
@@ -1726,19 +1756,35 @@ h2 {
   .portal-nav {
     flex: 1 1 auto;
     min-width: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    width: auto;
     gap: 6px;
   }
 
   .portal-nav a,
   .portal-nav button {
+    flex: 1 1 0;
     min-width: 0;
+    max-width: 100%;
     min-height: 40px;
     gap: 5px;
-    padding: 0 8px;
+    padding: 0 7px;
     font-size: 0.74rem;
+    line-height: 1;
+    text-align: center;
     white-space: nowrap;
+  }
+
+  .portal-return-text--desktop {
+    display: none;
+  }
+
+  .portal-return-text--mobile {
+    display: inline;
   }
 
   .portal-nav .portal-icon {
