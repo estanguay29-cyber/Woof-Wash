@@ -328,7 +328,7 @@ form.addEventListener("submit", async (e) => {
 
       const destino = obtenerDestinoPorRole(data.role);
       localStorage.removeItem("authRedirect");
-      await mostrarExitoLoginSeguro("Inicio de sesi\u00f3n exitoso");
+      await mostrarExitoLoginSeguro("Login exitoso");
       window.location.href = destino;
       return;
     }

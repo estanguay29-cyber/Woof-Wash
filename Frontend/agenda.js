@@ -2756,7 +2756,7 @@ async function guardarEdicionCita(event) {
     cerrarModalEdicion();
     await cargarCitasAgenda();
     await cargarStatsAgenda();
-    mostrarExitoAgenda("Cita editada con \u00e9xito");
+    mostrarExitoAgenda("Cita actualizada con \u00e9xito");
   } catch (error) {
     alert(error.message);
   } finally {
@@ -3236,7 +3236,7 @@ async function guardarCalificacionDesdeDetalle() {
     await cargarCitasAgenda();
     const citaActualizada = citasAgenda.find((item) => item.id === cita.id);
     if (citaActualizada) renderizarDetalleCita(citaActualizada);
-    mostrarExitoAgenda("Calificaci\u00f3n registrada con \u00e9xito");
+    mostrarExitoAgenda("Calificaci\u00f3n enviada con \u00e9xito");
     mostrarFeedbackDetalle("Calificación guardada.");
   } catch (error) {
     mostrarFeedbackDetalle(error.message);

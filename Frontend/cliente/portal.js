@@ -105,7 +105,9 @@ function obtenerDiaSemanaMexicoCliente(fecha = new Date()) {
   }
 }
 
-function obtenerReglaZonaAutomaticaCliente() {
+function obtenerReglaZonaAutomaticaCliente(fechaISO = "") {
+  const reglaPorFecha = obtenerReglaZonaCliente(fechaISO);
+  if (reglaPorFecha) return reglaPorFecha;
   const dia = obtenerDiaSemanaMexicoCliente();
   return clientServiceZonesConfig.rulesByDay[String(dia)] || clientServiceZonesConfig.rulesByDay[dia] || {
     dia: "Hoy",
@@ -147,7 +149,7 @@ async function cargarZonasServicioCliente() {
 }
 
 function validarZonaAgendaCliente(cita = {}) {
-  const regla = cita.reglaZona || obtenerReglaZonaAutomaticaCliente();
+  const regla = cita.reglaZona || obtenerReglaZonaAutomaticaCliente(cita.fecha);
   if (!regla) {
     return { ok: false, message: "No pudimos calcular la zona automatica del dia." };
   }
@@ -161,12 +163,13 @@ function actualizarGuiaZonaAgenda() {
   const guide = document.getElementById("clientScheduleZoneGuide");
   const zoneInput = document.getElementById("scheduleZone");
   const submit = document.getElementById("clientScheduleSubmit");
+  const fechaSeleccionada = valorInput("scheduleDate");
   if (!guide) return;
 
   guide.classList.remove("is-ok", "is-warning", "is-error");
   if (submit) submit.disabled = false;
 
-  const regla = obtenerReglaZonaAutomaticaCliente();
+  const regla = obtenerReglaZonaAutomaticaCliente(fechaSeleccionada);
   if (!regla) {
     guide.textContent = "No pudimos calcular la zona automatica del dia.";
     guide.classList.add("is-warning");
@@ -181,7 +184,7 @@ function actualizarGuiaZonaAgenda() {
   }
 
   if (regla.esDescanso) {
-    guide.textContent = `${regla.dia || "Hoy"} no est\u00e1 disponible para solicitudes de cita.`;
+    guide.textContent = `${regla.dia || "Ese dia"} no est\u00e1 disponible para solicitudes de cita.`;
     guide.classList.add("is-error");
     if (submit) submit.disabled = true;
     return;
@@ -193,7 +196,9 @@ function actualizarGuiaZonaAgenda() {
     return;
   }
 
-  guide.textContent = `Zona asignada automaticamente: ${zonaTexto}. La asigna el sistema segun el dia actual.`;
+  guide.textContent = fechaSeleccionada
+    ? `Zona asignada automaticamente: ${zonaTexto}. La asigna el sistema segun la fecha seleccionada.`
+    : `Zona asignada automaticamente: ${zonaTexto}. Selecciona una fecha para recalcularla por dia.`;
   guide.classList.add("is-ok");
 }
 
@@ -957,7 +962,7 @@ function validarDireccionAgendaCliente(cita = {}) {
 function construirMensajeWhatsApp(item = {}, cita = {}) {
   const foto = item.fotoUrl || "[Sin foto guardada]";
   const cliente = obtenerDatosClienteWhatsApp();
-  const zonaTexto = cita.zonaTexto || describirZonaCliente(cita.reglaZona || obtenerReglaZonaAutomaticaCliente());
+  const zonaTexto = cita.zonaTexto || describirZonaCliente(cita.reglaZona || obtenerReglaZonaAutomaticaCliente(cita.fecha));
   const direccion = cita.direccionTexto || construirDireccionAgendaCliente(cita);
   const comentarios = valorOpcionalWhatsApp(cita.comentarios);
 
@@ -1374,10 +1379,11 @@ function abrirAgendaClientItem(id) {
 }
 
 function leerAgendaClientItem() {
-  const reglaZona = obtenerReglaZonaAutomaticaCliente();
+  const fecha = valorInput("scheduleDate");
+  const reglaZona = obtenerReglaZonaAutomaticaCliente(fecha);
   return {
     servicio: valorInput("scheduleService"),
-    fecha: valorInput("scheduleDate"),
+    fecha,
     horario: valorInput("scheduleTime"),
     reglaZona,
     zona: reglaZona?.zona || "",
@@ -1427,6 +1433,7 @@ function enviarAgendaClientItem(event) {
   cita.direccionTexto = construirDireccionAgendaCliente(cita);
 
   window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item, cita))}`, "_blank", "noopener,noreferrer");
+  mostrarExitoPortalCliente("Solicitud lista para WhatsApp");
   cerrarAgendaClientItem();
 }
 
