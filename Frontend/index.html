@@ -250,17 +250,18 @@
 
       <div class="hero-zone-card hero-zone-card-floating is-loading">
         <div class="hero-zone-status" aria-hidden="true"></div>
-        <figure class="hero-zone-visual">
-          <img id="zonaHoyImagen" src="img/Zona1.jpg" alt="" loading="lazy" decoding="async">
-          <span class="hero-zone-visual-fallback">Zona</span>
-        </figure>
         <div class="hero-zone-content">
           <span class="hero-zone-label">Zona de servicio</span>
           <div id="zonaHoy" class="hero-zone-text text-sm md:text-base text-gray-700">Cargando zonas disponibles...</div>
         </div>
+        <figure class="hero-zone-visual">
+          <img id="zonaHoyImagen" src="img/Zona1.jpg" alt="" loading="lazy" decoding="async">
+          <span class="hero-zone-visual-fallback">Zona</span>
+        </figure>
         <button onclick="abrirZonas()" class="hero-zone-button">
           Ver zonas
         </button>
+        <p id="zonaHoyNota" class="hero-zone-note hero-zone-note-standalone">Agenda tu servicio según la zona disponible de hoy.</p>
       </div>
 
       <div class="hero-actions">

@@ -1547,6 +1547,7 @@ function renderizarZonaHoyPublica() {
   const zonaHTML = document.getElementById("zonaHoy");
   if (!zonaHTML) return;
   zonaHTML.closest(".hero-zone-card")?.classList.remove("is-loading");
+  const notaZona = document.getElementById("zonaHoyNota");
 
   const regla = obtenerReglaZonaPublica(hoy);
   actualizarImagenZonaHeroPublica(regla);
@@ -1554,8 +1555,8 @@ function renderizarZonaHoyPublica() {
     zonaHTML.innerHTML = `
       <span class="hero-zone-day">Zona de hoy &middot; ${escapeHtmlPublico(regla.dia || "Domingo")}</span>
       <span class="hero-zone-main">Hoy descansamos</span>
-      <span class="hero-zone-note">Consulta las zonas activas de lunes a sabado para agendar tu servicio.</span>
     `;
+    if (notaZona) notaZona.textContent = "Consulta las zonas activas de lunes a sábado para agendar tu servicio.";
     return;
   }
 
@@ -1563,8 +1564,8 @@ function renderizarZonaHoyPublica() {
     <span class="hero-zone-day">Zona de hoy &middot; ${escapeHtmlPublico(regla.dia || "")}</span>
     <span class="hero-zone-main">Atendemos: ${escapeHtmlPublico(regla.zone?.label || regla.zona)}</span>
     <span class="hero-zone-area">${escapeHtmlPublico(regla.zone?.nombre || "")}</span>
-    <span class="hero-zone-note">Agenda tu servicio seg\u00fan la zona disponible de hoy.</span>
   `;
+  if (notaZona) notaZona.textContent = "Agenda tu servicio según la zona disponible de hoy.";
 }
 
 function crearTarjetaZonaPublica(dia) {
