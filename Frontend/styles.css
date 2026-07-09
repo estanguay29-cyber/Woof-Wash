@@ -2670,7 +2670,7 @@ h1, h2, h3 {
 
 .jingle-toggle-btn.is-playing .jingle-toggle-icon {
   background: #8cc63f;
-  color: #ffffff;
+  color: #0b2a6b;
 }
 
 .jingle-action {
@@ -2810,7 +2810,7 @@ h1, h2, h3 {
   border: 1px solid rgba(140, 198, 63, 0.34);
   border-radius: 999px;
   background: #0b2a6b;
-  color: #ffffff;
+  color: #0b2a6b;
   font-size: 0.95rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -6109,6 +6109,7 @@ body {
   justify-self: auto;
   min-height: 42px;
   padding-inline: 22px;
+  color: #0b2a6b;
 }
 
 .hero-zone-note-standalone {
