@@ -478,22 +478,8 @@ function obtenerNombreEmpleadoDesdeValor(value) {
 }
 
 function obtenerEmpleadoCita(cita = {}) {
-  const candidatos = [
-    cita.empleadoAsignadoNombre,
-    cita.atendidoPor,
-    cita.empleado
-  ];
-
-  if (Array.isArray(cita.empleadosAsignadosNombres) && cita.empleadosAsignadosNombres.length) {
-    candidatos.push(...cita.empleadosAsignadosNombres);
-  }
-
-  if (Array.isArray(cita.empleadosAsignados) && cita.empleadosAsignados.length) {
-    candidatos.push(...cita.empleadosAsignados);
-  }
-
-  const nombre = candidatos.map(obtenerNombreEmpleadoDesdeValor).find(Boolean);
-  return nombre ? obtenerPrimerNombreTexto(nombre, nombre) : "Sin asignar";
+  const empleados = obtenerEmpleadosDetalleCita(cita);
+  return empleados.length ? empleados.map((empleado) => empleado.nombre).join(", ") : "Sin asignar";
 }
 
 function obtenerInicialesEmpleadoPortal(nombre = "") {
@@ -504,6 +490,39 @@ function obtenerInicialesEmpleadoPortal(nombre = "") {
     .slice(0, 2)
     .map((parte) => parte.charAt(0).toUpperCase())
     .join("") || "WW";
+}
+
+function obtenerEmpleadosDetalleCita(cita = {}) {
+  const empleados = [];
+  const agregarEmpleado = (value, fotoPerfilUrl = "") => {
+    const nombre = obtenerNombreEmpleadoDesdeValor(value);
+    if (!nombre || nombre === "Sin asignar") return;
+    const clave = normalizarTexto(nombre).toLowerCase();
+    if (empleados.some((empleado) => empleado.clave === clave)) return;
+    empleados.push({
+      clave,
+      nombre,
+      fotoPerfilUrl: normalizarTexto(value?.fotoPerfilUrl || fotoPerfilUrl)
+    });
+  };
+
+  if (Array.isArray(cita.empleadosAsignadosDetalle)) {
+    cita.empleadosAsignadosDetalle.forEach((empleado) => agregarEmpleado(empleado));
+  }
+
+  if (Array.isArray(cita.empleadosAsignadosNombres)) {
+    cita.empleadosAsignadosNombres.forEach((nombre) => agregarEmpleado(nombre));
+  }
+
+  if (Array.isArray(cita.empleadosAsignados)) {
+    cita.empleadosAsignados.forEach((empleado) => agregarEmpleado(empleado));
+  }
+
+  agregarEmpleado(cita.empleadoAsignadoNombre, cita.empleadoAsignadoFotoUrl);
+  agregarEmpleado(cita.atendidoPor);
+  agregarEmpleado(cita.empleado);
+
+  return empleados.map(({ clave, ...empleado }) => empleado);
 }
 
 function obtenerEmpleadoDetalleCita(cita = {}) {
@@ -528,11 +547,14 @@ function obtenerEmpleadoDetalleCita(cita = {}) {
 }
 
 function renderizarEmpleadoAsignadoCita(cita = {}) {
-  const empleado = obtenerEmpleadoDetalleCita(cita);
+  const empleados = obtenerEmpleadosDetalleCita(cita);
   const completada = cita.estado === "completada";
+  const etiquetaEmpleados = completada
+    ? (empleados.length > 1 ? "Te atendieron" : "Te atendi\u00f3")
+    : (empleados.length > 1 ? "Te atender\u00e1n" : "Te atender\u00e1");
   const etiqueta = completada ? "Te atendió" : "Te atenderá";
 
-  if (!empleado) {
+  if (!empleados.length) {
     return `
       <div class="appointment-employee-card is-unassigned">
         <span class="appointment-employee-avatar" aria-hidden="true">WW</span>
@@ -544,16 +566,24 @@ function renderizarEmpleadoAsignadoCita(cita = {}) {
     `;
   }
 
-  const avatar = empleado.fotoPerfilUrl
-    ? `<img src="${escaparHtml(empleado.fotoPerfilUrl)}" alt="${escaparHtml(empleado.nombre)}">`
-    : escaparHtml(obtenerInicialesEmpleadoPortal(empleado.nombre));
+  const empleadosHtml = empleados.map((empleado) => {
+    const avatar = empleado.fotoPerfilUrl
+      ? `<img src="${escaparHtml(empleado.fotoPerfilUrl)}" alt="${escaparHtml(empleado.nombre)}">`
+      : escaparHtml(obtenerInicialesEmpleadoPortal(empleado.nombre));
+
+    return `
+      <span class="appointment-employee-person">
+        <span class="appointment-employee-avatar ${empleado.fotoPerfilUrl ? "has-photo" : ""}">${avatar}</span>
+        <strong>${escaparHtml(empleado.nombre)}</strong>
+      </span>
+    `;
+  }).join("");
 
   return `
     <div class="appointment-employee-card">
-      <span class="appointment-employee-avatar ${empleado.fotoPerfilUrl ? "has-photo" : ""}">${avatar}</span>
       <span>
-        <small>${escaparHtml(etiqueta)}</small>
-        <strong>${escaparHtml(empleado.nombre)}</strong>
+        <small>${escaparHtml(etiquetaEmpleados)}</small>
+        <span class="appointment-employee-list">${empleadosHtml}</span>
       </span>
     </div>
   `;

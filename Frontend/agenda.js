@@ -65,15 +65,12 @@ const AGENDA_DURACION_BLOQUEADA_MIN = 30;
 const AGENDA_DURACION_BLOQUEADA_MAX = 720;
 const AGENDA_DURACIONES_SERVICIO = {
   mascota: {
-    basico: 80,
-    completo: 110,
-    premium_spa: 140
+    esencial: 80,
+    spa: 120
   },
   auto: {
     lavado_basico: 60,
-    basico: 60,
-    completo: 90,
-    premium: 120
+    lavado_completo: 90
   }
 };
 
@@ -86,9 +83,8 @@ const SERVICIOS_CATALOGO = {
       { value: "Gigante", label: "Gigante, m\u00e1s de 40 kg", nombre: "Mascota gigante" }
     ],
     paquetes: [
-      { value: "B\u00e1sico", label: "B\u00e1sico: ba\u00f1o + secado + o\u00eddos + perfumado", nombre: "B\u00e1sico" },
-      { value: "Completo", label: "Completo: b\u00e1sico + u\u00f1as + corte + deslanado", nombre: "Completo" },
-      { value: "Premium SPA", label: "Premium SPA: completo + aromaterapia + cuidado de piel + hidrataci\u00f3n de pelo", nombre: "Premium SPA" }
+      { value: "Esencial", label: "Esencial", nombre: "Esencial" },
+      { value: "SPA", label: "SPA", nombre: "SPA" }
     ]
   },
   auto: {
@@ -99,9 +95,8 @@ const SERVICIOS_CATALOGO = {
       { value: "Pick Up", label: "Pick Up", nombre: "Pick Up" }
     ],
     paquetes: [
-      { value: "Lavado B\u00e1sico", label: "Lavado B\u00e1sico: solo exterior", nombre: "Lavado B\u00e1sico" },
-      { value: "Completo", label: "Completo: exterior + aspirado + tablero + llantas", nombre: "Completo" },
-      { value: "Premium", label: "Premium: completo + detallado + cera", nombre: "Premium" }
+      { value: "Lavado b\u00e1sico", label: "Lavado b\u00e1sico", nombre: "Lavado b\u00e1sico" },
+      { value: "Lavado completo", label: "Lavado completo", nombre: "Lavado completo" }
     ]
   }
 };
@@ -699,6 +694,15 @@ function programarLookupCliente() {
 function buscarOpcionServicio(opciones, value) {
   const normalizado = normalizarServicioKey(value);
   return opciones.find((opcion) => normalizarServicioKey(opcion.value) === normalizado) || null;
+}
+
+function servicioDisponibleEnCatalogo(servicio = {}, tipoFallback = "mascota") {
+  const tipo = SERVICIOS_CATALOGO[servicio.tipo] ? servicio.tipo : tipoFallback;
+  const catalogo = SERVICIOS_CATALOGO[tipo] || SERVICIOS_CATALOGO.mascota;
+  return Boolean(
+    buscarOpcionServicio(catalogo.categorias, servicio.categoria)
+    && buscarOpcionServicio(catalogo.paquetes, servicio.paquete)
+  );
 }
 
 function obtenerServicioSeleccionado(tipo, categoriaValue, paqueteValue) {
@@ -2545,6 +2549,15 @@ function construirPayloadFormulario(form, prefijo = "") {
     delete payload.serviciosDetalle;
   }
 
+  if (prefijo && citaEnEdicionServicioLegacy && !servicioEdicionActualizado) {
+    delete payload.servicioTipo;
+    delete payload.servicioCategoria;
+    delete payload.servicioPaquete;
+    delete payload.servicioNombre;
+    delete payload.servicioKey;
+    delete payload.serviciosDetalle;
+  }
+
   if (prefijo) {
     const calificacion = normalizarCalificacionServicio(get("calificacionServicio"));
     payload.calificacionServicio = calificacion;
@@ -2626,7 +2639,6 @@ function abrirModalEdicion(id) {
   if (!cita || !modal || !editForm) return;
 
   citaEnEdicionId = id;
-  citaEnEdicionServicioLegacy = !(cita.servicioCategoria && cita.servicioPaquete);
   servicioEdicionActualizado = false;
   duracionBloqueadaManualEditar = false;
   editForm.elements.editClienteNombre.value = cita.cliente;
@@ -2640,6 +2652,9 @@ function abrirModalEdicion(id) {
     editForm.elements.editTipoServicio.value = serviciosEdicion[0].tipo;
   }
   actualizarCatalogoEdicion(cita.servicioCategoria, cita.servicioPaquete, serviciosEdicion);
+  citaEnEdicionServicioLegacy = !serviciosEdicion.every((servicio) =>
+    servicioDisponibleEnCatalogo(servicio, cita.tipoServicio || "mascota")
+  );
   actualizarCamposMascotaFormulario("edit", { limpiarSiAuto: cita.tipoServicio !== "mascota" });
   const duracionEstimadaEdicion = calcularDuracionEstimadaFormulario("edit");
   const duracionBloqueadaGuardada = obtenerDuracionBloqueadaValida(cita.duracionBloqueadaMinutos);
@@ -2686,7 +2701,9 @@ function abrirModalEdicion(id) {
 
   const servicioAnterior = document.getElementById("editServicioAnterior");
   if (servicioAnterior) {
-    servicioAnterior.textContent = citaEnEdicionServicioLegacy ? `Servicio guardado anteriormente: ${cita.detalle}` : "";
+    servicioAnterior.textContent = citaEnEdicionServicioLegacy
+      ? `Servicio guardado anteriormente: ${crearResumenServicioCita(cita)}`
+      : "";
     servicioAnterior.classList.toggle("hidden", !citaEnEdicionServicioLegacy);
   }
 

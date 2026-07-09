@@ -1042,7 +1042,7 @@ const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
 const APPOINTMENT_SERVICE_CATALOG = Object.freeze({
   mascota: {
     categorias: ["Chico", "Mediano", "Grande", "Gigante"],
-    paquetes: ["B\u00e1sico", "Completo", "Premium SPA"],
+    paquetes: ["Esencial", "SPA"],
     nombres: {
       Chico: "Mascota chico",
       Mediano: "Mascota mediano",
@@ -1052,7 +1052,7 @@ const APPOINTMENT_SERVICE_CATALOG = Object.freeze({
   },
   auto: {
     categorias: ["Auto chico", "Auto mediano", "Camioneta/SUV", "Pick Up"],
-    paquetes: ["Lavado B\u00e1sico", "Completo", "Premium"],
+    paquetes: ["Lavado b\u00e1sico", "Lavado completo"],
     nombres: {
       "Auto chico": "Auto chico",
       "Auto mediano": "Auto mediano",
@@ -1072,15 +1072,12 @@ const CONFIG_AGENDA = Object.freeze({
   },
   duraciones: {
     mascota: {
-      basico: 80,
-      completo: 110,
-      premium_spa: 140
+      esencial: 80,
+      spa: 120
     },
     auto: {
       lavado_basico: 60,
-      basico: 60,
-      completo: 90,
-      premium: 120
+      lavado_completo: 90
     }
   }
 });

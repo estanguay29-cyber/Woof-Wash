@@ -1463,7 +1463,7 @@ h2 {
 }
 
 .appointment-employee-card {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   max-width: 100%;
@@ -1476,8 +1476,27 @@ h2 {
   color: var(--ink);
 }
 
+.appointment-employee-card > span:last-child {
+  min-width: 0;
+}
+
 .appointment-employee-card.is-unassigned {
   opacity: 0.82;
+}
+
+.appointment-employee-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.appointment-employee-person {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .appointment-employee-avatar {
@@ -1503,7 +1522,8 @@ h2 {
 }
 
 .appointment-employee-card small,
-.appointment-employee-card strong {
+.appointment-employee-card strong,
+.appointment-employee-list {
   display: block;
   min-width: 0;
 }
