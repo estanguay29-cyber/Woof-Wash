@@ -271,27 +271,57 @@ function renderAvatarEmpleado(empleado = {}, size = "sm") {
   return `<span class="portal-employee-avatar ${sizeClass}" aria-hidden="true">${escapeHtml(obtenerInicialesEmpleado(empleado))}</span>`;
 }
 
-function obtenerEmpleadoAsignadoPortal(cita = {}) {
-  const detalles = Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : [];
-  const detalleActual = detalles.find((empleado) => String(empleado.id || empleado._id || "") === String(state.empleadoSeleccionadoId || "")) || detalles[0];
-  const empleadoLista = state.empleados.find((empleado) => String(empleado.id || empleado._id || "") === String(state.empleadoSeleccionadoId || ""));
+function normalizarNombresEmpleadoPortal(value) {
+  return String(value || "")
+    .split(/\s*(?:,|\||\/|;|\by\b)\s*/i)
+    .map((nombre) => nombre.trim())
+    .filter(Boolean);
+}
 
-  return {
-    ...(empleadoLista || {}),
-    ...(detalleActual || {}),
-    nombreCompleto: detalleActual?.nombreCompleto || empleadoLista?.nombreCompleto || "Empleado asignado",
-    fotoPerfilUrl: detalleActual?.fotoPerfilUrl || empleadoLista?.fotoPerfilUrl || ""
+function obtenerEmpleadosAsignadosPortal(cita = {}) {
+  const empleados = [];
+  const agregar = (empleado = {}, nombreFallback = "", fotoFallback = "") => {
+    const id = String(empleado.id || empleado._id || "").trim();
+    const fotoPerfilUrl = String(empleado.fotoPerfilUrl || fotoFallback || "").trim();
+    const nombres = normalizarNombresEmpleadoPortal(
+      empleado.nombreCompleto || empleado.nombre || empleado.usuario || empleado.email || nombreFallback
+    );
+
+    nombres.forEach((nombreCompleto) => {
+      const clave = nombreCompleto.toLowerCase();
+      const existente = empleados.find((item) => (id && item.id === id) || item.clave === clave);
+      if (existente) {
+        if (!existente.fotoPerfilUrl && fotoPerfilUrl) existente.fotoPerfilUrl = fotoPerfilUrl;
+        if (!existente.id && id) existente.id = id;
+        return;
+      }
+      empleados.push({ id, clave, nombreCompleto, fotoPerfilUrl });
+    });
   };
+
+  const empleadoLista = state.empleados.find((empleado) => String(empleado.id || empleado._id || "") === String(state.empleadoSeleccionadoId || ""));
+  (Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : []).forEach((empleado) => agregar(empleado));
+  normalizarNombresEmpleadoPortal(cita.empleadosAsignadosNombres).forEach((nombre) => agregar({}, nombre));
+  normalizarNombresEmpleadoPortal(cita.empleadoAsignadoNombre).forEach((nombre) => agregar({}, nombre));
+  normalizarNombresEmpleadoPortal(cita.atendidoPor).forEach((nombre) => agregar({}, nombre));
+
+  if (!empleados.length && empleadoLista) {
+    agregar(empleadoLista, empleadoLista.nombreCompleto || "Empleado asignado", empleadoLista.fotoPerfilUrl || "");
+  }
+
+  return empleados.map(({ clave, ...empleado }) => empleado);
 }
 
 function renderEmpleadoAsignadoPortal(cita = {}) {
-  const empleado = obtenerEmpleadoAsignadoPortal(cita);
+  const empleados = obtenerEmpleadosAsignadosPortal(cita);
+  const empleado = empleados.find((item) => String(item.id || "") === String(state.empleadoSeleccionadoId || "")) || empleados[0] || {};
+  const nombres = empleados.map((item) => item.nombreCompleto).filter(Boolean).join(", ") || "Empleado asignado";
   return `
     <div class="appointment-employee-card">
       ${renderAvatarEmpleado(empleado, "sm")}
       <span>
         <small>Cita asignada a</small>
-        <strong>${escapeHtml(empleado.nombreCompleto || "Empleado asignado")}</strong>
+        <strong>${escapeHtml(nombres)}</strong>
       </span>
     </div>
   `;

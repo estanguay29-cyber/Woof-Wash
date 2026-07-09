@@ -168,7 +168,65 @@
 const token = localStorage.getItem("token");
 const PRODUCTOS_CATALOGO = Object.freeze(window.WoofWashProductos?.catalogo || {});
 const PRODUCTOS_POR_NOMBRE = Object.freeze(window.WoofWashProductos?.porNombre || {});
-const carrito = (JSON.parse(localStorage.getItem("carrito")) || []).reduce((acc, item) => {
+const CART_STORAGE_LEGACY_KEY = "carrito";
+const CART_STORAGE_GUEST_KEY = "woofwash_cart_guest";
+const CART_STORAGE_USER_PREFIX = "woofwash_cart_user_";
+
+function decodificarPayloadJwtCheckout(tokenValue) {
+  if (typeof tokenValue !== "string") return null;
+  const partes = tokenValue.split(".");
+  if (partes.length !== 3) return null;
+  try {
+    const base64 = partes[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + padding));
+  } catch {
+    return null;
+  }
+}
+
+function tokenCheckoutEsValido(tokenValue) {
+  const payload = decodificarPayloadJwtCheckout(tokenValue);
+  if (!payload || typeof payload.exp !== "number") return false;
+  return payload.exp > Math.floor(Date.now() / 1000);
+}
+
+function obtenerClaveCarritoCheckout() {
+  if (!tokenCheckoutEsValido(token)) return CART_STORAGE_GUEST_KEY;
+  const payload = decodificarPayloadJwtCheckout(token) || {};
+  const id = String(payload.userId || payload.id || payload._id || payload.sub || payload.email || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "_")
+    .slice(0, 96);
+  return id ? `${CART_STORAGE_USER_PREFIX}${id}` : CART_STORAGE_GUEST_KEY;
+}
+
+function migrarCarritoLegacyCheckout() {
+  const clave = obtenerClaveCarritoCheckout();
+  if (clave !== CART_STORAGE_GUEST_KEY) {
+    localStorage.removeItem(CART_STORAGE_LEGACY_KEY);
+    return;
+  }
+
+  const legacyRaw = localStorage.getItem(CART_STORAGE_LEGACY_KEY);
+  if (!legacyRaw) return;
+  if (!localStorage.getItem(CART_STORAGE_GUEST_KEY)) {
+    localStorage.setItem(CART_STORAGE_GUEST_KEY, legacyRaw);
+  }
+  localStorage.removeItem(CART_STORAGE_LEGACY_KEY);
+}
+
+function leerCarritoCheckout() {
+  migrarCarritoLegacyCheckout();
+  try {
+    return JSON.parse(localStorage.getItem(obtenerClaveCarritoCheckout()) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+const carrito = leerCarritoCheckout().reduce((acc, item) => {
   const producto = PRODUCTOS_CATALOGO[item?.id] || PRODUCTOS_POR_NOMBRE[item?.nombre];
   const cantidad = Number(item?.cantidad);
 
@@ -181,7 +239,8 @@ const carrito = (JSON.parse(localStorage.getItem("carrito")) || []).reduce((acc,
 
   return acc;
 }, []);
-localStorage.setItem("carrito", JSON.stringify(carrito));
+localStorage.setItem(obtenerClaveCarritoCheckout(), JSON.stringify(carrito));
+localStorage.removeItem(CART_STORAGE_LEGACY_KEY);
 const form = document.getElementById("checkoutForm");
 const mensaje = document.getElementById("mensaje");
 const checkoutWhatsAppLink = document.getElementById("checkoutWhatsAppLink");

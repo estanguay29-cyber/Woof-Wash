@@ -1256,11 +1256,21 @@ function normalizarIdsEmpleadosAsignados(value) {
 }
 
 function normalizarNombresEmpleadosAsignados(value) {
-  if (Array.isArray(value)) {
-    return value.map((nombre) => String(nombre || "").trim()).filter(Boolean);
-  }
-  const nombre = String(value || "").trim();
-  return nombre ? [nombre] : [];
+  const valores = Array.isArray(value) ? value : [value];
+  const nombres = [];
+  valores.forEach((item) => {
+    String(item || "")
+      .split(/\s*(?:,|\||\/|;|\by\b)\s*/i)
+      .map((nombre) => String(nombre || "").trim())
+      .filter(Boolean)
+      .forEach((nombre) => {
+        const clave = nombre.toLowerCase();
+        if (!nombres.some((existente) => existente.toLowerCase() === clave)) {
+          nombres.push(nombre);
+        }
+      });
+  });
+  return nombres;
 }
 
 function obtenerSelectorEmpleadosAgenda(target) {
@@ -1482,37 +1492,46 @@ function renderizarAvatarEmpleadoAgenda(empleado = {}, size = "md") {
 }
 
 function obtenerEmpleadosDetalleCitaAgenda(cita = {}) {
-  const detalles = Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : [];
-  if (detalles.length) {
-    return detalles
-      .map((empleado) => ({
-        id: String(empleado.id || empleado._id || ""),
-        nombreCompleto: empleado.nombreCompleto || empleado.nombre || "Empleado",
-        fotoPerfilUrl: empleado.fotoPerfilUrl || ""
-      }))
-      .filter((empleado) => empleado.id || empleado.nombreCompleto);
+  const empleados = [];
+  const agregarEmpleado = (empleado = {}, nombreFallback = "", fotoFallback = "") => {
+    const id = String(empleado.id || empleado._id || empleado.empleadoAsignadoId || "").trim();
+    const fotoPerfilUrl = String(empleado.fotoPerfilUrl || fotoFallback || "").trim();
+    const nombres = normalizarNombresEmpleadosAsignados(
+      empleado.nombreCompleto || empleado.nombre || empleado.usuario || empleado.email || nombreFallback
+    );
+
+    nombres.forEach((nombre) => {
+      if (!nombre || nombre === "Sin asignar") return;
+      const claveNombre = nombre.toLowerCase();
+      const existente = empleados.find((item) =>
+        (id && item.id === id) || item.claveNombre === claveNombre
+      );
+
+      if (existente) {
+        if (!existente.fotoPerfilUrl && fotoPerfilUrl) existente.fotoPerfilUrl = fotoPerfilUrl;
+        if (!existente.id && id) existente.id = id;
+        return;
+      }
+
+      empleados.push({ id, claveNombre, nombreCompleto: nombre, fotoPerfilUrl });
+    });
+  };
+
+  if (Array.isArray(cita.empleadosAsignadosDetalle)) {
+    cita.empleadosAsignadosDetalle.forEach((empleado) => agregarEmpleado(empleado));
   }
 
   const ids = normalizarIdsEmpleadosAsignados(cita.empleadosAsignados?.length ? cita.empleadosAsignados : cita.empleadoAsignadoId);
   const nombres = obtenerNombresEmpleadosCita(cita);
-  const empleadosPorId = ids
-    .map((id, index) => {
-      const empleado = obtenerEmpleadoAgendaPorId(id);
-      return {
-        id,
-        nombreCompleto: empleado?.nombreCompleto || nombres[index] || cita.empleadoAsignadoNombre || "Empleado",
-        fotoPerfilUrl: empleado?.fotoPerfilUrl || ""
-      };
-    })
-    .filter((empleado) => empleado.id || empleado.nombreCompleto);
+  ids.forEach((id, index) => {
+    const empleado = obtenerEmpleadoAgendaPorId(id);
+    agregarEmpleado({ ...(empleado || {}), id }, nombres[index] || cita.empleadoAsignadoNombre || "Empleado", empleado?.fotoPerfilUrl || "");
+  });
 
-  if (empleadosPorId.length) return empleadosPorId;
+  nombres.forEach((nombre) => agregarEmpleado({}, nombre));
+  normalizarNombresEmpleadosAsignados(cita.atendidoPor).forEach((nombre) => agregarEmpleado({}, nombre));
 
-  return nombres.map((nombre) => ({
-    id: "",
-    nombreCompleto: nombre,
-    fotoPerfilUrl: ""
-  }));
+  return empleados.map(({ claveNombre, ...empleado }) => empleado);
 }
 
 function renderizarEmpleadosAsignadosAgenda(cita = {}) {
@@ -2018,7 +2037,7 @@ function crearCardCita(cita) {
         <div><dt>Teléfono</dt><dd>${escapeHtml(cita.telefono)}</dd></div>
         <div><dt>Servicio</dt><dd>${escapeHtml(formatearServicio(cita.tipoServicio))}</dd></div>
         <div><dt>Zona</dt><dd>${escapeHtml(formatearZonaServicio(cita.zona))}</dd></div>
-        <div><dt>Atiende</dt><dd>${escapeHtml(cita.atendidoPor || formatearEmpleadosCita(cita))}</dd></div>
+        <div><dt>Atiende</dt><dd>${escapeHtml(formatearEmpleadosCita(cita))}</dd></div>
         <div><dt>Empleados</dt><dd>${escapeHtml(formatearEmpleadosCita(cita))}</dd></div>
         <div><dt>Dirección</dt><dd>${escapeHtml(cita.direccion)}</dd></div>
       </dl>
@@ -2060,7 +2079,7 @@ function crearUrlWhatsApp(cita) {
   const mensaje = [
     `Hola ${cita.cliente}, te contactamos de Woof & Wash para confirmar tu cita.`,
     `Servicio: ${crearTextoServiciosDetalle(cita)}.`,
-    cita.atendidoPor ? `Te atendera: ${cita.atendidoPor}.` : "",
+    `Te atendera: ${formatearEmpleadosCita(cita)}.`,
     `Empleados asignados: ${formatearEmpleadosCita(cita)}.`,
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.`,
     `Zona: ${formatearZonaServicio(cita.zona)}.`,
@@ -2074,7 +2093,7 @@ function crearUrlWhatsAppDetalle(cita) {
   const telefono = normalizarTelefonoWhatsApp(cita.telefono);
   if (!telefono) return "#";
   const tipo = cita.tipoServicio === "auto" ? "lavado" : "estética";
-  const atendido = cita.atendidoPor ? ` Te atendera ${cita.atendidoPor}.` : "";
+  const atendido = ` Te atendera ${formatearEmpleadosCita(cita)}.`;
   const empleados = ` Empleados asignados: ${formatearEmpleadosCita(cita)}.`;
   const mensaje = `Hola, soy de Woof & Wash. Te escribimos sobre tu cita de ${tipo} programada para el ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.${atendido}${empleados}\nServicio: ${crearTextoServiciosDetalle(cita)}.`;
 
@@ -2940,7 +2959,7 @@ function renderizarDetalleCita(cita) {
       ${crearItemDetalleAgenda("Fecha", formatearFechaAgenda(cita.fecha))}
       ${crearItemDetalleAgenda("Hora", cita.hora)}
       ${crearItemDetalleAgenda("Zona", formatearZonaServicio(cita.zona))}
-      ${crearItemDetalleAgenda("Atendido por", cita.atendidoPor || formatearEmpleadosCita(cita))}
+      ${crearItemDetalleAgenda("Atendido por", formatearEmpleadosCita(cita))}
       ${crearItemDetalleAgenda("Empleados asignados", formatearEmpleadosCita(cita))}
       ${crearItemDetalleAgenda("Calificación", formatearEstrellasCalificacion(calificacion))}
       ${crearItemDetalleAgenda("Comentario cliente", cita.comentarioCliente || "-")}
@@ -3283,7 +3302,7 @@ function construirResumenCita(cita) {
     `Servicio: ${crearTextoServiciosDetalle(cita)}`,
     ...(cita.tipoServicio === "mascota" ? [`Mascota: ${textoMascota || "Sin datos"}`] : []),
     `Recompensa: ${obtenerTextoRecompensaCita(cita) || "No aplica"}`,
-    `Atiende: ${cita.atendidoPor || "Por asignar"}`,
+    `Atiende: ${formatearEmpleadosCita(cita)}`,
     `Empleados asignados: ${formatearEmpleadosCita(cita)}`,
     `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora || "-"}`,
     `Zona: ${formatearZonaServicio(cita.zona) || "-"}`,

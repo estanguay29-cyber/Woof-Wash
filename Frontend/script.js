@@ -418,8 +418,64 @@ function normalizarCarritoLocal(items) {
   }, []);
 }
 
-let carrito = normalizarCarritoLocal(JSON.parse(localStorage.getItem("carrito")) || []);
-localStorage.setItem("carrito", JSON.stringify(carrito));
+const CART_STORAGE_LEGACY_KEY = "carrito";
+const CART_STORAGE_GUEST_KEY = "woofwash_cart_guest";
+const CART_STORAGE_USER_PREFIX = "woofwash_cart_user_";
+
+function obtenerIdentificadorUsuarioCarrito() {
+  const token = localStorage.getItem("token");
+  if (!tokenDeSesionEsValido(token)) return "";
+
+  const payload = decodificarPayloadJwt(token) || {};
+  const id = payload.userId || payload.id || payload._id || payload.sub || payload.email || "";
+  return String(id || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "_")
+    .slice(0, 96);
+}
+
+function obtenerClaveCarritoActual() {
+  const userId = obtenerIdentificadorUsuarioCarrito();
+  return userId ? `${CART_STORAGE_USER_PREFIX}${userId}` : CART_STORAGE_GUEST_KEY;
+}
+
+function parsearCarritoStorage(key) {
+  try {
+    return normalizarCarritoLocal(JSON.parse(localStorage.getItem(key) || "[]"));
+  } catch {
+    return [];
+  }
+}
+
+function migrarCarritoLegacySiAplica() {
+  const claveActual = obtenerClaveCarritoActual();
+  if (claveActual !== CART_STORAGE_GUEST_KEY) {
+    localStorage.removeItem(CART_STORAGE_LEGACY_KEY);
+    return;
+  }
+
+  const legacyRaw = localStorage.getItem(CART_STORAGE_LEGACY_KEY);
+  if (!legacyRaw) return;
+
+  if (!localStorage.getItem(CART_STORAGE_GUEST_KEY)) {
+    localStorage.setItem(CART_STORAGE_GUEST_KEY, legacyRaw);
+  }
+
+  localStorage.removeItem(CART_STORAGE_LEGACY_KEY);
+}
+
+function leerCarritoActual() {
+  migrarCarritoLegacySiAplica();
+  return parsearCarritoStorage(obtenerClaveCarritoActual());
+}
+
+function limpiarCarritoActual() {
+  localStorage.removeItem(obtenerClaveCarritoActual());
+  localStorage.removeItem(CART_STORAGE_LEGACY_KEY);
+}
+
+let carrito = leerCarritoActual();
 let total = 0;
 let adminValidado = false;
 let tokenAdminValidado = null;
@@ -457,6 +513,7 @@ function guardarNombreUsuario(usuario) {
 function limpiarSesion() {
   localStorage.removeItem("token");
   localStorage.removeItem("usuario");
+  carrito = leerCarritoActual();
 }
 
 function manejarRespuestaAuthCliente(res, data = {}, options = {}) {
@@ -902,7 +959,8 @@ function vaciarCarrito() {
 // GUARDAR
 function guardarCarrito() {
   carrito = normalizarCarritoLocal(carrito);
-  localStorage.setItem("carrito", JSON.stringify(carrito));
+  localStorage.setItem(obtenerClaveCarritoActual(), JSON.stringify(carrito));
+  localStorage.removeItem(CART_STORAGE_LEGACY_KEY);
 }
 
 function crearMensajePedidoWhatsApp() {
@@ -2020,8 +2078,8 @@ async function confirmarEliminarCuenta() {
     }
 
     mostrarMensajeEliminarCuenta(data.message || "Cuenta eliminada correctamente.", "ok");
+    limpiarCarritoActual();
     limpiarSesion();
-    localStorage.removeItem("carrito");
     localStorage.removeItem("direccion");
     localStorage.removeItem("mostrarPedidosAlRegresar");
     localStorage.removeItem("abrirCarritoAlRegresar");

@@ -477,6 +477,20 @@ function obtenerNombreEmpleadoDesdeValor(value) {
   );
 }
 
+function obtenerIdEmpleadoDesdeValor(value) {
+  if (!value || typeof value !== "object") return "";
+  return normalizarTexto(value.id || value._id || value.empleadoAsignadoId || value.userId);
+}
+
+function separarNombresEmpleadoPortal(value) {
+  const nombre = obtenerNombreEmpleadoDesdeValor(value);
+  if (!nombre) return [];
+  return nombre
+    .split(/\s*(?:,|\||\/|;|\by\b)\s*/i)
+    .map((item) => normalizarTexto(item))
+    .filter(Boolean);
+}
+
 function obtenerEmpleadoCita(cita = {}) {
   const empleados = obtenerEmpleadosDetalleCita(cita);
   return empleados.length ? empleados.map((empleado) => empleado.nombre).join(", ") : "Sin asignar";
@@ -495,14 +509,29 @@ function obtenerInicialesEmpleadoPortal(nombre = "") {
 function obtenerEmpleadosDetalleCita(cita = {}) {
   const empleados = [];
   const agregarEmpleado = (value, fotoPerfilUrl = "") => {
-    const nombre = obtenerNombreEmpleadoDesdeValor(value);
-    if (!nombre || nombre === "Sin asignar") return;
-    const clave = normalizarTexto(nombre).toLowerCase();
-    if (empleados.some((empleado) => empleado.clave === clave)) return;
-    empleados.push({
-      clave,
-      nombre,
-      fotoPerfilUrl: normalizarTexto(value?.fotoPerfilUrl || fotoPerfilUrl)
+    const id = obtenerIdEmpleadoDesdeValor(value);
+    const nombres = separarNombresEmpleadoPortal(value);
+    const foto = normalizarTexto(value?.fotoPerfilUrl || fotoPerfilUrl);
+
+    nombres.forEach((nombre) => {
+      if (!nombre || nombre === "Sin asignar") return;
+      const claveNombre = normalizarTexto(nombre).toLowerCase();
+      const existente = empleados.find((empleado) =>
+        (id && empleado.id === id) || empleado.claveNombre === claveNombre
+      );
+
+      if (existente) {
+        if (!existente.fotoPerfilUrl && foto) existente.fotoPerfilUrl = foto;
+        if (!existente.id && id) existente.id = id;
+        return;
+      }
+
+      empleados.push({
+        id,
+        claveNombre,
+        nombre,
+        fotoPerfilUrl: foto
+      });
     });
   };
 
@@ -522,7 +551,7 @@ function obtenerEmpleadosDetalleCita(cita = {}) {
   agregarEmpleado(cita.atendidoPor);
   agregarEmpleado(cita.empleado);
 
-  return empleados.map(({ clave, ...empleado }) => empleado);
+  return empleados.map(({ claveNombre, ...empleado }) => empleado);
 }
 
 function obtenerEmpleadoDetalleCita(cita = {}) {

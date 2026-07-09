@@ -107,7 +107,32 @@ function verPedidos() {
   window.location.href = "index.html";
 }
 
+function decodificarPayloadJwtSuccess(tokenValue) {
+  if (typeof tokenValue !== "string") return null;
+  const partes = tokenValue.split(".");
+  if (partes.length !== 3) return null;
+  try {
+    const base64 = partes[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    return JSON.parse(atob(base64 + padding));
+  } catch {
+    return null;
+  }
+}
+
+function obtenerClaveCarritoSuccess() {
+  const token = localStorage.getItem("token");
+  const payload = decodificarPayloadJwtSuccess(token) || {};
+  const id = String(payload.userId || payload.id || payload._id || payload.sub || payload.email || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "_")
+    .slice(0, 96);
+  return id ? `woofwash_cart_user_${id}` : "woofwash_cart_guest";
+}
+
 function limpiarCompraFinalizada() {
+  localStorage.removeItem(obtenerClaveCarritoSuccess());
   localStorage.removeItem("carrito");
   localStorage.removeItem("direccion");
   localStorage.removeItem("abrirCarritoAlRegresar");
