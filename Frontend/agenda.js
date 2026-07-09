@@ -1477,6 +1477,61 @@ function renderizarAvatarEmpleadoAgenda(empleado = {}, size = "md") {
   return `<span class="agenda-employee-avatar ${sizeClass}" aria-hidden="true">${escapeHtml(obtenerInicialesEmpleadoAgenda(empleado))}</span>`;
 }
 
+function obtenerEmpleadosDetalleCitaAgenda(cita = {}) {
+  const detalles = Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : [];
+  if (detalles.length) {
+    return detalles
+      .map((empleado) => ({
+        id: String(empleado.id || empleado._id || ""),
+        nombreCompleto: empleado.nombreCompleto || empleado.nombre || "Empleado",
+        fotoPerfilUrl: empleado.fotoPerfilUrl || ""
+      }))
+      .filter((empleado) => empleado.id || empleado.nombreCompleto);
+  }
+
+  const ids = normalizarIdsEmpleadosAsignados(cita.empleadosAsignados?.length ? cita.empleadosAsignados : cita.empleadoAsignadoId);
+  const nombres = obtenerNombresEmpleadosCita(cita);
+  const empleadosPorId = ids
+    .map((id, index) => {
+      const empleado = obtenerEmpleadoAgendaPorId(id);
+      return {
+        id,
+        nombreCompleto: empleado?.nombreCompleto || nombres[index] || cita.empleadoAsignadoNombre || "Empleado",
+        fotoPerfilUrl: empleado?.fotoPerfilUrl || ""
+      };
+    })
+    .filter((empleado) => empleado.id || empleado.nombreCompleto);
+
+  if (empleadosPorId.length) return empleadosPorId;
+
+  return nombres.map((nombre) => ({
+    id: "",
+    nombreCompleto: nombre,
+    fotoPerfilUrl: ""
+  }));
+}
+
+function renderizarEmpleadosAsignadosAgenda(cita = {}) {
+  const empleados = obtenerEmpleadosDetalleCitaAgenda(cita);
+
+  if (!empleados.length) {
+    return `
+      <div class="agenda-assigned-employees is-unassigned">
+        <span class="agenda-employee-avatar agenda-employee-avatar-sm" aria-hidden="true">WW</span>
+        <span><small>Empleado asignado</small><strong>Sin asignar</strong></span>
+      </div>
+    `;
+  }
+
+  const etiqueta = empleados.length > 1 ? "Empleados asignados" : "Empleado asignado";
+  return `
+    <div class="agenda-assigned-employees">
+      ${empleados.map((empleado) => renderizarAvatarEmpleadoAgenda(empleado, "sm")).join("")}
+      <span><small>${escapeHtml(etiqueta)}</small><strong>${escapeHtml(empleados.map((empleado) => empleado.nombreCompleto).join(", "))}</strong></span>
+    </div>
+  `;
+}
+
 async function cargarEmpleadosAgenda() {
   try {
     const elementos = obtenerElementosAgenda();
@@ -1703,6 +1758,7 @@ function mapearCitaApi(cita) {
     empleadoAsignadoNombre: empleadosAsignadosNombres[0] || "",
     empleadosAsignados,
     empleadosAsignadosNombres,
+    empleadosAsignadosDetalle: Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : [],
     estadoOperativo: cita.estadoOperativo || "pendiente",
     calificacionCliente: Number(cita.calificacionCliente) || null,
     comentarioCliente: cita.comentarioCliente || "",
@@ -1947,6 +2003,7 @@ function crearCardCita(cita) {
           <h3>${escapeHtml(cita.cliente)}</h3>
           <p>${escapeHtml(resumenServicios)}</p>
           ${listaServicios}
+          ${renderizarEmpleadosAsignadosAgenda(cita)}
         </div>
         <div class="agenda-appointment-time">
           <strong>${escapeHtml(cita.hora)}</strong>
@@ -1957,7 +2014,7 @@ function crearCardCita(cita) {
         <div><dt>Teléfono</dt><dd>${escapeHtml(cita.telefono)}</dd></div>
         <div><dt>Servicio</dt><dd>${escapeHtml(formatearServicio(cita.tipoServicio))}</dd></div>
         <div><dt>Zona</dt><dd>${escapeHtml(formatearZonaServicio(cita.zona))}</dd></div>
-        <div><dt>Atiende</dt><dd>${escapeHtml(cita.atendidoPor || "Por asignar")}</dd></div>
+        <div><dt>Atiende</dt><dd>${escapeHtml(cita.atendidoPor || formatearEmpleadosCita(cita))}</dd></div>
         <div><dt>Empleados</dt><dd>${escapeHtml(formatearEmpleadosCita(cita))}</dd></div>
         <div><dt>Dirección</dt><dd>${escapeHtml(cita.direccion)}</dd></div>
       </dl>
@@ -2292,6 +2349,16 @@ function normalizarCalificacionServicio(value) {
   return Number.isInteger(numero) && numero >= 1 && numero <= 5 ? numero : null;
 }
 
+function mostrarExitoAgenda(mensaje) {
+  try {
+    if (typeof window.mostrarExito === "function") {
+      window.mostrarExito(mensaje).catch?.(() => {});
+    }
+  } catch (error) {
+    // La animacion de exito es decorativa; nunca debe romper la accion completada.
+  }
+}
+
 function formatearEstrellasCalificacion(value) {
   const calificacion = normalizarCalificacionServicio(value);
   if (!calificacion) return "Sin calificación";
@@ -2544,6 +2611,7 @@ async function crearCitaDesdeFormulario(event) {
     await actualizarDisponibilidadCrear();
     await cargarCitasAgenda();
     await cargarStatsAgenda();
+    mostrarExitoAgenda("Cita registrada con \u00e9xito");
   } catch (error) {
     alert(error.message);
   } finally {
@@ -2688,6 +2756,7 @@ async function guardarEdicionCita(event) {
     cerrarModalEdicion();
     await cargarCitasAgenda();
     await cargarStatsAgenda();
+    mostrarExitoAgenda("Cita editada con \u00e9xito");
   } catch (error) {
     alert(error.message);
   } finally {
@@ -2844,6 +2913,7 @@ function renderizarDetalleCita(cita) {
       ${listaServicios}
     </div>
     ${miniCardsServicios}
+    ${renderizarEmpleadosAsignadosAgenda(cita)}
     <dl class="agenda-detail-grid">
       ${crearItemDetalleAgenda("Cliente", cita.cliente)}
       ${crearItemDetalleAgenda("Teléfono", cita.telefono)}
@@ -2853,7 +2923,7 @@ function renderizarDetalleCita(cita) {
       ${crearItemDetalleAgenda("Fecha", formatearFechaAgenda(cita.fecha))}
       ${crearItemDetalleAgenda("Hora", cita.hora)}
       ${crearItemDetalleAgenda("Zona", formatearZonaServicio(cita.zona))}
-      ${crearItemDetalleAgenda("Atendido por", cita.atendidoPor || "Por asignar")}
+      ${crearItemDetalleAgenda("Atendido por", cita.atendidoPor || formatearEmpleadosCita(cita))}
       ${crearItemDetalleAgenda("Empleados asignados", formatearEmpleadosCita(cita))}
       ${crearItemDetalleAgenda("Calificación", formatearEstrellasCalificacion(calificacion))}
       ${crearItemDetalleAgenda("Comentario cliente", cita.comentarioCliente || "-")}
@@ -3166,6 +3236,7 @@ async function guardarCalificacionDesdeDetalle() {
     await cargarCitasAgenda();
     const citaActualizada = citasAgenda.find((item) => item.id === cita.id);
     if (citaActualizada) renderizarDetalleCita(citaActualizada);
+    mostrarExitoAgenda("Calificaci\u00f3n registrada con \u00e9xito");
     mostrarFeedbackDetalle("Calificación guardada.");
   } catch (error) {
     mostrarFeedbackDetalle(error.message);

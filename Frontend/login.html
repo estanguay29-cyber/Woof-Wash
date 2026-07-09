@@ -144,6 +144,7 @@
     </section>
   </main>
 
+<script src="success-toast.js"></script>
 <script>
 const form = document.getElementById("loginForm");
 const mensajeDiv = document.getElementById("mensaje");
@@ -233,6 +234,19 @@ function ocultarAvisoUsuario() {
   usuarioAyuda.classList.add("hidden");
 }
 
+async function mostrarExitoLoginSeguro(mensaje) {
+  if (typeof window.mostrarExito !== "function") return;
+
+  try {
+    await Promise.race([
+      window.mostrarExito(mensaje),
+      new Promise((resolve) => window.setTimeout(resolve, 1900))
+    ]);
+  } catch (error) {
+    // El toast no debe bloquear ni cambiar la redireccion por rol.
+  }
+}
+
 function togglePassword(inputId, button) {
   const input = document.getElementById(inputId);
   const eyeOpen = button.querySelector(".eye-open");
@@ -314,6 +328,7 @@ form.addEventListener("submit", async (e) => {
 
       const destino = obtenerDestinoPorRole(data.role);
       localStorage.removeItem("authRedirect");
+      await mostrarExitoLoginSeguro("Inicio de sesi\u00f3n exitoso");
       window.location.href = destino;
       return;
     }

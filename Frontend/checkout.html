@@ -48,9 +48,9 @@
             <span class="inline-flex items-center gap-2 rounded-full border border-[#8cc63f]/25 bg-[#8cc63f]/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.28em] text-[#5c8d17]">
               Entrega segura
             </span>
-            <h2 class="mt-4 text-3xl font-black tracking-tight text-[#0b2a6b]">Datos de entrega</h2>
+            <h2 class="mt-4 text-3xl font-black tracking-tight text-[#0b2a6b]">Pedido por WhatsApp</h2>
             <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-              Completa tu información para preparar tu pedido y enviarte al pago de forma segura.
+              Las compras en linea estan pausadas temporalmente. Puedes enviarnos tu carrito por WhatsApp para coordinar la entrega.
             </p>
           </div>
 
@@ -94,8 +94,12 @@
                 <path d="M5 12h14" />
                 <path d="m12 5 7 7-7 7" />
               </svg>
-              Continuar al pago
+              Compras en linea proximamente
             </button>
+
+            <a id="checkoutWhatsAppLink" href="#" target="_blank" rel="noopener noreferrer" class="hidden w-full items-center justify-center rounded-2xl bg-[#8cc63f] px-5 py-3.5 text-center text-sm font-bold text-white shadow-[0_18px_35px_rgba(140,198,63,0.28)] transition hover:-translate-y-0.5 hover:bg-[#7bb631]">
+              Pedir por WhatsApp
+            </a>
 
             <p id="mensaje" class="text-center text-sm font-semibold"></p>
           </form>
@@ -106,7 +110,7 @@
             <div class="flex items-start justify-between gap-4">
               <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.34em] text-white/80">Resumen</p>
-                <h3 class="mt-2 text-2xl font-black">Pago confiable</h3>
+                <h3 class="mt-2 text-2xl font-black">Compra en linea proximamente</h3>
               </div>
               <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-[#8cc63f]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -118,8 +122,8 @@
 
             <div class="mt-6 space-y-4 text-sm text-white/90">
               <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-4">
-                <p class="font-semibold text-white">Tu compra sigue este proceso</p>
-                <p class="mt-1 leading-6 text-white/85">Capturamos tus datos de entrega, te enviamos al pago y conservamos tu dirección para futuras compras.</p>
+                <p class="font-semibold text-white">Estamos preparando esta funcion</p>
+                <p class="mt-1 leading-6 text-white/85">Por ahora no procesamos pagos desde la pagina. Te ayudamos por WhatsApp y coordinamos tu pedido para tu proxima cita.</p>
               </div>
               <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                 <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-3">
@@ -128,7 +132,7 @@
                 </div>
                 <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-3">
                   <p class="text-xs uppercase tracking-[0.28em] text-white/75">Paso 2</p>
-                  <p class="mt-1 font-semibold text-white">Pago seguro</p>
+                  <p class="mt-1 font-semibold text-white">WhatsApp</p>
                 </div>
                 <div class="rounded-2xl border border-white/20 bg-white/14 px-4 py-3">
                   <p class="text-xs uppercase tracking-[0.28em] text-white/75">Paso 3</p>
@@ -147,11 +151,11 @@
               </li>
               <li class="flex gap-3">
                 <span class="mt-1 h-2.5 w-2.5 rounded-full bg-[#0b2a6b]"></span>
-                Si ya compraste antes, tus datos se cargarán automáticamente.
+                Si ya nos escribiste antes, tus datos pueden ayudarte a coordinar mas rapido.
               </li>
               <li class="flex gap-3">
                 <span class="mt-1 h-2.5 w-2.5 rounded-full bg-[#f59e0b]"></span>
-                Al continuar, serás redirigido al proveedor de pago correspondiente.
+                Mientras tanto, coordinamos el pedido directamente por WhatsApp.
               </li>
             </ul>
           </div>
@@ -180,6 +184,10 @@ const carrito = (JSON.parse(localStorage.getItem("carrito")) || []).reduce((acc,
 localStorage.setItem("carrito", JSON.stringify(carrito));
 const form = document.getElementById("checkoutForm");
 const mensaje = document.getElementById("mensaje");
+const checkoutWhatsAppLink = document.getElementById("checkoutWhatsAppLink");
+// Cambiar a true cuando Stripe/compras en linea queden listos para produccion.
+const COMPRAS_EN_LINEA_HABILITADAS = false;
+const WHATSAPP_PEDIDOS_PRODUCTOS_URL = "https://wa.me/523337276934?text=";
 
 const API_URL = "https://woof-wash.onrender.com";
 
@@ -196,12 +204,59 @@ function obtenerApiBase() {
 
   return API_URL;
 }
-if (!token) {
+function crearMensajePedidoWhatsApp() {
+  const lineas = carrito.map((item) => {
+    const producto = PRODUCTOS_CATALOGO[item.id];
+    return producto ? `* ${producto.nombre} x${item.cantidad}` : "";
+  }).filter(Boolean);
+  const totalEstimado = carrito.reduce((acc, item) => {
+    const producto = PRODUCTOS_CATALOGO[item.id];
+    return acc + (producto ? producto.precio * item.cantidad : 0);
+  }, 0);
+
+  return [
+    "Hola, quiero pedir estos productos de Woof & Wash para mi próxima cita:",
+    "",
+    ...lineas,
+    "",
+    `Total estimado: $${totalEstimado} MXN`,
+    "",
+    "Entiendo que por ahora los pedidos de productos no se completan desde la página. ¿Me pueden ayudar a coordinarlo por WhatsApp para entrega en mi próxima cita?"
+  ].join("\n");
+}
+
+function mostrarComprasPausadas() {
+  const submitButton = form?.querySelector("button[type='submit']");
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.classList.add("opacity-60", "cursor-not-allowed");
+    submitButton.textContent = "Compras en linea proximamente";
+  }
+  if (checkoutWhatsAppLink) {
+    if (carrito.length) {
+      checkoutWhatsAppLink.href = `${WHATSAPP_PEDIDOS_PRODUCTOS_URL}${encodeURIComponent(crearMensajePedidoWhatsApp())}`;
+      checkoutWhatsAppLink.classList.remove("hidden");
+      checkoutWhatsAppLink.classList.add("inline-flex");
+    } else {
+      checkoutWhatsAppLink.href = "#";
+      checkoutWhatsAppLink.classList.add("hidden");
+      checkoutWhatsAppLink.classList.remove("inline-flex");
+    }
+  }
+  mensaje.textContent = carrito.length
+    ? "Por el momento las compras en linea no estan habilitadas. Estamos preparando esta funcion para que puedas comprar desde la pagina muy pronto. Mientras tanto, puedes pedir tus productos por WhatsApp y te los llevamos en tu proxima cita."
+    : "Por el momento las compras en linea no estan habilitadas. Tu carrito esta vacio; vuelve a la tienda para agregar productos y pedirlos por WhatsApp.";
+  mensaje.className = "rounded-2xl border border-[#8cc63f]/30 bg-[#fffae8] px-4 py-4 text-center text-sm font-semibold leading-6 text-[#0b2a6b]";
+}
+
+if (!COMPRAS_EN_LINEA_HABILITADAS) {
+  mostrarComprasPausadas();
+} else if (!token) {
   localStorage.setItem("authRedirect", "checkout.html");
   window.location.href = "login.html";
 }
 
-if (!carrito.length) {
+if (COMPRAS_EN_LINEA_HABILITADAS && !carrito.length) {
   window.location.href = "index.html";
 }
 
@@ -246,6 +301,11 @@ if (direccionGuardada) {
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+
+  if (!COMPRAS_EN_LINEA_HABILITADAS) {
+    mostrarComprasPausadas();
+    return;
+  }
 
   const datos = {
     nombre: document.getElementById("nombre").value.trim(),

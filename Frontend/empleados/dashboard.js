@@ -130,6 +130,43 @@ function renderAvatarPerfilEmpleado(empleado = {}) {
   }
 }
 
+function renderAvatarEmpleadoInline(empleado = {}) {
+  const nombre = empleado.nombre || empleado.nombreCompleto || empleado.email || "Empleado";
+  const foto = String(empleado.fotoPerfilUrl || "").trim();
+
+  if (foto) {
+    return `<span class="appointment-employee-avatar"><img src="${escapeHtml(foto)}" alt="${escapeHtml(nombre)}"></span>`;
+  }
+
+  return `<span class="appointment-employee-avatar" aria-hidden="true">${escapeHtml(obtenerInicialesEmpleado(empleado))}</span>`;
+}
+
+function obtenerEmpleadoCitaEmpleado(cita = {}) {
+  const detalles = Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : [];
+  const detalleActual = detalles.find((empleado) => String(empleado.id || empleado._id || "") === String(empleadoPerfilActual?.id || "")) || detalles[0];
+  return {
+    ...(empleadoPerfilActual || {}),
+    ...(detalleActual || {}),
+    nombre: detalleActual?.nombreCompleto || empleadoPerfilActual?.nombre || empleadoPerfilActual?.nombreCompleto || "Tu servicio asignado",
+    fotoPerfilUrl: detalleActual?.fotoPerfilUrl || empleadoPerfilActual?.fotoPerfilUrl || ""
+  };
+}
+
+function renderEmpleadoAsignadoEmpleado(cita = {}) {
+  const empleado = obtenerEmpleadoCitaEmpleado(cita);
+  const nombre = empleado.nombre || empleado.nombreCompleto || "Tu servicio asignado";
+
+  return `
+    <div class="appointment-employee-card">
+      ${renderAvatarEmpleadoInline(empleado)}
+      <span>
+        <small>Cita asignada a</small>
+        <strong>${escapeHtml(nombre)}</strong>
+      </span>
+    </div>
+  `;
+}
+
 function setEstadoFotoEmpleado(message, isError = false) {
   const status = document.getElementById("employeePhotoStatus");
   if (!status) return;
@@ -523,6 +560,7 @@ function renderCitas(citas = [], fecha = fechaLocalISO()) {
         </div>
         <h3>${escapeHtml(cita.clienteNombre || "Cliente")}</h3>
         <p>${escapeHtml(descripcion)}</p>
+        ${renderEmpleadoAsignadoEmpleado(cita)}
         <div class="appointment-meta">
           <span class="appointment-total">${escapeHtml(formatoMoneda(cita.totalCobrado))}</span>
           ${cita.direccion ? `<p>${escapeHtml(cita.direccion)}</p>` : ""}

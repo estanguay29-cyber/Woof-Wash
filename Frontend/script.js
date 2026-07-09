@@ -2,6 +2,9 @@ const CATALOGO_PRODUCTOS_MASCOTAS = Object.freeze(window.WoofWashProductos?.masc
 const CATALOGO_PRODUCTOS_AUTO = Object.freeze(window.WoofWashProductos?.autoGroups || []);
 const PRODUCTOS_CATALOGO = Object.freeze(window.WoofWashProductos?.catalogo || {});
 const PRODUCTOS_POR_NOMBRE = Object.freeze(window.WoofWashProductos?.porNombre || {});
+// Cambiar a true cuando Stripe/compras en linea queden listos para produccion.
+const COMPRAS_EN_LINEA_HABILITADAS = false;
+const WHATSAPP_PEDIDOS_PRODUCTOS_URL = "https://wa.me/523337276934?text=";
 const productoMascotaTimers = new Map();
 const productoMascotaResumeTimers = new Map();
 let selectorVarianteProductoState = null;
@@ -188,7 +191,13 @@ function crearCardProductoMascota(producto, index) {
   const variantes = obtenerVariantesProductoMascota(producto);
   const inicial = variantes[0];
   const badge = index === 0 ? `<div class="absolute top-3 right-3 z-10 bg-[#8cc63f] text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-sm">NUEVO</div>` : "";
-  const terminosBusqueda = [producto.nombre, ...variantes.map((variante) => variante.nombre), ...variantes.map((variante) => variante.etiqueta || "")]
+  const terminosBusqueda = [
+    producto.nombre,
+    producto.categoria || "",
+    producto.descripcion || "",
+    ...variantes.map((variante) => variante.nombre),
+    ...variantes.map((variante) => variante.etiqueta || "")
+  ]
     .join(" ")
     .toLowerCase();
 
@@ -373,7 +382,20 @@ function renderizarProductosAuto() {
   const slider = document.getElementById("sliderAutos");
   if (!slider) return;
 
-  slider.innerHTML = obtenerCatalogoAutoActual().map(crearCardProductoAuto).join("");
+  const productosAuto = obtenerCatalogoAutoActual();
+
+  if (!productosAuto.length) {
+    slider.innerHTML = `
+      <div class="w-full rounded-3xl border border-[#0b2a6b]/10 bg-[#fffae8] px-6 py-8 text-center shadow-[0_18px_45px_rgba(11,42,107,0.10)]">
+        <span class="inline-flex items-center rounded-full bg-[#8cc63f]/15 px-4 py-2 text-xs font-extrabold uppercase tracking-[0.22em] text-[#5f921f]">Proximamente</span>
+        <h3 class="mt-4 text-2xl font-extrabold text-[#0b2a6b]">Pronto tendremos productos para el cuidado de tus autos.</h3>
+        <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">Estamos preparando una linea especial para que tu auto tambien luzca increible despues de cada servicio.</p>
+      </div>
+    `;
+    return;
+  }
+
+  slider.innerHTML = productosAuto.map(crearCardProductoAuto).join("");
 }
 
 function normalizarCarritoLocal(items) {
@@ -552,6 +574,120 @@ function renderizarAccesosCuenta() {
   }
 }
 
+function escaparHtmlCuenta(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function obtenerAccionesCuentaSesion() {
+  const token = obtenerTokenValido();
+  const rol = obtenerRolSesion();
+
+  if (!token) {
+    return [
+      { tipo: "link", label: "Crear cuenta", href: "register.html", estilo: "primary" },
+      { tipo: "link", label: "Iniciar sesi&oacute;n", href: "login.html", estilo: "secondary" }
+    ];
+  }
+
+  const acciones = [];
+
+  if (rol === "cliente") {
+    acciones.push({ tipo: "link", label: "Mi portal", href: "cliente/portal.html", estilo: "portal" });
+  }
+
+  if (rol === "empleado") {
+    acciones.push({ tipo: "link", label: "Mi portal", href: "empleados/dashboard.html", estilo: "portal" });
+  }
+
+  if (rol === "admin" && adminValidado) {
+    acciones.push(
+      { tipo: "link", label: "Panel de agenda", href: "agenda.html", estilo: "portal" },
+      { tipo: "link", label: "Panel de admin", href: "admin.html", estilo: "portal" },
+      { tipo: "link", label: "Portal empleados", href: "empleados/portal.html", estilo: "portal" }
+    );
+  }
+
+  acciones.push(
+    { tipo: "button", label: "Cerrar sesi&oacute;n", action: "logout", estilo: "secondary" },
+    { tipo: "button", label: "Eliminar cuenta", action: "delete", estilo: "danger" }
+  );
+
+  return acciones;
+}
+
+function obtenerIconoCuentaAccion(accion = {}) {
+  if (accion.action === "logout") {
+    return '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h5a2 2 0 012 2v1"/></svg>';
+  }
+
+  if (accion.action === "delete") {
+    return '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3M4 7h16"/></svg>';
+  }
+
+  if (accion.href === "register.html") {
+    return '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3M12 14c3.314 0 6 1.343 6 3v1H6v-1c0-1.657 2.686-3 6-3zm0-2a4 4 0 100-8 4 4 0 000 8z"/></svg>';
+  }
+
+  if (accion.href === "login.html") {
+    return '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14M5 4h6a2 2 0 012 2v2"/></svg>';
+  }
+
+  return '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M7 14h10M9 18h6"/></svg>';
+}
+
+function renderizarBotonCuentaAccion(accion, contexto) {
+  const clase = `account-nav-action account-nav-action-${accion.estilo || "secondary"}`;
+  const cerrarMobile = contexto === "mobile" ? "toggleMenu();" : "";
+  const icono = `<span class="account-nav-action-icon" aria-hidden="true">${obtenerIconoCuentaAccion(accion)}</span>`;
+  const label = `<span>${accion.label}</span>`;
+
+  if (accion.tipo === "link") {
+    const preparaAuth = ["login.html", "register.html"].includes(accion.href) ? "guardarRetornoAuth();" : "";
+    const cierraMobile = contexto === "mobile" ? "toggleMenu();" : "";
+    return `<a href="${escaparHtmlCuenta(accion.href)}" class="${clase}" onclick="${preparaAuth}${cierraMobile}">${icono}${label}</a>`;
+  }
+
+  const handler = accion.action === "delete"
+    ? `${cerrarMobile}eliminarCuenta()`
+    : `${cerrarMobile}logout()`;
+  return `<button type="button" class="${clase}" onclick="${handler}">${icono}${label}</button>`;
+}
+
+function renderizarNavegacionCuenta() {
+  const acciones = obtenerAccionesCuentaSesion();
+  const token = obtenerTokenValido();
+  const rol = obtenerRolSesion();
+  const usuario = obtenerNombreGuardado();
+  const mobileAccountNav = document.getElementById("mobileAccountNav");
+  const desktopAccountMenu = document.getElementById("desktopAccountMenu");
+  const desktopAccountLabel = document.getElementById("desktopAccountLabel");
+  const desktopAccountTrigger = document.getElementById("desktopAccountTrigger");
+
+  if (mobileAccountNav) {
+    mobileAccountNav.innerHTML = acciones.map((accion) => renderizarBotonCuentaAccion(accion, "mobile")).join("");
+  }
+
+  if (desktopAccountMenu) {
+    const estado = token
+      ? `<div class="desktop-account-status"><span>${escaparHtmlCuenta(usuario || "Usuario")}</span><small>${escaparHtmlCuenta(rol || "cuenta")}</small></div>`
+      : '<div class="desktop-account-status"><span>Tu cuenta</span><small>Acceso Woof & Wash</small></div>';
+    desktopAccountMenu.innerHTML = `${estado}${acciones.map((accion) => renderizarBotonCuentaAccion(accion, "desktop")).join("")}`;
+  }
+
+  if (desktopAccountLabel) {
+    desktopAccountLabel.textContent = token ? "Cuenta" : "Entrar";
+  }
+
+  if (desktopAccountTrigger) {
+    desktopAccountTrigger.setAttribute("aria-expanded", desktopAccountMenu && !desktopAccountMenu.classList.contains("hidden") ? "true" : "false");
+  }
+}
+
 async function validarAccesosAdmin() {
   const token = obtenerTokenValido();
   const rolLocal = obtenerRolSesion();
@@ -561,21 +697,25 @@ async function validarAccesosAdmin() {
     adminValidado = false;
     tokenAdminValidado = null;
     renderizarAccesosAdmin(false);
+    renderizarNavegacionCuenta();
     return false;
   }
 
   if (tokenAdminValidado === token) {
     renderizarAccesosAdmin(adminValidado);
+    renderizarNavegacionCuenta();
     return adminValidado;
   }
 
-  adminValidado = rolLocal === "admin";
+  adminValidado = false;
   tokenAdminValidado = token;
-  renderizarAccesosAdmin(adminValidado);
+  renderizarAccesosAdmin(false);
+  renderizarNavegacionCuenta();
 
   if (rolLocal !== "admin") {
     adminValidado = false;
     renderizarAccesosAdmin(false);
+    renderizarNavegacionCuenta();
     return false;
   }
 
@@ -593,15 +733,18 @@ async function validarAccesosAdmin() {
       }
       adminValidado = false;
       renderizarAccesosAdmin(false);
+      renderizarNavegacionCuenta();
       return false;
     }
 
     adminValidado = data?.role === "admin";
     renderizarAccesosAdmin(adminValidado);
+    renderizarNavegacionCuenta();
     return adminValidado;
   } catch {
     adminValidado = false;
     renderizarAccesosAdmin(false);
+    renderizarNavegacionCuenta();
     return false;
   }
 }
@@ -648,6 +791,22 @@ function sincronizarVisibilidadChat() {
   chat.classList.toggle("hidden", carritoAbierto);
 }
 
+function sincronizarBloqueoScrollOverlay() {
+  const carritoPanel = document.getElementById("carritoPanel");
+  const modalZonas = document.getElementById("modalZonas");
+  const menuMobile = document.getElementById("menuMobile");
+  const selectorVariante = document.getElementById("productVariantModal");
+
+  const hayOverlayAbierto = [
+    carritoPanel && !carritoPanel.classList.contains("translate-x-full"),
+    modalZonas && !modalZonas.classList.contains("pointer-events-none"),
+    menuMobile && !menuMobile.classList.contains("-translate-x-full"),
+    selectorVariante && !selectorVariante.classList.contains("hidden")
+  ].some(Boolean);
+
+  document.body.classList.toggle("overflow-hidden", hayOverlayAbierto);
+}
+
 // ABRIR / CERRAR
 function toggleCarrito() {
   const panel = document.getElementById("carritoPanel");
@@ -658,9 +817,9 @@ function toggleCarrito() {
   panel.classList.toggle("translate-x-full");
   overlay.classList.toggle("opacity-0");
   overlay.classList.toggle("pointer-events-none");
-  document.body.classList.toggle("overflow-hidden");
   cerrarMenuCuenta();
   sincronizarVisibilidadChat();
+  sincronizarBloqueoScrollOverlay();
 }
 // ANIMACION
 function animacionAgregar() {
@@ -746,6 +905,34 @@ function guardarCarrito() {
   localStorage.setItem("carrito", JSON.stringify(carrito));
 }
 
+function crearMensajePedidoWhatsApp() {
+  const lineas = carrito.map((item) => {
+    const producto = obtenerProductoPorId(item.id);
+    if (!producto) return "";
+    return `* ${producto.nombre} x${item.cantidad}`;
+  }).filter(Boolean);
+
+  const totalEstimado = carrito.reduce((acc, item) => {
+    const producto = obtenerProductoPorId(item.id);
+    return acc + (producto ? producto.precio * item.cantidad : 0);
+  }, 0);
+
+  return [
+    "Hola, quiero pedir estos productos de Woof & Wash para mi próxima cita:",
+    "",
+    ...lineas,
+    "",
+    `Total estimado: $${totalEstimado} MXN`,
+    "",
+    "Entiendo que por ahora los pedidos de productos no se completan desde la página. ¿Me pueden ayudar a coordinarlo por WhatsApp para entrega en mi próxima cita?"
+  ].join("\n");
+}
+
+function abrirPedidoWhatsApp() {
+  if (!carrito.length) return;
+  window.open(`${WHATSAPP_PEDIDOS_PRODUCTOS_URL}${encodeURIComponent(crearMensajePedidoWhatsApp())}`, "_blank", "noopener,noreferrer");
+}
+
 function obtenerToken() {
   return localStorage.getItem("token");
 }
@@ -803,6 +990,7 @@ function actualizarCarrito() {
   const contadorMini = document.getElementById("contadorCarritoMini");
   const btnWhats = document.getElementById("btnWhats");
   const btnVaciar = document.getElementById("btnVaciar");
+  const cartCheckoutNotice = document.getElementById("cartCheckoutNotice");
   const cuentaBox = document.getElementById("cuentaBox");
 const menuCuentaUsuario = document.getElementById("menuCuentaUsuario");
   const eliminarCuentaPanel = document.getElementById("eliminarCuentaPanel");
@@ -821,6 +1009,8 @@ const menuCuentaUsuario = document.getElementById("menuCuentaUsuario");
   if (authButtons) {
     authButtons.classList.toggle("hidden", !!token);
   }
+
+  renderizarNavegacionCuenta();
 
   if (cuentaBox) {
   cuentaBox.classList.toggle("hidden", !token);
@@ -871,6 +1061,7 @@ if (carrito.length === 0) {
 
   if (btnVaciar) btnVaciar.classList.add("hidden");
   if (btnWhats) btnWhats.classList.add("hidden");
+  if (cartCheckoutNotice) cartCheckoutNotice.classList.add("hidden");
 
   if (authButtons) {
     if (token) {
@@ -889,6 +1080,9 @@ if (carrito.length === 0) {
 
   // CARRITO CON PRODUCTOS
   if (btnVaciar) btnVaciar.classList.remove("hidden");
+  if (cartCheckoutNotice) {
+    cartCheckoutNotice.classList.toggle("hidden", COMPRAS_EN_LINEA_HABILITADAS);
+  }
 
   carrito.forEach(item => {
     const producto = obtenerProductoPorId(item.id);
@@ -932,7 +1126,17 @@ if (carrito.length === 0) {
   }
 
   // LOGIN / CHECKOUT
-  if (token) {
+  if (!COMPRAS_EN_LINEA_HABILITADAS) {
+    if (authButtons) authButtons.classList.add("hidden");
+    if (nombreUsuario) {
+      nombreUsuario.innerText = "Por el momento las compras en linea no estan habilitadas. Pide tus productos por WhatsApp.";
+    }
+    if (btnWhats) {
+      btnWhats.classList.remove("hidden");
+      btnWhats.innerText = "Pedir por WhatsApp";
+      btnWhats.onclick = abrirPedidoWhatsApp;
+    }
+  } else if (token) {
     if (authButtons) authButtons.classList.add("hidden");
 
     if (btnWhats) {
@@ -1154,14 +1358,37 @@ function toggleMenu() {
 
   if (isOpen) {
     menu.classList.add("-translate-x-full");
-    document.body.classList.remove("overflow-hidden");
   } else {
+    renderizarNavegacionCuenta();
+    validarAccesosAdmin();
     menu.classList.remove("-translate-x-full");
-    document.body.classList.add("overflow-hidden");
+  }
+
+  sincronizarBloqueoScrollOverlay();
+}
+
+function obtenerDiaSemanaMexicoPublico(fecha = new Date()) {
+  try {
+    const dia = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      timeZone: "America/Mexico_City"
+    }).format(fecha).slice(0, 3).toLowerCase();
+
+    return {
+      sun: 0,
+      mon: 1,
+      tue: 2,
+      wed: 3,
+      thu: 4,
+      fri: 5,
+      sat: 6
+    }[dia] ?? fecha.getDay();
+  } catch (error) {
+    return fecha.getDay();
   }
 }
 
-const hoy = new Date().getDay();
+const hoy = obtenerDiaSemanaMexicoPublico();
 
 const zonasServicioFallback = [
   { value: "zona_1", label: "Zona 1", nombre: "Valle Real - Solares", mapImage: "img/Zona1.jpg" },
@@ -1277,20 +1504,20 @@ function crearImagenZonaPublica(zona) {
   return `
     <figure class="zone-card-preview">
       <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa de cobertura ${escapeHtmlPublico(label)} - ${escapeHtmlPublico(nombre)}" loading="lazy" decoding="async" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
-      <span class="zone-map-fallback">Mapa pendiente</span>
+      <span class="zone-map-fallback">Cobertura por zona</span>
     </figure>
   `;
 }
 
 function crearImagenZonaGrandePublica(zona) {
   if (!zona?.mapImage) {
-    return `<div class="zones-map-empty">Mapa pendiente</div>`;
+    return `<div class="zones-map-empty">Cobertura por zona</div>`;
   }
 
   return `
     <figure class="zones-map-figure">
       <img src="${escapeHtmlPublico(zona.mapImage)}" alt="Mapa ampliado de cobertura ${escapeHtmlPublico(zona.label || "Zona")} - ${escapeHtmlPublico(zona.nombre || "")}" onerror="this.hidden=true;this.closest('figure').classList.add('is-missing');">
-      <span class="zone-map-fallback">Mapa pendiente</span>
+      <span class="zone-map-fallback">Cobertura por zona</span>
     </figure>
   `;
 }
@@ -1302,14 +1529,19 @@ function renderizarZonaHoyPublica() {
 
   const regla = obtenerReglaZonaPublica(hoy);
   if (regla.esDescanso) {
-    zonaHTML.innerHTML = "Hoy descansamos. Consulta las zonas activas de lunes a sábado.";
+    zonaHTML.innerHTML = `
+      <span class="hero-zone-day">Zona de hoy &middot; ${escapeHtmlPublico(regla.dia || "Domingo")}</span>
+      <span class="hero-zone-main">Hoy descansamos</span>
+      <span class="hero-zone-note">Consulta las zonas activas de lunes a sabado para agendar tu servicio.</span>
+    `;
     return;
   }
 
   zonaHTML.innerHTML = `
-    Hoy atendemos <span class="text-[#0b2a6b] font-semibold">${escapeHtmlPublico(regla.zone?.label || regla.zona)}</span>
-    <span class="block text-xs md:text-sm text-gray-500">${escapeHtmlPublico(regla.zone?.nombre || "")}</span>
-    ${crearImagenZonaPublica(regla.zone)}
+    <span class="hero-zone-day">Zona de hoy &middot; ${escapeHtmlPublico(regla.dia || "")}</span>
+    <span class="hero-zone-main">Atendemos: ${escapeHtmlPublico(regla.zone?.label || regla.zona)}</span>
+    <span class="hero-zone-area">${escapeHtmlPublico(regla.zone?.nombre || "")}</span>
+    <span class="hero-zone-note">Agenda tu servicio segun la zona disponible de hoy.</span>
   `;
 }
 
@@ -1360,7 +1592,7 @@ function renderizarZonaDestacadaPublica() {
   if (item.esDescanso) {
     destino.innerHTML = `
       <section class="zones-today-panel is-rest">
-        <span class="zone-status">Hoy</span>
+        <span class="zone-status">Zona de hoy &middot; ${escapeHtmlPublico(item.dia || "Domingo")}</span>
         <h4>${escapeHtmlPublico(item.dia)} de descanso</h4>
         <p>Descanso - no hay servicio programado.</p>
       </section>
@@ -1372,9 +1604,10 @@ function renderizarZonaDestacadaPublica() {
   destino.innerHTML = `
     <section class="zones-today-panel">
       <div class="zones-today-copy">
-        <span class="zone-status">Hoy</span>
+        <span class="zone-status">Zona de hoy &middot; ${escapeHtmlPublico(item.dia || "")}</span>
         <h4>${escapeHtmlPublico(zona.label || item.zona)}</h4>
         <p>${escapeHtmlPublico(zona.nombre || "")}</p>
+        <p class="zones-today-note">Agenda tu servicio segun la zona disponible de hoy.</p>
         <button type="button" class="zone-map-button is-primary" onclick="abrirMapaZonaPublica(${hoy})">Ver mapa</button>
       </div>
       ${crearImagenZonaGrandePublica(zona)}
@@ -1422,13 +1655,13 @@ function abrirZonas() {
   mostrarListaZonasPublica();
 
   modal.classList.remove("opacity-0", "pointer-events-none");
-  document.body.classList.add("overflow-hidden");
+  sincronizarBloqueoScrollOverlay();
 }
 
 function cerrarZonas() {
   const modal = document.getElementById("modalZonas");
   if (modal) modal.classList.add("opacity-0", "pointer-events-none");
-  document.body.classList.remove("overflow-hidden");
+  sincronizarBloqueoScrollOverlay();
 }
 
 document.addEventListener("keydown", (event) => {
@@ -1624,6 +1857,11 @@ async function obtenerPerfil() {
 }
 
 function irCheckout() {
+  if (!COMPRAS_EN_LINEA_HABILITADAS) {
+    abrirPedidoWhatsApp();
+    return;
+  }
+
   const token = obtenerTokenValido();
 
   if (!token) {
@@ -1642,6 +1880,11 @@ function irCheckout() {
 function cerrarMenuCuenta() {
   const menu = document.getElementById("menuCuenta");
   if (menu) menu.classList.add("hidden");
+
+  const desktopMenu = document.getElementById("desktopAccountMenu");
+  const desktopTrigger = document.getElementById("desktopAccountTrigger");
+  if (desktopMenu) desktopMenu.classList.add("hidden");
+  if (desktopTrigger) desktopTrigger.setAttribute("aria-expanded", "false");
 }
 function logout() {
   cerrarMenuCuenta();
@@ -2394,6 +2637,25 @@ function toggleMenuCuenta() {
   const menu = document.getElementById("menuCuenta");
   if (!menu) return;
   menu.classList.toggle("hidden");
+  const desktopMenu = document.getElementById("desktopAccountMenu");
+  const desktopTrigger = document.getElementById("desktopAccountTrigger");
+  if (desktopMenu) desktopMenu.classList.add("hidden");
+  if (desktopTrigger) desktopTrigger.setAttribute("aria-expanded", "false");
+  validarAccesosAdmin();
+}
+
+function toggleDesktopAccountMenu() {
+  const menu = document.getElementById("desktopAccountMenu");
+  const trigger = document.getElementById("desktopAccountTrigger");
+  if (!menu) return;
+
+  const abrir = menu.classList.contains("hidden");
+  const menuCarrito = document.getElementById("menuCuenta");
+  if (menuCarrito) menuCarrito.classList.add("hidden");
+
+  renderizarNavegacionCuenta();
+  menu.classList.toggle("hidden", !abrir);
+  if (trigger) trigger.setAttribute("aria-expanded", abrir ? "true" : "false");
   validarAccesosAdmin();
 }
 
@@ -2406,11 +2668,17 @@ function toggleEliminarCuentaPanel() {
 document.addEventListener("click", function (e) {
   const box = document.getElementById("cuentaBox");
   const menu = document.getElementById("menuCuenta");
+  const desktopBox = document.getElementById("desktopAccountBox");
+  const desktopMenu = document.getElementById("desktopAccountMenu");
+  const desktopTrigger = document.getElementById("desktopAccountTrigger");
 
-  if (!box || !menu) return;
-
-  if (!box.contains(e.target)) {
+  if (box && menu && !box.contains(e.target)) {
     menu.classList.add("hidden");
+  }
+
+  if (desktopBox && desktopMenu && !desktopBox.contains(e.target)) {
+    desktopMenu.classList.add("hidden");
+    if (desktopTrigger) desktopTrigger.setAttribute("aria-expanded", "false");
   }
 });
 

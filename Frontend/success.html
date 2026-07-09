@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pago exitoso</title>
+<title>Compras en linea proximamente - Woof & Wash</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,12 +53,12 @@
     <img src="img/perritologo.png" alt="Woof & Wash" class="h-12 w-12 object-contain">
   </div>
 
-  <h1 class="mt-5 text-center text-3xl font-extrabold text-green-600" style="font-family: 'Poppins', sans-serif;">
-    ¡Pago exitoso!
+  <h1 class="mt-5 text-center text-3xl font-extrabold text-[#0b2a6b]" style="font-family: 'Poppins', sans-serif;">
+    Compras en linea proximamente
   </h1>
 
   <p id="estadoPago" class="mt-3 rounded-2xl border border-[#8cc63f]/20 bg-[#8cc63f]/10 px-4 py-3 text-center text-sm font-medium text-slate-600">
-    Confirmando tu pedido...
+    Por ahora los pedidos de productos se coordinan por WhatsApp.
   </p>
 
   <div class="mt-6 space-y-3">
@@ -79,6 +79,8 @@
 
 <script>
 const estadoPago = document.getElementById("estadoPago");
+// Cambiar a true cuando Stripe/compras en linea queden listos para produccion.
+const COMPRAS_EN_LINEA_HABILITADAS = false;
 
 const API_URL = "https://woof-wash.onrender.com";
 
@@ -132,11 +134,16 @@ function manejarRespuestaAuthSuccess(res, data = {}) {
 }
 
 async function confirmarPedido() {
+  if (!COMPRAS_EN_LINEA_HABILITADAS) {
+    estadoPago.textContent = "Las compras en linea no estan habilitadas en este momento. Vuelve al inicio para pedir tus productos por WhatsApp.";
+    return;
+  }
+
   const token = localStorage.getItem("token");
   const sessionId = new URLSearchParams(window.location.search).get("session_id");
 
   if (!token || !sessionId) {
-    estadoPago.textContent = "Tu pago fue exitoso. Puedes volver al inicio para revisar tu carrito.";
+    estadoPago.textContent = "No encontramos una sesion de compra para confirmar.";
     return;
   }
 
@@ -164,9 +171,9 @@ async function confirmarPedido() {
       return;
     }
 
-    estadoPago.textContent = data.message || "El pago fue exitoso, pero no se pudo confirmar el pedido.";
+    estadoPago.textContent = data.message || "No se pudo confirmar el pedido.";
   } catch (error) {
-    estadoPago.textContent = "El pago fue exitoso, pero no se pudo confirmar el pedido en este momento.";
+    estadoPago.textContent = "No se pudo confirmar el pedido en este momento.";
   }
 }
 

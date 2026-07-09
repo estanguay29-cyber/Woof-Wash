@@ -3,6 +3,58 @@
 
   window.WoofWashProductos.mascotaGroups = Object.freeze([
     {
+      id: "traje-rojo-murcielago",
+      nombre: "Traje rojo Murciélago",
+      precio: 290,
+      categoria: "Ropa para mascotas / Disfraz",
+      descripcion: "Ropa para mascotas / Disfraz. Traje rojo tipo murciélago en talla mediana para un look divertido y cómodo.",
+      tipoVariante: "talla",
+      variantes: [
+        { id: "traje-rojo-murcielago", nombre: "Traje rojo Murciélago", etiqueta: "Mediana", imagen: "img/Traje-rojo.png" }
+      ]
+    },
+    {
+      id: "deportivo-negro",
+      nombre: "Deportivo negro",
+      precio: 220,
+      categoria: "Ropa para mascotas",
+      descripcion: "Ropa para mascotas. Deportivo negro en talla chica, ideal para paseos con estilo y comodidad.",
+      tipoVariante: "talla",
+      variantes: [
+        { id: "deportivo-negro", nombre: "Deportivo negro", etiqueta: "Chica", imagen: "img/Deportivo-negro.png" }
+      ]
+    },
+    {
+      id: "sueter-negro",
+      nombre: "Suéter negro",
+      precio: 220,
+      categoria: "Ropa para mascotas",
+      descripcion: "Ropa para mascotas. Suéter negro en talla mediana, suave y práctico para días frescos.",
+      tipoVariante: "talla",
+      variantes: [
+        { id: "sueter-negro", nombre: "Suéter negro", etiqueta: "Mediana", imagen: "img/Sueter-negro.png" }
+      ]
+    },
+    {
+      id: "vestido-rosa",
+      nombre: "Vestido rosa",
+      precio: 280,
+      categoria: "Ropa para mascotas",
+      descripcion: "Ropa para mascotas. Vestido rosa en talla chica con un estilo tierno, limpio y comodo.",
+      tipoVariante: "talla",
+      variantes: [
+        { id: "vestido-rosa", nombre: "Vestido rosa", etiqueta: "Chica", imagen: "img/Vestido-rosa.png" }
+      ]
+    },
+    {
+      id: "peluche-cabra-blanca",
+      nombre: "Peluche cabra blanca",
+      precio: 160,
+      categoria: "Juguetes para mascotas",
+      imagen: "img/Cabra-blanca.png",
+      descripcion: "Juguetes para mascotas. Peluche de cabra blanca, suave y perfecto para juego ligero o compania."
+    },
+    {
       id: "peluche-jirafa",
       nombre: "Peluche jirafa",
       precio: 160,

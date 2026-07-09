@@ -271,6 +271,32 @@ function renderAvatarEmpleado(empleado = {}, size = "sm") {
   return `<span class="portal-employee-avatar ${sizeClass}" aria-hidden="true">${escapeHtml(obtenerInicialesEmpleado(empleado))}</span>`;
 }
 
+function obtenerEmpleadoAsignadoPortal(cita = {}) {
+  const detalles = Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : [];
+  const detalleActual = detalles.find((empleado) => String(empleado.id || empleado._id || "") === String(state.empleadoSeleccionadoId || "")) || detalles[0];
+  const empleadoLista = state.empleados.find((empleado) => String(empleado.id || empleado._id || "") === String(state.empleadoSeleccionadoId || ""));
+
+  return {
+    ...(empleadoLista || {}),
+    ...(detalleActual || {}),
+    nombreCompleto: detalleActual?.nombreCompleto || empleadoLista?.nombreCompleto || "Empleado asignado",
+    fotoPerfilUrl: detalleActual?.fotoPerfilUrl || empleadoLista?.fotoPerfilUrl || ""
+  };
+}
+
+function renderEmpleadoAsignadoPortal(cita = {}) {
+  const empleado = obtenerEmpleadoAsignadoPortal(cita);
+  return `
+    <div class="appointment-employee-card">
+      ${renderAvatarEmpleado(empleado, "sm")}
+      <span>
+        <small>Cita asignada a</small>
+        <strong>${escapeHtml(empleado.nombreCompleto || "Empleado asignado")}</strong>
+      </span>
+    </div>
+  `;
+}
+
 function renderEmployeeList() {
   const list = document.getElementById("employeeList");
   if (!list) return;
@@ -694,6 +720,7 @@ function renderCitasDashboard(citas = [], fecha = fechaLocalISO()) {
         </div>
         <h3>${escapeHtml(cita.clienteNombre || "Cliente")}</h3>
         <p>${escapeHtml(descripcion)}</p>
+        ${renderEmpleadoAsignadoPortal(cita)}
         <div class="appointment-meta">
           ${tieneDato(cita.totalCobrado) ? `<span class="appointment-total">${escapeHtml(formatoMoneda(cita.totalCobrado))}</span>` : ""}
           ${cita.direccion ? `<p>${escapeHtml(cita.direccion)}</p>` : ""}

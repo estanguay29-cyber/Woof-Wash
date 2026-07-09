@@ -107,6 +107,11 @@
 
     <a href="#nosotros" onclick="toggleMenu()">Nosotros</a>
 
+    <div class="mobile-account-section" aria-label="Cuenta">
+      <p class="mobile-account-kicker">Cuenta</p>
+      <div id="mobileAccountNav" class="mobile-account-actions"></div>
+    </div>
+
     <a href="https://wa.me/523337276934" target="_blank" rel="noopener noreferrer" class="mobile-menu-cta">
       Reservar
     </a>
@@ -172,6 +177,30 @@
         </svg>
       </button>
 
+      <div id="desktopAccountBox" class="desktop-account-box hidden md:block relative">
+        <button
+          id="desktopAccountTrigger"
+          type="button"
+          onclick="toggleDesktopAccountMenu()"
+          class="desktop-account-trigger"
+          aria-label="Abrir menu de cuenta"
+          aria-expanded="false"
+          aria-controls="desktopAccountMenu"
+        >
+          <span class="desktop-account-avatar" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </span>
+          <span id="desktopAccountLabel" class="desktop-account-label">Cuenta</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 desktop-account-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        <div id="desktopAccountMenu" class="desktop-account-menu hidden" role="menu" aria-label="Opciones de cuenta"></div>
+      </div>
+
       <button id="cart-icon" onclick="toggleCarrito()" aria-label="Ver carrito" class="cart-header-btn relative">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 md:w-7 md:h-7 text-[#0b2a6b]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l1 2h13l-1.5 9h-11z"/>
@@ -229,7 +258,7 @@
           </svg>
         </div>
         <div class="hero-zone-content">
-          <span class="hero-zone-label">Hoy estamos en:</span>
+          <span class="hero-zone-label">Zona de servicio</span>
           <div id="zonaHoy" class="hero-zone-text text-sm md:text-base text-gray-700">Cargando zonas disponibles...</div>
         </div>
         <button onclick="abrirZonas()" class="hero-zone-button">
@@ -1258,6 +1287,11 @@ class="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-[#fffdf7] shadow-[0_20p
       <button id="btnVaciar" type="button" onclick="vaciarCarrito()" class="hidden cart-clear-btn">
         Vaciar carrito
       </button>
+    </div>
+
+    <div id="cartCheckoutNotice" class="hidden mb-4 rounded-2xl border border-[#8cc63f]/30 bg-[#fffae8] px-4 py-4 text-sm leading-6 text-[#0b2a6b]">
+      <p class="font-extrabold">Compras en linea pausadas temporalmente.</p>
+      <p class="mt-1 text-slate-600">Por ahora los pedidos de productos todavia no se completan desde la pagina. Escribenos por WhatsApp y te los llevamos en tu proxima cita.</p>
     </div>
 
     <button id="btnWhats" type="button" class="hidden w-full rounded-2xl bg-[#8cc63f] px-5 py-3.5 text-center text-sm font-bold text-white shadow-[0_18px_35px_rgba(140,198,63,0.28)] transition hover:-translate-y-0.5 hover:bg-[#7bb631]">

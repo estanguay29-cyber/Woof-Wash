@@ -6,9 +6,9 @@ const HERO_ANIMATION_FRAMES = Array.from(
   (_, index) => `../img/Vanimacion${index + 1}.png`
 );
 const HERO_ANIMATION_FRAME_MS = 280;
-const CLIENT_ITEMS_STORAGE_KEY = "woofwash_cliente_items_v1";
 const WHATSAPP_AGENDA_URL = "https://wa.me/523337276934?text=";
 const WHATSAPP_CONFIRMATION_TEXT = "Entiendo que la fecha, horario y zona solicitados est\u00e1n sujetos a disponibilidad. Woof & Wash me confirmar\u00e1 por WhatsApp si es posible atenderme en ese momento o me compartir\u00e1 una opci\u00f3n cercana para coordinar la cita.";
+const CLIENT_ZONE_PENDING_TEXT = "Zona pendiente por confirmar";
 const CLIENT_SERVICE_ZONES_FALLBACK = Object.freeze({
   zones: [
     { value: "zona_1", label: "Zona 1", nombre: "Valle Real - Solares" },
@@ -29,6 +29,8 @@ const CLIENT_SERVICE_ZONES_FALLBACK = Object.freeze({
   }
 });
 const clientItemPhotoUrls = new Map();
+let clientItemsCache = [];
+let clientProfileCache = null;
 let clientServiceZonesConfig = normalizarConfigZonasCliente(CLIENT_SERVICE_ZONES_FALLBACK);
 let clientServiceZonesPromise = null;
 
@@ -82,11 +84,43 @@ function obtenerReglaZonaCliente(fechaISO) {
   return clientServiceZonesConfig.rulesByDay[String(fecha.getDay())] || clientServiceZonesConfig.rulesByDay[fecha.getDay()] || null;
 }
 
+function obtenerDiaSemanaMexicoCliente(fecha = new Date()) {
+  try {
+    const dia = new Intl.DateTimeFormat("en-US", {
+      weekday: "short",
+      timeZone: "America/Mexico_City"
+    }).format(fecha).slice(0, 3).toLowerCase();
+
+    return {
+      sun: 0,
+      mon: 1,
+      tue: 2,
+      wed: 3,
+      thu: 4,
+      fri: 5,
+      sat: 6
+    }[dia] ?? fecha.getDay();
+  } catch (error) {
+    return fecha.getDay();
+  }
+}
+
+function obtenerReglaZonaAutomaticaCliente() {
+  const dia = obtenerDiaSemanaMexicoCliente();
+  return clientServiceZonesConfig.rulesByDay[String(dia)] || clientServiceZonesConfig.rulesByDay[dia] || {
+    dia: "Hoy",
+    zona: "",
+    esDescanso: false,
+    zonaPendiente: true
+  };
+}
+
 function describirZonaCliente(regla = {}) {
+  if (regla.zonaPendiente || !regla.zona) return CLIENT_ZONE_PENDING_TEXT;
   if (regla.esDescanso) return "No disponible";
   const zona = obtenerZonaCliente(regla.zona);
-  if (!zona) return regla.zona || "Zona no disponible";
-  return [zona.label, zona.nombre].filter(Boolean).join(": ");
+  if (!zona) return regla.zona || CLIENT_ZONE_PENDING_TEXT;
+  return [zona.label, zona.nombre].filter(Boolean).join(" \u00b7 ");
 }
 
 async function cargarZonasServicioCliente() {
@@ -113,23 +147,12 @@ async function cargarZonasServicioCliente() {
 }
 
 function validarZonaAgendaCliente(cita = {}) {
-  const regla = obtenerReglaZonaCliente(cita.fecha);
+  const regla = cita.reglaZona || obtenerReglaZonaAutomaticaCliente();
   if (!regla) {
-    return { ok: false, message: "Selecciona una fecha valida para calcular la zona del d\u00eda." };
+    return { ok: false, message: "No pudimos calcular la zona automatica del dia." };
   }
   if (regla.esDescanso) {
     return { ok: false, message: `${regla.dia || "Ese d\u00eda"} no est\u00e1 disponible para agendar.` };
-  }
-  if (regla.permiteTodasLasZonas) return { ok: true, regla };
-
-  const zonaIngresada = obtenerZonaCliente(cita.zona);
-  const zonaEsperada = obtenerZonaCliente(regla.zona);
-  if (!zonaIngresada || !zonaEsperada || zonaIngresada.value !== zonaEsperada.value) {
-    return {
-      ok: false,
-      regla,
-      message: `Ese d\u00eda corresponde a la zona: ${describirZonaCliente(regla)}. Ajusta la zona para continuar.`
-    };
   }
   return { ok: true, regla };
 }
@@ -140,47 +163,38 @@ function actualizarGuiaZonaAgenda() {
   const submit = document.getElementById("clientScheduleSubmit");
   if (!guide) return;
 
-  const fecha = valorInput("scheduleDate");
-  const zona = valorInput("scheduleZone");
   guide.classList.remove("is-ok", "is-warning", "is-error");
   if (submit) submit.disabled = false;
 
-  const regla = obtenerReglaZonaCliente(fecha);
-  if (!fecha) {
-    guide.textContent = "Selecciona una fecha para ver la zona correspondiente.";
-    if (zoneInput) zoneInput.placeholder = "Primero elige fecha";
-    return;
-  }
+  const regla = obtenerReglaZonaAutomaticaCliente();
   if (!regla) {
-    guide.textContent = "No pudimos calcular la zona de esa fecha. Revisa el formato de fecha.";
+    guide.textContent = "No pudimos calcular la zona automatica del dia.";
     guide.classList.add("is-warning");
+    if (zoneInput) zoneInput.value = "";
     return;
   }
   const zonaTexto = describirZonaCliente(regla);
-  if (zoneInput && !regla.esDescanso) zoneInput.placeholder = zonaTexto;
+  if (zoneInput) {
+    zoneInput.value = regla.esDescanso ? "No disponible" : zonaTexto;
+    zoneInput.readOnly = true;
+    zoneInput.setAttribute("aria-readonly", "true");
+  }
 
   if (regla.esDescanso) {
-    guide.textContent = `${regla.dia || "Ese d\u00eda"} no est\u00e1 disponible para solicitudes de cita.`;
+    guide.textContent = `${regla.dia || "Hoy"} no est\u00e1 disponible para solicitudes de cita.`;
     guide.classList.add("is-error");
     if (submit) submit.disabled = true;
     return;
   }
 
-  if (!zona) {
-    guide.textContent = `Ese d\u00eda corresponde a la zona: ${zonaTexto}.`;
-    guide.classList.add("is-ok");
+  if (regla.zonaPendiente) {
+    guide.textContent = "No pudimos confirmar la zona automatica en este momento. La enviaremos como pendiente por confirmar.";
+    guide.classList.add("is-warning");
     return;
   }
 
-  const validacion = validarZonaAgendaCliente({ fecha, zona });
-  if (validacion.ok) {
-    guide.textContent = `Zona correcta para ${regla.dia}: ${zonaTexto}.`;
-    guide.classList.add("is-ok");
-  } else {
-    guide.textContent = validacion.message;
-    guide.classList.add("is-error");
-    if (submit) submit.disabled = true;
-  }
+  guide.textContent = `Zona asignada automaticamente: ${zonaTexto}. La asigna el sistema segun el dia actual.`;
+  guide.classList.add("is-ok");
 }
 
 function renderizarZonasCliente() {
@@ -256,10 +270,20 @@ function protegerPortalCliente() {
   return true;
 }
 
-async function clienteFetch(path) {
+async function clienteFetch(path, options = {}) {
   const token = obtenerToken();
+  const headers = {
+    ...(options.headers || {}),
+    Authorization: `Bearer ${token}`
+  };
+
+  if (options.body && !(options.body instanceof FormData) && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { Authorization: `Bearer ${token}` }
+    ...options,
+    headers
   });
 
   let data = {};
@@ -288,8 +312,27 @@ async function clienteFetch(path) {
 }
 
 function obtenerPrimerNombre() {
-  const usuario = normalizarTexto(localStorage.getItem("usuario"));
+  const usuario = normalizarTexto(clientProfileCache?.nombreCompleto || clientProfileCache?.usuario || localStorage.getItem("usuario"));
   return obtenerPrimerNombreTexto(usuario, "cliente");
+}
+
+function normalizarPerfilCliente(data = {}) {
+  const user = data.user || data.usuario || data || {};
+  return {
+    usuario: normalizarTexto(user.usuario),
+    nombreCompleto: normalizarTexto(user.nombreCompleto),
+    telefono: normalizarTexto(user.telefono),
+    email: normalizarTexto(user.email),
+    role: normalizarTexto(user.role)
+  };
+}
+
+async function cargarPerfilCliente() {
+  const perfil = normalizarPerfilCliente(await clienteFetch("/perfil"));
+  clientProfileCache = perfil;
+  if (perfil.usuario) localStorage.setItem("usuario", perfil.usuario);
+  if (perfil.telefono) localStorage.setItem("clienteTelefono", perfil.telefono);
+  return perfil;
 }
 
 function obtenerPrimerNombreTexto(value, fallback = "") {
@@ -446,6 +489,69 @@ function obtenerEmpleadoCita(cita = {}) {
 
   const nombre = candidatos.map(obtenerNombreEmpleadoDesdeValor).find(Boolean);
   return nombre ? obtenerPrimerNombreTexto(nombre, nombre) : "Sin asignar";
+}
+
+function obtenerInicialesEmpleadoPortal(nombre = "") {
+  const limpio = normalizarTexto(nombre);
+  return limpio
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0).toUpperCase())
+    .join("") || "WW";
+}
+
+function obtenerEmpleadoDetalleCita(cita = {}) {
+  const detalle = Array.isArray(cita.empleadosAsignadosDetalle) && cita.empleadosAsignadosDetalle.length
+    ? cita.empleadosAsignadosDetalle[0]
+    : null;
+  const nombre = normalizarTexto(
+    detalle?.nombreCompleto ||
+    cita.empleadoAsignadoNombre ||
+    cita.atendidoPor ||
+    obtenerEmpleadoCita(cita)
+  );
+
+  if (!nombre || nombre === "Sin asignar") {
+    return null;
+  }
+
+  return {
+    nombre,
+    fotoPerfilUrl: normalizarTexto(detalle?.fotoPerfilUrl || cita.empleadoAsignadoFotoUrl || "")
+  };
+}
+
+function renderizarEmpleadoAsignadoCita(cita = {}) {
+  const empleado = obtenerEmpleadoDetalleCita(cita);
+  const completada = cita.estado === "completada";
+  const etiqueta = completada ? "Te atendió" : "Te atenderá";
+
+  if (!empleado) {
+    return `
+      <div class="appointment-employee-card is-unassigned">
+        <span class="appointment-employee-avatar" aria-hidden="true">WW</span>
+        <span>
+          <small>${escaparHtml(completada ? "Atención" : "Asignación")}</small>
+          <strong>Empleado por asignar</strong>
+        </span>
+      </div>
+    `;
+  }
+
+  const avatar = empleado.fotoPerfilUrl
+    ? `<img src="${escaparHtml(empleado.fotoPerfilUrl)}" alt="${escaparHtml(empleado.nombre)}">`
+    : escaparHtml(obtenerInicialesEmpleadoPortal(empleado.nombre));
+
+  return `
+    <div class="appointment-employee-card">
+      <span class="appointment-employee-avatar ${empleado.fotoPerfilUrl ? "has-photo" : ""}">${avatar}</span>
+      <span>
+        <small>${escaparHtml(etiqueta)}</small>
+        <strong>${escaparHtml(empleado.nombre)}</strong>
+      </span>
+    </div>
+  `;
 }
 
 function renderizarBienvenida() {
@@ -622,17 +728,11 @@ function renderizarFidelidad(loyalty = {}) {
 }
 
 function obtenerClienteItems() {
-  try {
-    const raw = localStorage.getItem(CLIENT_ITEMS_STORAGE_KEY);
-    const items = raw ? JSON.parse(raw) : [];
-    return Array.isArray(items) ? items.map(normalizarClientItem).filter(Boolean) : [];
-  } catch (error) {
-    return [];
-  }
+  return clientItemsCache.map(normalizarClientItem).filter(Boolean);
 }
 
 function guardarClienteItems(items = []) {
-  localStorage.setItem(CLIENT_ITEMS_STORAGE_KEY, JSON.stringify(items.map(normalizarClientItem).filter(Boolean)));
+  clientItemsCache = items.map(normalizarClientItem).filter(Boolean);
 }
 
 let clientItemTipoActivo = "mascota";
@@ -783,31 +883,107 @@ function renderFotoClientItem(item = {}) {
   const foto = obtenerFotoClientItem(item);
   const nombre = obtenerNombreClientItem(item);
   if (foto) {
-    return `<img src="${escaparHtml(foto)}" alt="${escaparHtml(nombre)}">`;
+    return `
+      <button type="button" class="client-item-photo-button" data-action="view-photo" data-photo-url="${escaparHtml(foto)}" data-photo-title="${escaparHtml(nombre)}" aria-label="Ver foto completa de ${escaparHtml(nombre)}">
+        <img src="${escaparHtml(foto)}" alt="${escaparHtml(nombre)}" loading="lazy">
+      </button>
+    `;
   }
   return `<span>${escaparHtml(obtenerIniciales(nombre))}</span>`;
 }
 
+function abrirVisorFotoClientItem(src = "", title = "") {
+  const modal = document.getElementById("clientPhotoViewer");
+  const image = document.getElementById("clientPhotoViewerImage");
+  const heading = document.getElementById("clientPhotoViewerTitle");
+  const foto = normalizarTexto(src);
+  const nombre = normalizarTexto(title) || "Foto del registro";
+
+  if (!modal || !image || !foto) return;
+
+  image.src = foto;
+  image.alt = nombre;
+  if (heading) heading.textContent = nombre;
+  modal.classList.remove("hidden");
+}
+
+function cerrarVisorFotoClientItem() {
+  const modal = document.getElementById("clientPhotoViewer");
+  const image = document.getElementById("clientPhotoViewerImage");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  if (image) {
+    image.removeAttribute("src");
+    image.alt = "";
+  }
+}
+
+function valorOpcionalWhatsApp(value) {
+  return normalizarTexto(value) || "No especificado";
+}
+
+function obtenerDatosClienteWhatsApp() {
+  const nombrePerfil = normalizarTexto(clientProfileCache?.nombreCompleto || clientProfileCache?.usuario);
+  const telefonoPerfil = normalizarTexto(clientProfileCache?.telefono);
+  return {
+    nombre: nombrePerfil || normalizarTexto(localStorage.getItem("usuario")) || "Cliente",
+    telefono: telefonoPerfil || normalizarTexto(localStorage.getItem("clienteTelefono") || localStorage.getItem("telefono"))
+  };
+}
+
+function construirDireccionAgendaCliente(cita = {}) {
+  const calle = normalizarTexto(cita.calle);
+  const numeroExterior = normalizarTexto(cita.numeroExterior);
+  const numeroInterior = normalizarTexto(cita.numeroInterior);
+
+  if (!calle || !numeroExterior) return "";
+
+  return numeroInterior
+    ? `${calle} #${numeroExterior}, Interior ${numeroInterior}`
+    : `${calle} #${numeroExterior}`;
+}
+
+function validarDireccionAgendaCliente(cita = {}) {
+  if (!normalizarTexto(cita.calle)) {
+    return { ok: false, message: "Escribe la calle o avenida para generar la cita por WhatsApp." };
+  }
+  if (!normalizarTexto(cita.numeroExterior)) {
+    return { ok: false, message: "Escribe el numero exterior para generar la cita por WhatsApp." };
+  }
+  return { ok: true };
+}
+
 function construirMensajeWhatsApp(item = {}, cita = {}) {
   const foto = item.fotoUrl || "[Sin foto guardada]";
+  const cliente = obtenerDatosClienteWhatsApp();
+  const zonaTexto = cita.zonaTexto || describirZonaCliente(cita.reglaZona || obtenerReglaZonaAutomaticaCliente());
+  const direccion = cita.direccionTexto || construirDireccionAgendaCliente(cita);
+  const comentarios = valorOpcionalWhatsApp(cita.comentarios);
 
   if (item.tipo === "auto") {
     return [
       "Hola, Woof & Wash",
       "",
-      "Quiero agendar una cita para:",
+      "Quiero generar una cita mediante WhatsApp.",
       "",
-      `Vehiculo: ${obtenerNombreClientItem(item)}`,
-      `Marca: ${item.marca || "-"}`,
-      `Modelo: ${item.modelo || "-"}`,
-      `A\u00f1o: ${item.anio || "-"}`,
-      `Color: ${item.color || "-"}`,
-      `Tipo de veh\u00edculo: ${item.tipoVehiculo || "-"}`,
-      `Servicio solicitado: ${cita.servicio || item.servicio || "-"}`,
-      `Fecha deseada: ${cita.fecha || item.fecha || "-"}`,
-      `Horario deseado: ${cita.horario || item.horario || "-"}`,
-      `Zona: ${cita.zona || item.zona || "-"}`,
-      `Comentarios de la cita: ${cita.comentarios || item.comentarios || "-"}`,
+      `Cliente: ${valorOpcionalWhatsApp(cliente.nombre)}`,
+      `Tel\u00e9fono: ${valorOpcionalWhatsApp(cliente.telefono)}`,
+      "",
+      "Datos del auto:",
+      `Veh\u00edculo: ${valorOpcionalWhatsApp(obtenerNombreClientItem(item))}`,
+      `Marca: ${valorOpcionalWhatsApp(item.marca)}`,
+      `Modelo: ${valorOpcionalWhatsApp(item.modelo)}`,
+      `A\u00f1o: ${valorOpcionalWhatsApp(item.anio)}`,
+      `Color: ${valorOpcionalWhatsApp(item.color)}`,
+      `Tipo de veh\u00edculo: ${valorOpcionalWhatsApp(item.tipoVehiculo)}`,
+      "",
+      `Servicio solicitado: ${valorOpcionalWhatsApp(cita.servicio || item.servicio)}`,
+      `Fecha deseada: ${valorOpcionalWhatsApp(cita.fecha || item.fecha)}`,
+      `Horario deseado: ${valorOpcionalWhatsApp(cita.horario || item.horario)}`,
+      `Zona autom\u00e1tica del d\u00eda: ${valorOpcionalWhatsApp(zonaTexto)}`,
+      `Direcci\u00f3n: ${valorOpcionalWhatsApp(direccion)}`,
+      `Comentarios de la cita: ${comentarios}`,
       "",
       `Foto: ${foto}`,
       "",
@@ -818,31 +994,35 @@ function construirMensajeWhatsApp(item = {}, cita = {}) {
   return [
     "Hola, Woof & Wash",
     "",
-    "Quiero agendar una cita para:",
-      "",
-      `Nombre: ${item.nombre || "-"}`,
-      "Tipo: Perrito",
-      `Raza: ${item.raza || "-"}`,
-      `Edad: ${item.edad || "-"}`,
-      `Tama\u00f1o: ${item.tamano || "-"}`,
-      `Tipo de pelo: ${item.tipoPelo || "-"}`,
-      `Cuidados especiales generales: ${item.cuidados || "-"}`,
-      `Servicio solicitado: ${cita.servicio || item.paquete || "-"}`,
-      `Fecha deseada: ${cita.fecha || item.fecha || "-"}`,
-      `Horario deseado: ${cita.horario || item.horario || "-"}`,
-      `Zona: ${cita.zona || item.zona || "-"}`,
-      `Comentarios de la cita: ${cita.comentarios || item.comentarios || "-"}`,
-      "",
-      `Foto: ${foto}`,
+    "Quiero generar una cita mediante WhatsApp.",
+    "",
+    `Cliente: ${valorOpcionalWhatsApp(cliente.nombre)}`,
+    `Tel\u00e9fono: ${valorOpcionalWhatsApp(cliente.telefono)}`,
+    "",
+    "Datos de la mascota:",
+    `Nombre de la mascota: ${valorOpcionalWhatsApp(item.nombre)}`,
+    "Tipo: Perrito",
+    `Raza: ${valorOpcionalWhatsApp(item.raza)}`,
+    `Edad: ${valorOpcionalWhatsApp(item.edad)}`,
+    `Tama\u00f1o: ${valorOpcionalWhatsApp(item.tamano)}`,
+    `Tipo de pelo: ${valorOpcionalWhatsApp(item.tipoPelo)}`,
+    `Cuidados especiales generales: ${valorOpcionalWhatsApp(item.cuidados)}`,
+    "",
+    `Servicio solicitado: ${valorOpcionalWhatsApp(cita.servicio || item.paquete)}`,
+    `Fecha deseada: ${valorOpcionalWhatsApp(cita.fecha || item.fecha)}`,
+    `Horario deseado: ${valorOpcionalWhatsApp(cita.horario || item.horario)}`,
+    `Zona autom\u00e1tica del d\u00eda: ${valorOpcionalWhatsApp(zonaTexto)}`,
+    `Direcci\u00f3n: ${valorOpcionalWhatsApp(direccion)}`,
+    `Comentarios de la cita: ${comentarios}`,
+    "",
+    `Foto: ${foto}`,
     "",
     WHATSAPP_CONFIRMATION_TEXT
   ].join("\n");
 }
 
 function abrirWhatsAppClientItem(id) {
-  const item = obtenerClienteItems().find((actual) => actual.id === id);
-  if (!item) return;
-  window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item))}`, "_blank", "noopener,noreferrer");
+  abrirAgendaClientItem(id);
 }
 
 function crearBotonRegistroClientItem(tipo, label) {
@@ -901,7 +1081,7 @@ function renderizarGrupoClientItems(list, items, emptyText, tipo) {
             `).join("")}
           </dl>
           <div class="client-item-card-actions">
-            <button type="button" class="client-item-whatsapp" data-action="schedule" data-id="${escaparHtml(item.id)}">Agendar cita para ${escaparHtml(nombre)}</button>
+            <button type="button" class="client-item-whatsapp" data-action="schedule" data-id="${escaparHtml(item.id)}" data-item-id="${escaparHtml(item.id)}">Generar cita mediante WhatsApp</button>
             <button type="button" class="client-item-secondary" data-action="edit" data-id="${escaparHtml(item.id)}">Editar datos</button>
             <button type="button" class="client-item-danger" data-action="delete" data-id="${escaparHtml(item.id)}">Eliminar</button>
           </div>
@@ -1006,6 +1186,33 @@ function validarClientItem(item = {}) {
   return Boolean(item.nombre && item.raza && item.edad && item.tamano && item.tipoPelo);
 }
 
+function mostrarExitoPortalCliente(mensaje) {
+  try {
+    if (typeof window.mostrarExito === "function") {
+      window.mostrarExito(mensaje).catch?.(() => {});
+    }
+  } catch (error) {
+    // La animacion es decorativa; el registro ya fue guardado.
+  }
+}
+
+async function cargarClientItemsCliente() {
+  const data = await clienteFetch("/cliente/items");
+  guardarClienteItems(Array.isArray(data.items) ? data.items : []);
+  renderizarClientItems();
+  return obtenerClienteItems();
+}
+
+function construirPayloadClientItem(item, itemPrevio = {}, fotoUrl = "") {
+  const { id, fotoFile, ...payload } = item;
+  return {
+    ...itemPrevio,
+    ...payload,
+    fotoUrl: fotoUrl || itemPrevio.fotoUrl || "",
+    fotoNombre: item.fotoNombre || itemPrevio.fotoNombre || ""
+  };
+}
+
 async function guardarClientItem(event) {
   event.preventDefault();
   const item = leerFormularioClientItem();
@@ -1019,7 +1226,11 @@ async function guardarClientItem(event) {
   const items = obtenerClienteItems();
   const index = items.findIndex((actual) => actual.id === item.id);
   const itemPrevio = index >= 0 ? items[index] : {};
+  const esEdicion = index >= 0;
   const mensaje = document.getElementById("portalMessage");
+  const saveButton = document.getElementById("clientItemSave");
+  if (saveButton?.disabled) return;
+  if (saveButton) saveButton.disabled = true;
 
   if (mensaje) {
     mensaje.textContent = item.fotoFile ? "Guardando foto..." : "Guardando registro...";
@@ -1039,30 +1250,32 @@ async function guardarClientItem(event) {
     if (mensaje) {
       mensaje.textContent = error.message || "No se pudo guardar la foto.";
     }
+    if (saveButton) saveButton.disabled = false;
     return;
   }
 
-  const { fotoFile, ...itemSinArchivo } = item;
-  const itemFinal = {
-    ...itemPrevio,
-    ...itemSinArchivo,
-    fotoUrl,
-    fotoNombre: item.fotoNombre || itemPrevio.fotoNombre || "",
-    updatedAt: new Date().toISOString(),
-    createdAt: itemPrevio.createdAt || new Date().toISOString()
-  };
+  try {
+    const payload = construirPayloadClientItem(item, itemPrevio, fotoUrl);
+    const path = esEdicion ? `/cliente/items/${encodeURIComponent(item.id)}` : "/cliente/items";
+    const method = esEdicion ? "PATCH" : "POST";
+    const data = await clienteFetch(path, {
+      method,
+      body: JSON.stringify(payload)
+    });
+    const itemGuardado = normalizarClientItem(data.item || payload);
 
-  if (index >= 0) {
-    items[index] = itemFinal;
-  } else {
-    items.unshift(itemFinal);
-  }
-
-  guardarClienteItems(items);
-  limpiarFormularioClientItem();
-  renderizarClientItems();
-  if (mensaje) {
-    mensaje.textContent = "Registro guardado. Puedes solicitar la cita desde su card.";
+    limpiarFormularioClientItem();
+    await cargarClientItemsCliente();
+    if (mensaje) {
+      mensaje.textContent = "Registro guardado. Puedes solicitar la cita desde su card.";
+    }
+    mostrarExitoPortalCliente(itemGuardado?.tipo === "auto" ? "Auto registrado con \u00e9xito" : "Mascota registrada con \u00e9xito");
+  } catch (error) {
+    if (mensaje) {
+      mensaje.textContent = error.message || "No se pudo guardar el registro.";
+    }
+  } finally {
+    if (saveButton) saveButton.disabled = false;
   }
 }
 
@@ -1096,22 +1309,34 @@ function editarClientItem(id) {
   document.getElementById("clientItemForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function eliminarClientItem(id) {
+async function eliminarClientItem(id) {
   const item = obtenerClienteItems().find((actual) => actual.id === id);
   const nombre = obtenerNombreClientItem(item);
   if (!item || !window.confirm(`Eliminar card de ${nombre}?`)) return;
-  const photoUrl = clientItemPhotoUrls.get(id);
-  if (photoUrl) URL.revokeObjectURL(photoUrl);
-  clientItemPhotoUrls.delete(id);
-  guardarClienteItems(obtenerClienteItems().filter((actual) => actual.id !== id));
-  limpiarFormularioClientItem();
-  renderizarClientItems();
+  const mensaje = document.getElementById("portalMessage");
+
+  try {
+    await clienteFetch(`/cliente/items/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const photoUrl = clientItemPhotoUrls.get(id);
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    clientItemPhotoUrls.delete(id);
+    limpiarFormularioClientItem();
+    await cargarClientItemsCliente();
+    if (mensaje) mensaje.textContent = "Registro eliminado.";
+  } catch (error) {
+    if (mensaje) mensaje.textContent = error.message || "No se pudo eliminar el registro.";
+  }
 }
 
 function cerrarAgendaClientItem() {
   document.getElementById("clientScheduleModal")?.classList.add("hidden");
   document.getElementById("clientScheduleForm")?.reset();
   setValorInput("clientScheduleItemId", "");
+  const error = document.getElementById("clientScheduleAddressError");
+  if (error) {
+    error.textContent = "";
+    error.classList.add("hidden");
+  }
   actualizarGuiaZonaAgenda();
 }
 
@@ -1119,10 +1344,18 @@ function abrirAgendaClientItem(id) {
   const item = obtenerClienteItems().find((actual) => actual.id === id);
   if (!item) return;
   const modal = document.getElementById("clientScheduleModal");
+  const form = document.getElementById("clientScheduleForm");
   const select = document.getElementById("scheduleService");
   const title = document.getElementById("clientScheduleTitle");
   const copy = document.getElementById("clientScheduleCopy");
   if (!modal || !select) return;
+
+  form?.reset();
+  const error = document.getElementById("clientScheduleAddressError");
+  if (error) {
+    error.textContent = "";
+    error.classList.add("hidden");
+  }
 
   const servicios = CLIENT_SCHEDULE_SERVICES[item.tipo === "auto" ? "auto" : "mascota"];
   select.innerHTML = '<option value="">Selecciona servicio</option>' + servicios.map((servicio) => (
@@ -1135,17 +1368,23 @@ function abrirAgendaClientItem(id) {
       ? "Elige el lavado y los datos de esta solicitud para enviarla por WhatsApp. Te confirmaremos disponibilidad por ese medio."
       : "Elige el servicio de est\u00e9tica canina y los datos de esta solicitud para enviarla por WhatsApp. Te confirmaremos disponibilidad por ese medio.";
   }
-  modal.classList.remove("hidden");
   actualizarGuiaZonaAgenda();
-  cargarZonasServicioCliente();
+  modal.classList.remove("hidden");
+  cargarZonasServicioCliente().then(actualizarGuiaZonaAgenda).catch(actualizarGuiaZonaAgenda);
 }
 
 function leerAgendaClientItem() {
+  const reglaZona = obtenerReglaZonaAutomaticaCliente();
   return {
     servicio: valorInput("scheduleService"),
     fecha: valorInput("scheduleDate"),
     horario: valorInput("scheduleTime"),
-    zona: valorInput("scheduleZone"),
+    reglaZona,
+    zona: reglaZona?.zona || "",
+    zonaTexto: describirZonaCliente(reglaZona || {}),
+    calle: valorInput("scheduleStreet"),
+    numeroExterior: valorInput("scheduleExtNumber"),
+    numeroInterior: valorInput("scheduleIntNumber"),
     comentarios: valorInput("scheduleComments")
   };
 }
@@ -1156,17 +1395,37 @@ function enviarAgendaClientItem(event) {
   const item = obtenerClienteItems().find((actual) => actual.id === id);
   const cita = leerAgendaClientItem();
   const mensaje = document.getElementById("portalMessage");
+  const addressError = document.getElementById("clientScheduleAddressError");
+  if (addressError) {
+    addressError.textContent = "";
+    addressError.classList.add("hidden");
+  }
   if (!item) return;
-  if (!cita.servicio || !cita.fecha || !cita.horario || !cita.zona) {
-    if (mensaje) mensaje.textContent = "Completa servicio, fecha, horario y zona para agendar.";
+  if (!cita.servicio || !cita.fecha || !cita.horario) {
+    if (mensaje) mensaje.textContent = "Completa servicio, fecha y horario para agendar.";
     return;
   }
   const validacionZona = validarZonaAgendaCliente(cita);
   if (!validacionZona.ok) {
     actualizarGuiaZonaAgenda();
-    if (mensaje) mensaje.textContent = validacionZona.message || "La zona no corresponde a la fecha seleccionada.";
+    if (mensaje) mensaje.textContent = validacionZona.message || "No pudimos asignar la zona automatica.";
     return;
   }
+  cita.reglaZona = validacionZona.regla;
+  cita.zona = validacionZona.regla?.zona || cita.zona;
+  cita.zonaTexto = describirZonaCliente(validacionZona.regla);
+
+  const validacionDireccion = validarDireccionAgendaCliente(cita);
+  if (!validacionDireccion.ok) {
+    if (addressError) {
+      addressError.textContent = validacionDireccion.message;
+      addressError.classList.remove("hidden");
+    }
+    if (mensaje) mensaje.textContent = validacionDireccion.message;
+    return;
+  }
+  cita.direccionTexto = construirDireccionAgendaCliente(cita);
+
   window.open(`${WHATSAPP_AGENDA_URL}${encodeURIComponent(construirMensajeWhatsApp(item, cita))}`, "_blank", "noopener,noreferrer");
   cerrarAgendaClientItem();
 }
@@ -1194,7 +1453,15 @@ function inicializarClientItems() {
   document.getElementById("clientItemCancel")?.addEventListener("click", limpiarFormularioClientItem);
   document.getElementById("clientScheduleForm")?.addEventListener("submit", enviarAgendaClientItem);
   document.getElementById("scheduleDate")?.addEventListener("change", actualizarGuiaZonaAgenda);
-  document.getElementById("scheduleZone")?.addEventListener("input", actualizarGuiaZonaAgenda);
+  ["scheduleStreet", "scheduleExtNumber"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("input", () => {
+      const error = document.getElementById("clientScheduleAddressError");
+      if (error) {
+        error.textContent = "";
+        error.classList.add("hidden");
+      }
+    });
+  });
   document.getElementById("clientScheduleClose")?.addEventListener("click", cerrarAgendaClientItem);
   document.getElementById("clientScheduleCancel")?.addEventListener("click", cerrarAgendaClientItem);
   document.getElementById("clientZonesOpen")?.addEventListener("click", abrirZonasCliente);
@@ -1205,10 +1472,18 @@ function inicializarClientItems() {
   document.getElementById("clientZonesModal")?.addEventListener("click", (event) => {
     if (event.target.id === "clientZonesModal") cerrarZonasCliente();
   });
+  document.getElementById("clientPhotoViewerClose")?.addEventListener("click", cerrarVisorFotoClientItem);
+  document.getElementById("clientPhotoViewer")?.addEventListener("click", (event) => {
+    if (event.target.id === "clientPhotoViewer") cerrarVisorFotoClientItem();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") cerrarVisorFotoClientItem();
+  });
   document.querySelector(".client-item-sections")?.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
-    const id = button.dataset.id || "";
+    const id = button.dataset.itemId || button.dataset.id || button.closest(".client-item-card")?.dataset.id || "";
+    if (button.dataset.action === "view-photo") abrirVisorFotoClientItem(button.dataset.photoUrl, button.dataset.photoTitle);
     if (button.dataset.action === "schedule" || button.dataset.action === "whatsapp") abrirAgendaClientItem(id);
     if (button.dataset.action === "edit") editarClientItem(id);
     if (button.dataset.action === "delete") eliminarClientItem(id);
@@ -1271,6 +1546,7 @@ function renderizarCitas(citas = []) {
           </div>
           <span class="status-pill ${cita.estado === "cancelada" ? "is-warning" : ""}">${escaparHtml(formatearEstado(cita.estado))}</span>
         </div>
+        ${renderizarEmpleadoAsignadoCita(cita)}
         <ul class="details">
           ${crearDetallePortal("calendario", "Fecha", formatearFecha(cita.fecha))}
           ${crearDetallePortal("reloj", "Hora", cita.hora || "Sin hora")}
@@ -1335,15 +1611,22 @@ async function cargarPortal() {
   const mensaje = document.getElementById("portalMessage");
   mensaje.textContent = "Cargando tu portal...";
 
-  const [loyaltyResult, pedidosResult, citasResult] = await Promise.allSettled([
+  const [perfilResult, loyaltyResult, pedidosResult, citasResult, itemsResult] = await Promise.allSettled([
+    cargarPerfilCliente(),
     clienteFetch("/cliente/loyalty"),
     clienteFetch("/mis-pedidos"),
-    clienteFetch("/cliente/appointments")
+    clienteFetch("/cliente/appointments"),
+    clienteFetch("/cliente/items")
   ]);
+
+  if (perfilResult.status === "fulfilled") {
+    renderizarBienvenida();
+  }
 
   const loyalty = loyaltyResult.status === "fulfilled" ? loyaltyResult.value : {};
   const pedidos = pedidosResult.status === "fulfilled" ? pedidosResult.value.pedidos || [] : [];
   const citas = citasResult.status === "fulfilled" ? citasResult.value.citas || [] : [];
+  const items = itemsResult.status === "fulfilled" ? itemsResult.value.items || [] : [];
 
   if (loyaltyResult.status === "fulfilled") {
     renderizarFidelidad(loyalty);
@@ -1361,6 +1644,14 @@ async function cargarPortal() {
     renderizarCitas(citas);
   } else {
     mostrarErrorSeccion("appointmentsList", "No se pudo cargar tu historial de citas.");
+  }
+
+  if (itemsResult.status === "fulfilled") {
+    guardarClienteItems(items);
+    renderizarClientItems();
+  } else {
+    mostrarErrorSeccion("clientPetsList", "No se pudieron cargar tus mascotas.");
+    mostrarErrorSeccion("clientCarsList", "No se pudieron cargar tus autos.");
   }
 
   actualizarResumen({ pedidos, citas, loyalty });

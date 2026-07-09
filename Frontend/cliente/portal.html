@@ -285,11 +285,15 @@
             </label>
             <label>Fecha deseada<input id="scheduleDate" type="date"></label>
             <label>Horario deseado<input id="scheduleTime" type="text" placeholder="11:00 a.m."></label>
-            <label>Zona o colonia<input id="scheduleZone" type="text" autocomplete="off"></label>
+            <label>Zona asignada automáticamente<input id="scheduleZone" type="text" autocomplete="off" readonly aria-readonly="true"></label>
+            <label>Calle o avenida<input id="scheduleStreet" type="text" autocomplete="street-address" placeholder="Av. Patria"></label>
+            <label>Número exterior<input id="scheduleExtNumber" type="text" autocomplete="off" placeholder="1234"></label>
+            <label>Número interior <span class="optional-field">(opcional)</span><input id="scheduleIntNumber" type="text" autocomplete="off" placeholder="Depto. 2B"></label>
             <label>Comentarios de esta cita<textarea id="scheduleComments" rows="3"></textarea></label>
           </div>
+          <div id="clientScheduleAddressError" class="client-schedule-error hidden" role="alert"></div>
           <div id="clientScheduleZoneGuide" class="client-schedule-zone-guide" role="status" aria-live="polite">
-            Selecciona una fecha para ver la zona correspondiente.
+            La zona se asigna automaticamente segun el dia actual.
           </div>
           <button type="button" class="client-zones-link" id="clientZonesOpen">Ver zonas por d&iacute;a</button>
           <div class="client-schedule-notice" role="note">
@@ -312,6 +316,16 @@
           <p>Consulta la zona disponible para cada d&iacute;a antes de solicitar tu cita por WhatsApp.</p>
         </div>
         <div id="clientZonesList" class="client-zones-list" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <div id="clientPhotoViewer" class="client-photo-viewer hidden" role="dialog" aria-modal="true" aria-labelledby="clientPhotoViewerTitle">
+      <div class="client-photo-viewer-dialog">
+        <button type="button" class="client-photo-viewer-close" id="clientPhotoViewerClose" aria-label="Cerrar foto completa">&times;</button>
+        <div class="client-photo-viewer-frame">
+          <img id="clientPhotoViewerImage" src="" alt="">
+        </div>
+        <p id="clientPhotoViewerTitle" class="client-photo-viewer-title">Foto del registro</p>
       </div>
     </div>
 
@@ -411,6 +425,7 @@
     </a>
   </nav>
 
+  <script src="../success-toast.js"></script>
   <script src="portal.js"></script>
 </body>
 </html>

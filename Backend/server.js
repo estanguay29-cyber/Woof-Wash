@@ -14,6 +14,7 @@ const User = require("./User");
 const Employee = require("./Employee");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
+const ClientItem = require("./ClientItem");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
 const AppointmentSlotLock = require("./AppointmentSlotLock");
 const PerformanceAttendance = require("./PerformanceAttendance");
@@ -64,6 +65,8 @@ const MAIL_CODE_TTL_MINUTES = 10;
 const META_DIARIA_EMPLEADOS_MXN = 2000;
 const META_SEMANAL_EMPLEADOS_MXN = 22000;
 const BACKEND_VERSION = "fecha-cumpleanos-persistencia-v2";
+// Cambiar a true cuando Stripe/compras en linea queden listos para produccion.
+const COMPRAS_EN_LINEA_HABILITADAS = false;
 const CLOUDINARY_UPLOAD_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "woofwash/client-items";
 const EMPLOYEE_PROFILE_UPLOAD_FOLDER = process.env.CLOUDINARY_EMPLOYEE_PROFILE_FOLDER || "woofwash/employee-profiles";
 const CLIENT_ITEM_PHOTO_TYPES = Object.freeze({
@@ -1335,6 +1338,58 @@ function obtenerTipoGeneralServicioAgenda(cita = {}) {
   return "mascota";
 }
 
+function contarUnidadesFidelidadCita(cita = {}) {
+  const tipo = obtenerTipoGeneralServicioAgenda(cita);
+  if (tipo !== "mascota") return 1;
+
+  const serviciosDetalle = construirServiciosDetalleCompatibles(cita)
+    .filter((servicio) => (servicio.tipo || tipo) === "mascota");
+
+  if (!serviciosDetalle.length) return 1;
+
+  const nombresMascota = serviciosDetalle
+    .map((servicio) => normalizarTextoPlano(servicio.mascotaNombre, 80).toLowerCase())
+    .filter(Boolean);
+
+  if (nombresMascota.length === serviciosDetalle.length) {
+    return Math.max(new Set(nombresMascota).size, 1);
+  }
+
+  return serviciosDetalle.length;
+}
+
+function contarUnidadesFidelidadConsumidasCita(cita = {}) {
+  const total = Math.max(contarUnidadesFidelidadCita(cita), 1);
+  if (cita.rewardConsumido === true) return total;
+
+  const consumidas = Number(cita.rewardUnidadesConsumidas);
+  if (!Number.isFinite(consumidas) || consumidas <= 0) return 0;
+
+  return Math.min(Math.floor(consumidas), total);
+}
+
+function contarUnidadesFidelidadDisponiblesCita(cita = {}) {
+  const total = Math.max(contarUnidadesFidelidadCita(cita), 1);
+  return Math.max(total - contarUnidadesFidelidadConsumidasCita(cita), 0);
+}
+
+function expandirCitasPorUnidadesFidelidad(citas = [], tipoObjetivo = "") {
+  const tipo = tipoObjetivo === "auto" ? "auto" : tipoObjetivo === "mascota" ? "mascota" : "";
+  const unidades = [];
+
+  for (const cita of citas) {
+    const tipoCita = obtenerTipoGeneralServicioAgenda(cita);
+    if (tipo && tipoCita !== tipo) continue;
+
+    const cantidad = contarUnidadesFidelidadDisponiblesCita(cita);
+    for (let index = 0; index < cantidad; index += 1) {
+      unidades.push(cita);
+    }
+  }
+
+  return unidades;
+}
+
 function crearProgresoRecompensasAgenda(citas = []) {
   const resumen = {
     mascota: {
@@ -1356,7 +1411,7 @@ function crearProgresoRecompensasAgenda(citas = []) {
   for (const cita of citas) {
     const tipo = obtenerTipoGeneralServicioAgenda(cita);
     if (!resumen[tipo]) continue;
-    resumen[tipo].cantidad += 1;
+    resumen[tipo].cantidad += contarUnidadesFidelidadDisponiblesCita(cita);
   }
 
   Object.values(resumen).forEach((item) => {
@@ -1382,27 +1437,92 @@ function construirResumenFidelidad(progreso = {}) {
   }, {});
 }
 
-async function construirFidelidadClientePorEmail(email) {
-  const emailNormalizado = normalizarEmail(email);
+async function obtenerClientUserIdCitaPorEmail(clienteEmail = "") {
+  const emailNormalizado = normalizarEmail(clienteEmail);
+  if (!emailNormalizado || !validarEmail(emailNormalizado)) return null;
 
-  if (!emailNormalizado || !validarEmail(emailNormalizado)) {
+  const user = await User.findOne({ email: emailNormalizado }).select("_id role");
+  if (!user || obtenerRolUsuario(user) !== "cliente") return null;
+  return user._id;
+}
+
+async function completarClientUserIdCita(datos = {}) {
+  if (!Object.prototype.hasOwnProperty.call(datos, "clienteEmail")) return;
+
+  const clientUserId = await obtenerClientUserIdCitaPorEmail(datos.clienteEmail);
+  datos.clientUserId = clientUserId || null;
+}
+
+async function obtenerClientePortalAutenticado(req, res, select = "email role") {
+  const userId = typeof req.user?.id === "string" ? req.user.id : "";
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    res.status(401).json({ message: "Token invalido" });
+    return null;
+  }
+
+  const user = await User.findById(userId).select(select);
+  if (!user || obtenerRolUsuario(user) !== "cliente") {
+    res.status(403).json({ message: "No autorizado" });
+    return null;
+  }
+
+  return user;
+}
+
+function obtenerIdEmpleadoAsignadoValor(value) {
+  if (!value) return "";
+  if (typeof value === "object" && value._id) return String(value._id);
+  return String(value);
+}
+
+function construirEmpleadoAsignadoDetalle(value, nombreFallback = "") {
+  const esObjeto = value && typeof value === "object";
+  const id = obtenerIdEmpleadoAsignadoValor(value);
+  const nombreCompleto = esObjeto
+    ? String(value.nombreCompleto || value.nombre || nombreFallback || "").trim()
+    : String(nombreFallback || "").trim();
+  const fotoPerfilUrl = esObjeto ? String(value.fotoPerfilUrl || "").trim() : "";
+
+  if (!id && !nombreCompleto) return null;
+
+  return {
+    id,
+    nombreCompleto,
+    fotoPerfilUrl
+  };
+}
+
+function construirEmpleadosAsignadosDetalleCita(cita = {}) {
+  const empleados = Array.isArray(cita.empleadosAsignados) ? cita.empleadosAsignados : [];
+  const nombres = Array.isArray(cita.empleadosAsignadosNombres) ? cita.empleadosAsignadosNombres : [];
+  const detalle = empleados
+    .map((empleado, index) => construirEmpleadoAsignadoDetalle(empleado, nombres[index] || ""))
+    .filter(Boolean);
+
+  if (detalle.length) return detalle;
+
+  const nombreFallback = cita.empleadoAsignadoNombre || nombres[0] || "";
+  const empleadoPrincipal = construirEmpleadoAsignadoDetalle(cita.empleadoAsignadoId, nombreFallback);
+  return empleadoPrincipal ? [empleadoPrincipal] : [];
+}
+
+async function construirFidelidadClientePorUserId(userId) {
+  if (!mongoose.Types.ObjectId.isValid(String(userId || ""))) {
     return {
-      email: "",
       mascota: { completados: 0, objetivo: 8, restantes: 8, rewardEligible: false },
       auto: { completados: 0, objetivo: 8, restantes: 8, rewardEligible: false }
     };
   }
 
   const citasCompletadas = await Appointment.find({
-    clienteEmail: emailNormalizado,
+    clientUserId: new mongoose.Types.ObjectId(String(userId)),
     estado: "completada",
     rewardGratisAplicado: { $ne: true },
     rewardConsumido: { $ne: true }
-  }).select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey");
+  }).select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey mascotaNombre serviciosDetalle rewardUnidadesConsumidas rewardConsumido");
   const progreso = construirResumenFidelidad(crearProgresoRecompensasAgenda(citasCompletadas));
 
   return {
-    email: emailNormalizado,
     ...progreso
   };
 }
@@ -1415,6 +1535,7 @@ function construirCitaClientePortal(cita) {
   const empleadosAsignadosNombres = Array.isArray(obj.empleadosAsignadosNombres)
     ? obj.empleadosAsignadosNombres.filter(Boolean)
     : [];
+  const empleadosAsignadosDetalle = construirEmpleadosAsignadosDetalleCita(obj);
 
   return {
     id: obj._id,
@@ -1439,22 +1560,39 @@ function construirCitaClientePortal(cita) {
       referencias: obj.direccion?.referencias || ""
     },
     atendidoPor: obj.atendidoPor || "",
-    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || empleadosAsignadosNombres[0] || "",
+    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || empleadosAsignadosNombres[0] || empleadosAsignadosDetalle[0]?.nombreCompleto || "",
+    empleadoAsignadoFotoUrl: empleadosAsignadosDetalle[0]?.fotoPerfilUrl || "",
     empleadosAsignadosNombres,
+    empleadosAsignadosDetalle,
     rewardGratisAplicado: obj.rewardGratisAplicado === true,
     rewardTipo: obj.rewardTipo || "",
     rewardConsumido: obj.rewardConsumido === true
   };
 }
 
-async function obtenerServiciosElegiblesRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
-  const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(clienteTelefono);
+function construirFiltroClienteRecompensa({ clienteTelefono, clientUserId } = {}) {
+  if (mongoose.Types.ObjectId.isValid(String(clientUserId || ""))) {
+    return {
+      ok: true,
+      filtro: { clientUserId: new mongoose.Types.ObjectId(String(clientUserId)) },
+      tieneClientUserId: true
+    };
+  }
+
+  const { telefono, filtro } = construirFiltroTelefonoAgenda(clienteTelefono);
+  if (!telefono) return { ok: false, filtro: {}, tieneClientUserId: false };
+
+  return { ok: true, filtro, tieneClientUserId: false };
+}
+
+async function obtenerServiciosElegiblesRecompensa({ clienteTelefono, clientUserId = null, servicioTipo, excludeId = "" }) {
+  const filtroCliente = construirFiltroClienteRecompensa({ clienteTelefono, clientUserId });
   const tipo = servicioTipo === "auto" ? "auto" : servicioTipo === "mascota" ? "mascota" : "";
 
-  if (!telefono || !tipo) return [];
+  if (!filtroCliente.ok || !tipo) return [];
 
   const filtro = {
-    ...filtroTelefono,
+    ...filtroCliente.filtro,
     estado: "completada",
     rewardGratisAplicado: { $ne: true },
     rewardConsumido: { $ne: true }
@@ -1466,26 +1604,33 @@ async function obtenerServiciosElegiblesRecompensa({ clienteTelefono, servicioTi
 
   return Appointment.find(filtro)
     .sort({ fecha: 1, hora: 1, createdAt: 1, _id: 1 })
-    .select("_id servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey")
-    .then((citas) => citas.filter((cita) => obtenerTipoGeneralServicioAgenda(cita) === tipo).slice(0, 8));
+    .select("_id servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey mascotaNombre serviciosDetalle rewardUnidadesConsumidas rewardConsumido")
+    .then((citas) => expandirCitasPorUnidadesFidelidad(citas, tipo).slice(0, 8));
 }
 
-async function validarRecompensaDisponible({ clienteTelefono, servicioTipo, excludeId = "" }) {
-  const servicios = await obtenerServiciosElegiblesRecompensa({ clienteTelefono, servicioTipo, excludeId });
+async function validarRecompensaDisponible({ clienteTelefono, clientUserId = null, servicioTipo, excludeId = "" }) {
+  const servicios = await obtenerServiciosElegiblesRecompensa({ clienteTelefono, clientUserId, servicioTipo, excludeId });
+  const sourceUnitCounts = servicios.reduce((acc, item) => {
+    const id = String(item._id);
+    acc[id] = (acc[id] || 0) + 1;
+    return acc;
+  }, {});
+  const sourceIds = Object.keys(sourceUnitCounts);
   return {
     disponible: servicios.length >= 8,
-    sourceIds: servicios.map((item) => item._id)
+    sourceIds,
+    sourceUnitCounts
   };
 }
 
-async function buscarCitaGratisActivaRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
-  const { telefono, filtro: filtroTelefono } = construirFiltroTelefonoAgenda(clienteTelefono);
+async function buscarCitaGratisActivaRecompensa({ clienteTelefono, clientUserId = null, servicioTipo, excludeId = "" }) {
+  const filtroCliente = construirFiltroClienteRecompensa({ clienteTelefono, clientUserId });
   const tipo = servicioTipo === "auto" ? "auto" : servicioTipo === "mascota" ? "mascota" : "";
 
-  if (!telefono || !tipo) return null;
+  if (!filtroCliente.ok || !tipo) return null;
 
   const filtro = {
-    ...filtroTelefono,
+    ...filtroCliente.filtro,
     rewardGratisAplicado: true,
     rewardGrupoId: { $in: ["", null] },
     estado: { $nin: ["cancelada", "no_asistio"] }
@@ -1502,8 +1647,8 @@ async function buscarCitaGratisActivaRecompensa({ clienteTelefono, servicioTipo,
   return citasGratis.find((cita) => (cita.rewardTipo || obtenerTipoGeneralServicioAgenda(cita)) === tipo) || null;
 }
 
-async function validarAplicacionRecompensa({ clienteTelefono, servicioTipo, excludeId = "" }) {
-  const citaGratisActiva = await buscarCitaGratisActivaRecompensa({ clienteTelefono, servicioTipo, excludeId });
+async function validarAplicacionRecompensa({ clienteTelefono, clientUserId = null, servicioTipo, excludeId = "" }) {
+  const citaGratisActiva = await buscarCitaGratisActivaRecompensa({ clienteTelefono, clientUserId, servicioTipo, excludeId });
 
   if (citaGratisActiva) {
     return {
@@ -1513,7 +1658,7 @@ async function validarAplicacionRecompensa({ clienteTelefono, servicioTipo, excl
     };
   }
 
-  const recompensa = await validarRecompensaDisponible({ clienteTelefono, servicioTipo, excludeId });
+  const recompensa = await validarRecompensaDisponible({ clienteTelefono, clientUserId, servicioTipo, excludeId });
 
   if (!recompensa.disponible) {
     return {
@@ -1588,6 +1733,7 @@ async function consumirRecompensaCita(cita) {
   const tipo = cita.rewardTipo || obtenerTipoGeneralServicioAgenda(cita);
   const elegibles = await validarRecompensaDisponible({
     clienteTelefono: cita.clienteTelefono,
+    clientUserId: cita.clientUserId || null,
     servicioTipo: tipo,
     excludeId: cita._id
   });
@@ -1596,36 +1742,85 @@ async function consumirRecompensaCita(cita) {
     return { ok: false, status: 409, message: `Este cliente ya no tiene 8 servicios de ${tipo} disponibles para consumir.` };
   }
 
-  const grupoId = `reward-${Date.now()}-${cita._id}`;
-  const resultado = await Appointment.updateMany(
-    {
-      _id: { $in: elegibles.sourceIds },
-      estado: "completada",
-      rewardGratisAplicado: { $ne: true },
-      rewardConsumido: { $ne: true }
-    },
-    {
-      $set: {
-        rewardConsumido: true,
-        rewardGrupoId: grupoId
-      }
-    }
-  );
+  const sourceUnitCounts = elegibles.sourceUnitCounts || {};
+  const sourceIdsUnicos = Object.keys(sourceUnitCounts);
+  const citasFuente = await Appointment.find({
+    _id: { $in: sourceIdsUnicos },
+    estado: "completada",
+    rewardGratisAplicado: { $ne: true },
+    rewardConsumido: { $ne: true }
+  }).select("_id servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey mascotaNombre serviciosDetalle rewardUnidadesConsumidas rewardConsumido");
 
-  if (resultado.modifiedCount !== 8) {
-    await Appointment.updateMany(
-      { rewardGrupoId: grupoId },
-      {
-        $set: { rewardConsumido: false },
-        $unset: { rewardGrupoId: "" }
-      }
-    );
+  if (citasFuente.length !== sourceIdsUnicos.length) {
     return { ok: false, status: 409, message: "La recompensa ya fue consumida por otra operacion. Actualiza la agenda e intenta de nuevo." };
   }
 
+  const citasFuentePorId = new Map(citasFuente.map((item) => [String(item._id), item]));
+  const snapshotFuentes = sourceIdsUnicos.map((id) => {
+    const citaFuente = citasFuentePorId.get(id);
+    const unidadesNecesarias = Number(sourceUnitCounts[id]) || 0;
+    const unidadesDisponibles = contarUnidadesFidelidadDisponiblesCita(citaFuente);
+    const unidadesPrevias = contarUnidadesFidelidadConsumidasCita(citaFuente);
+    return {
+      id,
+      unidadesNecesarias,
+      unidadesDisponibles,
+      unidadesPrevias,
+      totalUnidades: contarUnidadesFidelidadCita(citaFuente),
+      rewardConsumidoPrevio: citaFuente.rewardConsumido === true
+    };
+  });
+
+  if (snapshotFuentes.some((item) => item.unidadesNecesarias < 1 || item.unidadesDisponibles < item.unidadesNecesarias)) {
+    return { ok: false, status: 409, message: "La recompensa ya fue consumida por otra operacion. Actualiza la agenda e intenta de nuevo." };
+  }
+
+  const grupoId = `reward-${Date.now()}-${cita._id}`;
+  const operacionesConsumo = snapshotFuentes.map((item) => ({
+    updateOne: {
+      filter: {
+        _id: item.id,
+        estado: "completada",
+        rewardGratisAplicado: { $ne: true },
+        rewardConsumido: { $ne: true },
+        $or: item.unidadesPrevias === 0
+          ? [{ rewardUnidadesConsumidas: 0 }, { rewardUnidadesConsumidas: { $exists: false } }]
+          : [{ rewardUnidadesConsumidas: item.unidadesPrevias }]
+      },
+      update: {
+        $inc: { rewardUnidadesConsumidas: item.unidadesNecesarias }
+      }
+    }
+  }));
+
+  const resultado = await Appointment.bulkWrite(operacionesConsumo);
+
+  const totalModificadas = Number(resultado.modifiedCount ?? resultado.nModified ?? 0);
+  if (totalModificadas !== sourceIdsUnicos.length) {
+    await Promise.all(snapshotFuentes.map((item) => Appointment.updateOne(
+      { _id: item.id },
+      {
+        $set: {
+          rewardUnidadesConsumidas: item.unidadesPrevias,
+          rewardConsumido: item.rewardConsumidoPrevio
+        }
+      }
+    )));
+    return { ok: false, status: 409, message: "La recompensa ya fue consumida por otra operacion. Actualiza la agenda e intenta de nuevo." };
+  }
+
+  await Promise.all(snapshotFuentes.map((item) => {
+    const unidadesFinales = item.unidadesPrevias + item.unidadesNecesarias;
+    if (unidadesFinales < item.totalUnidades) return Promise.resolve();
+    return Appointment.updateOne(
+      { _id: item.id, rewardUnidadesConsumidas: unidadesFinales },
+      { $set: { rewardConsumido: true } }
+    );
+  }));
+
   cita.rewardTipo = tipo;
   cita.rewardGrupoId = grupoId;
-  cita.rewardSourceIds = elegibles.sourceIds;
+  cita.rewardSourceIds = sourceIdsUnicos;
   return { ok: true };
 }
 
@@ -2474,8 +2669,16 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
 
 function construirCitaAdmin(cita) {
   const obj = typeof cita.toObject === "function" ? cita.toObject() : cita;
+  const empleadosAsignadosDetalle = construirEmpleadosAsignadosDetalleCita(obj);
+  const empleadosAsignadosIds = Array.isArray(obj.empleadosAsignados)
+    ? obj.empleadosAsignados.map(obtenerIdEmpleadoAsignadoValor).filter(Boolean)
+    : obj.empleadoAsignadoId ? [obtenerIdEmpleadoAsignadoValor(obj.empleadoAsignadoId)].filter(Boolean) : [];
+  const empleadosAsignadosNombres = Array.isArray(obj.empleadosAsignadosNombres)
+    ? obj.empleadosAsignadosNombres
+    : obj.empleadoAsignadoNombre ? [obj.empleadoAsignadoNombre] : [];
   return {
     id: obj._id,
+    clientUserId: obj.clientUserId ? String(obj.clientUserId) : "",
     clienteNombre: obj.clienteNombre || "",
     clienteTelefono: obj.clienteTelefono || "",
     clienteEmail: obj.clienteEmail || "",
@@ -2499,14 +2702,12 @@ function construirCitaAdmin(cita) {
     direccion: obj.direccion || "",
     notas: obj.notas || "",
     atendidoPor: obj.atendidoPor || "",
-    empleadoAsignadoId: obj.empleadoAsignadoId ? String(obj.empleadoAsignadoId) : (Array.isArray(obj.empleadosAsignados) && obj.empleadosAsignados[0] ? String(obj.empleadosAsignados[0]) : ""),
-    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || (Array.isArray(obj.empleadosAsignadosNombres) && obj.empleadosAsignadosNombres[0] ? obj.empleadosAsignadosNombres[0] : ""),
-    empleadosAsignados: Array.isArray(obj.empleadosAsignados)
-      ? obj.empleadosAsignados.map((id) => String(id))
-      : obj.empleadoAsignadoId ? [String(obj.empleadoAsignadoId)] : [],
-    empleadosAsignadosNombres: Array.isArray(obj.empleadosAsignadosNombres)
-      ? obj.empleadosAsignadosNombres
-      : obj.empleadoAsignadoNombre ? [obj.empleadoAsignadoNombre] : [],
+    empleadoAsignadoId: obj.empleadoAsignadoId ? obtenerIdEmpleadoAsignadoValor(obj.empleadoAsignadoId) : (empleadosAsignadosIds[0] || ""),
+    empleadoAsignadoNombre: obj.empleadoAsignadoNombre || empleadosAsignadosNombres[0] || empleadosAsignadosDetalle[0]?.nombreCompleto || "",
+    empleadoAsignadoFotoUrl: empleadosAsignadosDetalle[0]?.fotoPerfilUrl || "",
+    empleadosAsignados: empleadosAsignadosIds,
+    empleadosAsignadosNombres,
+    empleadosAsignadosDetalle,
     calificacionServicio: Number.isInteger(obj.calificacionServicio) ? obj.calificacionServicio : null,
     calificacionCliente: Number.isInteger(obj.calificacionCliente) ? obj.calificacionCliente : null,
     comentarioCliente: obj.comentarioCliente || "",
@@ -2520,6 +2721,7 @@ function construirCitaAdmin(cita) {
     rewardGratisAplicado: Boolean(obj.rewardGratisAplicado),
     rewardTipo: obj.rewardTipo || "",
     rewardConsumido: Boolean(obj.rewardConsumido),
+    rewardUnidadesConsumidas: Number.isFinite(obj.rewardUnidadesConsumidas) ? obj.rewardUnidadesConsumidas : 0,
     rewardGrupoId: obj.rewardGrupoId || "",
     rewardSourceIds: Array.isArray(obj.rewardSourceIds) ? obj.rewardSourceIds.map((id) => String(id)) : [],
     estado: obj.estado || "pendiente",
@@ -2560,7 +2762,12 @@ function construirCitaEmpleado(cita) {
     zona: base.zona,
     direccion: base.direccion,
     notas: base.notas,
+    empleadoAsignadoId: base.empleadoAsignadoId,
     empleadoAsignadoNombre: base.empleadoAsignadoNombre,
+    empleadoAsignadoFotoUrl: base.empleadoAsignadoFotoUrl,
+    empleadosAsignados: base.empleadosAsignados,
+    empleadosAsignadosNombres: base.empleadosAsignadosNombres,
+    empleadosAsignadosDetalle: base.empleadosAsignadosDetalle,
     estado: base.estado,
     estadoOperativo: base.estadoOperativo,
     estadoVisible: obtenerEstadoVisibleCita(base),
@@ -2890,6 +3097,187 @@ app.post("/cliente/items/photo", auth, async (req, res) => {
   }
 });
 
+async function obtenerClienteAutenticado(req, res) {
+  const userId = typeof req.user?.id === "string" ? req.user.id : "";
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    res.status(401).json({ message: "Token invalido" });
+    return null;
+  }
+
+  const user = await User.findById(userId).select("role");
+  if (!user || obtenerRolUsuario(user) !== "cliente") {
+    res.status(403).json({ message: "No autorizado" });
+    return null;
+  }
+
+  return userId;
+}
+
+function construirClientItemRespuesta(item) {
+  const obj = item.toObject ? item.toObject() : item;
+  return {
+    id: String(obj._id),
+    tipo: obj.tipo === "auto" ? "auto" : "mascota",
+    nombre: obj.nombre || "",
+    especie: obj.especie || "Perro",
+    raza: obj.raza || "",
+    edad: obj.edad || "",
+    tamano: obj.tamano || "",
+    tipoPelo: obj.tipoPelo || "",
+    cuidados: obj.cuidados || "",
+    marca: obj.marca || "",
+    modelo: obj.modelo || "",
+    anio: obj.anio || "",
+    color: obj.color || "",
+    tipoVehiculo: obj.tipoVehiculo || "",
+    fotoUrl: obj.fotoUrl || "",
+    fotoNombre: obj.fotoNombre || "",
+    createdAt: obj.createdAt,
+    updatedAt: obj.updatedAt
+  };
+}
+
+function limpiarClientItemPayload(body = {}) {
+  const tipo = body.tipo === "auto" || body.tipo === "mascota" ? body.tipo : "";
+  const datos = {
+    tipo,
+    nombre: normalizarTextoPlano(body.nombre, 120),
+    fotoUrl: normalizarTextoPlano(body.fotoUrl, 1000),
+    fotoNombre: normalizarTextoPlano(body.fotoNombre, 180)
+  };
+
+  if (tipo === "auto") {
+    datos.especie = "Perro";
+    datos.raza = "";
+    datos.edad = "";
+    datos.tamano = "";
+    datos.tipoPelo = "";
+    datos.cuidados = "";
+    datos.marca = normalizarTextoPlano(body.marca, 80);
+    datos.modelo = normalizarTextoPlano(body.modelo, 80);
+    datos.anio = normalizarTextoPlano(body.anio, 10);
+    datos.color = normalizarTextoPlano(body.color, 40);
+    datos.tipoVehiculo = normalizarTextoPlano(body.tipoVehiculo, 80);
+  } else {
+    datos.especie = "Perro";
+    datos.raza = normalizarTextoPlano(body.raza, 80);
+    datos.edad = normalizarTextoPlano(body.edad, 20);
+    datos.tamano = normalizarTextoPlano(body.tamano, 40);
+    datos.tipoPelo = normalizarTextoPlano(body.tipoPelo, 80);
+    datos.cuidados = normalizarTextoPlano(body.cuidados, 500);
+    datos.marca = "";
+    datos.modelo = "";
+    datos.anio = "";
+    datos.color = "";
+    datos.tipoVehiculo = "";
+  }
+
+  return datos;
+}
+
+function validarClientItemPayload(datos) {
+  if (!["mascota", "auto"].includes(datos.tipo)) {
+    return "Tipo de registro invalido.";
+  }
+
+  if (!datos.nombre) return "El nombre es obligatorio.";
+  if (datos.tipo === "auto") {
+    if (!datos.marca || !datos.modelo || !datos.tipoVehiculo) {
+      return "Completa nombre, marca, modelo y tipo de vehiculo.";
+    }
+    return "";
+  }
+
+  if (!datos.raza || !datos.edad || !datos.tamano || !datos.tipoPelo) {
+    return "Completa nombre, raza, edad, tamano y tipo de pelo.";
+  }
+
+  return "";
+}
+
+app.get("/cliente/items", auth, async (req, res) => {
+  try {
+    const userId = await obtenerClienteAutenticado(req, res);
+    if (!userId) return;
+
+    const items = await ClientItem.find({ userId }).sort({ updatedAt: -1, createdAt: -1 });
+    res.json({ items: items.map(construirClientItemRespuesta) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron cargar tus registros." });
+  }
+});
+
+app.post("/cliente/items", auth, async (req, res) => {
+  try {
+    const userId = await obtenerClienteAutenticado(req, res);
+    if (!userId) return;
+
+    const datos = limpiarClientItemPayload(req.body);
+    const error = validarClientItemPayload(datos);
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+
+    const item = await ClientItem.create({ ...datos, userId });
+    res.status(201).json({ item: construirClientItemRespuesta(item) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo guardar el registro." });
+  }
+});
+
+app.patch("/cliente/items/:id", auth, async (req, res) => {
+  try {
+    const userId = await obtenerClienteAutenticado(req, res);
+    if (!userId) return;
+
+    const id = String(req.params.id || "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Registro invalido." });
+    }
+
+    const datos = limpiarClientItemPayload(req.body);
+    const error = validarClientItemPayload(datos);
+    if (error) {
+      return res.status(400).json({ message: error });
+    }
+
+    const item = await ClientItem.findOneAndUpdate(
+      { _id: id, userId },
+      { $set: datos },
+      { new: true, runValidators: true }
+    );
+
+    if (!item) {
+      return res.status(404).json({ message: "Registro no encontrado." });
+    }
+
+    res.json({ item: construirClientItemRespuesta(item) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar el registro." });
+  }
+});
+
+app.delete("/cliente/items/:id", auth, async (req, res) => {
+  try {
+    const userId = await obtenerClienteAutenticado(req, res);
+    if (!userId) return;
+
+    const id = String(req.params.id || "");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Registro invalido." });
+    }
+
+    const item = await ClientItem.findOneAndDelete({ _id: id, userId });
+    if (!item) {
+      return res.status(404).json({ message: "Registro no encontrado." });
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo eliminar el registro." });
+  }
+});
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("Mongo conectado"))
   .catch((err) => console.log(err));
@@ -3092,23 +3480,40 @@ app.post("/login", authRateLimit, async (req, res) => {
 // ============================
 // PERFIL (PROTEGIDA)
 // ============================
-app.get("/perfil", auth, (req, res) => {
-  res.json({ message: "Acceso permitido", user: req.user });
+app.get("/perfil", auth, async (req, res) => {
+  try {
+    const userId = typeof req.user?.id === "string" ? req.user.id : "";
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Sesion invalida" });
+    }
+
+    const user = await User.findById(userId).select("usuario email role nombreCompleto telefono");
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    res.json({
+      message: "Acceso permitido",
+      user: {
+        id: user._id.toString(),
+        usuario: user.usuario || "",
+        email: user.email || "",
+        role: obtenerRolUsuario(user),
+        nombreCompleto: user.nombreCompleto || "",
+        telefono: user.telefono || ""
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error del servidor" });
+  }
 });
 
 app.get("/cliente/loyalty", auth, async (req, res) => {
   try {
-    const userId = typeof req.user?.id === "string" ? req.user.id : "";
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(401).json({ message: "Token invalido" });
-    }
+    const user = await obtenerClientePortalAutenticado(req, res, "role");
+    if (!user) return;
 
-    const user = await User.findById(userId).select("email role");
-    if (!user || obtenerRolUsuario(user) !== "cliente") {
-      return res.status(403).json({ message: "No autorizado" });
-    }
-
-    const loyalty = await construirFidelidadClientePorEmail(user.email);
+    const loyalty = await construirFidelidadClientePorUserId(user._id);
     res.json(loyalty);
   } catch (error) {
     res.status(500).json({ message: "No se pudo obtener la tarjeta de fidelidad" });
@@ -3117,26 +3522,16 @@ app.get("/cliente/loyalty", auth, async (req, res) => {
 
 app.get("/cliente/appointments", auth, async (req, res) => {
   try {
-    const userId = typeof req.user?.id === "string" ? req.user.id : "";
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(401).json({ message: "Token invalido" });
-    }
+    const user = await obtenerClientePortalAutenticado(req, res, "role");
+    if (!user) return;
 
-    const user = await User.findById(userId).select("email role");
-    if (!user || obtenerRolUsuario(user) !== "cliente") {
-      return res.status(403).json({ message: "No autorizado" });
-    }
-
-    const emailNormalizado = normalizarEmail(user.email);
-    if (!emailNormalizado || !validarEmail(emailNormalizado)) {
-      return res.status(400).json({ message: "Tu cuenta no tiene un correo valido" });
-    }
-
-    const citas = await Appointment.find({ clienteEmail: emailNormalizado })
+    const citas = await Appointment.find({ clientUserId: user._id })
+      .populate("empleadoAsignadoId", "nombreCompleto fotoPerfilUrl")
+      .populate("empleadosAsignados", "nombreCompleto fotoPerfilUrl")
       .sort({ fecha: -1, hora: -1, createdAt: -1 });
 
     res.json({
-      email: emailNormalizado,
+      userId: user._id.toString(),
       citas: citas.map(construirCitaClientePortal)
     });
   } catch (error) {
@@ -3264,6 +3659,12 @@ async function confirmarPedidoPagado(pedido, session = {}) {
 
 app.post("/create-checkout-session", auth, checkoutLimiter, async (req, res) => {
   try {
+    if (!COMPRAS_EN_LINEA_HABILITADAS) {
+      return res.status(503).json({
+        message: "Por el momento las compras en linea no estan habilitadas. Puedes pedir tus productos por WhatsApp y coordinamos la entrega en tu proxima cita."
+      });
+    }
+
     const { carrito, datos } = req.body;
     const userId = req.user.id;
     const carritoSeguro = construirCarritoSeguro(carrito);
@@ -3370,6 +3771,12 @@ app.get("/mis-pedidos", auth, async (req, res) => {
 
 app.post("/confirm-order", auth, checkoutLimiter, async (req, res) => {
   try {
+    if (!COMPRAS_EN_LINEA_HABILITADAS) {
+      return res.status(503).json({
+        message: "Por el momento las compras en linea no estan habilitadas. Puedes pedir tus productos por WhatsApp y coordinamos la entrega en tu proxima cita."
+      });
+    }
+
     const { sessionId } = req.body;
     const stripeClient = obtenerStripeClient();
 
@@ -4176,7 +4583,10 @@ async function construirAppointmentsEmpleadoRespuesta(employeeId, fecha, options
   const citas = await Appointment.find({
     fecha,
     ...filtroEmpleado
-  }).sort({ fecha: 1, hora: 1 });
+  })
+    .populate("empleadoAsignadoId", "nombreCompleto fotoPerfilUrl")
+    .populate("empleadosAsignados", "nombreCompleto fotoPerfilUrl")
+    .sort({ fecha: 1, hora: 1 });
   const metricas = calcularMetricasEmpleado(await Appointment.find(filtroEmpleado));
 
   return {
@@ -5076,6 +5486,10 @@ app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado,
     }
 
     await cita.save();
+    await cita.populate([
+      { path: "empleadoAsignadoId", select: "nombreCompleto fotoPerfilUrl" },
+      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" }
+    ]);
     res.json({ message: "Estado operativo actualizado", cita: construirCitaEmpleado(cita) });
   } catch (error) {
     res.status(500).json({ message: "No se pudo actualizar el estado operativo" });
@@ -5132,7 +5546,10 @@ app.get("/admin/appointments", auth, requireAdmin, async (req, res) => {
       Object.assign(filtro, filtroTelefono.filtro);
     }
 
-    const citas = await Appointment.find(filtro).sort({ fecha: 1, hora: 1, createdAt: -1 });
+    const citas = await Appointment.find(filtro)
+      .populate("empleadoAsignadoId", "nombreCompleto fotoPerfilUrl")
+      .populate("empleadosAsignados", "nombreCompleto fotoPerfilUrl")
+      .sort({ fecha: 1, hora: 1, createdAt: -1 });
     res.json({ citas: citas.map(construirCitaAdmin) });
   } catch (error) {
     res.status(500).json({ message: "No se pudieron obtener las citas" });
@@ -5362,6 +5779,8 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
       return res.status(400).json({ message: "Solo puedes registrar calificacion en citas completadas" });
     }
 
+    await completarClientUserIdCita(datos);
+
     if (datos.rewardGratisAplicado) {
       const rewardTipo = datos.rewardTipo || datos.servicioTipo;
       if (rewardTipo !== datos.servicioTipo) {
@@ -5370,6 +5789,7 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
 
       const recompensa = await validarAplicacionRecompensa({
         clienteTelefono: datos.clienteTelefono,
+        clientUserId: datos.clientUserId || null,
         servicioTipo: rewardTipo
       });
 
@@ -5432,6 +5852,10 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
       throw error;
     }
 
+    await cita.populate([
+      { path: "empleadoAsignadoId", select: "nombreCompleto fotoPerfilUrl" },
+      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" }
+    ]);
     res.status(201).json({ message: "Cita creada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
     if (error.status) {
@@ -5501,6 +5925,10 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       datos.calificacionServicio = null;
     }
 
+    if (Object.prototype.hasOwnProperty.call(datos, "clienteEmail")) {
+      await completarClientUserIdCita(datos);
+    }
+
     const rewardAplicadoFinal = Object.prototype.hasOwnProperty.call(datos, "rewardGratisAplicado")
       ? datos.rewardGratisAplicado
       : Boolean(cita.rewardGratisAplicado);
@@ -5523,9 +5951,11 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       }
     }
 
-    if (cita.rewardGrupoId) {
+    if (cita.rewardGrupoId || Number(cita.rewardUnidadesConsumidas) > 0) {
       const camposProtegidosRecompensa = [
         "clienteTelefono",
+        "clienteEmail",
+        "clientUserId",
         "servicioTipo",
         "servicioCategoria",
         "servicioPaquete",
@@ -5553,6 +5983,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       if (!cita.rewardGrupoId) {
         const recompensa = await validarAplicacionRecompensa({
           clienteTelefono: clienteTelefonoFinal,
+          clientUserId: Object.prototype.hasOwnProperty.call(datos, "clientUserId") ? datos.clientUserId : cita.clientUserId,
           servicioTipo: rewardTipoFinal,
           excludeId: appointmentId
         });
@@ -5611,6 +6042,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       "clienteNombre",
       "clienteTelefono",
       "clienteEmail",
+      "clientUserId",
       "mascotaNombre",
       "mascotaEdad",
       "servicioTipo",
@@ -5704,6 +6136,10 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       throw error;
     }
 
+    await cita.populate([
+      { path: "empleadoAsignadoId", select: "nombreCompleto fotoPerfilUrl" },
+      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" }
+    ]);
     res.json({ message: "Cita actualizada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
     if (error.status) {
@@ -5839,6 +6275,10 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
       throw error;
     }
 
+    await cita.populate([
+      { path: "empleadoAsignadoId", select: "nombreCompleto fotoPerfilUrl" },
+      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" }
+    ]);
     res.json({ message: "Estado actualizado correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
     if (error.status) {
@@ -5886,7 +6326,7 @@ app.get("/admin/customers/:telefono/rewards", auth, requireAdmin, async (req, re
       rewardGratisAplicado: { $ne: true },
       rewardConsumido: { $ne: true }
     })
-      .select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey");
+      .select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey mascotaNombre serviciosDetalle rewardUnidadesConsumidas rewardConsumido");
     const progresoRecompensas = crearProgresoRecompensasAgenda(citasCompletadas);
     const serviciosAgrupados = Object.values(progresoRecompensas)
       .sort((a, b) => b.cantidad - a.cantidad || a.servicioTipo.localeCompare(b.servicioTipo));

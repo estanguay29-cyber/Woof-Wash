@@ -1133,6 +1133,58 @@ input {
   overflow-wrap: anywhere;
 }
 
+.appointment-employee-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 9px 12px;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 250, 232, 0.96), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 10px 22px rgba(11, 42, 107, 0.08);
+}
+
+.appointment-employee-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 2px solid rgba(140, 198, 63, 0.55);
+  background: #0b2a6b;
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 950;
+}
+
+.appointment-employee-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.appointment-employee-card small,
+.appointment-employee-card strong {
+  display: block;
+}
+
+.appointment-employee-card small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.appointment-employee-card strong {
+  color: var(--blue);
+  font-size: 0.9rem;
+  font-weight: 950;
+  overflow-wrap: anywhere;
+}
+
 .appointment-meta {
   display: flex;
   flex-wrap: wrap;
