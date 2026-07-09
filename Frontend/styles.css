@@ -283,6 +283,18 @@ h1, h2, h3 {
   margin-right: 8px;
 }
 
+@media (min-width: 768px) {
+  #desktopAccountBox.desktop-account-box {
+    display: block !important;
+  }
+}
+
+@media (max-width: 767px) {
+  #desktopAccountBox.desktop-account-box {
+    display: none !important;
+  }
+}
+
 .desktop-account-trigger {
   min-height: 46px;
   display: inline-flex;

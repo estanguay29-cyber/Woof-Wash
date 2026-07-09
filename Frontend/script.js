@@ -1129,7 +1129,7 @@ if (carrito.length === 0) {
   if (!COMPRAS_EN_LINEA_HABILITADAS) {
     if (authButtons) authButtons.classList.add("hidden");
     if (nombreUsuario) {
-      nombreUsuario.innerText = "Por el momento las compras en linea no estan habilitadas. Pide tus productos por WhatsApp.";
+      nombreUsuario.innerText = "Por el momento las compras se finalizan por WhatsApp. Envia tu pedido y te confirmamos disponibilidad y entrega.";
     }
     if (btnWhats) {
       btnWhats.classList.remove("hidden");
