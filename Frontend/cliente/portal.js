@@ -251,6 +251,8 @@ function obtenerRolSesion() {
 function limpiarSesion() {
   localStorage.removeItem("token");
   localStorage.removeItem("usuario");
+  localStorage.removeItem("clienteTelefono");
+  localStorage.removeItem("telefono");
 }
 
 function redirigirALogin() {
@@ -336,7 +338,8 @@ async function cargarPerfilCliente() {
   const perfil = normalizarPerfilCliente(await clienteFetch("/perfil"));
   clientProfileCache = perfil;
   if (perfil.usuario) localStorage.setItem("usuario", perfil.usuario);
-  if (perfil.telefono) localStorage.setItem("clienteTelefono", perfil.telefono);
+  localStorage.removeItem("clienteTelefono");
+  localStorage.removeItem("telefono");
   return perfil;
 }
 
@@ -992,7 +995,7 @@ function obtenerDatosClienteWhatsApp() {
   const telefonoPerfil = normalizarTexto(clientProfileCache?.telefono);
   return {
     nombre: nombrePerfil || normalizarTexto(localStorage.getItem("usuario")) || "Cliente",
-    telefono: telefonoPerfil || normalizarTexto(localStorage.getItem("clienteTelefono") || localStorage.getItem("telefono"))
+    telefono: telefonoPerfil
   };
 }
 

@@ -104,6 +104,12 @@ const AppointmentSchema = new mongoose.Schema(
       default: null,
       index: true
     },
+    customerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CustomerProfile",
+      default: null,
+      index: true
+    },
     servicioTipo: {
       type: String,
       enum: ["mascota", "auto"],
@@ -359,6 +365,7 @@ AppointmentSchema.index({ fecha: 1 });
 AppointmentSchema.index({ estado: 1 });
 AppointmentSchema.index({ clienteTelefono: 1 });
 AppointmentSchema.index({ clientUserId: 1, fecha: -1 });
+AppointmentSchema.index({ customerId: 1, fecha: -1 });
 AppointmentSchema.index({ servicioKey: 1 });
 AppointmentSchema.index({ empleadoAsignadoId: 1, fecha: 1 });
 AppointmentSchema.index({ empleadosAsignados: 1 });

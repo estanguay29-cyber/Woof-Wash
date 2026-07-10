@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const ADMIN_PAGES = new Set(["pedidos", "agenda", "empleados", "portal"]);
+  const ADMIN_PAGES = new Set(["pedidos", "agenda", "clientes", "empleados", "portal"]);
   const COLLAPSE_KEY = "wwAdminNavCollapsed";
 
   function getToken() {
@@ -465,6 +465,7 @@
       { key: "sitio", label: "Volver al sitio", icon: "&#127968;", href: `${prefix}index.html` },
       { key: "pedidos", label: "Pedidos", icon: "&#128230;", href: `${prefix}admin.html` },
       { key: "agenda", label: "Agenda", icon: "&#128197;", href: `${prefix}agenda.html` },
+      { key: "clientes", label: "Clientes", icon: "&#128100;", href: `${prefix}clientes.html` },
       { key: "empleados", label: "Empleados", icon: "&#128101;", href: `${prefix}empleados.html#employees` },
       { key: "desempeno", label: "Desempe&ntilde;o y n&oacute;mina", icon: "&#128200;", href: `${prefix}empleados.html#desempeno-nomina` },
       { key: "portal", label: "Portal empleados", icon: "&#128272;", href: `${prefix}empleados/portal.html` }

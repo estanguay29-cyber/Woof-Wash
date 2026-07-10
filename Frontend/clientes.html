@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/img/favicon.png">
+  <link rel="apple-touch-icon" href="/img/favicon.png">
+  <title>Clientes - Woof & Wash Admin</title>
+  <link rel="stylesheet" href="tailwind.css">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="clientes.css">
+</head>
+<body class="admin-page customers-page" data-admin-page="clientes">
+  <main class="admin-shell customers-shell">
+    <header class="admin-topbar">
+      <div class="admin-brand">
+        <div class="admin-logo-mark">
+          <img src="/img/favicon.png" alt="Woof & Wash">
+        </div>
+        <div>
+          <p class="admin-kicker">Administracion segura</p>
+          <h1>Clientes</h1>
+        </div>
+      </div>
+      <div class="admin-actions">
+        <button id="btnVolverSitio" type="button" class="admin-button admin-button-light">Volver al sitio</button>
+        <button id="btnAdminLogout" type="button" class="admin-button admin-button-dark">Cerrar sesion</button>
+      </div>
+    </header>
+
+    <section id="customersAccessMessage" class="admin-access-message hidden"></section>
+    <section id="customersFeedback" class="admin-feedback hidden"></section>
+
+    <section id="customersPanel" class="customers-panel hidden">
+      <section class="customers-hero">
+        <div>
+          <p class="admin-kicker">Admin > Clientes</p>
+          <h2>Clientes con cuenta y sin cuenta</h2>
+          <p>Gestiona perfiles internos, citas asociadas, coincidencias pendientes y fidelidad sin usar email o telefono como permiso del portal.</p>
+        </div>
+        <div id="customersStatus" class="admin-status-pill">Validando permisos...</div>
+      </section>
+
+      <section class="customers-toolbar">
+        <label class="customers-search">
+          Buscar
+          <input id="customersSearch" type="search" autocomplete="off" placeholder="Nombre, email, telefono">
+        </label>
+        <label class="customers-filter">
+          Filtro
+          <select id="customersFilter">
+            <option value="todos">Todos</option>
+            <option value="con_cuenta">Con cuenta web</option>
+            <option value="sin_cuenta">Sin cuenta web</option>
+            <option value="pendientes">Citas pendientes de vincular</option>
+            <option value="premios">Con premios disponibles</option>
+            <option value="duplicados">Posibles duplicados</option>
+            <option value="activos">Activos</option>
+            <option value="inactivos">Inactivos</option>
+          </select>
+        </label>
+        <button id="btnReloadCustomers" type="button" class="admin-button admin-button-dark">Actualizar</button>
+      </section>
+
+      <section class="customers-layout">
+        <div class="customers-list-card">
+          <div class="customers-list-header">
+            <div>
+              <p class="admin-kicker">Listado</p>
+              <h2>Clientes</h2>
+            </div>
+            <span id="customersCount" class="customers-count">0</span>
+          </div>
+          <div id="customersList" class="customers-list"></div>
+        </div>
+
+        <aside id="customerDetail" class="customer-detail">
+          <div class="customer-empty">
+            Selecciona un cliente para ver su detalle.
+          </div>
+        </aside>
+      </section>
+    </section>
+  </main>
+
+  <script src="admin-nav.js" defer></script>
+  <script src="clientes.js"></script>
+</body>
+</html>

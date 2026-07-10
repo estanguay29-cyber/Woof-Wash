@@ -14,6 +14,7 @@ const User = require("./User");
 const Employee = require("./Employee");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
+const CustomerProfile = require("./CustomerProfile");
 const ClientItem = require("./ClientItem");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
 const AppointmentSlotLock = require("./AppointmentSlotLock");
@@ -1450,6 +1451,247 @@ async function completarClientUserIdCita(datos = {}) {
   datos.clientUserId = clientUserId || null;
 }
 
+function normalizarTelefonoClientePerfil(value) {
+  return normalizarTelefonoAgenda(value);
+}
+
+function obtenerObjectIdSeguro(value) {
+  return mongoose.Types.ObjectId.isValid(String(value || ""))
+    ? new mongoose.Types.ObjectId(String(value))
+    : null;
+}
+
+function obtenerAdminUserId(req) {
+  return obtenerObjectIdSeguro(req?.admin?._id || req?.user?.id);
+}
+
+function construirCondicionesCustomerProfile({ emailNormalizado = "", telefonoNormalizado = "" } = {}) {
+  const condiciones = [];
+  if (emailNormalizado) condiciones.push({ emailNormalizado });
+  if (telefonoNormalizado) condiciones.push({ telefonoNormalizado });
+  return condiciones;
+}
+
+async function buscarCuentaClientePorEmail(emailNormalizado = "") {
+  if (!emailNormalizado || !validarEmail(emailNormalizado)) return null;
+  const user = await User.findOne({ email: emailNormalizado }).select("_id email role telefono nombreCompleto usuario");
+  return user && obtenerRolUsuario(user) === "cliente" ? user : null;
+}
+
+function aplicarDatosBasicosCustomerProfile(customer, datos = {}, { creadoDesde = "cita_admin" } = {}) {
+  const nombre = normalizarTextoPlano(datos.clienteNombre || datos.nombre || "", 120);
+  const emailNormalizado = normalizarEmail(datos.clienteEmail || datos.email || "");
+  const telefonoNormalizado = normalizarTelefonoClientePerfil(datos.clienteTelefono || datos.telefono || "");
+  const direccion = normalizarTextoPlano(datos.direccion || "", 240);
+  const zona = normalizarTextoPlano(datos.zona || "", 80);
+  const fecha = normalizarTextoPlano(datos.fecha || "", 10);
+
+  if (nombre && (!customer.nombre || customer.nombre.length < nombre.length)) customer.nombre = nombre;
+  if (telefonoNormalizado) {
+    customer.telefono = telefonoNormalizado;
+    customer.telefonoNormalizado = telefonoNormalizado;
+  }
+  if (emailNormalizado) {
+    customer.email = emailNormalizado;
+    customer.emailNormalizado = emailNormalizado;
+  }
+  if (!customer.creadoDesde) customer.creadoDesde = creadoDesde;
+
+  if (fecha && validarFechaISOAgenda(fecha)) {
+    if (!customer.fechaPrimerServicio || fecha < customer.fechaPrimerServicio) customer.fechaPrimerServicio = fecha;
+    if (!customer.fechaUltimoServicio || fecha > customer.fechaUltimoServicio) customer.fechaUltimoServicio = fecha;
+  }
+
+  if (direccion) {
+    const yaExiste = (customer.direccionesUsadas || []).some((item) => (
+      normalizarTextoPlano(item.texto || "", 240).toLowerCase() === direccion.toLowerCase()
+    ));
+    if (!yaExiste) {
+      customer.direccionesUsadas = [
+        { texto: direccion, zona, fuente: creadoDesde, ultimaVezUsada: new Date() },
+        ...(customer.direccionesUsadas || [])
+      ].slice(0, 8);
+    }
+  }
+
+  customer.estadoRevision = customer.userId
+    ? "vinculado"
+    : customer.estadoRevision === "posible_duplicado" || customer.estadoRevision === "pendiente_revision"
+      ? customer.estadoRevision
+      : "sin_cuenta";
+}
+
+function customerTieneEmailDistinto(customer = {}, emailNormalizado = "") {
+  return Boolean(emailNormalizado && customer.emailNormalizado && customer.emailNormalizado !== emailNormalizado);
+}
+
+function customerTieneTelefonoDistinto(customer = {}, telefonoNormalizado = "") {
+  return Boolean(telefonoNormalizado && customer.telefonoNormalizado && customer.telefonoNormalizado !== telefonoNormalizado);
+}
+
+function puedeAsignarClientUserIdPorCustomer(customer = {}, emailNormalizado = "", motivo = "") {
+  if (!customer?.userId || !emailNormalizado) return false;
+  if (customer.emailNormalizado !== emailNormalizado) return false;
+  return ["email", "email_telefono", "cuenta_email", "cuenta_email_existente"].includes(motivo);
+}
+
+function motivoCustomerProfileEsConflicto(motivo = "", estadoRevision = "") {
+  return estadoRevision === "posible_duplicado" || String(motivo || "").includes("conflicto") || String(motivo || "").startsWith("multiples_");
+}
+
+async function resolverCustomerProfileParaCita(datos = {}, { crearSiNoExiste = true } = {}) {
+  const emailNormalizado = normalizarEmail(datos.clienteEmail || "");
+  const telefonoNormalizado = normalizarTelefonoClientePerfil(datos.clienteTelefono || "");
+  const condiciones = construirCondicionesCustomerProfile({ emailNormalizado, telefonoNormalizado });
+  const matches = condiciones.length
+    ? await CustomerProfile.find({ $or: condiciones }).limit(10)
+    : [];
+
+  let customer = null;
+  let estadoRevision = "";
+  let motivo = "nuevo";
+
+  const matchesEmail = emailNormalizado
+    ? matches.filter((item) => item.emailNormalizado === emailNormalizado)
+    : [];
+  const matchesTelefono = telefonoNormalizado
+    ? matches.filter((item) => item.telefonoNormalizado === telefonoNormalizado)
+    : [];
+  const matchesAmbos = emailNormalizado && telefonoNormalizado
+    ? matches.filter((item) => item.emailNormalizado === emailNormalizado && item.telefonoNormalizado === telefonoNormalizado)
+    : [];
+
+  if (matchesAmbos.length === 1) {
+    customer = matchesAmbos[0];
+    motivo = "email_telefono";
+  } else if (matchesAmbos.length > 1) {
+    estadoRevision = "posible_duplicado";
+    motivo = "multiples_email_telefono";
+  } else if (matchesEmail.length === 1) {
+    if (customerTieneTelefonoDistinto(matchesEmail[0], telefonoNormalizado)) {
+      estadoRevision = "posible_duplicado";
+      motivo = "email_telefono_conflicto";
+    } else {
+      customer = matchesEmail[0];
+      motivo = "email";
+    }
+  } else if (matchesEmail.length > 1) {
+    estadoRevision = "posible_duplicado";
+    motivo = "multiples_email";
+  } else if (matchesTelefono.length === 1) {
+    if (
+      customerTieneEmailDistinto(matchesTelefono[0], emailNormalizado) ||
+      (emailNormalizado && matchesTelefono[0].userId && !matchesTelefono[0].emailNormalizado)
+    ) {
+      estadoRevision = "posible_duplicado";
+      motivo = "telefono_email_conflicto";
+    } else {
+      customer = matchesTelefono[0];
+      motivo = "telefono";
+    }
+  } else if (matchesTelefono.length > 1) {
+    estadoRevision = "posible_duplicado";
+    motivo = "multiples_telefono";
+  }
+
+  const cuentaPorEmail = await buscarCuentaClientePorEmail(emailNormalizado);
+
+  if (!customer && cuentaPorEmail && !motivoCustomerProfileEsConflicto(motivo, estadoRevision)) {
+    customer = await CustomerProfile.findOne({ userId: cuentaPorEmail._id });
+    motivo = customer ? "cuenta_email_existente" : "cuenta_email";
+  }
+
+  if (!customer && crearSiNoExiste) {
+    customer = new CustomerProfile({
+      creadoDesde: "cita_admin",
+      estadoRevision: estadoRevision || "sin_cuenta"
+    });
+  }
+
+  if (!customer) {
+    return { customer: null, customerId: null, clientUserId: null, motivo, estadoRevision };
+  }
+
+  aplicarDatosBasicosCustomerProfile(customer, datos, { creadoDesde: "cita_admin" });
+
+  if (cuentaPorEmail && !motivoCustomerProfileEsConflicto(motivo, estadoRevision) && (!customer.userId || String(customer.userId) === String(cuentaPorEmail._id))) {
+    customer.userId = cuentaPorEmail._id;
+    customer.estadoRevision = "vinculado";
+  } else if (estadoRevision && !customer.userId) {
+    customer.estadoRevision = estadoRevision;
+  }
+
+  await customer.save();
+
+  return {
+    customer,
+    customerId: customer._id,
+    clientUserId: puedeAsignarClientUserIdPorCustomer(customer, emailNormalizado, motivo) ? customer.userId : null,
+    motivo,
+    estadoRevision: customer.estadoRevision || estadoRevision || ""
+  };
+}
+
+async function completarClienteInternoCita(datos = {}) {
+  const resolucion = await resolverCustomerProfileParaCita(datos, { crearSiNoExiste: true });
+  datos.customerId = resolucion.customerId || null;
+  datos.clientUserId = resolucion.clientUserId || null;
+  return resolucion;
+}
+
+function aplicarAjustesCustomerFidelidad(resumen = {}, customer = null) {
+  const resultado = {
+    mascota: { ...(resumen.mascota || { completados: 0, objetivo: 8 }) },
+    auto: { ...(resumen.auto || { completados: 0, objetivo: 8 }) }
+  };
+
+  for (const tipo of ["mascota", "auto"]) {
+    const ajustes = (customer?.ajustesFidelidad || [])
+      .filter((item) => item.tipo === tipo)
+      .reduce((total, item) => total + (Number(item.unidades) || 0), 0);
+    const premiosUsados = (customer?.premiosManual || [])
+      .filter((item) => item.tipo === tipo)
+      .reduce((total, item) => total + (Number(item.unidadesConsumidas) || 0), 0);
+    const objetivo = Number(resultado[tipo].objetivo) || 8;
+    const completados = Math.max((Number(resultado[tipo].completados) || 0) + ajustes - premiosUsados, 0);
+    resultado[tipo] = {
+      completados,
+      objetivo,
+      restantes: Math.max(objetivo - completados, 0),
+      rewardEligible: completados >= objetivo
+    };
+  }
+
+  return resultado;
+}
+
+async function asegurarCustomerProfileCuentaWeb(user = {}) {
+  if (!user?._id || obtenerRolUsuario(user) !== "cliente") return null;
+  const emailNormalizado = normalizarEmail(user.email || "");
+  const telefonoNormalizado = normalizarTelefonoClientePerfil(user.telefono || "");
+  let customer = await CustomerProfile.findOne({ userId: user._id });
+
+  if (!customer && emailNormalizado) {
+    customer = await CustomerProfile.findOne({ emailNormalizado });
+  }
+
+  if (!customer) {
+    customer = new CustomerProfile({ creadoDesde: "cuenta_web" });
+  }
+
+  customer.userId = user._id;
+  customer.email = emailNormalizado || customer.email || "";
+  customer.emailNormalizado = emailNormalizado || customer.emailNormalizado || "";
+  if (telefonoNormalizado) {
+    customer.telefono = telefonoNormalizado;
+    customer.telefonoNormalizado = telefonoNormalizado;
+  }
+  if (!customer.nombre) customer.nombre = user.nombreCompleto || user.usuario || "";
+  customer.estadoRevision = "vinculado";
+  await customer.save();
+  return customer;
+}
+
 async function obtenerClientePortalAutenticado(req, res, select = "email role") {
   const userId = typeof req.user?.id === "string" ? req.user.id : "";
   if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -1518,10 +1760,10 @@ async function construirFidelidadClientePorUserId(userId) {
     rewardConsumido: { $ne: true }
   }).select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey mascotaNombre serviciosDetalle rewardUnidadesConsumidas rewardConsumido");
   const progreso = construirResumenFidelidad(crearProgresoRecompensasAgenda(citasCompletadas));
+  const customer = await CustomerProfile.findOne({ userId: new mongoose.Types.ObjectId(String(userId)) })
+    .select("ajustesFidelidad premiosManual");
 
-  return {
-    ...progreso
-  };
+  return aplicarAjustesCustomerFidelidad(progreso, customer);
 }
 
 function construirCitaClientePortal(cita) {
@@ -2676,6 +2918,7 @@ function construirCitaAdmin(cita) {
   return {
     id: obj._id,
     clientUserId: obj.clientUserId ? String(obj.clientUserId) : "",
+    customerId: obj.customerId ? String(obj.customerId) : "",
     clienteNombre: obj.clienteNombre || "",
     clienteTelefono: obj.clienteTelefono || "",
     clienteEmail: obj.clienteEmail || "",
@@ -3349,6 +3592,7 @@ app.post("/register", authRateLimit, async (req, res) => {
     });
 
     await nuevoUsuario.save();
+    await asegurarCustomerProfileCuentaWeb(nuevoUsuario);
 
     res.json({ message: "Usuario creado correctamente" });
   } catch (error) {
@@ -5750,6 +5994,435 @@ app.get("/admin/customers/lookup", auth, requireAdmin, async (req, res) => {
   }
 });
 
+function contarPremiosDisponiblesAdmin(progreso = {}) {
+  return ["mascota", "auto"].reduce((total, tipo) => {
+    const item = progreso[tipo] || {};
+    return total + Math.floor((Number(item.completados ?? item.cantidad) || 0) / (Number(item.objetivo) || 8));
+  }, 0);
+}
+
+function contarPremiosUsadosCustomer(customer = {}) {
+  return (customer.premiosManual || []).reduce((total, item) => total + (Number(item.unidadesConsumidas) || 0), 0);
+}
+
+async function obtenerCitasPosiblesCustomer(customer = {}, { limit = 20 } = {}) {
+  const condiciones = [];
+  if (customer.emailNormalizado) condiciones.push({ clienteEmail: customer.emailNormalizado });
+  if (customer.telefonoNormalizado) {
+    condiciones.push(construirFiltroTelefonoAgenda(customer.telefonoNormalizado).filtro);
+  }
+  if (!condiciones.length) return [];
+
+  const filtro = {
+    $or: condiciones,
+    _id: { $nin: customer.citasIgnoradas || [] },
+    $and: [{ $or: [{ customerId: { $exists: false } }, { customerId: null }] }]
+  };
+
+  return Appointment.find(filtro)
+    .sort({ fecha: -1, hora: -1, createdAt: -1 })
+    .limit(limit);
+}
+
+function describirCoincidenciaCitaCustomer(cita = {}, customer = {}) {
+  const emailCoincide = Boolean(customer.emailNormalizado && normalizarEmail(cita.clienteEmail || "") === customer.emailNormalizado);
+  const telefonoCita = normalizarTelefonoClientePerfil(cita.clienteTelefono || "");
+  const telefonoCoincide = Boolean(customer.telefonoNormalizado && telefonoCita === customer.telefonoNormalizado);
+  if (emailCoincide && telefonoCoincide) return "email_telefono";
+  if (emailCoincide) return "email";
+  if (telefonoCoincide) return "telefono";
+  return "revision";
+}
+
+function construirCitaResumenCustomer(cita, customer = null) {
+  const base = construirCitaAdmin(cita);
+  return {
+    ...base,
+    coincidencia: customer ? describirCoincidenciaCitaCustomer(cita, customer) : ""
+  };
+}
+
+function citaPuedeVincularseACustomer(cita = {}, customer = {}) {
+  if (!cita?._id || !customer?._id) return false;
+  if (cita.customerId && String(cita.customerId) !== String(customer._id)) return false;
+  return describirCoincidenciaCitaCustomer(cita, customer) !== "revision";
+}
+
+async function construirResumenCustomerProfile(customer) {
+  const [citasCustomer, citasPortal, posiblesCitas, duplicadosEmail, duplicadosTelefono] = await Promise.all([
+    Appointment.find({ customerId: customer._id }).sort({ fecha: -1, hora: -1, createdAt: -1 }),
+    customer.userId ? Appointment.find({ clientUserId: customer.userId }).sort({ fecha: -1, hora: -1, createdAt: -1 }) : Promise.resolve([]),
+    obtenerCitasPosiblesCustomer(customer, { limit: 12 }),
+    customer.emailNormalizado ? CustomerProfile.countDocuments({ emailNormalizado: customer.emailNormalizado, _id: { $ne: customer._id } }) : Promise.resolve(0),
+    customer.telefonoNormalizado ? CustomerProfile.countDocuments({ telefonoNormalizado: customer.telefonoNormalizado, _id: { $ne: customer._id } }) : Promise.resolve(0)
+  ]);
+
+  const completadas = citasCustomer.filter((cita) => cita.estado === "completada");
+  const progresoBase = construirResumenFidelidad(crearProgresoRecompensasAgenda(completadas.filter((cita) => (
+    cita.rewardGratisAplicado !== true && cita.rewardConsumido !== true
+  ))));
+  const progreso = aplicarAjustesCustomerFidelidad(progresoBase, customer);
+  const serviciosMascota = progreso.mascota?.completados || 0;
+  const serviciosAuto = progreso.auto?.completados || 0;
+  const posibleDuplicado = duplicadosEmail > 0 || duplicadosTelefono > 0;
+  const estado = customer.userId
+    ? "vinculado"
+    : posibleDuplicado
+      ? "posible_duplicado"
+      : posiblesCitas.length
+        ? "pendiente_revision"
+        : (customer.estadoRevision || "sin_cuenta");
+
+  return {
+    id: String(customer._id),
+    nombre: customer.nombre || "",
+    telefono: customer.telefono || customer.telefonoNormalizado || "",
+    telefonoNormalizado: customer.telefonoNormalizado || "",
+    email: customer.email || customer.emailNormalizado || "",
+    emailNormalizado: customer.emailNormalizado || "",
+    userId: customer.userId ? String(customer.userId) : "",
+    tieneCuentaWeb: Boolean(customer.userId),
+    activo: customer.activo !== false,
+    creadoDesde: customer.creadoDesde || "",
+    estado,
+    notasAdmin: customer.notasAdmin || "",
+    fechaPrimerServicio: customer.fechaPrimerServicio || "",
+    fechaUltimoServicio: customer.fechaUltimoServicio || "",
+    citasTotales: citasCustomer.length,
+    citasCompletadas: completadas.length,
+    citasPortalTotales: citasPortal.length,
+    serviciosMascota,
+    serviciosAuto,
+    premiosDisponibles: contarPremiosDisponiblesAdmin(progreso),
+    premiosUsados: contarPremiosUsadosCustomer(customer),
+    ultimaCita: citasCustomer[0]?.fecha || "",
+    progresoFidelidad: progreso,
+    ajustesFidelidad: customer.ajustesFidelidad || [],
+    premiosManual: customer.premiosManual || [],
+    direccionesUsadas: customer.direccionesUsadas || [],
+    posiblesCitasSinVincular: posiblesCitas.map((cita) => construirCitaResumenCustomer(cita, customer)),
+    citasAsociadas: citasCustomer.map((cita) => construirCitaResumenCustomer(cita, customer)),
+    citasVisiblesPortal: citasPortal.map((cita) => construirCitaResumenCustomer(cita, customer))
+  };
+}
+
+async function buscarCuentasCoincidentesCustomer(customer = {}) {
+  const condiciones = [{ role: "cliente" }];
+  const or = [];
+  if (customer.emailNormalizado) or.push({ email: customer.emailNormalizado });
+  if (customer.telefonoNormalizado) {
+    const ultimos10 = customer.telefonoNormalizado.slice(-10);
+    if (ultimos10.length === 10) or.push({ telefono: { $regex: construirRegexTelefonoAgenda(ultimos10) } });
+  }
+  if (!or.length) return [];
+  condiciones.push({ $or: or });
+
+  const users = await User.find({ $and: condiciones })
+    .select("_id usuario email nombreCompleto telefono role")
+    .limit(20);
+
+  return users.map((user) => {
+    const emailCoincide = Boolean(customer.emailNormalizado && user.email === customer.emailNormalizado);
+    const telefonoCoincide = Boolean(customer.telefonoNormalizado && normalizarTelefonoClientePerfil(user.telefono || "") === customer.telefonoNormalizado);
+    return {
+      id: String(user._id),
+      usuario: user.usuario || "",
+      email: user.email || "",
+      nombreCompleto: user.nombreCompleto || "",
+      telefono: user.telefono || "",
+      coincidencia: emailCoincide && telefonoCoincide ? "email_telefono" : emailCoincide ? "email" : telefonoCoincide ? "telefono" : "revision"
+    };
+  });
+}
+
+app.get("/admin/customers", auth, requireAdmin, async (req, res) => {
+  try {
+    const usuariosCliente = await User.find({ role: "cliente" }).select("_id usuario email role telefono nombreCompleto").limit(300);
+    await Promise.all(usuariosCliente.map((user) => asegurarCustomerProfileCuentaWeb(user)));
+
+    const busqueda = normalizarTextoPlano(req.query?.q || "", 80).toLowerCase();
+    const filtro = normalizarTextoPlano(req.query?.filtro || "todos", 40);
+    const condiciones = {};
+
+    if (busqueda) {
+      const digitos = normalizarTelefonoClientePerfil(busqueda);
+      const busquedaOr = [
+        { nombre: { $regex: busqueda.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } },
+        { emailNormalizado: { $regex: busqueda.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" } }
+      ];
+      if (digitos) busquedaOr.push({ telefonoNormalizado: digitos });
+      condiciones.$and = [{ $or: busquedaOr }];
+    }
+
+    if (filtro === "con_cuenta") condiciones.userId = { $ne: null };
+    if (filtro === "sin_cuenta") {
+      condiciones.$and = [
+        ...(condiciones.$and || []),
+        { $or: [{ userId: null }, { userId: { $exists: false } }] }
+      ];
+    }
+    if (filtro === "inactivos") condiciones.activo = false;
+    if (filtro === "activos") condiciones.activo = { $ne: false };
+
+    const customers = await CustomerProfile.find(condiciones)
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(150);
+    const resumenes = await Promise.all(customers.map(construirResumenCustomerProfile));
+    let clientes = resumenes;
+
+    if (filtro === "pendientes") clientes = clientes.filter((item) => item.posiblesCitasSinVincular.length > 0);
+    if (filtro === "premios") clientes = clientes.filter((item) => item.premiosDisponibles > 0);
+    if (filtro === "duplicados") clientes = clientes.filter((item) => item.estado === "posible_duplicado");
+
+    res.json({ clientes });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron obtener los clientes" });
+  }
+});
+
+app.post("/admin/customers", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const datos = {
+      nombre: normalizarTextoPlano(req.body?.nombre || "", 120),
+      telefono: normalizarTelefonoClientePerfil(req.body?.telefono || ""),
+      email: normalizarEmail(req.body?.email || "")
+    };
+    if (!datos.nombre && !datos.telefono && !datos.email) {
+      return res.status(400).json({ message: "Ingresa nombre, telefono o email" });
+    }
+    if (datos.email && !validarEmail(datos.email)) {
+      return res.status(400).json({ message: "email no es valido" });
+    }
+
+    const customer = new CustomerProfile({
+      nombre: datos.nombre,
+      telefono: datos.telefono,
+      telefonoNormalizado: datos.telefono,
+      email: datos.email,
+      emailNormalizado: datos.email,
+      creadoDesde: "manual",
+      estadoRevision: "sin_cuenta",
+      notasAdmin: normalizarTextoPlano(req.body?.notasAdmin || "", 2000)
+    });
+    await customer.save();
+    res.status(201).json({ message: "Cliente creado correctamente", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "Ya existe un cliente vinculado a esa cuenta" });
+    }
+    res.status(500).json({ message: "No se pudo crear el cliente" });
+  }
+});
+
+app.get("/admin/customers/:id", auth, requireAdmin, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    if (!customerId) return res.status(400).json({ message: "id de cliente no valido" });
+    const customer = await CustomerProfile.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    const [cliente, cuentasCoincidentes] = await Promise.all([
+      construirResumenCustomerProfile(customer),
+      buscarCuentasCoincidentesCustomer(customer)
+    ]);
+    res.json({ cliente, cuentasCoincidentes });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el cliente" });
+  }
+});
+
+app.post("/admin/customers/:id/link-user", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const userId = obtenerObjectIdSeguro(req.body?.userId);
+    if (!customerId || !userId) return res.status(400).json({ message: "Datos de vinculacion no validos" });
+
+    const [customer, user] = await Promise.all([
+      CustomerProfile.findById(customerId),
+      User.findById(userId).select("_id role email telefono nombreCompleto usuario")
+    ]);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    if (!user || obtenerRolUsuario(user) !== "cliente") return res.status(400).json({ message: "La cuenta no es de cliente" });
+
+    const emailCoincide = Boolean(customer.emailNormalizado && user.email === customer.emailNormalizado);
+    const telefonoCoincide = Boolean(customer.telefonoNormalizado && normalizarTelefonoClientePerfil(user.telefono || "") === customer.telefonoNormalizado);
+    if (!emailCoincide && !telefonoCoincide) {
+      return res.status(409).json({ message: "La cuenta no coincide por email ni telefono. Revisa antes de vincular." });
+    }
+
+    const otro = await CustomerProfile.findOne({ userId: user._id, _id: { $ne: customer._id } });
+    if (otro) return res.status(409).json({ message: "Esa cuenta ya esta vinculada a otro cliente" });
+
+    customer.userId = user._id;
+    customer.estadoRevision = "vinculado";
+    if (!customer.emailNormalizado && user.email) {
+      customer.email = user.email;
+      customer.emailNormalizado = user.email;
+    }
+    const telUsuario = normalizarTelefonoClientePerfil(user.telefono || "");
+    if (!customer.telefonoNormalizado && telUsuario) {
+      customer.telefono = telUsuario;
+      customer.telefonoNormalizado = telUsuario;
+    }
+    if (!customer.nombre) customer.nombre = user.nombreCompleto || user.usuario || "";
+    await customer.save();
+    await Appointment.updateMany({ customerId: customer._id }, { $set: { clientUserId: user._id } });
+
+    res.json({ message: "Cuenta vinculada correctamente", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    if (error?.code === 11000) return res.status(409).json({ message: "Esa cuenta ya esta vinculada a otro cliente" });
+    res.status(500).json({ message: "No se pudo vincular la cuenta" });
+  }
+});
+
+app.post("/admin/customers/:id/unlink-user", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const confirmacion = normalizarTextoPlano(req.body?.confirmacion || "", 40);
+    if (!customerId || confirmacion !== "DESVINCULAR") {
+      return res.status(400).json({ message: "Escribe DESVINCULAR para confirmar" });
+    }
+    const customer = await CustomerProfile.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    const userIdAnterior = customer.userId;
+    customer.userId = null;
+    customer.estadoRevision = "sin_cuenta";
+    await customer.save();
+    if (userIdAnterior) {
+      await Appointment.updateMany({ customerId: customer._id, clientUserId: userIdAnterior }, { $set: { clientUserId: null } });
+    }
+    res.json({ message: "Cuenta desvinculada correctamente", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo desvincular la cuenta" });
+  }
+});
+
+app.post("/admin/customers/:id/link-appointments", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const appointmentIds = Array.isArray(req.body?.appointmentIds) ? req.body.appointmentIds : [];
+    const ids = appointmentIds.map(obtenerObjectIdSeguro).filter(Boolean);
+    if (!customerId || !ids.length) return res.status(400).json({ message: "Selecciona citas validas" });
+    const customer = await CustomerProfile.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    const citas = await Appointment.find({ _id: { $in: ids } }).select("_id customerId clienteEmail clienteTelefono");
+    if (citas.length !== ids.length || citas.some((cita) => !citaPuedeVincularseACustomer(cita, customer))) {
+      return res.status(409).json({ message: "Solo puedes vincular citas candidatas por email o telefono y sin otro customerId asignado" });
+    }
+    await Appointment.updateMany(
+      { _id: { $in: ids } },
+      { $set: { customerId: customer._id, clientUserId: customer.userId || null } }
+    );
+    res.json({ message: "Citas vinculadas correctamente", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron vincular las citas" });
+  }
+});
+
+app.post("/admin/customers/:id/ignore-appointment", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const appointmentId = obtenerObjectIdSeguro(req.body?.appointmentId);
+    if (!customerId || !appointmentId) return res.status(400).json({ message: "Datos no validos" });
+    const customer = await CustomerProfile.findByIdAndUpdate(
+      customerId,
+      { $addToSet: { citasIgnoradas: appointmentId } },
+      { new: true }
+    );
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    res.json({ message: "Coincidencia ignorada", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo ignorar la coincidencia" });
+  }
+});
+
+app.post("/admin/customers/:id/mark-independent", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    if (!customerId) return res.status(400).json({ message: "id de cliente no valido" });
+    const customer = await CustomerProfile.findByIdAndUpdate(
+      customerId,
+      { $set: { estadoRevision: "independiente" } },
+      { new: true }
+    );
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    res.json({ message: "Cliente marcado como independiente", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar el cliente" });
+  }
+});
+
+app.post("/admin/customers/:id/rewards-used", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const tipo = normalizarTextoPlano(req.body?.tipo || "", 20);
+    const unidades = Number(req.body?.unidadesConsumidas || 8);
+    const motivo = normalizarTextoPlano(req.body?.motivo || "", 300);
+    if (!customerId || !["mascota", "auto"].includes(tipo) || !Number.isInteger(unidades) || unidades < 1 || unidades > 100 || motivo.length < 5) {
+      return res.status(400).json({ message: "Datos de premio usado no validos" });
+    }
+    const customer = await CustomerProfile.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    customer.premiosManual.push({ tipo, unidadesConsumidas: unidades, motivo, adminUserId: obtenerAdminUserId(req) });
+    await customer.save();
+    res.json({ message: "Premio usado registrado", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo registrar el premio usado" });
+  }
+});
+
+app.post("/admin/customers/:id/loyalty-adjustments", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const tipo = normalizarTextoPlano(req.body?.tipo || "", 20);
+    const unidades = Number(req.body?.unidades || 0);
+    const motivo = normalizarTextoPlano(req.body?.motivo || "", 300);
+    if (!customerId || !["mascota", "auto"].includes(tipo) || !Number.isInteger(unidades) || unidades === 0 || unidades < -100 || unidades > 100 || motivo.length < 5) {
+      return res.status(400).json({ message: "Datos de ajuste no validos" });
+    }
+    const customer = await CustomerProfile.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    customer.ajustesFidelidad.push({ tipo, unidades, motivo, adminUserId: obtenerAdminUserId(req) });
+    await customer.save();
+    res.json({ message: "Ajuste registrado", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo registrar el ajuste" });
+  }
+});
+
+app.patch("/admin/customers/:id/notes", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const notasAdmin = normalizarTextoPlano(req.body?.notasAdmin || "", 2000);
+    if (!customerId) return res.status(400).json({ message: "id de cliente no valido" });
+    const customer = await CustomerProfile.findByIdAndUpdate(customerId, { $set: { notasAdmin } }, { new: true });
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    res.json({ message: "Notas actualizadas", cliente: await construirResumenCustomerProfile(customer) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudieron actualizar las notas" });
+  }
+});
+
+app.get("/admin/customer-profiles/:id/rewards", auth, requireAdmin, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    if (!customerId) return res.status(400).json({ message: "id de cliente no valido" });
+    const customer = await CustomerProfile.findById(customerId);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    const resumen = await construirResumenCustomerProfile(customer);
+    res.json({
+      customerId: resumen.id,
+      progresoRecompensas: resumen.progresoFidelidad,
+      rewardEligible: resumen.premiosDisponibles > 0,
+      premiosDisponibles: resumen.premiosDisponibles,
+      premiosUsados: resumen.premiosUsados,
+      ajustesFidelidad: resumen.ajustesFidelidad,
+      premiosManual: resumen.premiosManual
+    });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo obtener el resumen de recompensas" });
+  }
+});
+
 app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const camposNoPermitidos = validarCamposCitaPermitidos(req.body, APPOINTMENT_CREATE_FIELDS);
@@ -5776,7 +6449,7 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
       return res.status(400).json({ message: "Solo puedes registrar calificacion en citas completadas" });
     }
 
-    await completarClientUserIdCita(datos);
+    await completarClienteInternoCita(datos);
 
     if (datos.rewardGratisAplicado) {
       const rewardTipo = datos.rewardTipo || datos.servicioTipo;
@@ -5922,8 +6595,23 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       datos.calificacionServicio = null;
     }
 
-    if (Object.prototype.hasOwnProperty.call(datos, "clienteEmail")) {
-      await completarClientUserIdCita(datos);
+    const cambioIdentidadCliente = ["clienteNombre", "clienteTelefono", "clienteEmail"].some((campo) => (
+      Object.prototype.hasOwnProperty.call(datos, campo)
+    ));
+
+    if (cambioIdentidadCliente) {
+      const datosClienteFinal = {
+        ...datos,
+        clienteNombre: Object.prototype.hasOwnProperty.call(datos, "clienteNombre") ? datos.clienteNombre : cita.clienteNombre,
+        clienteTelefono: Object.prototype.hasOwnProperty.call(datos, "clienteTelefono") ? datos.clienteTelefono : cita.clienteTelefono,
+        clienteEmail: Object.prototype.hasOwnProperty.call(datos, "clienteEmail") ? datos.clienteEmail : cita.clienteEmail,
+        direccion: Object.prototype.hasOwnProperty.call(datos, "direccion") ? datos.direccion : cita.direccion,
+        zona: Object.prototype.hasOwnProperty.call(datos, "zona") ? datos.zona : cita.zona,
+        fecha: Object.prototype.hasOwnProperty.call(datos, "fecha") ? datos.fecha : cita.fecha
+      };
+      await completarClienteInternoCita(datosClienteFinal);
+      datos.customerId = datosClienteFinal.customerId || null;
+      datos.clientUserId = datosClienteFinal.clientUserId || null;
     }
 
     const rewardAplicadoFinal = Object.prototype.hasOwnProperty.call(datos, "rewardGratisAplicado")
@@ -5953,6 +6641,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
         "clienteTelefono",
         "clienteEmail",
         "clientUserId",
+        "customerId",
         "servicioTipo",
         "servicioCategoria",
         "servicioPaquete",
@@ -6040,6 +6729,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       "clienteTelefono",
       "clienteEmail",
       "clientUserId",
+      "customerId",
       "mascotaNombre",
       "mascotaEdad",
       "servicioTipo",
