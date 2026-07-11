@@ -6005,6 +6005,60 @@ function contarPremiosUsadosCustomer(customer = {}) {
   return (customer.premiosManual || []).reduce((total, item) => total + (Number(item.unidadesConsumidas) || 0), 0);
 }
 
+function contarPremiosUsadosCustomerPorTipo(customer = {}, tipo = "") {
+  return (customer.premiosManual || [])
+    .filter((item) => item.tipo === tipo)
+    .reduce((total, item) => total + (Number(item.unidadesConsumidas) || 0), 0);
+}
+
+function contarAjustesCustomerPorTipo(customer = {}, tipo = "") {
+  return (customer.ajustesFidelidad || [])
+    .filter((item) => item.tipo === tipo)
+    .reduce((total, item) => total + (Number(item.unidades) || 0), 0);
+}
+
+function construirFidelidadDetalleCustomer(progresoBase = {}, progreso = {}, customer = {}) {
+  return ["mascota", "auto"].reduce((acc, tipo) => {
+    const objetivo = Number(progreso[tipo]?.objetivo || progresoBase[tipo]?.objetivo) || 8;
+    const unidadesAcumuladas = Number(progresoBase[tipo]?.completados) || 0;
+    const ajustesManuales = contarAjustesCustomerPorTipo(customer, tipo);
+    const unidadesConsumidas = contarPremiosUsadosCustomerPorTipo(customer, tipo);
+    const completados = Number(progreso[tipo]?.completados) || 0;
+    acc[tipo] = {
+      unidadesAcumuladas,
+      ajustesManuales,
+      unidadesConsumidas,
+      completados,
+      objetivo,
+      restantes: Math.max(objetivo - (completados % objetivo || (completados >= objetivo ? objetivo : completados)), 0),
+      premiosDisponibles: Math.floor(completados / objetivo),
+      premiosUsados: (customer.premiosManual || []).filter((item) => item.tipo === tipo).length,
+      rewardEligible: completados >= objetivo
+    };
+    return acc;
+  }, {});
+}
+
+function construirMovimientosAdministrativosCustomer(customer = {}) {
+  const ajustes = (customer.ajustesFidelidad || []).map((item) => ({
+    id: item._id ? String(item._id) : "",
+    fecha: item.fecha || "",
+    clase: "ajuste",
+    tipo: item.tipo || "",
+    cantidad: Number(item.unidades) || 0,
+    motivo: item.motivo || ""
+  }));
+  const premios = (customer.premiosManual || []).map((item) => ({
+    id: item._id ? String(item._id) : "",
+    fecha: item.fecha || "",
+    clase: "premio_usado",
+    tipo: item.tipo || "",
+    cantidad: Number(item.unidadesConsumidas) || 0,
+    motivo: item.motivo || ""
+  }));
+  return [...ajustes, ...premios].sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+}
+
 async function obtenerCitasPosiblesCustomer(customer = {}, { limit = 20 } = {}) {
   const condiciones = [];
   if (customer.emailNormalizado) condiciones.push({ clienteEmail: customer.emailNormalizado });
@@ -6057,13 +6111,19 @@ async function construirResumenCustomerProfile(customer) {
     customer.telefonoNormalizado ? CustomerProfile.countDocuments({ telefonoNormalizado: customer.telefonoNormalizado, _id: { $ne: customer._id } }) : Promise.resolve(0)
   ]);
 
+  const citasParaFidelidad = customer.userId ? citasPortal : citasCustomer;
   const completadas = citasCustomer.filter((cita) => cita.estado === "completada");
-  const progresoBase = construirResumenFidelidad(crearProgresoRecompensasAgenda(completadas.filter((cita) => (
+  const citasPendientesProximas = citasCustomer.filter((cita) => !["completada", "cancelada", "no_asistio"].includes(cita.estado || ""));
+  const completadasFidelidad = citasParaFidelidad.filter((cita) => cita.estado === "completada");
+  const progresoBase = construirResumenFidelidad(crearProgresoRecompensasAgenda(completadasFidelidad.filter((cita) => (
     cita.rewardGratisAplicado !== true && cita.rewardConsumido !== true
   ))));
   const progreso = aplicarAjustesCustomerFidelidad(progresoBase, customer);
+  const fidelidadDetalle = construirFidelidadDetalleCustomer(progresoBase, progreso, customer);
   const serviciosMascota = progreso.mascota?.completados || 0;
   const serviciosAuto = progreso.auto?.completados || 0;
+  const citasCompletadasOrdenAsc = [...completadas].sort((a, b) => `${a.fecha || ""} ${a.hora || ""}`.localeCompare(`${b.fecha || ""} ${b.hora || ""}`));
+  const ultimaCompletada = completadas[0] || null;
   const posibleDuplicado = duplicadosEmail > 0 || duplicadosTelefono > 0;
   const estado = customer.userId
     ? "vinculado"
@@ -6086,19 +6146,25 @@ async function construirResumenCustomerProfile(customer) {
     creadoDesde: customer.creadoDesde || "",
     estado,
     notasAdmin: customer.notasAdmin || "",
-    fechaPrimerServicio: customer.fechaPrimerServicio || "",
-    fechaUltimoServicio: customer.fechaUltimoServicio || "",
+    fechaPrimerServicio: customer.fechaPrimerServicio || citasCompletadasOrdenAsc[0]?.fecha || "",
+    fechaUltimoServicio: customer.fechaUltimoServicio || ultimaCompletada?.fecha || "",
     citasTotales: citasCustomer.length,
     citasCompletadas: completadas.length,
+    citasPendientesProximas: citasPendientesProximas.length,
     citasPortalTotales: citasPortal.length,
     serviciosMascota,
     serviciosAuto,
+    serviciosMascotaAcumulados: fidelidadDetalle.mascota?.unidadesAcumuladas || 0,
+    serviciosAutoAcumulados: fidelidadDetalle.auto?.unidadesAcumuladas || 0,
     premiosDisponibles: contarPremiosDisponiblesAdmin(progreso),
     premiosUsados: contarPremiosUsadosCustomer(customer),
     ultimaCita: citasCustomer[0]?.fecha || "",
+    ultimaVisita: ultimaCompletada?.fecha || "",
     progresoFidelidad: progreso,
+    fidelidadDetalle,
     ajustesFidelidad: customer.ajustesFidelidad || [],
     premiosManual: customer.premiosManual || [],
+    movimientosAdministrativos: construirMovimientosAdministrativosCustomer(customer),
     direccionesUsadas: customer.direccionesUsadas || [],
     posiblesCitasSinVincular: posiblesCitas.map((cita) => construirCitaResumenCustomer(cita, customer)),
     citasAsociadas: citasCustomer.map((cita) => construirCitaResumenCustomer(cita, customer)),
