@@ -1122,6 +1122,11 @@ function obtenerZonaPorFecha(fecha) {
   return enriquecerReglaZona(agendaZoneConfig.rulesByDay[fechaLocal.getDay()]);
 }
 
+function obtenerZonaAutomaticaFormulario(fecha) {
+  const regla = obtenerZonaPorFecha(fecha);
+  return regla?.esDescanso ? "" : normalizarZonaAgenda(regla?.zona || "");
+}
+
 function protegerAgendaAdmin() {
   const token = obtenerTokenAgenda();
 
@@ -1709,6 +1714,7 @@ function aplicarReglaZonaEnCampos({ fechaInput, zonaSelect, notice, submitButton
   submitButton.disabled = false;
 
   if (!fechaInput.value) {
+    zonaSelect.value = "";
     notice.textContent = "Selecciona una fecha para calcular la ruta.";
     notice.className = "agenda-date-notice";
     return false;
@@ -1723,7 +1729,7 @@ function aplicarReglaZonaEnCampos({ fechaInput, zonaSelect, notice, submitButton
     return false;
   }
 
-  zonaSelect.value = regla.zona;
+  zonaSelect.value = normalizarZonaAgenda(regla.zona);
   notice.innerHTML = crearResumenZonaHtml(regla, `${regla.dia}: zona asignada automáticamente, ${formatearZonaServicio(regla.zona)}.`);
   zonaSelect.disabled = true;
   notice.className = "agenda-date-notice is-fixed";
@@ -2534,6 +2540,10 @@ function construirPayloadFormulario(form, prefijo = "") {
     throw new Error("Selecciona máximo 2 empleados asignados.");
   }
 
+  const fechaPayload = get("fecha");
+  const zonaAutomatica = obtenerZonaAutomaticaFormulario(fechaPayload);
+  const zonaFormulario = normalizarZonaAgenda(document.getElementById(`${prefijo ? "editZonaCita" : "zonaCita"}`)?.value);
+
   const payload = {
     clienteNombre: get("clienteNombre"),
     clienteTelefono: telefono.normalizado,
@@ -2551,9 +2561,9 @@ function construirPayloadFormulario(form, prefijo = "") {
     atendidoPor: nombresEmpleadosSeleccionados.join(", ") || get("atendidoPor"),
     empleadoAsignadoId: empleadosSeleccionados[0] || "",
     empleadosAsignados: empleadosSeleccionados,
-    fecha: get("fecha"),
+    fecha: fechaPayload,
     hora: get("hora"),
-    zona: normalizarZonaAgenda(document.getElementById(`${prefijo ? "editZonaCita" : "zonaCita"}`)?.value),
+    zona: zonaAutomatica || zonaFormulario,
     direccion: get("direccion"),
     notas: get("notas")
   };
@@ -2683,7 +2693,7 @@ function abrirModalEdicion(id) {
     duracionBloqueadaManualEditar = duracionBloqueadaGuardada !== duracionEstimadaEdicion;
   }
   editForm.elements.editFechaCita.value = cita.fecha;
-  editForm.elements.editZonaCita.value = cita.zona;
+  editForm.elements.editZonaCita.value = obtenerZonaAutomaticaFormulario(cita.fecha) || normalizarZonaAgenda(cita.zona);
   editForm.elements.editDireccionCita.value = cita.direccion;
   editForm.elements.editNotasCita.value = cita.notas;
   const editAtendidoPor = editForm.elements.namedItem("editAtendidoPor");

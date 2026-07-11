@@ -2601,6 +2601,13 @@ function zonaAgendaPermitida(fecha, zona) {
   return { ok: true };
 }
 
+function obtenerZonaAutomaticaAgenda(fecha) {
+  if (!validarFechaISOAgenda(fecha)) return "";
+  const regla = obtenerReglaZonaAgenda(fecha);
+  if (!regla || regla.esDescanso || regla.permiteTodasLasZonas) return "";
+  return regla.zona || "";
+}
+
 function construirDatosCitaSeguro(body, { parcial = false } = {}) {
   const datos = {};
   const errores = [];
@@ -2776,6 +2783,11 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     } else {
       datos.duracionBloqueadaMinutos = datos.duracionEstimadaMinutos;
     }
+  }
+
+  const zonaAutomatica = obtenerZonaAutomaticaAgenda(datos.fecha);
+  if (zonaAutomatica) {
+    datos.zona = zonaAutomatica;
   }
 
   const requeridos = [
