@@ -1048,7 +1048,7 @@ async function cargarDisponibilidadFormulario({ modo = "crear", conservarHora = 
   if (duracionBloqueadaInput?.value && !duracionBloqueadaMinutos) {
     llenarSelectHorarios(horaSelect, [], "");
     submitButton.disabled = true;
-    mostrarAvisoDisponibilidad(notice, "Ingresa un tiempo bloqueado real entre 30 y 720 minutos.", "is-blocked");
+    mostrarAvisoDisponibilidad(notice, "Ingresa una duracion operativa entre 30 y 720 minutos.", "is-blocked");
     return;
   }
 
@@ -1070,7 +1070,7 @@ async function cargarDisponibilidadFormulario({ modo = "crear", conservarHora = 
     const tiempoBloqueado = Number(disponibilidad.duracionBloqueadaMinutos || disponibilidad.bloqueTotalMinutos)
       || (Number(disponibilidad.duracionMinutos) || 0) + (Number(disponibilidad.trasladoMinutos) || 0);
     const mensajeBase = disponibilidad.abierto
-      ? `Tiempo bloqueado: ${tiempoBloqueado} min (${disponibilidad.duracionMinutos} min + ${disponibilidad.trasladoMinutos} min traslado)`
+      ? `Duracion operativa: ${tiempoBloqueado} min (${disponibilidad.duracionMinutos} min + ${disponibilidad.trasladoMinutos} min traslado)`
       : "Este día no hay servicio disponible.";
 
     if (esEdicion) {
@@ -2529,7 +2529,7 @@ function construirPayloadFormulario(form, prefijo = "") {
   const nombresEmpleadosSeleccionados = obtenerNombresSeleccionEmpleadosAgenda(selectorEmpleadosId);
 
   if (!duracionBloqueadaMinutos) {
-    throw new Error("Ingresa un tiempo bloqueado real entre 30 y 720 minutos.");
+    throw new Error("Ingresa una duracion operativa entre 30 y 720 minutos.");
   }
 
   if (!validacionEmpleados.valido && !empleadosSeleccionados.length) {
