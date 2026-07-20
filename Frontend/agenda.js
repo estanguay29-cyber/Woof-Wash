@@ -2079,18 +2079,132 @@ function crearCardCita(cita) {
   `;
 }
 
+function limpiarTextoConfirmacionAgenda(value) {
+  const texto = String(value || "").trim();
+  if (!texto || /^(undefined|null|nan)$/i.test(texto)) return "";
+  return texto;
+}
+
+function obtenerValoresUnicosConfirmacionAgenda(valores = []) {
+  const resultado = [];
+  valores.forEach((value) => {
+    const texto = limpiarTextoConfirmacionAgenda(value);
+    if (!texto) return;
+    const existe = resultado.some((item) => item.toLowerCase() === texto.toLowerCase());
+    if (!existe) resultado.push(texto);
+  });
+  return resultado;
+}
+
+function unirListaConfirmacionAgenda(valores = []) {
+  const items = obtenerValoresUnicosConfirmacionAgenda(valores);
+  if (items.length <= 1) return items[0] || "";
+  if (items.length === 2) return `${items[0]} y ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+
+function obtenerServicioConfirmacionAgenda(cita = {}) {
+  const servicios = obtenerServiciosVisualesCita(cita);
+  const nombres = obtenerValoresUnicosConfirmacionAgenda(servicios.map((servicio) =>
+    servicio?.paquete || servicio?.nombre || cita.detalle || servicio?.categoria
+  ));
+
+  if (nombres.length === 1) return nombres[0];
+  if (nombres.length > 1) return "Servicios seleccionados";
+
+  if (cita.tipoServicio === "auto") return "Lavado";
+  return "Estética";
+}
+
+function obtenerDestinoConfirmacionAgenda(cita = {}) {
+  const servicios = obtenerServiciosVisualesCita(cita);
+  const esAuto = cita.tipoServicio === "auto" || servicios.some((servicio) => servicio?.tipo === "auto");
+
+  if (esAuto) {
+    const marcaModelo = [cita.marca, cita.modelo].map(limpiarTextoConfirmacionAgenda).filter(Boolean).join(" ");
+    const auto = limpiarTextoConfirmacionAgenda(
+      cita.autoNombre ||
+      cita.vehiculo ||
+      cita.vehiculoNombre ||
+      cita.tipoVehiculo ||
+      cita.tipoAuto ||
+      marcaModelo ||
+      servicios.find((servicio) => servicio?.tipo === "auto")?.categoria ||
+      "auto"
+    );
+    return `tu ${auto || "auto"}`;
+  }
+
+  const mascotas = obtenerValoresUnicosConfirmacionAgenda([
+    ...servicios
+      .filter((servicio) => servicio?.tipo !== "auto")
+      .map((servicio) => servicio?.mascotaNombre),
+    cita.mascotaNombre
+  ]);
+
+  return unirListaConfirmacionAgenda(mascotas) || "tu mascota";
+}
+
+function obtenerLineaEmpleadosConfirmacionAgenda(cita = {}) {
+  const nombres = obtenerNombresEmpleadosCita(cita).filter((nombre) => nombre && nombre !== "Sin asignar");
+  if (!nombres.length) return "👨‍🔧 Personal asignado: Por confirmar";
+
+  const empleados = unirListaConfirmacionAgenda(nombres);
+  const verbo = nombres.length === 1 ? "atenderá" : "atenderán";
+  return `👨‍🔧 Te ${verbo}: ${empleados}`;
+}
+
+function formatearHoraConfirmacionAgenda(hora) {
+  const partes = String(hora || "").match(/^(\d{1,2}):(\d{2})/);
+  if (!partes) return limpiarTextoConfirmacionAgenda(hora) || "hora por confirmar";
+
+  const horas = Number(partes[1]);
+  const minutos = partes[2];
+  if (!Number.isInteger(horas) || horas < 0 || horas > 23) return limpiarTextoConfirmacionAgenda(hora) || "hora por confirmar";
+
+  const periodo = horas >= 12 ? "p.m." : "a.m.";
+  const hora12 = horas % 12 || 12;
+  return `${hora12}:${minutos} ${periodo}`;
+}
+
+function formatearFechaConfirmacionAgenda(fecha) {
+  const partes = String(fecha || "").split("-");
+  if (partes.length !== 3) return formatearFechaAgenda(fecha || "") || "fecha por confirmar";
+
+  const fechaLocal = new Date(`${fecha}T12:00:00`);
+  if (Number.isNaN(fechaLocal.getTime())) return formatearFechaAgenda(fecha) || "fecha por confirmar";
+
+  const diaSemana = fechaLocal.toLocaleDateString("es-MX", { weekday: "long" });
+  const diaCapitalizado = diaSemana.charAt(0).toUpperCase() + diaSemana.slice(1);
+  return `${diaCapitalizado} ${partes[2]}/${partes[1]}`;
+}
+
+function crearMensajeConfirmacionWhatsApp(cita = {}) {
+  const nombreCliente = limpiarTextoConfirmacionAgenda(cita.cliente) || "cliente";
+  const servicio = obtenerServicioConfirmacionAgenda(cita);
+  const destino = obtenerDestinoConfirmacionAgenda(cita);
+  const fecha = formatearFechaConfirmacionAgenda(cita.fecha);
+  const hora = formatearHoraConfirmacionAgenda(cita.hora);
+  const articuloHora = /^1:/.test(hora) ? "la" : "las";
+
+  return [
+    `🐶✨ Hola, ${nombreCliente}`,
+    "",
+    "Te contactamos de Woof & Wash para confirmar tu cita:",
+    "",
+    `🛁 Servicio: ${servicio} para ${destino}`,
+    obtenerLineaEmpleadosConfirmacionAgenda(cita),
+    `📅 Fecha y hora: ${fecha} a ${articuloHora} ${hora}`,
+    "",
+    "Por favor confírmanos si todos los datos son correctos.",
+    "¡Gracias por confiar en Woof & Wash! 💙🐾"
+  ].join("\n");
+}
+
 function crearUrlWhatsApp(cita) {
   const telefono = normalizarTelefonoWhatsApp(cita.telefono);
   if (!telefono) return "#";
-  const mensaje = [
-    `Hola ${cita.cliente}, te contactamos de Woof & Wash para confirmar tu cita.`,
-    `Servicio: ${crearTextoServiciosDetalle(cita)}.`,
-    `Te atendera: ${formatearEmpleadosCita(cita)}.`,
-    `Empleados asignados: ${formatearEmpleadosCita(cita)}.`,
-    `Fecha y hora: ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.`,
-    `Zona: ${formatearZonaServicio(cita.zona)}.`,
-    "Por favor confirmanos si todo esta correcto."
-  ].filter(Boolean).join("\n");
+  const mensaje = crearMensajeConfirmacionWhatsApp(cita);
 
   return `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
 }
@@ -2098,10 +2212,7 @@ function crearUrlWhatsApp(cita) {
 function crearUrlWhatsAppDetalle(cita) {
   const telefono = normalizarTelefonoWhatsApp(cita.telefono);
   if (!telefono) return "#";
-  const tipo = cita.tipoServicio === "auto" ? "lavado" : "estética";
-  const atendido = ` Te atendera ${formatearEmpleadosCita(cita)}.`;
-  const empleados = ` Empleados asignados: ${formatearEmpleadosCita(cita)}.`;
-  const mensaje = `Hola, soy de Woof & Wash. Te escribimos sobre tu cita de ${tipo} programada para el ${formatearFechaAgenda(cita.fecha)} a las ${cita.hora}.${atendido}${empleados}\nServicio: ${crearTextoServiciosDetalle(cita)}.`;
+  const mensaje = crearMensajeConfirmacionWhatsApp(cita);
 
   return `https://wa.me/${telefono}?text=${encodeURIComponent(mensaje)}`;
 }

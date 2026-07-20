@@ -1067,7 +1067,7 @@ const CONFIG_AGENDA = Object.freeze({
   intervaloHorariosMinutos: 30,
   horariosOperacion: {
     lunesViernes: { inicio: "09:00", fin: "18:00" },
-    sabado: { inicio: "09:00", fin: "16:00" },
+    sabado: { inicio: "09:00", fin: "14:00" },
     domingo: null
   },
   duraciones: {
@@ -2312,7 +2312,7 @@ function validarHorarioOperativoAgenda({ fecha, inicioBloque, finBloque }) {
   const finOperacion = horaAMinutos(horario.fin);
 
   if (inicioBloque < inicioOperacion || finBloque > finOperacion) {
-    return { ok: false, message: "La cita no cabe dentro del horario operativo." };
+    return { ok: false, message: "La hora seleccionada esta fuera del horario operativo." };
   }
 
   return { ok: true, horario };
@@ -2458,7 +2458,7 @@ async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaqu
 
   for (
     let inicio = inicioOperacion;
-    inicio < finOperacion;
+    inicio <= finOperacion;
     inicio += CONFIG_AGENDA.intervaloHorariosMinutos
   ) {
     const hora = minutosAHora(inicio);
@@ -6804,7 +6804,14 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       estado: estadoFinal
     };
 
-    if (!["cancelada", "no_asistio"].includes(datosParaDisponibilidad.estado)) {
+    const citaEstabaInactiva = ["cancelada", "no_asistio"].includes(cita.estado || "");
+    const citaQuedaActiva = !["cancelada", "no_asistio"].includes(datosParaDisponibilidad.estado);
+    const cambioFechaHora = (
+      datosParaDisponibilidad.fecha !== cita.fecha ||
+      datosParaDisponibilidad.hora !== cita.hora
+    );
+
+    if (citaQuedaActiva && (cambioFechaHora || citaEstabaInactiva)) {
       const disponibilidad = await validarDisponibilidadAgenda(datosParaDisponibilidad, appointmentId);
 
       if (!disponibilidad.ok) {
