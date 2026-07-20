@@ -333,9 +333,20 @@
 
 .customer-card-list,
 .customer-loyalty-list,
-.customer-admin-movements {
+.customer-admin-movements,
+.customer-record-columns {
   display: grid;
   gap: 9px;
+}
+
+.customer-record-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.customer-record-columns h4,
+.customer-timeline-group h4 {
+  margin: 0 0 8px;
+  color: #0b2a6b;
 }
 
 .customer-card,
@@ -501,6 +512,13 @@
   font-weight: 900;
 }
 
+.customer-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .customer-badge.is-good {
   color: #0b2a6b;
   background: #dff3c9;
@@ -516,11 +534,73 @@
   background: #fff3cd;
 }
 
+.customer-badge.is-warning {
+  color: #7a4b00;
+  background: #fff3cd;
+}
+
 .customer-link-reason {
   width: fit-content;
   margin-top: 10px;
   color: #0b2a6b;
   background: #e8eef8;
+}
+
+.customer-cita-comment {
+  margin: 10px 0 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f7f8fb;
+  color: #52607a;
+  font-size: 0.86rem;
+}
+
+.customer-item-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.customer-item-photo {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f7f8fb;
+  color: #52607a;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.customer-item-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.customer-item-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+  color: #11224a;
+  font-size: 0.82rem;
+}
+
+.customer-item-grid strong {
+  display: block;
+  color: #52607a;
+  font-size: 0.72rem;
+}
+
+.customer-timeline-group + .customer-timeline-group {
+  margin-top: 14px;
 }
 
 @media (max-width: 1180px) {
@@ -544,7 +624,9 @@
   .customer-action-form,
   .customer-metrics.is-operational,
   .customer-loyalty-grid,
-  .customer-cita-grid {
+  .customer-cita-grid,
+  .customer-record-columns,
+  .customer-item-grid {
     grid-template-columns: 1fr;
   }
 

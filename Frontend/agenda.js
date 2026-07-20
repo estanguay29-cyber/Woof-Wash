@@ -3318,6 +3318,7 @@ function construirResumenCita(cita) {
     `Zona: ${formatearZonaServicio(cita.zona) || "-"}`,
     `Direccion: ${cita.direccion || "-"}`,
     `Estado: ${AGENDA_ESTADOS[cita.estado] || cita.estado || "-"}`,
+    `Total cobrado: ${Number.isFinite(cita.totalCobrado) ? `$${cita.totalCobrado.toFixed(2)}` : "Sin cobro"}`,
     `Calificación: ${formatearEstrellasCalificacion(cita.calificacionServicio)}`,
     `Notas: ${cita.notas || "Sin notas"}`
   ].join("\n");

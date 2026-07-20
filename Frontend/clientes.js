@@ -62,6 +62,19 @@ function formatearMonto(value) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount);
 }
 
+function formatearMontoMetrica(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "Sin datos";
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(amount);
+}
+
+function formatearDias(value) {
+  const days = Number(value);
+  if (!Number.isFinite(days)) return "Sin datos";
+  if (days === 0) return "Hoy";
+  return `${Math.max(Math.floor(days), 0)} dias`;
+}
+
 function mostrarCustomersFeedback(message, tipo = "success") {
   const feedback = byId("customersFeedback");
   if (!feedback) return;
@@ -224,6 +237,15 @@ function renderWhatsappButton(cliente = {}) {
   return `<button type="button" class="customer-action-button is-whatsapp" data-action="open-whatsapp" data-phone="${esc(telefono)}">WhatsApp</button>`;
 }
 
+function renderEmailButton(cliente = {}) {
+  const email = String(cliente.email || cliente.emailNormalizado || "").trim();
+  if (!email) return "";
+  return `
+    <a class="customer-action-button is-light" href="mailto:${esc(email)}">Email</a>
+    <button type="button" class="customer-action-button is-light" data-action="copy-email" data-email="${esc(email)}">Copiar email</button>
+  `;
+}
+
 function combinarCitasTimeline(cliente = {}) {
   const citas = [...(cliente.citasAsociadas || []), ...(cliente.citasVisiblesPortal || [])];
   const porId = new Map();
@@ -247,6 +269,15 @@ function obtenerServiciosCita(cita = {}) {
   return `${valor(cita.servicioNombre || cita.servicioTipo, "Servicio")}${mascota}`;
 }
 
+function obtenerEmpleadosCita(cita = {}) {
+  const detalle = Array.isArray(cita.empleadosAsignadosDetalle) ? cita.empleadosAsignadosDetalle : [];
+  const nombresDetalle = detalle.map((empleado) => empleado?.nombreCompleto).filter(Boolean);
+  if (nombresDetalle.length) return nombresDetalle.join(", ");
+  const nombres = Array.isArray(cita.empleadosAsignadosNombres) ? cita.empleadosAsignadosNombres.filter(Boolean) : [];
+  if (nombres.length) return nombres.join(", ");
+  return cita.empleadoAsignadoNombre || "";
+}
+
 function citaCuentaFidelidad(cita = {}) {
   return cita.estado === "completada" && cita.rewardGratisAplicado !== true && cita.rewardConsumido !== true;
 }
@@ -264,6 +295,8 @@ function renderCitaBadges(cita = {}) {
 
 function renderCitaTimeline(cita, { seleccionable = false } = {}) {
   const estado = valor(cita.estado, "pendiente");
+  const calificacion = numero(cita.calificacionServicio || cita.calificacionCliente);
+  const riesgo = etiquetaRiesgoCandidata(cita);
   return `
     <article class="customer-timeline-item is-${esc(estado)}">
       <div class="customer-timeline-dot" aria-hidden="true"></div>
@@ -277,13 +310,22 @@ function renderCitaTimeline(cita, { seleccionable = false } = {}) {
         </div>
         <div class="customer-cita-grid">
           <span><strong>Total</strong>${esc(formatearMonto(cita.totalCobrado))}</span>
-          <span><strong>Empleado</strong>${esc(valor(cita.empleadoAsignadoNombre, "Sin asignar"))}</span>
+          <span><strong>Empleado(s)</strong>${esc(valor(obtenerEmpleadosCita(cita), "Sin asignar"))}</span>
           <span><strong>Capturado</strong>${esc(valor(cita.clienteNombre, "Sin nombre"))}</span>
           <span><strong>Contacto</strong>${esc(valor(cita.clienteTelefono, "Sin telefono"))}</span>
+          <span><strong>Zona</strong>${esc(valor(cita.zona, "Sin zona"))}</span>
+          <span><strong>Direccion</strong>${esc(valor(cita.direccion, "Sin direccion"))}</span>
+          <span><strong>Fidelidad</strong>${esc(numero(cita.unidadesFidelidad))} unidades</span>
+          <span><strong>Calificacion</strong>${calificacion ? `${esc(calificacion)}/5` : "Sin calificacion"}</span>
         </div>
+        ${cita.comentarioCliente ? `<p class="customer-cita-comment">${esc(cita.comentarioCliente)}</p>` : ""}
         <div class="customer-badges">${renderCitaBadges(cita)}</div>
         ${seleccionable ? `
-          <div class="customer-link-reason">Coincide por ${esc(etiquetaCoincidencia(cita.coincidencia))}</div>
+          <div class="customer-link-reason">Coincide por ${esc(etiquetaCoincidencia(cita.coincidencia))} | ${esc(riesgo)}</div>
+          <div class="customer-cita-grid">
+            <span><strong>Email capturado</strong>${esc(valor(cita.clienteEmail, "Sin email"))}</span>
+            <span><strong>Telefono capturado</strong>${esc(valor(cita.clienteTelefono, "Sin telefono"))}</span>
+          </div>
           <div class="customer-actions-row">
             <button type="button" class="customer-action-button" data-action="link-appointment" data-appointment-id="${esc(cita.id)}">Vincular cita</button>
             <button type="button" class="customer-action-button is-light" data-action="ignore-appointment" data-appointment-id="${esc(cita.id)}">Ignorar</button>
@@ -291,6 +333,31 @@ function renderCitaTimeline(cita, { seleccionable = false } = {}) {
         ` : ""}
       </div>
     </article>
+  `;
+}
+
+function etiquetaRiesgoCandidata(cita = {}) {
+  if (cita.coincidencia === "email_telefono") return "Alta confianza";
+  if (cita.coincidencia === "telefono") return "Revisar: solo telefono";
+  if (cita.coincidencia === "email") return "Revisar: solo email";
+  return "Revisar datos";
+}
+
+function agruparCitasCliente(citas = []) {
+  return {
+    proximas: citas.filter((cita) => !["completada", "cancelada", "no_asistio"].includes(cita.estado || "")),
+    completadas: citas.filter((cita) => cita.estado === "completada"),
+    canceladas: citas.filter((cita) => cita.estado === "cancelada" || cita.estado === "no_asistio")
+  };
+}
+
+function renderGrupoTimeline(titulo, citas = []) {
+  if (!citas.length) return "";
+  return `
+    <div class="customer-timeline-group">
+      <h4>${esc(titulo)}</h4>
+      <div class="customer-timeline">${citas.map((cita) => renderCitaTimeline(cita)).join("")}</div>
+    </div>
   `;
 }
 
@@ -332,11 +399,80 @@ function renderMovimientos(movimientos = []) {
   `).join("");
 }
 
+function renderAlertasCliente(cliente = {}) {
+  const alertas = [];
+  if (numero(cliente.premiosDisponibles) > 0) alertas.push("Tiene premio disponible");
+  if ((cliente.posiblesCitasSinVincular || []).length) alertas.push("Pendiente de vincular citas");
+  if (!cliente.tieneCuentaWeb) alertas.push("Sin cuenta web");
+  if (!cliente.telefono) alertas.push("Sin telefono");
+  if (cliente.estado === "posible_duplicado") alertas.push("Posible duplicado");
+  if (cliente.segmentoActividad === "Cliente inactivo") alertas.push("Cliente inactivo");
+  if (!alertas.length) return "";
+  return `<div class="customer-alerts">${alertas.map((alerta) => `<span class="customer-badge is-warning">${esc(alerta)}</span>`).join("")}</div>`;
+}
+
+function renderClientItem(item = {}) {
+  const esAuto = item.tipo === "auto";
+  const titulo = esAuto
+    ? valor([item.marca, item.modelo].filter(Boolean).join(" "), "Auto sin nombre")
+    : valor(item.nombre, "Mascota sin nombre");
+  const detalles = esAuto
+    ? [
+        ["Ano", item.anio],
+        ["Color", item.color],
+        ["Tipo", item.tipoVehiculo],
+        ["Placas", item.placas],
+        ["Notas", item.cuidados]
+      ]
+    : [
+        ["Edad", item.edad],
+        ["Tamano", item.tamano],
+        ["Raza", item.raza],
+        ["Pelo", item.tipoPelo],
+        ["Notas", item.cuidados]
+      ];
+  return `
+    <article class="customer-item-card">
+      <div class="customer-item-photo">
+        ${item.fotoUrl ? `<img src="${esc(item.fotoUrl)}" alt="${esc(titulo)}">` : `<span>${esc(esAuto ? "Auto" : "Mascota")}</span>`}
+      </div>
+      <div>
+        <strong>${esc(titulo)}</strong>
+        <p class="customer-small">Registrado: ${esc(formatearFecha(item.createdAt))}</p>
+        <div class="customer-item-grid">
+          ${detalles.filter(([, value]) => String(value || "").trim()).map(([label, value]) => `<span><strong>${esc(label)}</strong>${esc(value)}</span>`).join("") || "<span>Sin detalles adicionales</span>"}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderRegistrosCliente(cliente = {}) {
+  const mascotas = cliente.clientItemsMascotas || [];
+  const autos = cliente.clientItemsAutos || [];
+  if (!cliente.tieneCuentaWeb) {
+    return "<p class='customer-empty'>Este cliente aun no tiene cuenta vinculada, por eso no hay mascotas/autos registrados desde portal.</p>";
+  }
+  return `
+    <div class="customer-record-columns">
+      <div>
+        <h4>Mascotas registradas</h4>
+        <div class="customer-card-list">${mascotas.length ? mascotas.map(renderClientItem).join("") : "<p class='customer-empty'>Sin mascotas registradas.</p>"}</div>
+      </div>
+      <div>
+        <h4>Autos registrados</h4>
+        <div class="customer-card-list">${autos.length ? autos.map(renderClientItem).join("") : "<p class='customer-empty'>Sin autos registrados.</p>"}</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderCustomerDetail(cliente, cuentas = []) {
   const detail = byId("customerDetail");
   if (!detail) return;
   const fidelidad = cliente.fidelidadDetalle || {};
   const citas = combinarCitasTimeline(cliente);
+  const citasAgrupadas = agruparCitasCliente(citas);
   const candidatas = cliente.posiblesCitasSinVincular || [];
   const candidatos = cuentas.length ? cuentas.map((cuenta) => `
     <article class="customer-card">
@@ -357,10 +493,12 @@ function renderCustomerDetail(cliente, cuentas = []) {
         <p class="admin-kicker">Detalle operativo</p>
         <h2>${esc(valor(cliente.nombre, "Cliente sin nombre"))}</h2>
         <p class="customer-meta">${esc(valor(cliente.telefono, "Sin telefono"))} | ${esc(valor(cliente.email, "Sin email"))}</p>
+        ${renderAlertasCliente(cliente)}
       </div>
       <div class="customer-header-actions">
         <span class="customer-status ${estadoClase(cliente.estado, cliente.tieneCuentaWeb)}">${esc(etiquetaEstado(cliente.estado, cliente.tieneCuentaWeb))}</span>
         ${renderWhatsappButton(cliente)}
+        ${renderEmailButton(cliente)}
       </div>
     </div>
 
@@ -375,14 +513,23 @@ function renderCustomerDetail(cliente, cuentas = []) {
       <h3>Resumen operativo</h3>
       <div class="customer-metrics is-operational">
         ${renderMetric("Citas totales", numero(cliente.citasTotales))}
+        ${renderMetric("Proximas", numero(cliente.proximasCitas ?? cliente.citasPendientesProximas))}
         ${renderMetric("Completadas", numero(cliente.citasCompletadas))}
-        ${renderMetric("Pendientes/proximas", numero(cliente.citasPendientesProximas))}
+        ${renderMetric("Canceladas", numero(cliente.citasCanceladas))}
         ${renderMetric("Mascota acum.", numero(cliente.serviciosMascotaAcumulados ?? cliente.serviciosMascota))}
         ${renderMetric("Auto acum.", numero(cliente.serviciosAutoAcumulados ?? cliente.serviciosAuto))}
-        ${renderMetric("Premios disp.", numero(cliente.premiosDisponibles))}
-        ${renderMetric("Premios usados", numero(cliente.premiosUsados))}
+        ${renderMetric("Ticket promedio", formatearMontoMetrica(cliente.ticketPromedio))}
+        ${renderMetric("Total vendido", formatearMontoMetrica(cliente.totalVendido))}
         ${renderMetric("Ultima visita", formatearFecha(cliente.ultimaVisita || cliente.fechaUltimoServicio))}
+        ${renderMetric("Proxima cita", formatearFecha(cliente.proximaCita))}
+        ${renderMetric("Desde ultima visita", formatearDias(cliente.diasDesdeUltimaVisita))}
+        ${renderMetric("Actividad", valor(cliente.segmentoActividad, "Sin datos"))}
       </div>
+    </section>
+
+    <section class="customer-section">
+      <h3>Registros del cliente</h3>
+      ${renderRegistrosCliente(cliente)}
     </section>
 
     <section class="customer-section">
@@ -411,9 +558,13 @@ function renderCustomerDetail(cliente, cuentas = []) {
 
     <section class="customer-section">
       <h3>Timeline de citas</h3>
-      <div class="customer-timeline">
-        ${citas.length ? citas.map((cita) => renderCitaTimeline(cita)).join("") : "<p class='customer-empty'>Sin citas asociadas.</p>"}
-      </div>
+      ${citas.length
+        ? [
+            renderGrupoTimeline("Proximas / pendientes", citasAgrupadas.proximas),
+            renderGrupoTimeline("Completadas / historial", citasAgrupadas.completadas),
+            renderGrupoTimeline("Canceladas", citasAgrupadas.canceladas)
+          ].join("")
+        : "<p class='customer-empty'>Sin citas asociadas.</p>"}
     </section>
 
     <section class="customer-section">
@@ -490,6 +641,13 @@ function abrirWhatsAppCliente(phone) {
   window.open(`https://wa.me/${telefono}?text=${message}`, "_blank", "noopener");
 }
 
+async function copiarEmailCliente(email = "") {
+  const value = String(email || "").trim();
+  if (!value) return;
+  await navigator.clipboard?.writeText(value);
+  mostrarCustomersFeedback("Email copiado");
+}
+
 async function handleDetailClick(event) {
   const actionButton = event.target.closest("[data-action]");
   if (!actionButton) return;
@@ -498,6 +656,8 @@ async function handleDetailClick(event) {
   try {
     if (action === "open-whatsapp") {
       abrirWhatsAppCliente(actionButton.dataset.phone);
+    } else if (action === "copy-email") {
+      await copiarEmailCliente(actionButton.dataset.email);
     } else if (action === "link-user" && selectedCustomerId) {
       await postCustomerAction(`/admin/customers/${selectedCustomerId}/link-user`, { userId: actionButton.dataset.userId });
     } else if (action === "unlink-user" && selectedCustomerId) {

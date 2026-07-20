@@ -17,7 +17,6 @@ const Appointment = require("./Appointment");
 const CustomerProfile = require("./CustomerProfile");
 const ClientItem = require("./ClientItem");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
-const AppointmentSlotLock = require("./AppointmentSlotLock");
 const PerformanceAttendance = require("./PerformanceAttendance");
 const PerformanceMetricRecord = require("./PerformanceMetricRecord");
 const employeeService = require("./services/employeeService");
@@ -2350,106 +2349,6 @@ function obtenerBloqueCitaAgenda(cita) {
 
 function bloquesTraslapados(nuevoBloque, bloqueExistente) {
   return nuevoBloque.inicioBloque < bloqueExistente.finBloque && nuevoBloque.finBloque > bloqueExistente.inicioBloque;
-}
-
-function estadoOcupaAgenda(estado = "pendiente") {
-  return !["cancelada", "no_asistio"].includes(estado || "pendiente");
-}
-
-function generarMinutosBloque(inicioMinutos, finMinutos) {
-  if (!Number.isInteger(inicioMinutos) || !Number.isInteger(finMinutos) || finMinutos <= inicioMinutos) {
-    return [];
-  }
-
-  const minutos = [];
-  for (let minuto = inicioMinutos; minuto < finMinutos; minuto += 1) {
-    minutos.push(minuto);
-  }
-  return minutos;
-}
-
-function crearErrorConflictoAgenda() {
-  const error = new Error("Este horario ya no está disponible. Elige otro horario.");
-  error.status = 409;
-  return error;
-}
-
-function esErrorDuplicadoMongo(error) {
-  return error?.code === 11000 || error?.writeErrors?.some((item) => item?.code === 11000);
-}
-
-async function liberarLocksAgenda(appointmentId) {
-  if (!appointmentId) return;
-  await AppointmentSlotLock.deleteMany({ appointmentId });
-}
-
-async function adquirirLocksAgenda({ fecha, inicioMinutos, finMinutos, appointmentId }) {
-  const minutos = generarMinutosBloque(inicioMinutos, finMinutos);
-  if (!fecha || !appointmentId || !minutos.length) {
-    return;
-  }
-
-  const locks = minutos.map((minuto) => ({
-    fecha,
-    minuto,
-    appointmentId
-  }));
-
-  try {
-    await AppointmentSlotLock.insertMany(locks, { ordered: true });
-  } catch (error) {
-    await liberarLocksAgenda(appointmentId);
-
-    if (esErrorDuplicadoMongo(error)) {
-      throw crearErrorConflictoAgenda();
-    }
-
-    throw error;
-  }
-}
-
-function crearSnapshotLocksAgenda(cita) {
-  if (!cita || !estadoOcupaAgenda(cita.estado)) {
-    return { activo: false, appointmentId: cita?._id || null };
-  }
-
-  const bloque = obtenerBloqueCitaAgenda(cita);
-  if (!bloque) {
-    return { activo: false, appointmentId: cita._id };
-  }
-
-  return {
-    activo: true,
-    fecha: cita.fecha,
-    inicioMinutos: bloque.inicioBloque,
-    finMinutos: bloque.finBloque,
-    appointmentId: cita._id
-  };
-}
-
-async function restaurarLocksAgenda(snapshot) {
-  if (!snapshot?.activo) return;
-  await adquirirLocksAgenda(snapshot);
-}
-
-async function reconstruirLocksAgenda() {
-  await AppointmentSlotLock.deleteMany({});
-
-  const citasActivas = await Appointment.find({
-    estado: { $nin: ["cancelada", "no_asistio"] }
-  }).sort({ fecha: 1, hora: 1, createdAt: 1 });
-
-  for (const cita of citasActivas) {
-    const bloque = obtenerBloqueCitaAgenda(cita);
-    if (!bloque) continue;
-
-    await adquirirLocksAgenda({
-      fecha: cita.fecha,
-      inicioMinutos: bloque.inicioBloque,
-      finMinutos: bloque.finBloque,
-      appointmentId: cita._id
-    });
-  }
 }
 
 async function obtenerCitasOcupadasAgenda(fecha, excludeId = "") {
@@ -6071,6 +5970,146 @@ function construirMovimientosAdministrativosCustomer(customer = {}) {
   return [...ajustes, ...premios].sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
 }
 
+function obtenerTelefonoCitaCustomer(citas = []) {
+  const cita = citas.find((item) => normalizarTelefonoClientePerfil(item?.clienteTelefono || ""));
+  return cita?.clienteTelefono || "";
+}
+
+function obtenerEmailCitaCustomer(citas = []) {
+  const cita = citas.find((item) => validarEmail(normalizarEmail(item?.clienteEmail || "")));
+  return normalizarEmail(cita?.clienteEmail || "");
+}
+
+function obtenerTelefonoVisibleCustomer({ customer = {}, user = null, citasCustomer = [], citasPortal = [] } = {}) {
+  const telefonoCustomer = normalizarTelefonoClientePerfil(customer.telefono || "");
+  if (telefonoCustomer) return customer.telefono || telefonoCustomer;
+
+  const telefonoNormalizado = normalizarTelefonoClientePerfil(customer.telefonoNormalizado || "");
+  if (telefonoNormalizado) return telefonoNormalizado;
+
+  const telefonoUser = normalizarTelefonoClientePerfil(user?.telefono || "");
+  if (telefonoUser) return user.telefono || telefonoUser;
+
+  const telefonoCitaCustomer = obtenerTelefonoCitaCustomer(citasCustomer);
+  if (telefonoCitaCustomer) return telefonoCitaCustomer;
+
+  if (customer.userId) {
+    const telefonoCitaPortal = obtenerTelefonoCitaCustomer(citasPortal);
+    if (telefonoCitaPortal) return telefonoCitaPortal;
+  }
+
+  return "";
+}
+
+function obtenerEmailVisibleCustomer({ customer = {}, user = null, citasCustomer = [], citasPortal = [] } = {}) {
+  const emailCustomer = normalizarEmail(customer.email || customer.emailNormalizado || "");
+  if (emailCustomer && validarEmail(emailCustomer)) return emailCustomer;
+
+  const emailUser = normalizarEmail(user?.email || "");
+  if (emailUser && validarEmail(emailUser)) return emailUser;
+
+  const emailCitaCustomer = obtenerEmailCitaCustomer(citasCustomer);
+  if (emailCitaCustomer) return emailCitaCustomer;
+
+  if (customer.userId) {
+    const emailCitaPortal = obtenerEmailCitaCustomer(citasPortal);
+    if (emailCitaPortal) return emailCitaPortal;
+  }
+
+  return "";
+}
+
+function obtenerIdCitaCustomer(cita = {}) {
+  return cita?._id ? String(cita._id) : cita?.id ? String(cita.id) : "";
+}
+
+function combinarCitasConfirmadasCustomer({ customer = {}, citasCustomer = [], citasPortal = [] } = {}) {
+  const citas = customer.userId ? [...citasCustomer, ...citasPortal] : [...citasCustomer];
+  const porId = new Map();
+  citas.forEach((cita) => {
+    const id = obtenerIdCitaCustomer(cita);
+    if (id && !porId.has(id)) porId.set(id, cita);
+  });
+  return [...porId.values()].sort((a, b) => `${b.fecha || ""} ${b.hora || ""}`.localeCompare(`${a.fecha || ""} ${a.hora || ""}`));
+}
+
+function obtenerFechaHoraCitaCustomer(cita = {}) {
+  const fecha = typeof cita.fecha === "string" ? cita.fecha : "";
+  const hora = typeof cita.hora === "string" ? cita.hora : "00:00";
+  if (!validarFechaISOAgenda(fecha)) return null;
+  const fechaHora = new Date(`${fecha}T${validarHoraAgenda(hora) ? hora : "00:00"}:00`);
+  return Number.isNaN(fechaHora.getTime()) ? null : fechaHora;
+}
+
+function contarUnidadesFidelidadCitaCustomer(cita = {}) {
+  if (cita.estado !== "completada" || cita.rewardGratisAplicado === true || cita.rewardConsumido === true) return 0;
+  return contarUnidadesFidelidadCita(cita);
+}
+
+function construirActividadCustomer(citasConfirmadas = []) {
+  const hoy = new Date();
+  const completadas = citasConfirmadas.filter((cita) => cita.estado === "completada");
+  const canceladas = citasConfirmadas.filter((cita) => cita.estado === "cancelada" || cita.estado === "no_asistio");
+  const proximas = citasConfirmadas.filter((cita) => {
+    const fechaHora = obtenerFechaHoraCitaCustomer(cita);
+    return fechaHora && fechaHora >= hoy && !["completada", "cancelada", "no_asistio"].includes(cita.estado || "");
+  });
+  const totalVendido = completadas.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+  const citasConCobro = completadas.filter((cita) => Number(cita.totalCobrado) > 0);
+  const ultimaCompletada = completadas[0] || null;
+  const proximaCita = proximas
+    .slice()
+    .sort((a, b) => `${a.fecha || ""} ${a.hora || ""}`.localeCompare(`${b.fecha || ""} ${b.hora || ""}`))[0] || null;
+  const ultimaFecha = obtenerFechaHoraCitaCustomer(ultimaCompletada);
+  const diasDesdeUltimaVisita = ultimaFecha
+    ? Math.max(Math.floor((hoy - ultimaFecha) / (1000 * 60 * 60 * 24)), 0)
+    : null;
+  const segmento = completadas.length >= 5
+    ? "Cliente frecuente"
+    : completadas.length === 0
+      ? "Cliente nuevo"
+      : diasDesdeUltimaVisita !== null && diasDesdeUltimaVisita > 120
+        ? "Cliente inactivo"
+        : "Cliente activo";
+
+  return {
+    totalCitas: citasConfirmadas.length,
+    proximasCitas: proximas.length,
+    citasCompletadas: completadas.length,
+    citasCanceladas: canceladas.length,
+    ticketPromedio: citasConCobro.length ? Math.round((totalVendido / citasConCobro.length) * 100) / 100 : 0,
+    totalVendido,
+    ultimaCita: citasConfirmadas[0]?.fecha || "",
+    proximaCita: proximaCita?.fecha || "",
+    diasDesdeUltimaVisita,
+    segmento
+  };
+}
+
+function construirClientItemAdminRespuesta(item = {}) {
+  const obj = typeof item?.toObject === "function" ? item.toObject() : item;
+  return {
+    id: obj._id ? String(obj._id) : "",
+    tipo: obj.tipo || "",
+    nombre: obj.nombre || "",
+    especie: obj.especie || "",
+    raza: obj.raza || "",
+    edad: obj.edad || "",
+    tamano: obj.tamano || "",
+    tipoPelo: obj.tipoPelo || "",
+    cuidados: obj.cuidados || "",
+    marca: obj.marca || "",
+    modelo: obj.modelo || "",
+    anio: obj.anio || "",
+    color: obj.color || "",
+    tipoVehiculo: obj.tipoVehiculo || "",
+    fotoUrl: obj.fotoUrl || "",
+    fotoNombre: obj.fotoNombre || "",
+    createdAt: obj.createdAt || null,
+    updatedAt: obj.updatedAt || null
+  };
+}
+
 async function obtenerCitasPosiblesCustomer(customer = {}, { limit = 20 } = {}) {
   const condiciones = [];
   if (customer.emailNormalizado) condiciones.push({ clienteEmail: customer.emailNormalizado });
@@ -6104,7 +6143,8 @@ function construirCitaResumenCustomer(cita, customer = null) {
   const base = construirCitaAdmin(cita);
   return {
     ...base,
-    coincidencia: customer ? describirCoincidenciaCitaCustomer(cita, customer) : ""
+    coincidencia: customer ? describirCoincidenciaCitaCustomer(cita, customer) : "",
+    unidadesFidelidad: contarUnidadesFidelidadCitaCustomer(cita)
   };
 }
 
@@ -6114,18 +6154,22 @@ function citaPuedeVincularseACustomer(cita = {}, customer = {}) {
   return describirCoincidenciaCitaCustomer(cita, customer) !== "revision";
 }
 
-async function construirResumenCustomerProfile(customer) {
-  const [citasCustomer, citasPortal, posiblesCitas, duplicadosEmail, duplicadosTelefono] = await Promise.all([
+async function construirResumenCustomerProfile(customer, { incluirClientItems = false } = {}) {
+  const [citasCustomer, citasPortal, userVinculado, clientItems, posiblesCitas, duplicadosEmail, duplicadosTelefono] = await Promise.all([
     Appointment.find({ customerId: customer._id }).sort({ fecha: -1, hora: -1, createdAt: -1 }),
     customer.userId ? Appointment.find({ clientUserId: customer.userId }).sort({ fecha: -1, hora: -1, createdAt: -1 }) : Promise.resolve([]),
+    customer.userId ? User.findById(customer.userId).select("email telefono") : Promise.resolve(null),
+    incluirClientItems && customer.userId ? ClientItem.find({ userId: customer.userId }).sort({ updatedAt: -1, createdAt: -1 }) : Promise.resolve([]),
     obtenerCitasPosiblesCustomer(customer, { limit: 12 }),
     customer.emailNormalizado ? CustomerProfile.countDocuments({ emailNormalizado: customer.emailNormalizado, _id: { $ne: customer._id } }) : Promise.resolve(0),
     customer.telefonoNormalizado ? CustomerProfile.countDocuments({ telefonoNormalizado: customer.telefonoNormalizado, _id: { $ne: customer._id } }) : Promise.resolve(0)
   ]);
 
+  const citasConfirmadas = combinarCitasConfirmadasCustomer({ customer, citasCustomer, citasPortal });
+  const actividad = construirActividadCustomer(citasConfirmadas);
   const citasParaFidelidad = customer.userId ? citasPortal : citasCustomer;
-  const completadas = citasCustomer.filter((cita) => cita.estado === "completada");
-  const citasPendientesProximas = citasCustomer.filter((cita) => !["completada", "cancelada", "no_asistio"].includes(cita.estado || ""));
+  const completadas = citasConfirmadas.filter((cita) => cita.estado === "completada");
+  const citasPendientesProximas = citasConfirmadas.filter((cita) => !["completada", "cancelada", "no_asistio"].includes(cita.estado || ""));
   const completadasFidelidad = citasParaFidelidad.filter((cita) => cita.estado === "completada");
   const progresoBase = construirResumenFidelidad(crearProgresoRecompensasAgenda(completadasFidelidad.filter((cita) => (
     cita.rewardGratisAplicado !== true && cita.rewardConsumido !== true
@@ -6136,6 +6180,8 @@ async function construirResumenCustomerProfile(customer) {
   const serviciosAuto = progreso.auto?.completados || 0;
   const citasCompletadasOrdenAsc = [...completadas].sort((a, b) => `${a.fecha || ""} ${a.hora || ""}`.localeCompare(`${b.fecha || ""} ${b.hora || ""}`));
   const ultimaCompletada = completadas[0] || null;
+  const telefonoVisible = obtenerTelefonoVisibleCustomer({ customer, user: userVinculado, citasCustomer, citasPortal });
+  const emailVisible = obtenerEmailVisibleCustomer({ customer, user: userVinculado, citasCustomer, citasPortal });
   const posibleDuplicado = duplicadosEmail > 0 || duplicadosTelefono > 0;
   const estado = customer.userId
     ? "vinculado"
@@ -6148,9 +6194,9 @@ async function construirResumenCustomerProfile(customer) {
   return {
     id: String(customer._id),
     nombre: customer.nombre || "",
-    telefono: customer.telefono || customer.telefonoNormalizado || "",
+    telefono: telefonoVisible,
     telefonoNormalizado: customer.telefonoNormalizado || "",
-    email: customer.email || customer.emailNormalizado || "",
+    email: emailVisible,
     emailNormalizado: customer.emailNormalizado || "",
     userId: customer.userId ? String(customer.userId) : "",
     tieneCuentaWeb: Boolean(customer.userId),
@@ -6160,9 +6206,11 @@ async function construirResumenCustomerProfile(customer) {
     notasAdmin: customer.notasAdmin || "",
     fechaPrimerServicio: customer.fechaPrimerServicio || citasCompletadasOrdenAsc[0]?.fecha || "",
     fechaUltimoServicio: customer.fechaUltimoServicio || ultimaCompletada?.fecha || "",
-    citasTotales: citasCustomer.length,
+    citasTotales: citasConfirmadas.length,
     citasCompletadas: completadas.length,
+    proximasCitas: actividad.proximasCitas,
     citasPendientesProximas: citasPendientesProximas.length,
+    citasCanceladas: actividad.citasCanceladas,
     citasPortalTotales: citasPortal.length,
     serviciosMascota,
     serviciosAuto,
@@ -6170,14 +6218,21 @@ async function construirResumenCustomerProfile(customer) {
     serviciosAutoAcumulados: fidelidadDetalle.auto?.unidadesAcumuladas || 0,
     premiosDisponibles: contarPremiosDisponiblesAdmin(progreso),
     premiosUsados: contarPremiosUsadosCustomer(customer),
-    ultimaCita: citasCustomer[0]?.fecha || "",
+    ultimaCita: actividad.ultimaCita,
     ultimaVisita: ultimaCompletada?.fecha || "",
+    proximaCita: actividad.proximaCita,
+    ticketPromedio: actividad.ticketPromedio,
+    totalVendido: actividad.totalVendido,
+    diasDesdeUltimaVisita: actividad.diasDesdeUltimaVisita,
+    segmentoActividad: actividad.segmento,
     progresoFidelidad: progreso,
     fidelidadDetalle,
     ajustesFidelidad: customer.ajustesFidelidad || [],
     premiosManual: customer.premiosManual || [],
     movimientosAdministrativos: construirMovimientosAdministrativosCustomer(customer),
     direccionesUsadas: customer.direccionesUsadas || [],
+    clientItemsMascotas: incluirClientItems ? clientItems.filter((item) => item.tipo === "mascota").map(construirClientItemAdminRespuesta) : [],
+    clientItemsAutos: incluirClientItems ? clientItems.filter((item) => item.tipo === "auto").map(construirClientItemAdminRespuesta) : [],
     posiblesCitasSinVincular: posiblesCitas.map((cita) => construirCitaResumenCustomer(cita, customer)),
     citasAsociadas: citasCustomer.map((cita) => construirCitaResumenCustomer(cita, customer)),
     citasVisiblesPortal: citasPortal.map((cita) => construirCitaResumenCustomer(cita, customer))
@@ -6299,7 +6354,7 @@ app.get("/admin/customers/:id", auth, requireAdmin, async (req, res) => {
     const customer = await CustomerProfile.findById(customerId);
     if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
     const [cliente, cuentasCoincidentes] = await Promise.all([
-      construirResumenCustomerProfile(customer),
+      construirResumenCustomerProfile(customer, { incluirClientItems: true }),
       buscarCuentasCoincidentesCustomer(customer)
     ]);
     res.json({ cliente, cuentasCoincidentes });
@@ -6570,33 +6625,16 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
       origen: datos.origen || "admin"
     });
 
-    const citaOcupaAgenda = estadoOcupaAgenda(cita.estado);
-
-    if (citaOcupaAgenda) {
-      await adquirirLocksAgenda({
-        fecha: cita.fecha,
-        inicioMinutos: cita.inicioBloque,
-        finMinutos: cita.finBloque,
-        appointmentId
-      });
-    }
-
     try {
       if (cita.estado === "completada" && cita.rewardGratisAplicado) {
         const consumo = await consumirRecompensaCita(cita);
         if (!consumo.ok) {
-          if (citaOcupaAgenda) {
-            await liberarLocksAgenda(appointmentId);
-          }
           return res.status(consumo.status).json({ message: consumo.message });
         }
       }
 
       await cita.save();
     } catch (error) {
-      if (citaOcupaAgenda) {
-        await liberarLocksAgenda(appointmentId);
-      }
       throw error;
     }
 
@@ -6783,25 +6821,6 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       Object.assign(datos, disponibilidad.bloque);
     }
 
-    const locksAnteriores = crearSnapshotLocksAgenda(cita);
-    const locksNuevos = estadoOcupaAgenda(datosParaDisponibilidad.estado)
-      ? {
-          activo: true,
-          fecha: datosParaDisponibilidad.fecha,
-          inicioMinutos: datos.inicioBloque,
-          finMinutos: datos.finBloque,
-          appointmentId: cita._id
-        }
-      : { activo: false, appointmentId: cita._id };
-    const cambiaronLocks = (
-      Boolean(locksAnteriores.activo) !== Boolean(locksNuevos.activo) ||
-      (locksAnteriores.activo && locksNuevos.activo && (
-        locksAnteriores.fecha !== locksNuevos.fecha ||
-        locksAnteriores.inicioMinutos !== locksNuevos.inicioMinutos ||
-        locksAnteriores.finMinutos !== locksNuevos.finMinutos
-      ))
-    );
-
     const camposEditables = [
       "clienteNombre",
       "clienteTelefono",
@@ -6844,28 +6863,6 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       "estado"
     ];
 
-    let locksNuevosAdquiridos = false;
-    let locksAnterioresLiberados = false;
-
-    if (cambiaronLocks) {
-      await liberarLocksAgenda(cita._id);
-      locksAnterioresLiberados = true;
-
-      try {
-        if (locksNuevos.activo) {
-          await adquirirLocksAgenda(locksNuevos);
-          locksNuevosAdquiridos = true;
-        }
-      } catch (error) {
-        try {
-          await restaurarLocksAgenda(locksAnteriores);
-        } catch (restoreError) {
-          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
-        }
-        throw error;
-      }
-    }
-
     for (const campo of camposEditables) {
       if (Object.prototype.hasOwnProperty.call(datos, campo)) {
         cita[campo] = datos[campo];
@@ -6876,28 +6873,12 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       if (cita.estado === "completada" && cita.rewardGratisAplicado) {
         const consumo = await consumirRecompensaCita(cita);
         if (!consumo.ok) {
-          if (locksNuevosAdquiridos) {
-            await liberarLocksAgenda(cita._id);
-          }
-          if (locksAnterioresLiberados) {
-            await restaurarLocksAgenda(locksAnteriores);
-          }
           return res.status(consumo.status).json({ message: consumo.message });
         }
       }
 
       await cita.save();
     } catch (error) {
-      if (locksNuevosAdquiridos) {
-        await liberarLocksAgenda(cita._id);
-      }
-      if (locksAnterioresLiberados) {
-        try {
-          await restaurarLocksAgenda(locksAnteriores);
-        } catch (restoreError) {
-          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
-        }
-      }
       throw error;
     }
 
@@ -6938,7 +6919,6 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
       return res.status(404).json({ message: "Cita no encontrada" });
     }
 
-    const locksAnteriores = crearSnapshotLocksAgenda(cita);
     const totalCobradoBody = req.body?.totalCobrado;
     if (estado === "completada" && cita.estado !== "completada" && (totalCobradoBody === undefined || totalCobradoBody === null)) {
       return res.status(400).json({ message: "totalCobrado es obligatorio al completar la cita" });
@@ -6972,38 +6952,6 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
       cita.finBloque = disponibilidad.bloque.finBloque;
     }
 
-    const locksNuevos = estadoOcupaAgenda(estado)
-      ? {
-          activo: true,
-          fecha: cita.fecha,
-          inicioMinutos: cita.inicioBloque,
-          finMinutos: cita.finBloque,
-          appointmentId: cita._id
-        }
-      : { activo: false, appointmentId: cita._id };
-    const cambiaronLocks = Boolean(locksAnteriores.activo) !== Boolean(locksNuevos.activo);
-    let locksNuevosAdquiridos = false;
-    let locksAnterioresLiberados = false;
-
-    if (cambiaronLocks) {
-      await liberarLocksAgenda(cita._id);
-      locksAnterioresLiberados = true;
-
-      try {
-        if (locksNuevos.activo) {
-          await adquirirLocksAgenda(locksNuevos);
-          locksNuevosAdquiridos = true;
-        }
-      } catch (error) {
-        try {
-          await restaurarLocksAgenda(locksAnteriores);
-        } catch (restoreError) {
-          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
-        }
-        throw error;
-      }
-    }
-
     cita.estado = estado;
     if (estado !== "completada") {
       cita.calificacionServicio = null;
@@ -7015,28 +6963,12 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
       if (estado === "completada" && cita.rewardGratisAplicado) {
         const consumo = await consumirRecompensaCita(cita);
         if (!consumo.ok) {
-          if (locksNuevosAdquiridos) {
-            await liberarLocksAgenda(cita._id);
-          }
-          if (locksAnterioresLiberados) {
-            await restaurarLocksAgenda(locksAnteriores);
-          }
           return res.status(consumo.status).json({ message: consumo.message });
         }
       }
 
       await cita.save();
     } catch (error) {
-      if (locksNuevosAdquiridos) {
-        await liberarLocksAgenda(cita._id);
-      }
-      if (locksAnterioresLiberados) {
-        try {
-          await restaurarLocksAgenda(locksAnteriores);
-        } catch (restoreError) {
-          console.log("No se pudieron restaurar los locks anteriores de la cita:", restoreError.message);
-        }
-      }
       throw error;
     }
 
@@ -7069,7 +7001,6 @@ app.delete("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asy
 
     cita.estado = "cancelada";
     await cita.save();
-    await liberarLocksAgenda(cita._id);
 
     res.json({ message: "Cita cancelada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
