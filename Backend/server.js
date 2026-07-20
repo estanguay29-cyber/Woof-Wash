@@ -2347,10 +2347,6 @@ function obtenerBloqueCitaAgenda(cita) {
   });
 }
 
-function bloquesTraslapados(nuevoBloque, bloqueExistente) {
-  return nuevoBloque.inicioBloque < bloqueExistente.finBloque && nuevoBloque.finBloque > bloqueExistente.inicioBloque;
-}
-
 async function obtenerCitasOcupadasAgenda(fecha, excludeId = "") {
   const filtro = {
     fecha,
@@ -2392,7 +2388,7 @@ async function validarDisponibilidadAgenda(datos, excludeId = "") {
   const horarioValido = validarHorarioOperativoAgenda({
     fecha: datos.fecha,
     inicioBloque: bloque.inicioBloque,
-    finBloque: bloque.finBloque
+    finBloque: bloque.inicioBloque
   });
 
   if (!horarioValido.ok) {
@@ -2400,13 +2396,13 @@ async function validarDisponibilidadAgenda(datos, excludeId = "") {
   }
 
   const citasOcupadas = await obtenerCitasOcupadasAgenda(datos.fecha, excludeId);
-  const traslape = citasOcupadas.find((cita) => bloquesTraslapados(bloque, cita));
+  const citaMismaHora = citasOcupadas.find((cita) => cita.hora === datos.hora);
 
-  if (traslape) {
+  if (citaMismaHora) {
     return {
       ok: false,
       status: 409,
-      message: "Este horario ya no está disponible. Elige otro horario.",
+      message: "Ya existe una cita programada para esta fecha y hora.",
       bloque
     };
   }
@@ -2462,16 +2458,13 @@ async function construirDisponibilidadAgenda({ fecha, servicioTipo, servicioPaqu
 
   for (
     let inicio = inicioOperacion;
-    inicio + bloqueTotalMinutos <= finOperacion;
+    inicio < finOperacion;
     inicio += CONFIG_AGENDA.intervaloHorariosMinutos
   ) {
-    const bloque = {
-      inicioBloque: inicio,
-      finBloque: inicio + bloqueTotalMinutos
-    };
+    const hora = minutosAHora(inicio);
 
-    if (!citasOcupadas.some((cita) => bloquesTraslapados(bloque, cita))) {
-      horariosDisponibles.push(minutosAHora(inicio));
+    if (!citasOcupadas.some((cita) => cita.hora === hora)) {
+      horariosDisponibles.push(hora);
     }
   }
 

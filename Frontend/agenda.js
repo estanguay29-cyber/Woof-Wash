@@ -1067,10 +1067,10 @@ async function cargarDisponibilidadFormulario({ modo = "crear", conservarHora = 
     const disponibilidad = await agendaFetch(`/admin/appointments/availability?${params.toString()}`);
     const horaObjetivo = conservarHora || horaSelect.value || "";
     const horaDisponible = llenarSelectHorarios(horaSelect, disponibilidad.horariosDisponibles, horaObjetivo);
-    const tiempoBloqueado = Number(disponibilidad.duracionBloqueadaMinutos || disponibilidad.bloqueTotalMinutos)
+    const duracionOperativa = Number(disponibilidad.duracionBloqueadaMinutos || disponibilidad.bloqueTotalMinutos)
       || (Number(disponibilidad.duracionMinutos) || 0) + (Number(disponibilidad.trasladoMinutos) || 0);
     const mensajeBase = disponibilidad.abierto
-      ? `Duracion operativa: ${tiempoBloqueado} min (${disponibilidad.duracionMinutos} min + ${disponibilidad.trasladoMinutos} min traslado)`
+      ? `Duracion operativa: ${duracionOperativa} min (${disponibilidad.duracionMinutos} min + ${disponibilidad.trasladoMinutos} min traslado)`
       : "Este día no hay servicio disponible.";
 
     if (esEdicion) {
