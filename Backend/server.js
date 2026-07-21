@@ -20,6 +20,7 @@ const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
 const PerformanceAttendance = require("./PerformanceAttendance");
 const PerformanceMetricRecord = require("./PerformanceMetricRecord");
 const employeeService = require("./services/employeeService");
+const appointmentCalendarService = require("./services/appointmentCalendarService");
 
 const app = express();
 app.disable("x-powered-by");
@@ -4284,6 +4285,24 @@ app.get("/admin/employees/:id/performance/history", auth, requireAdmin, async (r
   }
 });
 
+app.get("/admin/employees/:id/appointments/calendar", auth, requireAdmin, async (req, res) => {
+  try {
+    const employeeId = String(req.params.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res.status(400).json({ message: "Id de empleado no valido" });
+    }
+    const fallbackDate = appointmentCalendarService.getBusinessToday();
+    const startDate = normalizarTextoPlano(req.query?.startDate || req.query?.fecha, 10) || fallbackDate;
+    const endDate = normalizarTextoPlano(req.query?.endDate || req.query?.fecha, 10) || startDate;
+    const calendar = await appointmentCalendarService.queryCalendarAppointments({
+      AppointmentModel: Appointment, startDate, endDate, employeeId, role: "empleado"
+    });
+    return res.json(calendar);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || "No se pudo obtener el calendario del empleado" });
+  }
+});
+
 app.get("/admin/employees/:id/appointments", auth, requireAdmin, async (req, res) => {
   try {
     const id = String(req.params.id || "").trim();
@@ -5581,6 +5600,24 @@ app.get("/empleados/performance/history", auth, requireEmpleado, async (req, res
   }
 });
 
+app.get("/empleados/appointments/calendar", auth, requireEmpleado, async (req, res) => {
+  try {
+    const fallbackDate = appointmentCalendarService.getBusinessToday();
+    const startDate = normalizarTextoPlano(req.query?.startDate || req.query?.fecha, 10) || fallbackDate;
+    const endDate = normalizarTextoPlano(req.query?.endDate || req.query?.fecha, 10) || startDate;
+    const calendar = await appointmentCalendarService.queryCalendarAppointments({
+      AppointmentModel: Appointment,
+      startDate,
+      endDate,
+      employeeId: req.employeeProfile._id,
+      role: "empleado"
+    });
+    return res.json(calendar);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || "No se pudo obtener el calendario del empleado" });
+  }
+});
+
 app.get("/empleados/appointments", auth, requireEmpleado, async (req, res) => {
   try {
     const fecha = normalizarTextoPlano(req.query?.fecha, 10) || obtenerFechaLocalAgenda();
@@ -5638,6 +5675,20 @@ app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado,
     res.json({ message: "Estado operativo actualizado", cita: construirCitaEmpleado(cita) });
   } catch (error) {
     res.status(500).json({ message: "No se pudo actualizar el estado operativo" });
+  }
+});
+
+app.get("/admin/appointments/calendar", auth, requireAdmin, async (req, res) => {
+  try {
+    const fallbackDate = appointmentCalendarService.getBusinessToday();
+    const startDate = normalizarTextoPlano(req.query?.startDate || req.query?.fecha, 10) || fallbackDate;
+    const endDate = normalizarTextoPlano(req.query?.endDate || req.query?.fecha, 10) || startDate;
+    const calendar = await appointmentCalendarService.queryCalendarAppointments({
+      AppointmentModel: Appointment, startDate, endDate, role: "admin"
+    });
+    return res.json(calendar);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || "No se pudo obtener el calendario de citas" });
   }
 });
 

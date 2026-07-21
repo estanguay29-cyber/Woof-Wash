@@ -8,6 +8,7 @@
   <title>Portal empleados - Woof & Wash</title>
   <link rel="stylesheet" href="dashboard.css">
   <link rel="stylesheet" href="portal.css">
+  <link rel="stylesheet" href="../shared/appointments-calendar.css">
 </head>
 <body data-admin-page="portal">
   <main class="portal-shell">
@@ -83,10 +84,16 @@
       </section>
 
       <section id="employeePortalPanel" class="employee-portal-panel hidden" aria-label="Portal individual modo admin"></section>
+      <section id="adminEmployeeCalendarPanel" class="employee-portal-panel hidden" aria-label="Calendario del empleado seleccionado">
+        <div id="adminEmployeeSharedCalendar" class="appointments-calendar-host"></div>
+      </section>
     </section>
   </main>
 
   <script src="../admin-nav.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales-all.global.min.js"></script>
+  <script src="../shared/appointments-calendar.js"></script>
   <script src="portal.js"></script>
 </body>
 </html>

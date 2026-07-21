@@ -127,6 +127,7 @@ let rewardClienteActual = null;
 let duracionBloqueadaManualCrear = false;
 let duracionBloqueadaManualEditar = false;
 let empleadosAgenda = [];
+let calendarioAgendaVisual = null;
 
 function obtenerApiBaseAgenda() {
   const hostname = window.location.hostname;
@@ -178,7 +179,66 @@ async function agendaFetch(path, options = {}) {
     throw new Error(data.message || data.error || "No se pudo completar la solicitud");
   }
 
+  const method = String(options.method || "GET").toUpperCase();
+  if (["POST", "PATCH", "DELETE"].includes(method) && path.startsWith("/admin/appointments")) {
+    calendarioAgendaVisual?.refresh();
+  }
+
   return data;
+}
+
+function inicializarCalendarioAgenda() {
+  if (calendarioAgendaVisual) {
+    calendarioAgendaVisual.updateSize();
+    return calendarioAgendaVisual;
+  }
+  const host = document.getElementById("agendaSharedCalendar");
+  const calendarApi = window.WoofWashAppointmentsCalendar;
+  if (!host || !calendarApi?.createAppointmentsCalendar) return null;
+  try {
+    calendarioAgendaVisual = calendarApi.createAppointmentsCalendar({
+      container: host,
+      initialView: "dayGridMonth",
+      locale: "es",
+      timeZone: "America/Mexico_City",
+      loadEvents: async ({ startDate, endDate, signal }) => agendaFetch(
+        `/admin/appointments/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+        { signal }
+      )
+    });
+    return calendarioAgendaVisual;
+  } catch (error) {
+    host.textContent = error.message || "No se pudo inicializar el calendario.";
+    host.classList.add("appointments-calendar-init-error");
+    return null;
+  }
+}
+
+function cambiarVistaAgenda(tipo) {
+  const mostrarCalendario = tipo === "calendar";
+  const listView = document.getElementById("agendaListView");
+  const calendarView = document.getElementById("agendaCalendarView");
+  const listButton = document.getElementById("btnAgendaVistaLista");
+  const calendarButton = document.getElementById("btnAgendaVistaCalendario");
+  listView?.classList.toggle("hidden", mostrarCalendario);
+  calendarView?.classList.toggle("hidden", !mostrarCalendario);
+  listButton?.classList.toggle("is-active", !mostrarCalendario);
+  calendarButton?.classList.toggle("is-active", mostrarCalendario);
+  listButton?.setAttribute("aria-pressed", String(!mostrarCalendario));
+  calendarButton?.setAttribute("aria-pressed", String(mostrarCalendario));
+  if (mostrarCalendario) {
+    const yaInicializado = Boolean(calendarioAgendaVisual);
+    const calendar = inicializarCalendarioAgenda();
+    window.requestAnimationFrame(() => {
+      calendar?.updateSize();
+      if (yaInicializado) calendar?.refresh();
+    });
+  }
+}
+
+function configurarCalendarioAgenda() {
+  document.getElementById("btnAgendaVistaLista")?.addEventListener("click", () => cambiarVistaAgenda("list"));
+  document.getElementById("btnAgendaVistaCalendario")?.addEventListener("click", () => cambiarVistaAgenda("calendar"));
 }
 
 const AGENDA_RANGO_STORAGE_KEY = "agendaRangoFechas";
@@ -3567,6 +3627,7 @@ function aplicarFiltroRapido(tipo) {
 
 async function configurarAgenda() {
   const elementos = obtenerElementosAgenda();
+  configurarCalendarioAgenda();
   await cargarConfigZonasAgenda();
   poblarSelectZonasAgenda();
   const hoy = obtenerFechaLocalISO();

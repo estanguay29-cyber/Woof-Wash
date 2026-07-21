@@ -36,6 +36,9 @@ const state = {
   filtro: "",
   empleadoSeleccionadoId: ""
 };
+let adminEmployeeCalendar = null;
+let adminEmployeeAppointmentsView = "list";
+let employeePortalRequestId = 0;
 
 function obtenerApiBase() {
   const hostname = window.location.hostname;
@@ -230,15 +233,96 @@ async function parseResponse(res) {
   return data;
 }
 
-async function fetchAdmin(path) {
+async function fetchAdmin(path, options = {}) {
   const res = await fetch(`${obtenerApiBase()}${path}`, {
     cache: "no-store",
+    ...options,
     headers: {
       Authorization: `Bearer ${state.token}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      ...(options.headers || {})
     }
   });
   return parseResponse(res);
+}
+
+function adminEmployeeCalendarLoader(employeeId) {
+  const safeId = encodeURIComponent(String(employeeId || ""));
+  return ({ startDate, endDate, signal }) => fetchAdmin(
+    `/admin/employees/${safeId}/appointments/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+    { signal }
+  );
+}
+
+function initializeAdminEmployeeCalendar() {
+  if (adminEmployeeCalendar) {
+    adminEmployeeCalendar.updateSize();
+    return adminEmployeeCalendar;
+  }
+  const host = document.getElementById("adminEmployeeSharedCalendar");
+  const shared = window.WoofWashAppointmentsCalendar;
+  if (!host || !shared?.createAppointmentsCalendar) return null;
+  adminEmployeeCalendar = shared.createAppointmentsCalendar({
+    container: host,
+    initialView: "dayGridMonth",
+    locale: "es",
+    timeZone: "America/Mexico_City",
+    loadEvents: null,
+    noSelectionMessage: "Selecciona un empleado para consultar sus citas."
+  });
+  return adminEmployeeCalendar;
+}
+
+function updateAdminEmployeeCalendar(employeeId, refresh = adminEmployeeAppointmentsView === "calendar") {
+  if (!adminEmployeeCalendar) return;
+  if (!employeeId) {
+    adminEmployeeCalendar.setLoadEvents(null, {
+      refresh: false,
+      message: "Selecciona un empleado para consultar sus citas."
+    });
+    return;
+  }
+  adminEmployeeCalendar.setLoadEvents(adminEmployeeCalendarLoader(employeeId), {
+    refresh,
+    message: "Cargando citas del empleado seleccionado…"
+  });
+}
+
+function syncAdminEmployeeAppointmentsView({ refresh = false } = {}) {
+  const showCalendar = adminEmployeeAppointmentsView === "calendar";
+  const listView = document.getElementById("adminEmployeeAppointmentsListView");
+  const calendarPanel = document.getElementById("adminEmployeeCalendarPanel");
+  const listButton = document.getElementById("adminEmployeeAppointmentsListButton");
+  const calendarButton = document.getElementById("adminEmployeeAppointmentsCalendarButton");
+  listView?.classList.toggle("hidden", showCalendar);
+  calendarPanel?.classList.toggle("hidden", !showCalendar || !state.empleadoSeleccionadoId);
+  listButton?.classList.toggle("is-active", !showCalendar);
+  calendarButton?.classList.toggle("is-active", showCalendar);
+  listButton?.setAttribute("aria-pressed", String(!showCalendar));
+  calendarButton?.setAttribute("aria-pressed", String(showCalendar));
+  if (showCalendar && state.empleadoSeleccionadoId) {
+    const existed = Boolean(adminEmployeeCalendar);
+    const calendar = initializeAdminEmployeeCalendar();
+    if (!existed) updateAdminEmployeeCalendar(state.empleadoSeleccionadoId, false);
+    window.requestAnimationFrame(() => {
+      calendar?.updateSize();
+      if (!existed || refresh) calendar?.refresh();
+    });
+  }
+}
+
+function switchAdminEmployeeAppointmentsView(view) {
+  adminEmployeeAppointmentsView = view === "calendar" ? "calendar" : "list";
+  syncAdminEmployeeAppointmentsView({ refresh: adminEmployeeAppointmentsView === "calendar" });
+}
+
+function preserveAdminEmployeeCalendarPanel() {
+  const calendarPanel = document.getElementById("adminEmployeeCalendarPanel");
+  const portalContent = document.getElementById("portalContent");
+  if (calendarPanel && portalContent && calendarPanel.parentElement !== portalContent) {
+    portalContent.append(calendarPanel);
+  }
+  return calendarPanel;
 }
 
 function empleadoCoincideFiltro(empleado) {
@@ -807,6 +891,7 @@ function renderFelicitacionCumpleanosAdmin(empleado = {}, nombreFallback = "Empl
 function renderDetalleEmpleado(detalle) {
   const panel = document.getElementById("employeePortalPanel");
   if (!panel) return;
+  const calendarPanel = preserveAdminEmployeeCalendarPanel();
   const empleado = detalle?.portal?.empleado || {};
   const performance = detalle?.performance || {};
   const appointments = detalle?.appointments || {};
@@ -904,7 +989,14 @@ function renderDetalleEmpleado(detalle) {
             <button class="date-nav-button" type="button" data-action="appointments-today">Hoy</button>
             <button class="date-nav-button" type="button" data-action="appointments-next-day">Siguiente</button>
           </div>
-          <div class="timeline-list">${renderCitasDashboard(citas, fechaCitas)}</div>
+          <div class="appointments-view-switcher" role="group" aria-label="Vista de citas">
+            <button id="adminEmployeeAppointmentsListButton" class="appointments-view-button${adminEmployeeAppointmentsView === "list" ? " is-active" : ""}" type="button" data-action="appointments-list-view" aria-pressed="${adminEmployeeAppointmentsView === "list"}">Lista</button>
+            <button id="adminEmployeeAppointmentsCalendarButton" class="appointments-view-button${adminEmployeeAppointmentsView === "calendar" ? " is-active" : ""}" type="button" data-action="appointments-calendar-view" aria-pressed="${adminEmployeeAppointmentsView === "calendar"}">Calendario</button>
+          </div>
+          <div id="adminEmployeeAppointmentsListView" class="${adminEmployeeAppointmentsView === "calendar" ? "hidden" : ""}">
+            <div class="timeline-list">${renderCitasDashboard(citas, fechaCitas)}</div>
+          </div>
+          <div id="adminEmployeeCalendarMount"></div>
         </section>
 
         <section class="panel training-panel">
@@ -923,15 +1015,21 @@ function renderDetalleEmpleado(detalle) {
   `;
 
   panel.classList.remove("hidden");
+  const calendarMount = document.getElementById("adminEmployeeCalendarMount");
+  if (calendarPanel && calendarMount) calendarMount.append(calendarPanel);
+  syncAdminEmployeeAppointmentsView();
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalISO()) {
   if (!id) return;
+  const requestId = ++employeePortalRequestId;
   const mismoEmpleado = state.empleadoSeleccionadoId === String(id);
   state.empleadoSeleccionadoId = String(id);
+  updateAdminEmployeeCalendar(state.empleadoSeleccionadoId);
   const panel = document.getElementById("employeePortalPanel");
   if (panel) {
+    preserveAdminEmployeeCalendarPanel();
     panel.classList.remove("hidden");
     panel.innerHTML = `<div class="empty-state">Cargando portal individual...</div>`;
   }
@@ -945,6 +1043,7 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
       fetchAdmin(`/admin/employees/${employeeId}/performance?fecha=${fechaSeleccionada}`),
       cargarCitasDiaAdmin(id, fechaCitas)
     ]);
+    if (requestId !== employeePortalRequestId || state.empleadoSeleccionadoId !== String(id)) return;
     if (actualizarUrl) {
       const url = new URL(window.location.href);
       url.searchParams.set("empleadoId", id);
@@ -957,6 +1056,7 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
       appointments
     });
   } catch (error) {
+    if (requestId !== employeePortalRequestId) return;
     if (error.status === 401 || error.status === 403) return;
     if (panel) {
       panel.innerHTML = `<div class="empty-state">${escapeHtml(error.message || "No se pudo cargar el portal individual.")}</div>`;
@@ -965,8 +1065,11 @@ async function abrirPortalEmpleado(id, actualizarUrl = true, fecha = fechaLocalI
 }
 
 function volverALista() {
+  employeePortalRequestId += 1;
   document.getElementById("employeePortalPanel")?.classList.add("hidden");
   state.empleadoSeleccionadoId = "";
+  updateAdminEmployeeCalendar("");
+  document.getElementById("adminEmployeeCalendarPanel")?.classList.add("hidden");
   const url = new URL(window.location.href);
   url.searchParams.delete("empleadoId");
   window.history.replaceState({}, "", url);
@@ -1096,6 +1199,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const button = event.target.closest("button[data-action='back-to-list']");
     if (button) {
       volverALista();
+      return;
+    }
+
+    if (event.target.closest("button[data-action='appointments-list-view']")) {
+      switchAdminEmployeeAppointmentsView("list");
+      return;
+    }
+
+    if (event.target.closest("button[data-action='appointments-calendar-view']")) {
+      switchAdminEmployeeAppointmentsView("calendar");
       return;
     }
 

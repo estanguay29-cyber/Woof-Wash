@@ -32,6 +32,7 @@ const MANUALES_EMPLEADO = [
 const EMPLOYEE_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const EMPLOYEE_PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 let empleadoPerfilActual = null;
+let employeeAppointmentsCalendar = null;
 
 function obtenerApiBaseEmpleado() {
   const hostname = window.location.hostname;
@@ -353,7 +354,54 @@ async function empleadoFetch(path, options = {}) {
   if (!res.ok) {
     throw new Error(data.message || "No se pudo completar la solicitud");
   }
+  const method = String(options.method || "GET").toUpperCase();
+  if (["POST", "PATCH", "DELETE"].includes(method) && path.startsWith("/empleados/appointments")) {
+    employeeAppointmentsCalendar?.refresh();
+  }
   return data;
+}
+
+function initializeEmployeeAppointmentsCalendar() {
+  if (employeeAppointmentsCalendar) {
+    employeeAppointmentsCalendar.updateSize();
+    return employeeAppointmentsCalendar;
+  }
+  const host = document.getElementById("employeeSharedCalendar");
+  const shared = window.WoofWashAppointmentsCalendar;
+  if (!host || !shared?.createAppointmentsCalendar) return null;
+  employeeAppointmentsCalendar = shared.createAppointmentsCalendar({
+    container: host,
+    initialView: "dayGridMonth",
+    locale: "es",
+    timeZone: "America/Mexico_City",
+    loadEvents: ({ startDate, endDate, signal }) => empleadoFetch(
+      `/empleados/appointments/calendar?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+      { signal }
+    )
+  });
+  return employeeAppointmentsCalendar;
+}
+
+function switchEmployeeAppointmentsView(view) {
+  const showCalendar = view === "calendar";
+  const listView = document.getElementById("employeeAppointmentsListView");
+  const calendarView = document.getElementById("employeeAppointmentsCalendarView");
+  const listButton = document.getElementById("employeeAppointmentsListButton");
+  const calendarButton = document.getElementById("employeeAppointmentsCalendarButton");
+  listView?.classList.toggle("hidden", showCalendar);
+  calendarView?.classList.toggle("hidden", !showCalendar);
+  listButton?.classList.toggle("is-active", !showCalendar);
+  calendarButton?.classList.toggle("is-active", showCalendar);
+  listButton?.setAttribute("aria-pressed", String(!showCalendar));
+  calendarButton?.setAttribute("aria-pressed", String(showCalendar));
+  if (showCalendar) {
+    const existed = Boolean(employeeAppointmentsCalendar);
+    const calendar = initializeEmployeeAppointmentsCalendar();
+    window.requestAnimationFrame(() => {
+      calendar?.updateSize();
+      if (existed) calendar?.refresh();
+    });
+  }
 }
 
 function serviciosCita(cita) {
@@ -811,6 +859,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const historyBaseDate = document.getElementById("historyBaseDate");
   if (historyBaseDate) historyBaseDate.value = fechaLocalISO();
   renderManuales();
+  document.getElementById("employeeAppointmentsListButton")?.addEventListener("click", () => switchEmployeeAppointmentsView("list"));
+  document.getElementById("employeeAppointmentsCalendarButton")?.addEventListener("click", () => switchEmployeeAppointmentsView("calendar"));
 
   const cerrarSesionDesdePortal = () => {
     cerrarSesionEmpleado();
@@ -832,6 +882,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("refreshButton")?.addEventListener("click", async () => {
     try {
       await cargarPanelEmpleado();
+      employeeAppointmentsCalendar?.refresh();
     } catch (error) {
       mostrarCargando(false);
       const access = document.getElementById("employeeAccessMessage");

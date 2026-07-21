@@ -7,6 +7,7 @@
   <link rel="apple-touch-icon" href="/img/favicon.png">
   <title>Panel empleado - Woof & Wash</title>
   <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="../shared/appointments-calendar.css">
 </head>
 <body>
   <main class="employee-shell">
@@ -268,7 +269,16 @@
             <button id="appointmentsToday" class="date-nav-button" type="button">Hoy</button>
             <button id="appointmentsNextDay" class="date-nav-button" type="button">Siguiente</button>
           </div>
-          <div id="appointmentsList" class="timeline-list"></div>
+          <div class="appointments-view-switcher" role="group" aria-label="Vista de citas">
+            <button id="employeeAppointmentsListButton" type="button" class="appointments-view-button is-active" aria-pressed="true">Lista</button>
+            <button id="employeeAppointmentsCalendarButton" type="button" class="appointments-view-button" aria-pressed="false">Calendario</button>
+          </div>
+          <div id="employeeAppointmentsListView">
+            <div id="appointmentsList" class="timeline-list"></div>
+          </div>
+          <div id="employeeAppointmentsCalendarView" class="hidden">
+            <div id="employeeSharedCalendar" class="appointments-calendar-host"></div>
+          </div>
         </section>
 
         <section id="employeeManuals" class="panel training-panel">
@@ -319,6 +329,9 @@
     <a href="#employeeProfile" aria-label="Ir a perfil"><svg class="employee-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"></path><path d="M4 21a8 8 0 0 1 16 0"></path></svg><small>Perfil</small></a>
   </nav>
 
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales-all.global.min.js"></script>
+  <script src="../shared/appointments-calendar.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
