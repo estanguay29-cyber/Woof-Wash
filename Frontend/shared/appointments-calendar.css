@@ -4,6 +4,8 @@
   --ww-calendar-cream: #fffae8;
   --ww-calendar-border: #dbe3ef;
   --ww-calendar-text: #17233b;
+  --ww-calendar-secondary: #334155;
+  --ww-calendar-muted: #64748b;
 }
 
 .agenda-view-switcher,
@@ -51,8 +53,19 @@
 
 .appointments-calendar-shell {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   min-height: 360px;
   color: var(--ww-calendar-text);
+}
+
+.appointments-calendar-host {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  color: var(--ww-calendar-blue);
 }
 
 .appointments-calendar-state {
@@ -68,6 +81,8 @@
   text-align: center;
   background: #f7f9fc;
 }
+
+.appointments-calendar-state p { color: inherit; }
 
 .appointments-calendar-state.hidden { display: none; }
 .appointments-calendar-state.is-loading { color: var(--ww-calendar-blue); background: #eef4ff; }
@@ -108,18 +123,56 @@
   --fc-button-active-border-color: #78ad31;
   --fc-today-bg-color: rgba(140, 198, 63, 0.11);
   --fc-neutral-bg-color: #f8fafc;
+  --fc-page-bg-color: #ffffff;
+  --fc-list-event-hover-bg-color: #f1f5f9;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--ww-calendar-blue);
   font-family: Inter, Poppins, system-ui, sans-serif;
 }
 
 .appointments-calendar-host .fc .fc-toolbar { gap: 0.75rem; }
 .appointments-calendar-host .fc .fc-toolbar-title { color: var(--ww-calendar-blue); font-size: clamp(1.15rem, 2vw, 1.55rem); font-weight: 900; }
-.appointments-calendar-host .fc .fc-button { min-height: 40px; border-radius: 10px; font-weight: 750; box-shadow: none; }
+.appointments-calendar-host .fc .fc-button {
+  min-height: 40px;
+  border-radius: 10px;
+  color: #ffffff;
+  font-weight: 750;
+  background: var(--ww-calendar-blue);
+  border-color: var(--ww-calendar-blue);
+  box-shadow: none;
+}
+.appointments-calendar-host .fc .fc-button:hover,
+.appointments-calendar-host .fc .fc-button:focus { color: #ffffff; background: #123f89; border-color: #123f89; }
+.appointments-calendar-host .fc .fc-button.fc-button-active,
+.appointments-calendar-host .fc .fc-button:active { color: var(--ww-calendar-blue); background: var(--ww-calendar-green); border-color: #78ad31; }
+.appointments-calendar-host .fc .fc-button:disabled { color: var(--ww-calendar-blue); background: #e8eef7; border-color: #cad5e5; opacity: 1; }
 .appointments-calendar-host .fc .fc-scrollgrid { overflow: hidden; border-radius: 14px; }
 .appointments-calendar-host .fc .fc-col-header-cell { padding: 0.45rem 0; background: #f3f7fc; }
 .appointments-calendar-host .fc .fc-col-header-cell-cushion { color: var(--ww-calendar-blue); font-weight: 850; }
 .appointments-calendar-host .fc .fc-daygrid-day-number { color: #35435d; font-weight: 750; }
 .appointments-calendar-host .fc .fc-day-today .fc-daygrid-day-number { color: var(--ww-calendar-blue); }
-.appointments-calendar-host .fc .fc-more-link { color: var(--ww-calendar-blue); font-weight: 800; }
+.appointments-calendar-host .fc .fc-day-other .fc-daygrid-day-number { color: var(--ww-calendar-muted, #64748b); opacity: 1; }
+.appointments-calendar-host .fc .fc-more-link,
+.appointments-calendar-host .fc .fc-daygrid-more-link { color: var(--ww-calendar-blue); font-weight: 800; }
+.appointments-calendar-host .fc .fc-timegrid-slot-label,
+.appointments-calendar-host .fc .fc-timegrid-slot-label-cushion,
+.appointments-calendar-host .fc .fc-timegrid-axis-cushion { color: #334155; font-weight: 700; }
+.appointments-calendar-host .fc .fc-timegrid-col-frame,
+.appointments-calendar-host .fc .fc-daygrid-day-frame { color: #334155; background-color: transparent; }
+.appointments-calendar-host .fc .fc-list,
+.appointments-calendar-host .fc .fc-list-table,
+.appointments-calendar-host .fc .fc-list-table td { color: #334155; background-color: #ffffff; }
+.appointments-calendar-host .fc .fc-list-day-cushion { background-color: #edf3fa; }
+.appointments-calendar-host .fc .fc-list-day-text,
+.appointments-calendar-host .fc .fc-list-day-side-text { color: var(--ww-calendar-blue); font-weight: 850; }
+.appointments-calendar-host .fc .fc-list-event-time,
+.appointments-calendar-host .fc .fc-list-event-title,
+.appointments-calendar-host .fc .fc-list-event-title a { color: #334155; }
+.appointments-calendar-host .fc .fc-popover { color: #334155; background: #ffffff; }
+.appointments-calendar-host .fc .fc-popover-header { color: var(--ww-calendar-blue); background: #edf3fa; }
+.appointments-calendar-host .fc .fc-popover-title { color: var(--ww-calendar-blue); font-weight: 850; }
 
 .appointments-calendar-host .fc-event.ww-calendar-event {
   overflow: hidden;
@@ -129,6 +182,15 @@
   color: #17233b;
   cursor: pointer;
   box-shadow: 0 2px 7px rgba(23, 35, 59, 0.12);
+}
+
+/* FullCalendar define blanco en .fc-event-main por defecto. Los eventos de
+   Woof & Wash usan fondos claros, por eso el contenido debe heredar tinta. */
+.appointments-calendar-host .fc .ww-calendar-event .fc-event-main,
+.appointments-calendar-host .fc .ww-calendar-event .fc-event-main-frame,
+.appointments-calendar-host .fc .ww-calendar-event .ww-calendar-event-content,
+.appointments-calendar-host .fc .ww-calendar-event .ww-calendar-event-content * {
+  color: #17233b;
 }
 
 .ww-calendar-event-content { min-width: 0; padding: 0.2rem 0.35rem; line-height: 1.25; }
@@ -169,6 +231,7 @@
   overflow: auto;
   border-radius: 22px;
   background: #fffef9;
+  color: var(--ww-calendar-blue);
   box-shadow: 0 28px 80px rgba(5, 20, 50, 0.35);
 }
 .appointments-calendar-dialog-head {
@@ -193,7 +256,7 @@
   background: #fff;
 }
 .appointments-calendar-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; padding: 1.25rem 1.35rem; }
-.appointments-calendar-detail-item { min-width: 0; padding: 0.75rem; border: 1px solid #e1e7f0; border-radius: 13px; background: #fff; }
+.appointments-calendar-detail-item { min-width: 0; padding: 0.75rem; border: 1px solid #e1e7f0; border-radius: 13px; color: #334155; background: #fff; }
 .appointments-calendar-detail-item.is-wide { grid-column: 1 / -1; }
 .appointments-calendar-detail-item dt { margin-bottom: 0.2rem; color: #66738a; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
 .appointments-calendar-detail-item dd { overflow-wrap: anywhere; color: #18243b; font-weight: 700; }
@@ -215,15 +278,37 @@ body.appointments-calendar-modal-open { overflow: hidden; }
   .appointments-view-switcher { display: flex; width: 100%; }
   .agenda-view-button,
   .appointments-view-button { flex: 1; }
-  .agenda-calendar-card { padding: 1rem; }
+  .agenda-calendar-card { padding: 0.85rem; }
   .appointments-calendar-shell { min-height: 310px; }
-  .appointments-calendar-host .fc .fc-toolbar { align-items: stretch; flex-direction: column; }
-  .appointments-calendar-host .fc .fc-toolbar-chunk { display: flex; justify-content: center; flex-wrap: wrap; }
-  .appointments-calendar-host .fc .fc-button { min-height: 44px; padding: 0.5rem 0.68rem; }
+  .appointments-calendar-host { overflow: hidden; }
+  .appointments-calendar-host .fc .fc-toolbar { align-items: stretch; flex-direction: column; margin-bottom: 0.8rem; }
+  .appointments-calendar-host .fc .fc-toolbar-chunk { display: flex; width: 100%; min-width: 0; justify-content: center; flex-wrap: wrap; }
+  .appointments-calendar-host .fc .fc-toolbar-title { width: 100%; text-align: center; line-height: 1.25; }
+  .appointments-calendar-host .fc .fc-toolbar-chunk:first-child .fc-button-group { display: grid; width: 100%; grid-template-columns: 44px minmax(74px, 1fr) 44px; gap: 0.35rem; }
+  .appointments-calendar-host .fc .fc-toolbar-chunk:last-child .fc-button-group { display: grid; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.3rem; }
+  .appointments-calendar-host .fc .fc-button-group > .fc-button { margin: 0; border-radius: 9px; }
+  .appointments-calendar-host .fc .fc-button { min-width: 0; min-height: 44px; padding: 0.48rem 0.4rem; overflow: hidden; font-size: 0.78rem; text-overflow: ellipsis; white-space: nowrap; }
+  .appointments-calendar-host .fc .fc-view-harness,
+  .appointments-calendar-host .fc .fc-view,
+  .appointments-calendar-host .fc .fc-scrollgrid { width: 100%; max-width: 100%; min-width: 0; }
+  .appointments-calendar-host .fc .fc-list-event-time { width: 1%; padding-left: 0.55rem; padding-right: 0.45rem; color: #334155; white-space: nowrap; }
+  .appointments-calendar-host .fc .fc-list-event-title { padding-left: 0.45rem; padding-right: 0.55rem; }
   .appointments-calendar-host .fc .fc-list-event-title a,
-  .appointments-calendar-host .fc .fc-list-event-time { white-space: normal; }
+  .appointments-calendar-host .fc .fc-list-event-title { overflow-wrap: anywhere; white-space: normal; }
+  .appointments-calendar-host .fc .fc-col-header-cell-cushion,
+  .appointments-calendar-host .fc .fc-daygrid-day-number { font-size: 0.78rem; }
+  .appointments-calendar-modal { padding: 0.65rem; }
+  .appointments-calendar-dialog { width: 100%; max-height: calc(100dvh - 1.3rem); border-radius: 17px; }
+  .appointments-calendar-dialog-head { padding: 1rem; }
+  .appointments-calendar-detail { gap: 0.65rem; padding: 1rem; }
+  .appointments-calendar-dialog-actions { padding: 0 1rem 1rem; }
   .appointments-calendar-detail { grid-template-columns: 1fr; }
   .appointments-calendar-detail-item.is-wide { grid-column: auto; }
+}
+
+@media (max-width: 390px) {
+  .appointments-calendar-host .fc .fc-toolbar-chunk:last-child .fc-button-group { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .appointments-calendar-host .fc .fc-button { font-size: 0.76rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
