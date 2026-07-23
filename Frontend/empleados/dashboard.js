@@ -411,6 +411,14 @@ function serviciosCita(cita) {
   return [{ nombre: cita?.servicioNombre || "Servicio", tipo: cita?.servicioTipo || "mascota" }];
 }
 
+function renderEmployeeAppointmentPhone(value) {
+  const phoneApi = window.WoofWashAppointmentsCalendar;
+  const telValue = phoneApi?.normalizePhoneForTel?.(value) || "";
+  if (!telValue) return `<span class="appointment-phone is-unavailable">Teléfono no disponible</span>`;
+  const display = phoneApi.formatPhoneDisplay(value);
+  return `<a class="appointment-phone" href="tel:${escapeHtml(telValue)}" aria-label="Llamar al cliente al ${escapeHtml(display)}">&#128222; ${escapeHtml(display)}</a>`;
+}
+
 function textoServicio(servicio, index) {
   const tipo = servicio.tipo === "auto" ? "Auto" : "Mascota";
   const nombre = servicio.nombre || [servicio.categoria, servicio.paquete].filter(Boolean).join(" ") || "Servicio";
@@ -637,6 +645,7 @@ function renderCitas(citas = [], fecha = fechaLocalISO()) {
           <span>${escapeHtml(estadoTexto(estadoVisibleCita(cita)))}</span>
         </div>
         <h3>${escapeHtml(cita.clienteNombre || "Cliente")}</h3>
+        ${renderEmployeeAppointmentPhone(cita.clientPhone || cita.clienteTelefono)}
         <p>${escapeHtml(descripcion)}</p>
         ${renderEmpleadoAsignadoEmpleado(cita)}
         <div class="appointment-meta">

@@ -38,11 +38,13 @@ test("mantiene fecha y hora civiles al construir un evento", () => {
     endTime: "11:00",
     visibleStatus: "confirmada",
     subjectName: "Cooper",
-    clientName: "Lupita"
+    clientName: "Lupita",
+    clientPhone: "+52 33 1234 5678"
   });
   assert.equal(result.start, "2026-07-21T09:00:00");
   assert.equal(result.end, "2026-07-21T11:00:00");
   assert.equal(result.extendedProps.appointment.date, "2026-07-21");
+  assert.equal(result.extendedProps.appointment.clientPhone, "+52 33 1234 5678");
 });
 
 test("deduplica eventos por ID conservando el primero", () => {
@@ -67,4 +69,17 @@ test("asigna clases semanticas a estados conocidos y fallback seguro", () => {
 test("descarta DTOs sin fecha u hora valida", () => {
   assert.equal(calendar.toFullCalendarEvent({ id: "one", date: "2026-07-21", time: "25:00" }), null);
   assert.equal(calendar.toFullCalendarEvent({ id: "two", date: "", time: "09:00" }), null);
+});
+
+test("normaliza enlaces tel y conserva prefijos internacionales", () => {
+  assert.equal(calendar.normalizePhoneForTel("(33) 1234-5678"), "3312345678");
+  assert.equal(calendar.normalizePhoneForTel("+52 (33) 1234-5678"), "+523312345678");
+  assert.equal(calendar.formatPhoneDisplay("+52 (33) 1234-5678"), "+52 33 1234 5678");
+});
+
+test("rechaza telefonos vacios o maliciosos sin producir enlaces", () => {
+  assert.equal(calendar.normalizePhoneForTel(""), "");
+  assert.equal(calendar.normalizePhoneForTel("javascript:alert(1)"), "");
+  assert.equal(calendar.normalizePhoneForTel("<img src=x onerror=alert(1)>"), "");
+  assert.equal(calendar.formatPhoneDisplay("<script>alert(1)</script>"), "Teléfono no disponible");
 });

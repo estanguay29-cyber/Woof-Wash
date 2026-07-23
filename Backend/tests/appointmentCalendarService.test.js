@@ -15,6 +15,7 @@ function appointment(overrides = {}) {
     servicioNombre: "SPA canino",
     mascotaNombre: "Woofy",
     clienteNombre: "Cliente",
+    clienteTelefono: "3312345678",
     direccion: "Direccion de prueba",
     zona: "Zona 1",
     notas: "",
@@ -111,9 +112,15 @@ test("DTO distingue citas con y sin calificacion", () => {
   assert.equal(withoutRating.hasRating, false);
   assert.equal(withRating.hasRating, true);
   assert.equal(withRating.clientName, "Cliente");
+  assert.equal(withRating.clientPhone, "3312345678");
   assert.equal(withRating.subjectType, "mascota");
   assert.equal(withRating.endTime, null);
   assert.equal(Object.hasOwn(withRating, "clienteTelefono"), false);
+});
+
+test("DTO de calendario tolera citas antiguas sin telefono", () => {
+  const event = calendar.toCalendarEvent(appointment({ clienteTelefono: undefined }));
+  assert.equal(event.clientPhone, "");
 });
 
 test("consulta de empleado filtra asignaciones propias singulares y multiples", async () => {

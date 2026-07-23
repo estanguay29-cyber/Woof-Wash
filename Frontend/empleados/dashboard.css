@@ -1133,6 +1133,25 @@ input {
   overflow-wrap: anywhere;
 }
 
+.appointment-phone {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 36px;
+  margin: 2px 0;
+  color: var(--blue);
+  font-weight: 850;
+  text-decoration: underline;
+  text-decoration-color: rgba(11, 42, 107, 0.28);
+  text-underline-offset: 3px;
+}
+
+.appointment-phone.is-unavailable {
+  color: var(--muted);
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .appointment-employee-card {
   display: inline-flex;
   align-items: center;

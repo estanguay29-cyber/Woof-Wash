@@ -63,6 +63,29 @@
     return labels[status] || labels.pendiente;
   }
 
+  function normalizePhoneForTel(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const hasInternationalPrefix = raw.startsWith("+");
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length < 6 || digits.length > 15) return "";
+    return `${hasInternationalPrefix ? "+" : ""}${digits}`;
+  }
+
+  function formatPhoneDisplay(value) {
+    const normalized = normalizePhoneForTel(value);
+    if (!normalized) return "Teléfono no disponible";
+    const hasPlus = normalized.startsWith("+");
+    const digits = normalized.replace(/\D/g, "");
+    if (digits.length === 10) return `${digits.slice(0, 2)} ${digits.slice(2, 6)} ${digits.slice(6)}`;
+    if (digits.length > 10) {
+      const prefix = digits.slice(0, -10);
+      const local = digits.slice(-10);
+      return `${hasPlus ? "+" : ""}${prefix} ${local.slice(0, 2)} ${local.slice(2, 6)} ${local.slice(6)}`;
+    }
+    return `${hasPlus ? "+" : ""}${digits}`;
+  }
+
   function deduplicateEvents(events) {
     const seen = new Set();
     return (Array.isArray(events) ? events : []).filter((event) => {
@@ -133,6 +156,26 @@
     return wrapper;
   }
 
+  function sharedPhoneField(value) {
+    const wrapper = document.createElement("dl");
+    wrapper.className = "appointments-calendar-detail-item";
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    const telValue = normalizePhoneForTel(value);
+    term.textContent = "Teléfono";
+    if (telValue) {
+      const link = document.createElement("a");
+      link.className = "appointments-calendar-phone-link";
+      link.href = `tel:${telValue}`;
+      link.textContent = formatPhoneDisplay(value);
+      description.append(link);
+    } else {
+      description.textContent = "Teléfono no disponible";
+    }
+    wrapper.append(term, description);
+    return wrapper;
+  }
+
   function formatDetailDate(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
     if (!match) return "-";
@@ -199,6 +242,7 @@
         sharedDetailField("Fecha", formatDetailDate(appointment.date)),
         sharedDetailField("Horario", appointment.endTime ? `${appointment.time} a ${appointment.endTime}` : appointment.time),
         sharedDetailField("Cliente", appointment.clientName),
+        sharedPhoneField(appointment.clientPhone),
         sharedDetailField(subjectLabel, appointment.subjectName),
         sharedDetailField("Tipo de servicio", appointment.serviceType === "auto" ? "Auto" : appointment.serviceType === "mascota" ? "Mascota" : "Otro"),
         sharedDetailField("Servicio", appointment.serviceName),
@@ -429,6 +473,8 @@
     visibleRangeToInclusive,
     statusClass,
     statusLabel,
+    normalizePhoneForTel,
+    formatPhoneDisplay,
     deduplicateEvents,
     toFullCalendarEvent,
     buildFullCalendarEvents,

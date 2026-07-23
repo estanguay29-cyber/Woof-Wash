@@ -260,6 +260,14 @@
 .appointments-calendar-detail-item.is-wide { grid-column: 1 / -1; }
 .appointments-calendar-detail-item dt { margin-bottom: 0.2rem; color: #66738a; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
 .appointments-calendar-detail-item dd { overflow-wrap: anywhere; color: #18243b; font-weight: 700; }
+.appointments-calendar-phone-link {
+  color: var(--ww-calendar-blue);
+  font-weight: 850;
+  text-decoration: underline;
+  text-decoration-color: rgba(11, 42, 107, 0.3);
+  text-underline-offset: 3px;
+}
+.appointments-calendar-phone-link:hover { color: #123f89; text-decoration-color: currentColor; }
 .appointments-calendar-dialog-actions { display: flex; justify-content: flex-end; padding: 0 1.35rem 1.25rem; }
 .appointments-calendar-detail-close-button {
   min-height: 44px;

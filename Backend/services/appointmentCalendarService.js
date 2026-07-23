@@ -192,6 +192,7 @@ function toCalendarEvent(appointment = {}) {
     serviceType: ["mascota", "auto"].includes(source.servicioTipo) ? source.servicioTipo : "otro",
     serviceName: String(source.servicioNombre || "Servicio"),
     clientName: String(source.clienteNombre || "Cliente"),
+    clientPhone: String(source.clienteTelefono || ""),
     ...subject,
     address: String(source.direccion || ""),
     zone: String(source.zona || ""),

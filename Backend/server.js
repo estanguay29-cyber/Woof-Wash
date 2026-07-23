@@ -2896,6 +2896,7 @@ function construirCitaEmpleado(cita) {
     id: base.id,
     clienteNombre: base.clienteNombre,
     clienteTelefono: base.clienteTelefono,
+    clientPhone: base.clienteTelefono || "",
     servicioTipo: base.servicioTipo,
     servicioNombre: base.servicioNombre,
     servicioCategoria: base.servicioCategoria,
