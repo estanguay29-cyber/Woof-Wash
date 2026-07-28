@@ -105,7 +105,7 @@
         const host = parsed.hostname.toLowerCase();
         if (host === "maps.app.goo.gl" || host === "goo.gl" || host === "maps.google.com" || host.endsWith(".google.com")) return parsed.href;
       } catch {
-        // Ignora valores que no sean enlaces vÃ¡lidos de Google Maps.
+        // Ignora valores que no sean enlaces válidos de Google Maps.
       }
     }
     const coordinates = source.match(/(?:^|[^\d.-])(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)(?:$|[^\d.])/);
@@ -114,6 +114,15 @@
     const longitude = Number(coordinates[2]);
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return "";
     return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+  }
+
+  function noPhotoPlaceholderHtml() {
+    return '<span class="ww-no-photo" role="img" aria-label="Sin foto"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6.5h3l1.2-1.8h7.6L17 6.5h3v12H4z"></path><circle cx="12" cy="12.5" r="3.2"></circle><path d="M6.5 17l3.2-3 2.2 2 2.7-2.5 2.9 3.5"></path></svg><small>Sin foto</small></span>';
+  }
+
+  function replaceWithNoPhotoPlaceholder(container) {
+    if (!container) return;
+    container.innerHTML = noPhotoPlaceholderHtml();
   }
 
   function calendarDateTime(date, time) {
@@ -208,7 +217,7 @@
     wrapper.className = "appointments-calendar-detail-item is-wide";
     const term = document.createElement("dt");
     const description = document.createElement("dd");
-    term.textContent = "UbicaciÃ³n";
+    term.textContent = "Ubicación";
     if (value) {
       const link = document.createElement("a");
       link.href = value;
@@ -227,7 +236,7 @@
     const button = document.createElement("button");
     button.type = "button";
     button.className = "appointments-calendar-pets-toggle";
-    button.textContent = "Ver mÃ¡s";
+    button.textContent = "Ver más";
     button.setAttribute("aria-expanded", "false");
     const list = document.createElement("div");
     list.className = "appointments-calendar-pets-list hidden";
@@ -243,14 +252,14 @@
         image.src = pet.photoUrl;
         image.loading = "lazy";
         image.alt = `Foto de ${pet.name || "mascota"}`;
-        image.addEventListener("error", () => { media.textContent = (pet.name || "W").charAt(0).toUpperCase(); });
+        image.addEventListener("error", () => replaceWithNoPhotoPlaceholder(media));
         media.append(image);
-      } else media.textContent = (pet.name || "W").charAt(0).toUpperCase();
+      } else replaceWithNoPhotoPlaceholder(media);
       const copy = document.createElement("div");
       const name = document.createElement("strong");
       name.textContent = pet.name || "Mascota sin nombre";
       const detail = document.createElement("p");
-      detail.textContent = [pet.category, Number.isInteger(pet.age) ? `${pet.age} ${pet.age === 1 ? "aÃ±o" : "aÃ±os"}` : "", pet.package].filter(Boolean).join(" Â· ") || "Sin datos adicionales";
+      detail.textContent = [pet.category, Number.isInteger(pet.age) ? `${pet.age} ${pet.age === 1 ? "año" : "años"}` : "", pet.package].filter(Boolean).join(" / ") || "Sin datos adicionales";
       copy.append(name, detail);
       if (pet.notes) { const notes = document.createElement("p"); notes.textContent = `Indicaciones: ${pet.notes}`; copy.append(notes); }
       card.append(media, copy);
@@ -259,7 +268,7 @@
     button.addEventListener("click", () => {
       const expanded = button.getAttribute("aria-expanded") === "true";
       button.setAttribute("aria-expanded", String(!expanded));
-      button.textContent = expanded ? "Ver mÃ¡s" : "Ver menos";
+      button.textContent = expanded ? "Ver más" : "Ver menos";
       list.classList.toggle("hidden", expanded);
     });
     section.append(button, list);
@@ -563,6 +572,8 @@
     normalizePhoneForTel,
     formatPhoneDisplay,
     locationUrlFromAddress,
+    noPhotoPlaceholderHtml,
+    replaceWithNoPhotoPlaceholder,
     deduplicateEvents,
     toFullCalendarEvent,
     buildFullCalendarEvents,

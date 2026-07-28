@@ -863,6 +863,11 @@ function obtenerCantidadServicios(value) {
   return Math.min(Math.max(cantidad, AGENDA_SERVICIOS_MIN), AGENDA_SERVICIOS_MAX);
 }
 
+function placeholderSinFotoHtml() {
+  return window.WoofWashAppointmentsCalendar?.noPhotoPlaceholderHtml?.()
+    || '<span class="ww-no-photo" role="img" aria-label="Sin foto"><small>Sin foto</small></span>';
+}
+
 function obtenerServiciosDesdeBloques(prefijo = "") {
   const { container, tipoSelect } = obtenerConfigServiciosFormulario(prefijo);
   const tipo = SERVICIOS_CATALOGO[tipoSelect?.value] ? tipoSelect.value : "mascota";
@@ -946,10 +951,10 @@ function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
           <input type="number" min="1" max="40" step="1" inputmode="numeric" data-pet-age value="${Number.isInteger(servicio.mascotaEdad) ? String(servicio.mascotaEdad) : escapeHtml(servicio.mascotaEdad || "")}">
         </label>
         <div class="agenda-pet-photo-control">
-          <span class="agenda-pet-photo-preview">${fotoUrl ? `<img src="${escapeHtml(fotoUrl)}" alt="Foto de ${escapeHtml(servicio.mascotaNombre || "mascota")}">` : `<span aria-hidden="true">WW</span>`}</span>
+          <span class="agenda-pet-photo-preview">${fotoUrl ? `<img src="${escapeHtml(fotoUrl)}" alt="Foto de ${escapeHtml(servicio.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span>
           <label class="admin-button admin-button-light">${fotoUrl ? "Cambiar foto" : "Elegir foto"}<input type="file" accept="image/jpeg,image/png,image/webp" data-pet-photo class="agenda-visually-hidden"></label>
           <button type="button" class="admin-button admin-button-light ${fotoUrl ? "" : "hidden"}" data-remove-pet-photo>Quitar foto</button>
-          <small data-photo-status>FotografÃ­a opcional (JPG, PNG o WebP; mÃ¡ximo 5 MB).</small>
+          <small data-photo-status>Fotografía opcional (JPG, PNG o WebP; máximo 5 MB).</small>
         </div>
       `
       : "";
@@ -1034,6 +1039,9 @@ function construirServiciosDetalleFormulario(prefijo = "") {
       detalle.mascotaEdad = normalizarEdadMascotaServicio(servicio.mascotaEdad, index);
       detalle.fotoUrl = String(servicio.fotoUrl || "").trim().slice(0, 1000);
       detalle.fotoPublicId = String(servicio.fotoPublicId || "").trim().slice(0, 500);
+      if (Boolean(detalle.fotoUrl) !== Boolean(detalle.fotoPublicId)) {
+        throw new Error(`La fotografía de la mascota ${index + 1} está incompleta. Quítala o vuelve a cargarla.`);
+      }
     }
 
     return detalle;
@@ -2096,7 +2104,7 @@ function crearCardCita(cita) {
   const badgeServicios = crearBadgeServiciosCita(cita);
   const mascotas = obtenerServiciosVisualesCita(cita).filter((servicio) => servicio.tipo === "mascota");
   const detailsId = `agenda-pets-${String(cita.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((pet) => `<article><span class="agenda-pet-thumb">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : `<span aria-hidden="true">${escapeHtml((pet.mascotaNombre || "W").charAt(0).toUpperCase())}</span>`}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, formatearEdadMascota(pet.mascotaEdad)].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.paquete ? `<p>Paquete: ${escapeHtml(pet.paquete)}</p>` : ""}${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>` : "";
+  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((pet) => `<article><span class="agenda-pet-thumb">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, formatearEdadMascota(pet.mascotaEdad)].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.paquete ? `<p>Paquete: ${escapeHtml(pet.paquete)}</p>` : ""}${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>` : "";
   const detalleBloque = cita.duracionMinutos
     ? `<p class="agenda-appointment-notes">Duración: ${escapeHtml(cita.duracionMinutos)} min + ${escapeHtml(cita.trasladoMinutos || 0)} min traslado</p>`
     : "";
@@ -2113,7 +2121,7 @@ function crearCardCita(cita) {
           <h3>${escapeHtml(cita.cliente)}</h3>
           <p>${escapeHtml(resumenServicios)}</p>
           ${listaServicios}
-          ${mascotas.length ? `<button type="button" class="agenda-pet-toggle" data-action="toggle-pets" data-id="${escapeHtml(cita.id)}" aria-expanded="false" aria-controls="${detailsId}">Ver mÃ¡s</button>${detallesMascotas}` : ""}
+          ${mascotas.length ? `<button type="button" class="agenda-pet-toggle" data-action="toggle-pets" data-id="${escapeHtml(cita.id)}" aria-expanded="false" aria-controls="${detailsId}">Ver más</button>${detallesMascotas}` : ""}
           ${renderizarEmpleadosAsignadosAgenda(cita)}
         </div>
         <div class="agenda-appointment-time">
@@ -2830,7 +2838,12 @@ async function crearCitaDesdeFormulario(event) {
   event.preventDefault();
 
   const { form, fechaCita, zonaCita, btnCrear, filtroFechaDesde, filtroFechaHasta, filtroZona, buscador } = obtenerElementosAgenda();
-  if (!form || !fechaCita || !zonaCita || btnCrear?.disabled) return;
+  if (!form || !fechaCita || !zonaCita) return;
+  if (form.querySelector('[data-photo-uploading="true"]')) {
+    alert("Hay una fotografía subiendo. Espera a que termine antes de guardar.");
+    return;
+  }
+  if (btnCrear?.disabled) return;
   if (obtenerZonaPorFecha(fechaCita.value).esDescanso) return;
 
   btnCrear.disabled = true;
@@ -2988,7 +3001,12 @@ async function guardarEdicionCita(event) {
   event.preventDefault();
 
   const { editForm, editBtnGuardar, filtroFechaDesde, filtroFechaHasta, filtroZona, buscador } = obtenerElementosAgenda();
-  if (!editForm || !citaEnEdicionId || editBtnGuardar?.disabled) return;
+  if (!editForm || !citaEnEdicionId) return;
+  if (editForm.querySelector('[data-photo-uploading="true"]')) {
+    alert("Hay una fotografía subiendo. Espera a que termine antes de guardar.");
+    return;
+  }
+  if (editBtnGuardar?.disabled) return;
 
   editBtnGuardar.disabled = true;
 
@@ -3594,7 +3612,7 @@ async function manejarAccionesLista(event) {
     const panel = document.getElementById(target.getAttribute("aria-controls"));
     const expanded = target.getAttribute("aria-expanded") === "true";
     target.setAttribute("aria-expanded", String(!expanded));
-    target.textContent = expanded ? "Ver mÃ¡s" : "Ver menos";
+    target.textContent = expanded ? "Ver más" : "Ver menos";
     panel?.classList.toggle("hidden", expanded);
     return;
   }
@@ -3691,12 +3709,14 @@ async function manejarFotoMascotaFormulario(event) {
   const status = block.querySelector("[data-photo-status]");
   const preview = block.querySelector(".agenda-pet-photo-preview");
   const removeButton = block.querySelector("[data-remove-pet-photo]");
+  const form = block.closest("form");
+  const submitButton = form?.querySelector('button[type="submit"]');
   if (remove) {
     block.dataset.photoUrl = "";
     block.dataset.photoPublicId = "";
-    preview.replaceChildren(Object.assign(document.createElement("span"), { textContent: "WW" }));
+    preview.innerHTML = placeholderSinFotoHtml();
     removeButton?.classList.add("hidden");
-    if (status) status.textContent = "FotografÃ­a quitada. Se aplicarÃ¡ al guardar la cita.";
+    if (status) status.textContent = "Fotografía quitada. Se aplicará al guardar la cita.";
     return;
   }
   const file = input.files?.[0];
@@ -3708,32 +3728,41 @@ async function manejarFotoMascotaFormulario(event) {
   }
   if (file.size > 5 * 1024 * 1024) {
     input.value = "";
-    if (status) status.textContent = "La imagen supera el lÃ­mite de 5 MB.";
+    if (status) status.textContent = "La imagen supera el límite de 5 MB.";
     return;
   }
   input.disabled = true;
-  if (status) status.textContent = "Subiendo fotografÃ­aâ€¦";
+  const alreadyUploading = Boolean(form?.querySelector('[data-photo-uploading="true"]'));
+  if (submitButton && !alreadyUploading) submitButton.dataset.disabledBeforePhotoUpload = String(submitButton.disabled);
+  block.dataset.photoUploading = "true";
+  if (submitButton) submitButton.disabled = true;
+  if (status) status.textContent = "Subiendo fotografía…";
   try {
     const response = await fetch(`${obtenerApiBaseAgenda()}/admin/appointments/pet-photo`, {
       method: "POST", headers: { "Content-Type": file.type, Authorization: `Bearer ${obtenerTokenAgenda()}` }, body: file
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || "Error al subir fotografÃ­a.");
+    if (!response.ok) throw new Error(data.message || "No se pudo cargar la fotografía.");
     if (!block.isConnected) return;
     block.dataset.photoUrl = data.fotoUrl || "";
-    block.dataset.photoPublicId = data.publicId || "";
+    block.dataset.photoPublicId = data.fotoPublicId || data.publicId || "";
     const image = document.createElement("img");
     image.src = data.fotoUrl;
     image.alt = `Foto de ${block.querySelector("[data-pet-name]")?.value || "mascota"}`;
-    image.addEventListener("error", () => { preview.textContent = "WW"; });
+    image.addEventListener("error", () => { preview.innerHTML = placeholderSinFotoHtml(); });
     preview.replaceChildren(image);
     removeButton?.classList.remove("hidden");
-    if (status) status.textContent = "FotografÃ­a lista. Se asociarÃ¡ al guardar la cita.";
+    if (status) status.textContent = "Fotografía cargada.";
   } catch (error) {
-    if (status) status.textContent = error.message || "Error al subir fotografÃ­a.";
+    if (status) status.textContent = `No se pudo cargar la fotografía.${error.message ? ` ${error.message}` : ""} Puedes guardar la cita sin fotografía.`;
   } finally {
+    delete block.dataset.photoUploading;
     input.disabled = false;
     input.value = "";
+    if (submitButton && !form?.querySelector('[data-photo-uploading="true"]')) {
+      submitButton.disabled = submitButton.dataset.disabledBeforePhotoUpload === "true";
+      delete submitButton.dataset.disabledBeforePhotoUpload;
+    }
   }
 }
 
@@ -3748,8 +3777,8 @@ function construirResumenManana(citas) {
     const pets = obtenerServiciosVisualesCita(cita).filter((item) => item.tipo === "mascota");
     const petLines = pets.map((pet) => `* ${pet.mascotaNombre || "Mascota sin nombre"}${[pet.categoria, formatearEdadMascota(pet.mascotaEdad)].filter(Boolean).length ? ` (${[pet.categoria, formatearEdadMascota(pet.mascotaEdad)].filter(Boolean).join(", ")})` : ""}`);
     const services = [...new Set(obtenerServiciosVisualesCita(cita).map((item) => item.paquete || item.nombre).filter(Boolean))];
-    return [`*${new Date(`2000-01-01T${cita.hora || "00:00"}:00`).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit", hour12: true })}*`, "", `*${pets.length} ${pets.length === 1 ? "MASCOTA" : "MASCOTAS"}*`, "", ...petLines, "", "*SERVICIO*", "", `* ${services.join(", ") || cita.detalle || "No disponible"}`, "", "*CLIENTE*", "", `* ${cita.cliente || "No disponible"}`, "", "*CELULAR*", "", `* ${cita.telefono || "No disponible"}`, "", "*DIRECCIÃ“N*", "", `* ${cita.direccion || "No disponible"}`, "", "*UBICACIÃ“N*", "", `* ${obtenerUrlUbicacionCita(cita) || "No disponible"}`, "", "*COMENTARIOS*", "", `* ${cita.notas || "Sin comentarios"}`].join("\n");
-  }).join("\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n");
+    return [`*${new Date(`2000-01-01T${cita.hora || "00:00"}:00`).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit", hour12: true })}*`, "", `*${pets.length} ${pets.length === 1 ? "MASCOTA" : "MASCOTAS"}*`, "", ...petLines, "", "*SERVICIO*", "", `* ${services.join(", ") || cita.detalle || "No disponible"}`, "", "*CLIENTE*", "", `* ${cita.cliente || "No disponible"}`, "", "*CELULAR*", "", `* ${cita.telefono || "No disponible"}`, "", "*DIRECCIÓN*", "", `* ${cita.direccion || "No disponible"}`, "", "*UBICACIÓN*", "", `* ${obtenerUrlUbicacionCita(cita) || "No disponible"}`, "", "*COMENTARIOS*", "", `* ${cita.notas || "Sin comentarios"}`].join("\n");
+  }).join("\n\n--------------\n\n");
 }
 
 async function abrirResumenManana() {
@@ -3759,20 +3788,20 @@ async function abrirResumenManana() {
   modal?.classList.remove("hidden");
   modal?.setAttribute("aria-hidden", "false");
   document.body.classList.add("agenda-modal-open");
-  if (notice) { notice.textContent = "Obteniendo citas del dÃ­a siguienteâ€¦"; notice.classList.remove("hidden"); }
+  if (notice) { notice.textContent = "Obteniendo citas del día siguiente…"; notice.classList.remove("hidden"); }
   try {
     const data = await agendaFetch(`/admin/appointments?fecha=${encodeURIComponent(date)}`);
     const citas = (Array.isArray(data.citas) ? data.citas : []).map(mapearCitaApi).filter((cita) => cita.estado !== "cancelada").sort((a, b) => a.hora.localeCompare(b.hora));
     const text = construirResumenManana(citas);
-    document.getElementById("agendaTomorrowMeta").textContent = `${formatearFechaAgenda(date)} Â· ${citas.length} ${citas.length === 1 ? "cita" : "citas"}`;
+    document.getElementById("agendaTomorrowMeta").textContent = `${formatearFechaAgenda(date)} - ${citas.length} ${citas.length === 1 ? "cita" : "citas"}`;
     document.getElementById("agendaTomorrowText").value = text;
     const photos = citas.flatMap((cita) => obtenerServiciosVisualesCita(cita).filter((pet) => pet.fotoUrl).map((pet) => ({ ...pet, hora: cita.hora })));
     const share = document.getElementById("btnCompartirFotosManana");
     share?.classList.toggle("hidden", !photos.length);
     share._photos = photos;
-    if (notice) { notice.textContent = citas.length ? "" : "No existen citas activas para maÃ±ana."; notice.classList.toggle("hidden", Boolean(citas.length)); }
+    if (notice) { notice.textContent = citas.length ? "" : "No existen citas activas para mañana."; notice.classList.toggle("hidden", Boolean(citas.length)); }
   } catch (error) {
-    if (notice) { notice.textContent = error.message || "Error al obtener citas del dÃ­a siguiente."; notice.classList.remove("hidden"); }
+    if (notice) { notice.textContent = error.message || "Error al obtener citas del día siguiente."; notice.classList.remove("hidden"); }
   }
 }
 
@@ -3791,12 +3820,12 @@ async function compartirFotosManana() {
     const files = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
     if (!files.length) throw new Error("Ninguna imagen pudo prepararse para compartir.");
     if (!navigator.share || !navigator.canShare?.({ files })) throw new Error("El navegador no soporta compartir archivos.");
-    await navigator.share({ files, title: "FotografÃ­as de citas de maÃ±ana" });
+    await navigator.share({ files, title: "Fotografías de citas de mañana" });
   } catch (error) {
-    gallery.innerHTML = photos.map((photo) => `<a href="${escapeHtml(photo.fotoUrl)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" src="${escapeHtml(photo.fotoUrl)}" alt="${escapeHtml(photo.mascotaNombre || "Mascota")} ${escapeHtml(photo.hora || "")}"><span>${escapeHtml(photo.mascotaNombre || "Mascota")} Â· ${escapeHtml(photo.hora || "")}</span></a>`).join("");
+    gallery.innerHTML = photos.map((photo) => `<a href="${escapeHtml(photo.fotoUrl)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" src="${escapeHtml(photo.fotoUrl)}" alt="${escapeHtml(photo.mascotaNombre || "Mascota")} ${escapeHtml(photo.hora || "")}"><span>${escapeHtml(photo.mascotaNombre || "Mascota")} - ${escapeHtml(photo.hora || "")}</span></a>`).join("");
     gallery.classList.remove("hidden");
     const notice = document.getElementById("agendaTomorrowNotice");
-    if (notice) { notice.textContent = `${error.message} Puedes abrir o descargar cada imagen desde la galerÃ­a.`; notice.classList.remove("hidden"); }
+    if (notice) { notice.textContent = `${error.message} Puedes abrir o descargar cada imagen desde la galería.`; notice.classList.remove("hidden"); }
   }
 }
 
@@ -3966,10 +3995,14 @@ async function configurarAgenda() {
     const image = event.target.closest?.(".agenda-pet-thumb img");
     if (!image) return;
     const shell = image.closest(".agenda-pet-thumb");
-    if (shell) shell.textContent = (image.alt.replace(/^Foto de /, "").charAt(0) || "W").toUpperCase();
+    if (shell) shell.innerHTML = placeholderSinFotoHtml();
   }, true);
   elementos.editForm?.addEventListener("submit", guardarEdicionCita);
-  document.getElementById("btnResumenManana")?.addEventListener("click", abrirResumenManana);
+  const summaryButton = document.getElementById("btnResumenManana");
+  if (summaryButton && summaryButton.dataset.listenerBound !== "true") {
+    summaryButton.addEventListener("click", abrirResumenManana);
+    summaryButton.dataset.listenerBound = "true";
+  }
   const cerrarResumen = () => {
     const modal = document.getElementById("agendaTomorrowModal");
     modal?.classList.add("hidden");

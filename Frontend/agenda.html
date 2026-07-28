@@ -113,9 +113,12 @@
         </div>
       </section>
 
-      <div class="agenda-view-switcher" role="group" aria-label="Vista de citas">
-        <button id="btnAgendaVistaLista" type="button" class="agenda-view-button is-active" aria-pressed="true">Lista</button>
-        <button id="btnAgendaVistaCalendario" type="button" class="agenda-view-button" aria-pressed="false">Calendario</button>
+      <div class="agenda-primary-controls">
+        <div class="agenda-view-switcher" role="group" aria-label="Vista de citas">
+          <button id="btnAgendaVistaLista" type="button" class="agenda-view-button is-active" aria-pressed="true">Lista</button>
+          <button id="btnAgendaVistaCalendario" type="button" class="agenda-view-button" aria-pressed="false">Calendario</button>
+        </div>
+        <button id="btnResumenManana" type="button" class="admin-button admin-button-dark">Resumen de mañana</button>
       </div>
 
       <section id="agendaCalendarView" class="agenda-calendar-view hidden" aria-label="Calendario de citas">
@@ -138,10 +141,7 @@
               <p class="admin-kicker">Citas</p>
               <h2>Citas del día</h2>
             </div>
-            <div class="agenda-summary-heading-actions">
-              <button id="btnResumenManana" type="button" class="admin-button admin-button-dark">Resumen de maÃ±ana</button>
-              <span id="agendaListCount" class="agenda-count-pill">0 citas</span>
-            </div>
+            <span id="agendaListCount" class="agenda-count-pill">0 citas</span>
           </div>
           <div id="agendaAppointmentsList" class="agenda-appointments-list"></div>
         </article>
@@ -531,7 +531,7 @@
   <div id="agendaTomorrowModal" class="agenda-modal hidden" aria-hidden="true">
     <div class="agenda-modal-panel agenda-tomorrow-panel" role="dialog" aria-modal="true" aria-labelledby="agendaTomorrowTitle">
       <div class="agenda-modal-header">
-        <div><p class="admin-kicker">Agenda</p><h2 id="agendaTomorrowTitle">Resumen de maÃ±ana</h2><p id="agendaTomorrowMeta"></p></div>
+        <div><p class="admin-kicker">Agenda</p><h2 id="agendaTomorrowTitle">Resumen de mañana</h2><p id="agendaTomorrowMeta"></p></div>
         <button id="btnCerrarResumenManana" type="button" class="agenda-icon-button" aria-label="Cerrar resumen">&times;</button>
       </div>
       <p id="agendaTomorrowNotice" class="agenda-date-notice hidden" role="status"></p>

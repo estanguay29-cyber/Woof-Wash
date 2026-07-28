@@ -3290,7 +3290,7 @@ app.post("/admin/appointments/pet-photo", auth, requireAdmin, adminWriteLimiter,
     const fotoUrl = cloudinaryResult.secure_url || cloudinaryResult.url || "";
     const publicId = cloudinaryResult.public_id || "";
     if (!fotoUrl || !publicId) return res.status(502).json({ message: "Cloudinary no devolvio los datos completos de la foto." });
-    return res.status(201).json({ fotoUrl, publicId });
+    return res.status(201).json({ fotoUrl, fotoPublicId: publicId, publicId });
   } catch (error) {
     return res.status(error.status || 500).json({ message: error.message || "No se pudo guardar la foto." });
   }

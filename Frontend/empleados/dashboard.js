@@ -411,11 +411,16 @@ function serviciosCita(cita) {
   return [{ nombre: cita?.servicioNombre || "Servicio", tipo: cita?.servicioTipo || "mascota" }];
 }
 
+function placeholderSinFotoEmpleado() {
+  return window.WoofWashAppointmentsCalendar?.noPhotoPlaceholderHtml?.()
+    || '<span class="ww-no-photo" role="img" aria-label="Sin foto"><small>Sin foto</small></span>';
+}
+
 function renderMascotasCita(cita = {}) {
   const pets = serviciosCita(cita).filter((item) => item?.tipo === "mascota");
   if (!pets.length) return "";
   const id = `employee-pets-${String(cita.id || cita._id || "item").replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver mÃ¡s</button><div id="${id}" class="employee-pets-detail hidden">${pets.map((pet) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : escapeHtml((pet.mascotaNombre || "W").charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} aÃ±os` : "", pet.paquete].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
+  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver más</button><div id="${id}" class="employee-pets-detail hidden">${pets.map((pet) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoEmpleado()}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} años` : "", pet.paquete].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
 }
 
 function renderEmployeeAppointmentPhone(value) {
@@ -884,14 +889,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const image = event.target.closest?.(".employee-pet-photo img");
     if (!image) return;
     const shell = image.closest(".employee-pet-photo");
-    if (shell) shell.textContent = (image.alt.replace(/^Foto de /, "").charAt(0) || "W").toUpperCase();
+    if (shell) shell.innerHTML = placeholderSinFotoEmpleado();
   }, true);
   document.getElementById("appointmentsList")?.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-employee-pets-toggle]");
     if (!toggle) return;
     const expanded = toggle.getAttribute("aria-expanded") === "true";
     toggle.setAttribute("aria-expanded", String(!expanded));
-    toggle.textContent = expanded ? "Ver mÃ¡s" : "Ver menos";
+    toggle.textContent = expanded ? "Ver más" : "Ver menos";
     document.getElementById(toggle.getAttribute("aria-controls"))?.classList.toggle("hidden", expanded);
   });
   const dateInput = document.getElementById("weekDate");
