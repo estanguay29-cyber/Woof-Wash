@@ -138,7 +138,10 @@
               <p class="admin-kicker">Citas</p>
               <h2>Citas del día</h2>
             </div>
-            <span id="agendaListCount" class="agenda-count-pill">0 citas</span>
+            <div class="agenda-summary-heading-actions">
+              <button id="btnResumenManana" type="button" class="admin-button admin-button-dark">Resumen de maÃ±ana</button>
+              <span id="agendaListCount" class="agenda-count-pill">0 citas</span>
+            </div>
           </div>
           <div id="agendaAppointmentsList" class="agenda-appointments-list"></div>
         </article>
@@ -521,6 +524,23 @@
       <div class="agenda-edit-actions">
         <button id="btnCopiarRewardText" type="button" class="admin-button admin-button-dark">Copiar texto</button>
         <button id="btnCerrarRewardModalFooter" type="button" class="admin-button admin-button-light">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="agendaTomorrowModal" class="agenda-modal hidden" aria-hidden="true">
+    <div class="agenda-modal-panel agenda-tomorrow-panel" role="dialog" aria-modal="true" aria-labelledby="agendaTomorrowTitle">
+      <div class="agenda-modal-header">
+        <div><p class="admin-kicker">Agenda</p><h2 id="agendaTomorrowTitle">Resumen de maÃ±ana</h2><p id="agendaTomorrowMeta"></p></div>
+        <button id="btnCerrarResumenManana" type="button" class="agenda-icon-button" aria-label="Cerrar resumen">&times;</button>
+      </div>
+      <p id="agendaTomorrowNotice" class="agenda-date-notice hidden" role="status"></p>
+      <textarea id="agendaTomorrowText" class="agenda-tomorrow-text" rows="18" readonly aria-label="Mensaje completo del resumen"></textarea>
+      <div id="agendaTomorrowGallery" class="agenda-photo-gallery hidden"></div>
+      <div class="agenda-edit-actions">
+        <button id="btnCopiarResumenManana" type="button" class="admin-button admin-button-dark">Copiar mensaje</button>
+        <button id="btnWhatsAppResumenManana" type="button" class="admin-button admin-button-light">Abrir en WhatsApp</button>
+        <button id="btnCompartirFotosManana" type="button" class="admin-button admin-button-light hidden">Compartir fotos</button>
       </div>
     </div>
   </div>

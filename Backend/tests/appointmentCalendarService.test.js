@@ -123,6 +123,31 @@ test("DTO de calendario tolera citas antiguas sin telefono", () => {
   assert.equal(event.clientPhone, "");
 });
 
+test("DTO deriva ubicacion desde el campo direccion existente", () => {
+  const linked = calendar.toCalendarEvent(appointment({ direccion: "Av. Vallarta 123 https://maps.app.goo.gl/abc123" }));
+  const coordinates = calendar.toCalendarEvent(appointment({ direccion: "Acceso: 20.6736, -103.4054" }));
+  const unavailable = calendar.toCalendarEvent(appointment({ direccion: "Av. Vallarta 123" }));
+  assert.equal(linked.locationUrl, "https://maps.app.goo.gl/abc123");
+  assert.equal(coordinates.locationUrl, "https://www.google.com/maps?q=20.6736%2C-103.4054");
+  assert.equal(unavailable.locationUrl, "");
+});
+
+test("DTO agrega fotos y detalles de mascotas sin exponer publicId", () => {
+  const event = calendar.toCalendarEvent(appointment({
+    clienteEmail: "cliente@example.com",
+    serviciosDetalle: [
+      { tipo: "mascota", mascotaNombre: "Kayse", mascotaEdad: 9, categoria: "Grande", paquete: "Esencial", notas: "Tratar con calma", fotoUrl: "https://res.cloudinary.com/demo/image/upload/kayse.jpg", fotoPublicId: "private-id" },
+      { tipo: "mascota", mascotaNombre: "Luna", mascotaEdad: null, categoria: "Chico", paquete: "Premium", fotoUrl: "" }
+    ]
+  }));
+  assert.equal(event.clientEmail, "cliente@example.com");
+  assert.equal(event.pets.length, 2);
+  assert.deepEqual(event.pets[0], {
+    name: "Kayse", age: 9, category: "Grande", package: "Esencial", serviceName: "", notes: "Tratar con calma", photoUrl: "https://res.cloudinary.com/demo/image/upload/kayse.jpg"
+  });
+  assert.equal(Object.hasOwn(event.pets[0], "fotoPublicId"), false);
+});
+
 test("consulta de empleado filtra asignaciones propias singulares y multiples", async () => {
   const model = mockAppointmentModel([
     appointment({ _id: "singular", empleadoAsignadoId: "employee-1" }),

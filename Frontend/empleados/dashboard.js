@@ -411,12 +411,24 @@ function serviciosCita(cita) {
   return [{ nombre: cita?.servicioNombre || "Servicio", tipo: cita?.servicioTipo || "mascota" }];
 }
 
+function renderMascotasCita(cita = {}) {
+  const pets = serviciosCita(cita).filter((item) => item?.tipo === "mascota");
+  if (!pets.length) return "";
+  const id = `employee-pets-${String(cita.id || cita._id || "item").replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver mÃ¡s</button><div id="${id}" class="employee-pets-detail hidden">${pets.map((pet) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : escapeHtml((pet.mascotaNombre || "W").charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} aÃ±os` : "", pet.paquete].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
+}
+
 function renderEmployeeAppointmentPhone(value) {
   const phoneApi = window.WoofWashAppointmentsCalendar;
   const telValue = phoneApi?.normalizePhoneForTel?.(value) || "";
   if (!telValue) return `<span class="appointment-phone is-unavailable">Teléfono no disponible</span>`;
   const display = phoneApi.formatPhoneDisplay(value);
   return `<a class="appointment-phone" href="tel:${escapeHtml(telValue)}" aria-label="Llamar al cliente al ${escapeHtml(display)}">&#128222; ${escapeHtml(display)}</a>`;
+}
+
+function renderEmployeeLocation(address) {
+  const url = window.WoofWashAppointmentsCalendar?.locationUrlFromAddress?.(address || "") || "";
+  return url ? `<a class="appointment-location" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps</a>` : "";
 }
 
 function textoServicio(servicio, index) {
@@ -651,13 +663,20 @@ function renderCitas(citas = [], fecha = fechaLocalISO()) {
         <div class="appointment-meta">
           <span class="appointment-total">${escapeHtml(formatoMoneda(cita.totalCobrado))}</span>
           ${cita.direccion ? `<p>${escapeHtml(cita.direccion)}</p>` : ""}
+          ${renderEmployeeLocation(cita.direccion)}
         </div>
         <ul>
           ${servicios.map((servicio, index) => `<li>${escapeHtml(textoServicio(servicio, index))}</li>`).join("")}
         </ul>
+        ${renderMascotasCita(cita)}
       </article>
     `;
   }).join("");
+  container.querySelectorAll(".employee-pet-photo img").forEach((image) => {
+    if (image.src.includes("res.cloudinary.com") && image.src.includes("/image/upload/")) {
+      image.src = image.src.replace("/image/upload/", "/image/upload/w_160,h_160,c_fill,q_auto,f_auto/");
+    }
+  });
 }
 
 function formatoSemanaHistorial(item = {}) {
@@ -861,6 +880,20 @@ async function iniciarDashboardEmpleado() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("appointmentsList")?.addEventListener("error", (event) => {
+    const image = event.target.closest?.(".employee-pet-photo img");
+    if (!image) return;
+    const shell = image.closest(".employee-pet-photo");
+    if (shell) shell.textContent = (image.alt.replace(/^Foto de /, "").charAt(0) || "W").toUpperCase();
+  }, true);
+  document.getElementById("appointmentsList")?.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-employee-pets-toggle]");
+    if (!toggle) return;
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    toggle.textContent = expanded ? "Ver mÃ¡s" : "Ver menos";
+    document.getElementById(toggle.getAttribute("aria-controls"))?.classList.toggle("hidden", expanded);
+  });
   const dateInput = document.getElementById("weekDate");
   if (dateInput) dateInput.value = fechaLocalISO();
   const appointmentsDate = document.getElementById("appointmentsDate");

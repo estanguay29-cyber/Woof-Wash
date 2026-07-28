@@ -69,6 +69,7 @@ const BACKEND_VERSION = "fecha-cumpleanos-persistencia-v2";
 // Cambiar a true cuando Stripe/compras en linea queden listos para produccion.
 const COMPRAS_EN_LINEA_HABILITADAS = false;
 const CLOUDINARY_UPLOAD_FOLDER = process.env.CLOUDINARY_UPLOAD_FOLDER || "woofwash/client-items";
+const APPOINTMENT_PET_UPLOAD_FOLDER = process.env.CLOUDINARY_APPOINTMENT_PET_FOLDER || "woofwash/appointment-pets";
 const EMPLOYEE_PROFILE_UPLOAD_FOLDER = process.env.CLOUDINARY_EMPLOYEE_PROFILE_FOLDER || "woofwash/employee-profiles";
 const CLIENT_ITEM_PHOTO_TYPES = Object.freeze({
   "image/jpeg": ".jpg",
@@ -2145,6 +2146,30 @@ function normalizarServicioDetalleAgenda(servicio, index = 0) {
     return { error: mascotaEdad.error };
   }
 
+  const fotoUrl = tipo === "mascota" ? normalizarTextoPlano(servicio?.fotoUrl, 1000) : "";
+  const fotoPublicId = tipo === "mascota" ? normalizarTextoPlano(servicio?.fotoPublicId, 500) : "";
+  if (fotoUrl) {
+    try {
+      const parsedPhotoUrl = new URL(fotoUrl);
+      const cloudName = String(process.env.CLOUDINARY_CLOUD_NAME || "").trim();
+      const expectedPrefix = cloudName ? `/${cloudName}/image/upload/` : "";
+      const uploadPath = expectedPrefix && parsedPhotoUrl.pathname.startsWith(expectedPrefix)
+        ? parsedPhotoUrl.pathname.slice(expectedPrefix.length)
+        : "";
+      const pathParts = uploadPath.split("/").filter(Boolean);
+      const versionIndex = pathParts.findIndex((part) => /^v\d+$/.test(part));
+      const publicPathParts = versionIndex >= 0 ? pathParts.slice(versionIndex + 1) : [];
+      const publicIdFromUrl = publicPathParts.length
+        ? decodeURIComponent(publicPathParts.join("/").replace(/\.[a-z0-9]+$/i, ""))
+        : "";
+      if (!cloudName || parsedPhotoUrl.protocol !== "https:" || parsedPhotoUrl.hostname !== "res.cloudinary.com" || !uploadPath || !fotoPublicId || publicIdFromUrl !== fotoPublicId) {
+        return { error: `serviciosDetalle[${index}].fotoUrl no corresponde a una carga valida` };
+      }
+    } catch {
+      return { error: `serviciosDetalle[${index}].fotoUrl no es valida` };
+    }
+  }
+
   return {
     servicio: {
       tipo,
@@ -2155,6 +2180,8 @@ function normalizarServicioDetalleAgenda(servicio, index = 0) {
       notas: normalizarTextoPlano(servicio?.notas, 300),
       mascotaNombre: tipo === "mascota" ? normalizarTextoPlano(servicio?.mascotaNombre, 80) : "",
       mascotaEdad: tipo === "mascota" ? mascotaEdad.value : null,
+      fotoUrl,
+      fotoPublicId: fotoUrl ? fotoPublicId : "",
       duracionMinutos: duracionNumero
     }
   };
@@ -2200,6 +2227,8 @@ function construirServiciosDetalleCompatibles(cita) {
           ? servicio.mascotaEdad
           : (index === 0 && Number.isInteger(obj.mascotaEdad) ? obj.mascotaEdad : null))
         : null,
+      fotoUrl: servicio.tipo === "mascota" ? String(servicio.fotoUrl || "").trim() : "",
+      fotoPublicId: servicio.tipo === "mascota" ? String(servicio.fotoPublicId || "").trim() : "",
       duracionMinutos: Number(servicio.duracionMinutos) || 0
     }));
   }
@@ -2892,6 +2921,7 @@ const { contarServiciosCita, calcularMetricasEmpleado, calcularPuntualidadCita, 
 
 function construirCitaEmpleado(cita) {
   const base = construirCitaAdmin(cita);
+  const serviciosDetalleEmpleado = base.serviciosDetalle.map(({ fotoPublicId, ...servicio }) => servicio);
   return {
     id: base.id,
     clienteNombre: base.clienteNombre,
@@ -2901,8 +2931,9 @@ function construirCitaEmpleado(cita) {
     servicioNombre: base.servicioNombre,
     servicioCategoria: base.servicioCategoria,
     servicioPaquete: base.servicioPaquete,
-    serviciosDetalle: base.serviciosDetalle,
+    serviciosDetalle: serviciosDetalleEmpleado,
     mascotaNombre: base.mascotaNombre,
+    mascotaEdad: base.mascotaEdad,
     fecha: base.fecha,
     hora: base.hora,
     zona: base.zona,
@@ -3178,6 +3209,10 @@ app.use("/empleados/me/foto", express.raw({
   type: Object.keys(CLIENT_ITEM_PHOTO_TYPES),
   limit: "5mb"
 }));
+app.use("/admin/appointments/pet-photo", express.raw({
+  type: Object.keys(CLIENT_ITEM_PHOTO_TYPES),
+  limit: "5mb"
+}));
 app.use(express.json({ limit: "100kb" }));
 
 // ============================
@@ -3240,6 +3275,24 @@ app.post("/cliente/items/photo", auth, async (req, res) => {
     });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message || "No se pudo guardar la foto." });
+  }
+});
+
+app.post("/admin/appointments/pet-photo", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const contentType = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+    const extension = CLIENT_ITEM_PHOTO_TYPES[contentType];
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+    if (!extension) return res.status(400).json({ message: "Formato de imagen no permitido. Usa JPG, PNG o WebP." });
+    if (!bytes.length) return res.status(400).json({ message: "No se recibio imagen para guardar." });
+    const fileName = `pet-${Date.now()}-${crypto.randomBytes(8).toString("hex")}${extension}`;
+    const cloudinaryResult = await subirFotoCloudinary({ bytes, contentType, fileName, folder: APPOINTMENT_PET_UPLOAD_FOLDER });
+    const fotoUrl = cloudinaryResult.secure_url || cloudinaryResult.url || "";
+    const publicId = cloudinaryResult.public_id || "";
+    if (!fotoUrl || !publicId) return res.status(502).json({ message: "Cloudinary no devolvio los datos completos de la foto." });
+    return res.status(201).json({ fotoUrl, publicId });
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || "No se pudo guardar la foto." });
   }
 });
 

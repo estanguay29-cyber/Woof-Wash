@@ -68,6 +68,18 @@ const ServicioDetalleSchema = new mongoose.Schema(
       max: 40,
       default: null
     },
+    fotoUrl: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: ""
+    },
+    fotoPublicId: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: ""
+    },
     duracionMinutos: {
       type: Number,
       min: 0,

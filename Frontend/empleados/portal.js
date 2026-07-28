@@ -482,12 +482,24 @@ function serviciosCita(cita) {
   return [{ nombre: cita?.servicioNombre || "Servicio", tipo: cita?.servicioTipo || "mascota" }];
 }
 
+function renderMascotasCitaEmpleado(cita = {}) {
+  const pets = serviciosCita(cita).filter((item) => item?.tipo === "mascota");
+  if (!pets.length) return "";
+  const id = `employee-pets-${String(cita.id || cita._id || "item").replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver mÃ¡s</button><div id="${id}" class="employee-pets-detail hidden">${pets.map((pet) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : escapeHtml((pet.mascotaNombre || "W").charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} aÃ±os` : "", pet.paquete].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
+}
+
 function renderAdminEmployeeAppointmentPhone(value) {
   const phoneApi = window.WoofWashAppointmentsCalendar;
   const telValue = phoneApi?.normalizePhoneForTel?.(value) || "";
   if (!telValue) return `<span class="appointment-phone is-unavailable">Teléfono no disponible</span>`;
   const display = phoneApi.formatPhoneDisplay(value);
   return `<a class="appointment-phone" href="tel:${escapeHtml(telValue)}" aria-label="Llamar al cliente al ${escapeHtml(display)}">&#128222; ${escapeHtml(display)}</a>`;
+}
+
+function renderAdminEmployeeLocation(address) {
+  const url = window.WoofWashAppointmentsCalendar?.locationUrlFromAddress?.(address || "") || "";
+  return url ? `<a class="appointment-location" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps</a>` : "";
 }
 
 function metricState(value, type = "neutral") {
@@ -847,10 +859,12 @@ function renderCitasDashboard(citas = [], fecha = fechaLocalISO()) {
         <div class="appointment-meta">
           ${tieneDato(cita.totalCobrado) ? `<span class="appointment-total">${escapeHtml(formatoMoneda(cita.totalCobrado))}</span>` : ""}
           ${cita.direccion ? `<p>${escapeHtml(cita.direccion)}</p>` : ""}
+          ${renderAdminEmployeeLocation(cita.direccion)}
         </div>
         <ul>
           ${servicios.map((servicio, index) => `<li>${escapeHtml(textoServicio(servicio, index))}</li>`).join("")}
         </ul>
+        ${renderMascotasCitaEmpleado(cita)}
       </article>
     `;
   }).join("");
@@ -1026,6 +1040,11 @@ function renderDetalleEmpleado(detalle) {
   panel.classList.remove("hidden");
   const calendarMount = document.getElementById("adminEmployeeCalendarMount");
   if (calendarPanel && calendarMount) calendarMount.append(calendarPanel);
+  panel.querySelectorAll(".employee-pet-photo img").forEach((image) => {
+    if (image.src.includes("res.cloudinary.com") && image.src.includes("/image/upload/")) {
+      image.src = image.src.replace("/image/upload/", "/image/upload/w_160,h_160,c_fill,q_auto,f_auto/");
+    }
+  });
   syncAdminEmployeeAppointmentsView();
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1187,6 +1206,12 @@ async function iniciarPortal() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("employeePortalPanel")?.addEventListener("error", (event) => {
+    const image = event.target.closest?.(".employee-pet-photo img");
+    if (!image) return;
+    const shell = image.closest(".employee-pet-photo");
+    if (shell) shell.textContent = (image.alt.replace(/^Foto de /, "").charAt(0) || "W").toUpperCase();
+  }, true);
   document.getElementById("logoutButton")?.addEventListener("click", cerrarSesion);
 
   document.getElementById("showEmployeesButton")?.addEventListener("click", () => {
@@ -1205,6 +1230,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("employeePortalPanel")?.addEventListener("click", (event) => {
+    const petsToggle = event.target.closest("[data-employee-pets-toggle]");
+    if (petsToggle) {
+      const expanded = petsToggle.getAttribute("aria-expanded") === "true";
+      petsToggle.setAttribute("aria-expanded", String(!expanded));
+      petsToggle.textContent = expanded ? "Ver mÃ¡s" : "Ver menos";
+      document.getElementById(petsToggle.getAttribute("aria-controls"))?.classList.toggle("hidden", expanded);
+      return;
+    }
     const button = event.target.closest("button[data-action='back-to-list']");
     if (button) {
       volverALista();

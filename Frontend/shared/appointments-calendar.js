@@ -96,6 +96,26 @@
     });
   }
 
+  function locationUrlFromAddress(address) {
+    const source = typeof address === "string" ? address : "";
+    const urls = source.match(/https?:\/\/[^\s<>()]+/gi) || [];
+    for (const candidate of urls) {
+      try {
+        const parsed = new URL(candidate.replace(/[.,;]+$/, ""));
+        const host = parsed.hostname.toLowerCase();
+        if (host === "maps.app.goo.gl" || host === "goo.gl" || host === "maps.google.com" || host.endsWith(".google.com")) return parsed.href;
+      } catch {
+        // Ignora valores que no sean enlaces vÃ¡lidos de Google Maps.
+      }
+    }
+    const coordinates = source.match(/(?:^|[^\d.-])(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)(?:$|[^\d.])/);
+    if (!coordinates) return "";
+    const latitude = Number(coordinates[1]);
+    const longitude = Number(coordinates[2]);
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return "";
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+  }
+
   function calendarDateTime(date, time) {
     if (!DATE_PATTERN.test(String(date || "")) || !TIME_PATTERN.test(String(time || ""))) return "";
     return `${date}T${time}:00`;
@@ -183,6 +203,69 @@
     return `${Number(match[3])} de ${months[Number(match[2]) - 1]} de ${match[1]}`;
   }
 
+  function sharedLocationField(value) {
+    const wrapper = document.createElement("dl");
+    wrapper.className = "appointments-calendar-detail-item is-wide";
+    const term = document.createElement("dt");
+    const description = document.createElement("dd");
+    term.textContent = "UbicaciÃ³n";
+    if (value) {
+      const link = document.createElement("a");
+      link.href = value;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "Abrir en Google Maps";
+      description.append(link);
+    } else description.textContent = "No disponible";
+    wrapper.append(term, description);
+    return wrapper;
+  }
+
+  function createPetsDetail(pets = []) {
+    const section = document.createElement("section");
+    section.className = "appointments-calendar-pets is-wide";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "appointments-calendar-pets-toggle";
+    button.textContent = "Ver mÃ¡s";
+    button.setAttribute("aria-expanded", "false");
+    const list = document.createElement("div");
+    list.className = "appointments-calendar-pets-list hidden";
+    const id = `calendar-pets-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    list.id = id;
+    button.setAttribute("aria-controls", id);
+    pets.forEach((pet) => {
+      const card = document.createElement("article");
+      const media = document.createElement("span");
+      media.className = "appointments-calendar-pet-photo";
+      if (pet.photoUrl) {
+        const image = document.createElement("img");
+        image.src = pet.photoUrl;
+        image.loading = "lazy";
+        image.alt = `Foto de ${pet.name || "mascota"}`;
+        image.addEventListener("error", () => { media.textContent = (pet.name || "W").charAt(0).toUpperCase(); });
+        media.append(image);
+      } else media.textContent = (pet.name || "W").charAt(0).toUpperCase();
+      const copy = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = pet.name || "Mascota sin nombre";
+      const detail = document.createElement("p");
+      detail.textContent = [pet.category, Number.isInteger(pet.age) ? `${pet.age} ${pet.age === 1 ? "aÃ±o" : "aÃ±os"}` : "", pet.package].filter(Boolean).join(" Â· ") || "Sin datos adicionales";
+      copy.append(name, detail);
+      if (pet.notes) { const notes = document.createElement("p"); notes.textContent = `Indicaciones: ${pet.notes}`; copy.append(notes); }
+      card.append(media, copy);
+      list.append(card);
+    });
+    button.addEventListener("click", () => {
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded));
+      button.textContent = expanded ? "Ver mÃ¡s" : "Ver menos";
+      list.classList.toggle("hidden", expanded);
+    });
+    section.append(button, list);
+    return section;
+  }
+
   function createSharedDetailDialog() {
     const modal = document.createElement("div");
     modal.className = "appointments-calendar-modal hidden";
@@ -238,11 +321,13 @@
         ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(appointment.totalCharged)
         : "Sin monto registrado";
       const subjectLabel = appointment.subjectType === "mascota" ? "Mascota" : appointment.subjectType === "vehiculo" ? "Vehículo" : "Servicio";
+      const locationUrl = appointment.locationUrl || locationUrlFromAddress(appointment.address);
       content.replaceChildren(
         sharedDetailField("Fecha", formatDetailDate(appointment.date)),
         sharedDetailField("Horario", appointment.endTime ? `${appointment.time} a ${appointment.endTime}` : appointment.time),
         sharedDetailField("Cliente", appointment.clientName),
         sharedPhoneField(appointment.clientPhone),
+        sharedDetailField("Correo", appointment.clientEmail || "No disponible"),
         sharedDetailField(subjectLabel, appointment.subjectName),
         sharedDetailField("Tipo de servicio", appointment.serviceType === "auto" ? "Auto" : appointment.serviceType === "mascota" ? "Mascota" : "Otro"),
         sharedDetailField("Servicio", appointment.serviceName),
@@ -250,9 +335,11 @@
         sharedDetailField("Zona", appointment.zone),
         sharedDetailField("Empleados asignados", employees || "Sin asignar", true),
         sharedDetailField("Dirección", appointment.address, true),
+        sharedLocationField(locationUrl),
         sharedDetailField("Monto total", amount),
         sharedDetailField("Calificación", appointment.hasRating ? "Ya calificada" : "Sin calificación"),
         ...(appointment.notes ? [sharedDetailField("Notas", appointment.notes, true)] : [])
+        ,...(Array.isArray(appointment.pets) && appointment.pets.length ? [createPetsDetail(appointment.pets)] : [])
       );
       modal.classList.remove("hidden");
       modal.setAttribute("aria-hidden", "false");
@@ -475,6 +562,7 @@
     statusLabel,
     normalizePhoneForTel,
     formatPhoneDisplay,
+    locationUrlFromAddress,
     deduplicateEvents,
     toFullCalendarEvent,
     buildFullCalendarEvents,

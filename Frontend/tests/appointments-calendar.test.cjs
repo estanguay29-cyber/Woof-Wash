@@ -8,7 +8,7 @@ const vm = require("node:vm");
 
 const componentPath = path.join(__dirname, "..", "shared", "appointments-calendar.js");
 const source = fs.readFileSync(componentPath, "utf8");
-const context = { module: { exports: {} }, exports: {}, console };
+const context = { module: { exports: {} }, exports: {}, console, URL };
 vm.runInNewContext(source, context, { filename: componentPath });
 const calendar = context.module.exports;
 
@@ -82,4 +82,11 @@ test("rechaza telefonos vacios o maliciosos sin producir enlaces", () => {
   assert.equal(calendar.normalizePhoneForTel("javascript:alert(1)"), "");
   assert.equal(calendar.normalizePhoneForTel("<img src=x onerror=alert(1)>"), "");
   assert.equal(calendar.formatPhoneDisplay("<script>alert(1)</script>"), "Teléfono no disponible");
+});
+
+test("deriva Google Maps solo desde direccion o coordenadas", () => {
+  assert.equal(calendar.locationUrlFromAddress("Calle 1 https://maps.app.goo.gl/abc123"), "https://maps.app.goo.gl/abc123");
+  assert.equal(calendar.locationUrlFromAddress("Coordenadas 20.6736, -103.4054"), "https://www.google.com/maps?q=20.6736%2C-103.4054");
+  assert.equal(calendar.locationUrlFromAddress("Calle sin enlace"), "");
+  assert.equal(calendar.locationUrlFromAddress("https://example.com/no-es-maps"), "");
 });

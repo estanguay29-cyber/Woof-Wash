@@ -175,12 +175,45 @@ function calendarSubject(appointment = {}) {
   };
 }
 
+function locationUrlFromAddress(address) {
+  const source = typeof address === "string" ? address : "";
+  const urls = source.match(/https?:\/\/[^\s<>()]+/gi) || [];
+  for (const candidate of urls) {
+    try {
+      const parsed = new URL(candidate.replace(/[.,;]+$/, ""));
+      const host = parsed.hostname.toLowerCase();
+      if (host === "maps.app.goo.gl" || host === "goo.gl" || host === "maps.google.com" || host.endsWith(".google.com")) {
+        return parsed.href;
+      }
+    } catch {
+      // ContinÃºa con los demÃ¡s valores disponibles de la direcciÃ³n.
+    }
+  }
+  const coordinates = source.match(/(?:^|[^\d.-])(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)(?:$|[^\d.])/);
+  if (!coordinates) return "";
+  const latitude = Number(coordinates[1]);
+  const longitude = Number(coordinates[2]);
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return "";
+  return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+}
+
 function toCalendarEvent(appointment = {}) {
   const source = typeof appointment.toObject === "function" ? appointment.toObject() : appointment;
   const status = String(source.estado || "pendiente").trim() || "pendiente";
   const operationalStatus = String(source.estadoOperativo || "").trim() || null;
   const rating = Number(source.calificacionServicio);
   const subject = calendarSubject(source);
+  const petServices = Array.isArray(source.serviciosDetalle)
+    ? source.serviciosDetalle.filter((service) => service?.tipo === "mascota").map((service, index) => ({
+      name: String(service.mascotaNombre || (index === 0 ? source.mascotaNombre || "" : "")),
+      age: Number.isInteger(service.mascotaEdad) ? service.mascotaEdad : (index === 0 && Number.isInteger(source.mascotaEdad) ? source.mascotaEdad : null),
+      category: String(service.categoria || ""),
+      package: String(service.paquete || ""),
+      serviceName: String(service.nombre || ""),
+      notes: String(service.notas || ""),
+      photoUrl: String(service.fotoUrl || "")
+    }))
+    : [];
   return {
     id: objectIdString(source._id || source.id),
     date: String(source.fecha || ""),
@@ -193,12 +226,19 @@ function toCalendarEvent(appointment = {}) {
     serviceName: String(source.servicioNombre || "Servicio"),
     clientName: String(source.clienteNombre || "Cliente"),
     clientPhone: String(source.clienteTelefono || ""),
+    clientEmail: String(source.clienteEmail || ""),
     ...subject,
     address: String(source.direccion || ""),
+    locationUrl: locationUrlFromAddress(source.direccion),
     zone: String(source.zona || ""),
     assignedEmployees: normalizeAssignedEmployees(source),
     totalCharged: Number.isFinite(source.totalCobrado) ? source.totalCobrado : null,
     notes: String(source.notas || ""),
+    pets: petServices.length ? petServices : (source.servicioTipo === "mascota" ? [{
+      name: String(source.mascotaNombre || ""), age: Number.isInteger(source.mascotaEdad) ? source.mascotaEdad : null,
+      category: String(source.servicioCategoria || ""), package: String(source.servicioPaquete || ""),
+      serviceName: String(source.servicioNombre || ""), notes: "", photoUrl: ""
+    }] : []),
     hasRating: Number.isInteger(rating) && rating >= 1 && rating <= 5
   };
 }
@@ -264,6 +304,7 @@ module.exports = {
   validateCalendarRange,
   normalizeAssignedEmployees,
   normalizeVisibleStatus,
+  locationUrlFromAddress,
   toCalendarEvent,
   deduplicateCalendarEvents,
   sortCalendarEvents,
