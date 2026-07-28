@@ -128,6 +128,8 @@ let duracionBloqueadaManualCrear = false;
 let duracionBloqueadaManualEditar = false;
 let empleadosAgenda = [];
 let calendarioAgendaVisual = null;
+let rangoCitasAgendaCargado = null;
+let resumenMananaEnProceso = false;
 
 function obtenerApiBaseAgenda() {
   const hostname = window.location.hostname;
@@ -185,6 +187,24 @@ async function agendaFetch(path, options = {}) {
   }
 
   return data;
+}
+
+async function ejecutarPeticionConTimeout(executor, timeoutMs = 10000) {
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      controller?.abort();
+      const error = new Error("Tiempo de espera agotado");
+      error.name = "TimeoutError";
+      reject(error);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([executor(controller?.signal), timeoutPromise]);
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 function inicializarCalendarioAgenda() {
@@ -1900,6 +1920,22 @@ function construirQueryCitas() {
   return params.toString();
 }
 
+function obtenerRangoConsultaCitasActual() {
+  if (filtroRangoActual?.desde && filtroRangoActual?.hasta) {
+    return { desde: filtroRangoActual.desde, hasta: filtroRangoActual.hasta };
+  }
+  const dia = filtroDiaActual || obtenerFechaLocalISO();
+  return { desde: dia, hasta: dia };
+}
+
+function citasEnMemoriaIncluyenFecha(fecha) {
+  return Boolean(
+    rangoCitasAgendaCargado
+    && fecha >= rangoCitasAgendaCargado.desde
+    && fecha <= rangoCitasAgendaCargado.hasta
+  );
+}
+
 function limpiarAvisoRangoAgenda() {
   const { rangeNotice } = obtenerElementosAgenda();
   if (!rangeNotice) return;
@@ -1980,13 +2016,16 @@ async function cargarCitasAgenda() {
     lista.innerHTML = `<div class="agenda-empty-state"><h3>Cargando citas...</h3></div>`;
   }
 
+  const rangoSolicitado = obtenerRangoConsultaCitasActual();
   try {
     const data = await agendaFetch(`/admin/appointments?${construirQueryCitas()}`);
     citasAgenda = Array.isArray(data.citas) ? data.citas.map(mapearCitaApi) : [];
+    rangoCitasAgendaCargado = rangoSolicitado;
     await cargarRewardsParaCitas(citasAgenda);
     await cargarEmpleadosAgenda();
   } catch (error) {
     citasAgenda = [];
+    rangoCitasAgendaCargado = null;
     if (lista) {
       lista.innerHTML = `<div class="agenda-empty-state"><h3>No se pudo cargar la agenda</h3><p>${escapeHtml(error.message)}</p></div>`;
     }
@@ -3781,27 +3820,69 @@ function construirResumenManana(citas) {
   }).join("\n\n--------------\n\n");
 }
 
+async function construirResumenMananaFluido(citas, batchSize = 40) {
+  const partes = [];
+  for (let index = 0; index < citas.length; index += batchSize) {
+    partes.push(construirResumenManana(citas.slice(index, index + batchSize)));
+    if (index + batchSize < citas.length) {
+      await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    }
+  }
+  return partes.filter(Boolean).join("\n\n--------------\n\n");
+}
+
+function obtenerUrlFotoCompartida(url, anchoMaximo = 1200) {
+  const value = String(url || "");
+  if (!value.includes("res.cloudinary.com") || !value.includes("/image/upload/")) return value;
+  return value.replace("/image/upload/", `/image/upload/w_${anchoMaximo},c_limit,q_auto,f_auto/`);
+}
+
 async function abrirResumenManana() {
   const modal = document.getElementById("agendaTomorrowModal");
   const notice = document.getElementById("agendaTomorrowNotice");
+  const trigger = document.getElementById("btnResumenManana");
+  const textArea = document.getElementById("agendaTomorrowText");
+  const meta = document.getElementById("agendaTomorrowMeta");
+  const share = document.getElementById("btnCompartirFotosManana");
+  const gallery = document.getElementById("agendaTomorrowGallery");
   const date = fechaMananaNegocio();
   modal?.classList.remove("hidden");
   modal?.setAttribute("aria-hidden", "false");
   document.body.classList.add("agenda-modal-open");
-  if (notice) { notice.textContent = "Obteniendo citas del día siguiente…"; notice.classList.remove("hidden"); }
+  if (resumenMananaEnProceso) return;
+  resumenMananaEnProceso = true;
+  if (trigger) { trigger.disabled = true; trigger.textContent = "Generando…"; }
+  if (notice) { notice.textContent = "Generando resumen…"; notice.classList.remove("hidden"); }
+  if (meta) meta.textContent = formatearFechaAgenda(date);
+  if (textArea) textArea.value = "";
+  if (share) { share.classList.add("hidden"); share._photos = []; }
+  if (gallery) { gallery.classList.add("hidden"); gallery.replaceChildren(); }
   try {
-    const data = await agendaFetch(`/admin/appointments?fecha=${encodeURIComponent(date)}`);
-    const citas = (Array.isArray(data.citas) ? data.citas : []).map(mapearCitaApi).filter((cita) => cita.estado !== "cancelada").sort((a, b) => a.hora.localeCompare(b.hora));
-    const text = construirResumenManana(citas);
-    document.getElementById("agendaTomorrowMeta").textContent = `${formatearFechaAgenda(date)} - ${citas.length} ${citas.length === 1 ? "cita" : "citas"}`;
-    document.getElementById("agendaTomorrowText").value = text;
+    await new Promise((resolve) => window.requestAnimationFrame(resolve));
+    let citasFuente;
+    if (citasEnMemoriaIncluyenFecha(date)) {
+      citasFuente = citasAgenda.filter((cita) => cita.fecha === date);
+    } else {
+      const data = await ejecutarPeticionConTimeout(
+        (signal) => agendaFetch(`/admin/appointments?fecha=${encodeURIComponent(date)}`, { signal }),
+        10000
+      );
+      citasFuente = (Array.isArray(data.citas) ? data.citas : []).map(mapearCitaApi);
+    }
+    const citas = citasFuente.filter((cita) => cita.estado !== "cancelada").sort((a, b) => a.hora.localeCompare(b.hora));
+    const text = await construirResumenMananaFluido(citas);
+    if (meta) meta.textContent = `${formatearFechaAgenda(date)} - ${citas.length} ${citas.length === 1 ? "cita" : "citas"}`;
+    if (textArea) textArea.value = text;
     const photos = citas.flatMap((cita) => obtenerServiciosVisualesCita(cita).filter((pet) => pet.fotoUrl).map((pet) => ({ ...pet, hora: cita.hora })));
-    const share = document.getElementById("btnCompartirFotosManana");
     share?.classList.toggle("hidden", !photos.length);
-    share._photos = photos;
+    if (share) share._photos = photos;
     if (notice) { notice.textContent = citas.length ? "" : "No existen citas activas para mañana."; notice.classList.toggle("hidden", Boolean(citas.length)); }
   } catch (error) {
-    if (notice) { notice.textContent = error.message || "Error al obtener citas del día siguiente."; notice.classList.remove("hidden"); }
+    console.error("No se pudo generar el resumen de mañana", { name: error?.name || "Error" });
+    if (notice) { notice.textContent = "No pudimos generar el resumen. Intenta nuevamente."; notice.classList.remove("hidden"); }
+  } finally {
+    resumenMananaEnProceso = false;
+    if (trigger) { trigger.disabled = false; trigger.textContent = "Resumen de mañana"; }
   }
 }
 
@@ -3809,10 +3890,23 @@ async function compartirFotosManana() {
   const button = document.getElementById("btnCompartirFotosManana");
   const photos = button?._photos || [];
   const gallery = document.getElementById("agendaTomorrowGallery");
-  if (!photos.length) return;
+  const notice = document.getElementById("agendaTomorrowNotice");
+  if (!photos.length || button?.disabled) {
+    if (!photos.length && notice) {
+      notice.textContent = "No hay fotografías disponibles para compartir.";
+      notice.classList.remove("hidden");
+    }
+    return;
+  }
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Preparando fotos…";
   try {
     const results = await Promise.allSettled(photos.map(async (photo, index) => {
-      const response = await fetch(photo.fotoUrl, { mode: "cors" });
+      const response = await ejecutarPeticionConTimeout(
+        (signal) => fetch(obtenerUrlFotoCompartida(photo.fotoUrl), { mode: "cors", signal }),
+        15000
+      );
       if (!response.ok) throw new Error("Imagen no disponible");
       const blob = await response.blob();
       return new File([blob], `${photo.hora || "cita"}-${photo.mascotaNombre || `mascota-${index + 1}`}.${blob.type.split("/")[1] || "jpg"}`, { type: blob.type });
@@ -3822,10 +3916,18 @@ async function compartirFotosManana() {
     if (!navigator.share || !navigator.canShare?.({ files })) throw new Error("El navegador no soporta compartir archivos.");
     await navigator.share({ files, title: "Fotografías de citas de mañana" });
   } catch (error) {
-    gallery.innerHTML = photos.map((photo) => `<a href="${escapeHtml(photo.fotoUrl)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" src="${escapeHtml(photo.fotoUrl)}" alt="${escapeHtml(photo.mascotaNombre || "Mascota")} ${escapeHtml(photo.hora || "")}"><span>${escapeHtml(photo.mascotaNombre || "Mascota")} - ${escapeHtml(photo.hora || "")}</span></a>`).join("");
-    gallery.classList.remove("hidden");
-    const notice = document.getElementById("agendaTomorrowNotice");
-    if (notice) { notice.textContent = `${error.message} Puedes abrir o descargar cada imagen desde la galería.`; notice.classList.remove("hidden"); }
+    if (gallery) {
+      gallery.innerHTML = photos.map((photo) => {
+        const photoUrl = obtenerUrlFotoCompartida(photo.fotoUrl);
+        return `<a href="${escapeHtml(photoUrl)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" decoding="async" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(photo.mascotaNombre || "Mascota")} ${escapeHtml(photo.hora || "")}"><span>${escapeHtml(photo.mascotaNombre || "Mascota")} - ${escapeHtml(photo.hora || "")}</span></a>`;
+      }).join("");
+      gallery.classList.remove("hidden");
+    }
+    console.error("No se pudieron compartir las fotografías de mañana", { name: error?.name || "Error" });
+    if (notice) { notice.textContent = "No pudimos preparar todas las fotografías. Puedes abrir o descargar las disponibles desde la galería."; notice.classList.remove("hidden"); }
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText || "Compartir fotos";
   }
 }
 
