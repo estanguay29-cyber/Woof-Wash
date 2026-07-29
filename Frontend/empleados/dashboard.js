@@ -417,10 +417,10 @@ function placeholderSinFotoEmpleado() {
 }
 
 function renderMascotasCita(cita = {}) {
-  const pets = serviciosCita(cita).filter((item) => item?.tipo === "mascota");
+  const pets = serviciosCita(cita);
   if (!pets.length) return "";
   const id = `employee-pets-${String(cita.id || cita._id || "item").replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver más</button><div id="${id}" class="employee-pets-detail hidden">${pets.map((pet) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoEmpleado()}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} años` : "", pet.paquete].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
+  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver más</button><div id="${id}" class="employee-pets-detail hidden">${pets.map((pet, index) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${pet.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoEmpleado()}</span><div><strong>${escapeHtml(pet.tipo === "auto" ? `Vehículo ${index + 1}` : pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} años` : "", pet.paquete].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
 }
 
 function renderEmployeeAppointmentPhone(value) {

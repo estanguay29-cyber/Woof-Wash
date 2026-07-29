@@ -8408,6 +8408,36 @@ body {
   padding: 22px;
 }
 
+.agenda-tomorrow-photo-actions {
+  margin-top: 16px;
+}
+
+.agenda-tomorrow-photo-actions.hidden,
+.agenda-tomorrow-photo-actions .admin-button.hidden,
+.agenda-tomorrow-photo-notice.hidden {
+  display: none;
+}
+
+.agenda-tomorrow-photo-notice {
+  margin-top: 10px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.agenda-photo-gallery article {
+  min-width: 0;
+  border: 1px solid #d6deee;
+  border-radius: 14px;
+  padding: 8px;
+}
+
+.agenda-photo-gallery-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .agenda-modal-header {
   display: flex;
   align-items: flex-start;

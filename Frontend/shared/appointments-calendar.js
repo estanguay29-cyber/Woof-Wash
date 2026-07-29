@@ -251,13 +251,13 @@
         const image = document.createElement("img");
         image.src = pet.photoUrl;
         image.loading = "lazy";
-        image.alt = `Foto de ${pet.name || "mascota"}`;
+        image.alt = `Foto de ${pet.name || (pet.type === "auto" ? "vehículo" : "mascota")}`;
         image.addEventListener("error", () => replaceWithNoPhotoPlaceholder(media));
         media.append(image);
       } else replaceWithNoPhotoPlaceholder(media);
       const copy = document.createElement("div");
       const name = document.createElement("strong");
-      name.textContent = pet.name || "Mascota sin nombre";
+      name.textContent = pet.name || (pet.type === "auto" ? "Vehículo" : "Mascota sin nombre");
       const detail = document.createElement("p");
       detail.textContent = [pet.category, Number.isInteger(pet.age) ? `${pet.age} ${pet.age === 1 ? "año" : "años"}` : "", pet.package].filter(Boolean).join(" / ") || "Sin datos adicionales";
       copy.append(name, detail);

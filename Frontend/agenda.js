@@ -94,7 +94,7 @@ const SERVICIOS_CATALOGO = {
       { value: "Auto chico", label: "Auto chico", nombre: "Auto chico" },
       { value: "Auto mediano", label: "Auto mediano", nombre: "Auto mediano" },
       { value: "Camioneta/SUV", label: "Camioneta/SUV", nombre: "Camioneta/SUV" },
-      { value: "Pick Up", label: "Pick Up", nombre: "Pick Up" }
+      { value: "Pick Up", label: "Camioneta pickup", nombre: "Pick Up" }
     ],
     paquetes: [
       { value: "Lavado b\u00e1sico", label: "Lavado b\u00e1sico", nombre: "Lavado b\u00e1sico" },
@@ -131,6 +131,8 @@ let duracionBloqueadaManualEditar = false;
 let empleadosAgenda = [];
 let calendarioAgendaVisual = null;
 let resumenMananaEnProceso = false;
+let fotosResumenManana = [];
+let urlsObjetoFotosResumen = [];
 
 function obtenerApiBaseAgenda() {
   const hostname = window.location.hostname;
@@ -884,12 +886,12 @@ function obtenerServiciosDesdeBloques(prefijo = "") {
       notas: bloque.querySelector("[data-service-notes]")?.value || ""
     };
 
+    servicio.fotoUrl = bloque.dataset.photoUrl || "";
+    servicio.fotoPublicId = bloque.dataset.photoPublicId || "";
+    servicio._clientId = bloque.dataset.clientId || "";
     if (tipo === "mascota") {
       servicio.mascotaNombre = bloque.querySelector("[data-pet-name]")?.value || "";
       servicio.mascotaEdad = bloque.querySelector("[data-pet-age]")?.value || "";
-      servicio.fotoUrl = bloque.dataset.photoUrl || "";
-      servicio.fotoPublicId = bloque.dataset.photoPublicId || "";
-      servicio._clientId = bloque.dataset.clientId || "";
     }
 
     return servicio;
@@ -920,6 +922,14 @@ function actualizarEtiquetaCantidadServicios(prefijo = "") {
   const { tipoSelect, cantidadLabel } = obtenerConfigServiciosFormulario(prefijo);
   if (!cantidadLabel) return;
   cantidadLabel.textContent = tipoSelect?.value === "auto" ? "Número de autos" : "Número de mascotas";
+}
+
+function limpiarFotosBloquesFormulario(prefijo = "") {
+  const { container } = obtenerConfigServiciosFormulario(prefijo);
+  container?.querySelectorAll("[data-service-block]").forEach((bloque) => {
+    bloque.dataset.photoUrl = "";
+    bloque.dataset.photoPublicId = "";
+  });
 }
 
 function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
@@ -961,6 +971,16 @@ function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
         </div>
       `
       : "";
+    const camposVehiculo = tipo === "auto"
+      ? `
+        <div class="agenda-pet-photo-control">
+          <span class="agenda-pet-photo-preview">${fotoUrl ? `<img src="${escapeHtml(fotoUrl)}" alt="Foto de vehículo ${index + 1}">` : placeholderSinFotoHtml()}</span>
+          <label class="admin-button admin-button-light">${fotoUrl ? "Cambiar foto" : "Elegir foto"}<input type="file" accept="image/jpeg,image/png,image/webp" data-pet-photo class="agenda-visually-hidden"></label>
+          <button type="button" class="admin-button admin-button-light ${fotoUrl ? "" : "hidden"}" data-remove-pet-photo>Quitar foto</button>
+          <small data-photo-status>Fotografía opcional (JPG, PNG o WebP; máximo 5 MB).</small>
+        </div>
+      `
+      : "";
 
     return `
       <article class="agenda-service-block" data-service-block data-service-index="${index}" data-client-id="${escapeHtml(clientId)}" data-photo-url="${escapeHtml(fotoUrl)}" data-photo-public-id="${escapeHtml(servicio.fotoPublicId || "")}">
@@ -968,6 +988,7 @@ function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
           <strong>${escapeHtml(titulo)}</strong>
         </div>
         ${camposMascota}
+        ${camposVehiculo}
         <label>
           Tamaño o tipo
           <select data-service-category required>
@@ -1037,14 +1058,15 @@ function construirServiciosDetalleFormulario(prefijo = "") {
       notas: String(servicio.notas || "").trim().slice(0, 300)
     };
 
+    detalle.fotoUrl = String(servicio.fotoUrl || "").trim().slice(0, 1000);
+    detalle.fotoPublicId = String(servicio.fotoPublicId || "").trim().slice(0, 500);
+    if (Boolean(detalle.fotoUrl) !== Boolean(detalle.fotoPublicId)) {
+      throw new Error(`La fotografía de ${formatearServicio(tipo).toLowerCase()} ${index + 1} está incompleta. Quítala o vuelve a cargarla.`);
+    }
+
     if (normalizado.servicioTipo === "mascota") {
       detalle.mascotaNombre = String(servicio.mascotaNombre || "").trim().slice(0, 80);
       detalle.mascotaEdad = normalizarEdadMascotaServicio(servicio.mascotaEdad, index);
-      detalle.fotoUrl = String(servicio.fotoUrl || "").trim().slice(0, 1000);
-      detalle.fotoPublicId = String(servicio.fotoPublicId || "").trim().slice(0, 500);
-      if (Boolean(detalle.fotoUrl) !== Boolean(detalle.fotoPublicId)) {
-        throw new Error(`La fotografía de la mascota ${index + 1} está incompleta. Quítala o vuelve a cargarla.`);
-      }
     }
 
     return detalle;
@@ -2105,9 +2127,9 @@ function crearCardCita(cita) {
   const resumenServicios = obtenerResumenServiciosCita(cita);
   const listaServicios = crearListaServiciosDetalleHtml(cita);
   const badgeServicios = crearBadgeServiciosCita(cita);
-  const mascotas = obtenerServiciosVisualesCita(cita).filter((servicio) => servicio.tipo === "mascota");
+  const mascotas = obtenerServiciosVisualesCita(cita);
   const detailsId = `agenda-pets-${String(cita.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((pet) => `<article><span class="agenda-pet-thumb">${pet.fotoUrl ? `<img loading="lazy" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span><div><strong>${escapeHtml(pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, formatearEdadMascota(pet.mascotaEdad)].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.paquete ? `<p>Paquete: ${escapeHtml(pet.paquete)}</p>` : ""}${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>` : "";
+  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((item, index) => `<article><span class="agenda-pet-thumb">${item.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(item.fotoUrl)}" alt="Foto de ${item.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(item.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span><div><strong>${escapeHtml(item.tipo === "auto" ? `Vehículo ${index + 1}` : item.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([item.categoria, item.tipo === "mascota" ? formatearEdadMascota(item.mascotaEdad) : ""].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${item.paquete ? `<p>Paquete: ${escapeHtml(item.paquete)}</p>` : ""}${item.notas ? `<p>Indicaciones: ${escapeHtml(item.notas)}</p>` : ""}</div></article>`).join("")}</div>` : "";
   const detalleBloque = cita.duracionMinutos
     ? `<p class="agenda-appointment-notes">Duración: ${escapeHtml(cita.duracionMinutos)} min + ${escapeHtml(cita.trasladoMinutos || 0)} min traslado</p>`
     : "";
@@ -2490,6 +2512,7 @@ function crearMiniCardsServiciosHtml(cita) {
       <div class="agenda-detail-services-grid">
         ${servicios.map((servicio, index) => `
           <article class="agenda-detail-service-card">
+            <span class="agenda-pet-thumb">${servicio.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(servicio.fotoUrl)}" alt="Foto de ${servicio.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(servicio.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span>
             <span>${escapeHtml(`${formatearServicio(servicio.tipo)} ${index + 1}`)}</span>
             <strong>${escapeHtml(crearDetalleCortoServicio(servicio))}</strong>
             ${servicio.tipo === "mascota" && (servicio.mascotaNombre || Number.isInteger(servicio.mascotaEdad))
@@ -3741,7 +3764,7 @@ async function manejarFotoMascotaFormulario(event) {
   if (submitButton) submitButton.disabled = true;
   if (status) status.textContent = "Subiendo fotografía…";
   try {
-    const response = await fetch(`${obtenerApiBaseAgenda()}/admin/appointments/pet-photo`, {
+    const response = await fetch(`${obtenerApiBaseAgenda()}/admin/appointments/photo`, {
       method: "POST", headers: { "Content-Type": file.type, Authorization: `Bearer ${obtenerTokenAgenda()}` }, body: file
     });
     const data = await response.json().catch(() => ({}));
@@ -3751,7 +3774,7 @@ async function manejarFotoMascotaFormulario(event) {
     block.dataset.photoPublicId = data.fotoPublicId || data.publicId || "";
     const image = document.createElement("img");
     image.src = data.fotoUrl;
-    image.alt = `Foto de ${block.querySelector("[data-pet-name]")?.value || "mascota"}`;
+    image.alt = `Foto de ${block.querySelector("[data-pet-name]")?.value || "vehículo"}`;
     image.addEventListener("error", () => { preview.innerHTML = placeholderSinFotoHtml(); });
     preview.replaceChildren(image);
     removeButton?.classList.remove("hidden");
@@ -3823,6 +3846,149 @@ async function obtenerResumenManana() {
   }
 }
 
+function actualizarAccionesAdjuntosResumen(appointments = []) {
+  const urls = appointments.flatMap((appointment) =>
+    (Array.isArray(appointment.pets) ? appointment.pets : []).map((pet) => String(pet.photoUrl || "").trim())
+  ).filter((value) => {
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === "https:" || parsed.protocol === "http:";
+    } catch {
+      return false;
+    }
+  });
+  fotosResumenManana = [...new Set(urls)];
+  const actions = document.getElementById("agendaTomorrowPhotoActions");
+  const button = document.getElementById("btnCompartirFotosManana");
+  const notice = document.getElementById("agendaTomorrowPhotoNotice");
+  const gallery = document.getElementById("agendaTomorrowGallery");
+  actions?.classList.remove("hidden");
+  if (button) {
+    button.disabled = false;
+    button.textContent = "Compartir fotos";
+    button.classList.toggle("hidden", fotosResumenManana.length === 0);
+  }
+  if (notice) {
+    notice.textContent = fotosResumenManana.length ? "" : "Las citas de mañana no tienen fotografías disponibles.";
+    notice.classList.toggle("hidden", fotosResumenManana.length > 0);
+  }
+  if (gallery) { gallery.replaceChildren(); gallery.classList.add("hidden"); }
+}
+
+function obtenerUrlFotoResumenOptimizada(value) {
+  const url = new URL(value);
+  if (url.hostname.endsWith("cloudinary.com") && url.pathname.includes("/image/upload/")) {
+    url.pathname = url.pathname.replace("/image/upload/", "/image/upload/c_limit,w_1200/");
+  }
+  return url.href;
+}
+
+function extensionSeguraFoto(blob) {
+  const extensions = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+  return extensions[blob.type] || "jpg";
+}
+
+async function descargarFotoResumen(url, index) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(obtenerUrlFotoResumenOptimizada(url), { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    if (!blob.type.startsWith("image/") || blob.size === 0) throw new Error("El recurso no es una imagen válida");
+    if (blob.size > 15 * 1024 * 1024) throw new Error("La imagen es demasiado grande");
+    return {
+      file: new File([blob], `mascota-${index + 1}.${extensionSeguraFoto(blob)}`, { type: blob.type }),
+      sourceUrl: obtenerUrlFotoResumenOptimizada(url)
+    };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function mostrarAvisoFotosResumen(message) {
+  const notice = document.getElementById("agendaTomorrowPhotoNotice");
+  if (!notice) return;
+  notice.textContent = message;
+  notice.classList.toggle("hidden", !message);
+}
+
+function construirGaleriaFotosResumen(photos = []) {
+  const gallery = document.getElementById("agendaTomorrowGallery");
+  if (!gallery || !photos.length) return;
+  urlsObjetoFotosResumen.forEach((url) => URL.revokeObjectURL(url));
+  urlsObjetoFotosResumen = [];
+  const cards = photos.map((photo, index) => {
+    const objectUrl = URL.createObjectURL(photo.file);
+    urlsObjetoFotosResumen.push(objectUrl);
+    const card = document.createElement("article");
+    const image = document.createElement("img");
+    image.src = objectUrl;
+    image.alt = `Fotografía de mascota ${index + 1}`;
+    image.loading = "lazy";
+    image.decoding = "async";
+    const actions = document.createElement("div");
+    actions.className = "agenda-photo-gallery-actions";
+    const open = document.createElement("a");
+    open.href = photo.sourceUrl;
+    open.target = "_blank";
+    open.rel = "noopener noreferrer";
+    open.textContent = "Abrir foto";
+    const download = document.createElement("a");
+    download.href = objectUrl;
+    download.download = photo.file.name;
+    download.textContent = "Descargar";
+    actions.append(open, download);
+    card.append(image, actions);
+    return card;
+  });
+  gallery.replaceChildren(...cards);
+  gallery.classList.remove("hidden");
+}
+
+async function compartirFotosManana() {
+  const button = document.getElementById("btnCompartirFotosManana");
+  if (!fotosResumenManana.length) {
+    mostrarAvisoFotosResumen("Las citas de mañana no tienen fotografías disponibles.");
+    return;
+  }
+  if (button?.disabled) return;
+  if (button) { button.disabled = true; button.textContent = "Preparando fotos…"; }
+  mostrarAvisoFotosResumen("");
+  try {
+    const settled = await Promise.allSettled(fotosResumenManana.map(descargarFotoResumen));
+    const photos = settled.filter((result) => result.status === "fulfilled").map((result) => result.value);
+    const files = photos.map((photo) => photo.file);
+    if (!files.length) {
+      mostrarAvisoFotosResumen("No se pudo preparar ninguna fotografía. Puedes cerrar este aviso e intentarlo de nuevo.");
+      return;
+    }
+    let canShareFiles = false;
+    try {
+      canShareFiles = Boolean(navigator.share && navigator.canShare?.({ files }));
+    } catch {
+      canShareFiles = false;
+    }
+    if (canShareFiles) {
+      try {
+        await navigator.share({ files });
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        construirGaleriaFotosResumen(photos);
+        mostrarAvisoFotosResumen("No se pudo abrir el menú para compartir. Puedes abrir o descargar las fotos aquí.");
+      }
+    } else {
+      construirGaleriaFotosResumen(photos);
+      const failedCount = settled.length - photos.length;
+      mostrarAvisoFotosResumen(failedCount
+        ? `Se prepararon ${photos.length} fotos; ${failedCount} no se pudieron cargar.`
+        : "Tu navegador no permite compartir archivos directamente. Puedes abrir o descargar las fotos aquí.");
+    }
+  } finally {
+    if (button) { button.disabled = false; button.textContent = "Compartir fotos"; }
+  }
+}
+
 async function handleResumenMananaClick(event) {
   console.time("[RESUMEN] total");
   console.log("[RESUMEN] 1 click recibido");
@@ -3845,6 +4011,8 @@ async function handleResumenMananaClick(event) {
   mostrarEstadoResumenManana("Generando resumen…");
   if (meta) meta.textContent = "Mañana";
   if (textArea) textArea.value = "";
+  document.getElementById("agendaTomorrowPhotoActions")?.classList.add("hidden");
+  document.getElementById("agendaTomorrowGallery")?.classList.add("hidden");
   actionButtons.forEach((button) => { if (button) button.disabled = true; });
   try {
     console.log("[RESUMEN] 5 antes del fetch");
@@ -3852,6 +4020,7 @@ async function handleResumenMananaClick(event) {
     console.log("[RESUMEN] 6 después del fetch");
     const appointments = Array.isArray(data.appointments) ? data.appointments : [];
     const text = construirResumenManana(appointments);
+    actualizarAccionesAdjuntosResumen(appointments);
     if (meta) meta.textContent = `${formatearFechaAgenda(data.date)} - ${appointments.length} ${appointments.length === 1 ? "cita" : "citas"}`;
     if (textArea) textArea.value = text;
     actionButtons.forEach((button) => { if (button) button.disabled = false; });
@@ -3956,6 +4125,7 @@ async function configurarAgenda() {
     actualizarDisponibilidadCrear();
   });
   elementos.tipoServicio?.addEventListener("change", () => {
+    limpiarFotosBloquesFormulario("");
     actualizarCamposMascotaFormulario("", { limpiarSiAuto: true });
     actualizarCatalogoFormulario();
     actualizarPanelAplicarRecompensa();
@@ -3991,6 +4161,7 @@ async function configurarAgenda() {
   elementos.servicioPaquete?.addEventListener("change", actualizarDisponibilidadCrear);
   elementos.editTipoServicio?.addEventListener("change", () => {
     servicioEdicionActualizado = true;
+    limpiarFotosBloquesFormulario("edit");
     actualizarCamposMascotaFormulario("edit", { limpiarSiAuto: true });
     actualizarCatalogoEdicion();
     actualizarDisponibilidadEdicion();
@@ -4040,6 +4211,11 @@ async function configurarAgenda() {
   if (summaryButton && summaryButton.dataset.listenerBound !== "true") {
     summaryButton.addEventListener("click", handleResumenMananaClick);
     summaryButton.dataset.listenerBound = "true";
+  }
+  const sharePhotosButton = document.getElementById("btnCompartirFotosManana");
+  if (sharePhotosButton && sharePhotosButton.dataset.listenerBound !== "true") {
+    sharePhotosButton.addEventListener("click", compartirFotosManana);
+    sharePhotosButton.dataset.listenerBound = "true";
   }
   const cerrarResumen = () => {
     const modal = document.getElementById("agendaTomorrowModal");

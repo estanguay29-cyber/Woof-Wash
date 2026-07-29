@@ -145,8 +145,21 @@ test("DTO agrega fotos y detalles de mascotas sin exponer publicId", () => {
   assert.equal(event.clientEmail, "cliente@example.com");
   assert.equal(event.pets.length, 2);
   assert.deepEqual(event.pets[0], {
-    name: "Kayse", age: 9, category: "Grande", package: "Esencial", serviceName: "", notes: "Tratar con calma", photoUrl: "https://res.cloudinary.com/demo/image/upload/kayse.jpg"
+    type: "mascota", name: "Kayse", age: 9, category: "Grande", package: "Esencial", serviceName: "", notes: "Tratar con calma", photoUrl: "https://res.cloudinary.com/demo/image/upload/kayse.jpg"
   });
+  assert.equal(Object.hasOwn(event.pets[0], "fotoPublicId"), false);
+});
+
+test("DTO agrega foto de vehículo sin exponer publicId", () => {
+  const event = calendar.toCalendarEvent(appointment({
+    servicioTipo: "auto",
+    serviciosDetalle: [{
+      tipo: "auto", categoria: "Pick Up", paquete: "Lavado completo",
+      fotoUrl: "https://res.cloudinary.com/demo/image/upload/vehicle.jpg", fotoPublicId: "private-vehicle-id"
+    }]
+  }));
+  assert.equal(event.pets[0].type, "auto");
+  assert.equal(event.pets[0].photoUrl, "https://res.cloudinary.com/demo/image/upload/vehicle.jpg");
   assert.equal(Object.hasOwn(event.pets[0], "fotoPublicId"), false);
 });
 
