@@ -29,12 +29,16 @@ test("el control de resumen existe una vez y queda fuera del contenido dinamico"
   assert.match(html, /<button id="btnResumenManana" type="button"[^>]*>Resumen de mañana<\/button>/);
   assert.ok(html.indexOf('id="btnResumenManana"') < html.indexOf('id="agendaListView"'));
   assert.ok(html.indexOf('id="btnResumenManana"') < html.indexOf('id="agendaAppointmentsList"'));
+  assert.ok(html.indexOf('id="btnResumenManana"') < html.indexOf("<form"));
+  assert.match(html, /agenda\.js\?v=20260728-resumen-diagnostico-2/);
 });
 
 test("la configuracion del resumen evita duplicar su listener", () => {
   assert.match(agenda, /summaryButton\.dataset\.listenerBound !== "true"/);
   assert.match(agenda, /summaryButton\.dataset\.listenerBound = "true"/);
-  assert.match(agenda, /summaryButton\.addEventListener\("click", abrirResumenManana\)/);
+  assert.match(agenda, /summaryButton\.addEventListener\("click", handleResumenMananaClick\)/);
+  assert.equal((agenda.match(/summaryButton\.addEventListener\("click"/g) || []).length, 1);
+  assert.doesNotMatch(html, /btnResumenManana[^>]+onclick=/);
 });
 
 test("ver mas usa texto UTF-8 accesible y aria-expanded", () => {
@@ -55,31 +59,44 @@ test("el placeholder compartido y el bloqueo de carga estan conectados", () => {
 });
 
 test("el modal de manana abre antes de esperar datos o renderizado", () => {
-  const openSummary = sourceBetween("async function abrirResumenManana()", "function compartirFotosManana()");
-  assert.ok(openSummary.indexOf('modal?.classList.remove("hidden")') < openSummary.indexOf("await "));
-  assert.match(openSummary, /Generando resumen/);
+  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
+  assert.ok(handler.indexOf("abrirModalResumenManana()") < handler.indexOf("await obtenerResumenManana()"));
+  assert.ok(handler.indexOf('mostrarEstadoResumenManana("Generando resumen…")') < handler.indexOf("await obtenerResumenManana()"));
+  assert.match(styles, /\.agenda-modal[\s\S]*?position: fixed;[\s\S]*?z-index: 10030/);
+  assert.match(styles, /\.agenda-modal\.hidden[\s\S]*?display: none/);
 });
 
 test("generar el resumen hace una sola consulta dedicada y no usa la agenda cargada", () => {
-  const openSummary = sourceBetween("async function abrirResumenManana()", "function compartirFotosManana()");
-  assert.equal((openSummary.match(/agendaFetch\(/g) || []).length, 1);
-  assert.match(openSummary, /agendaFetch\("\/admin\/appointments\/tomorrow-summary"/);
-  assert.doesNotMatch(openSummary, /citasAgenda|mapearCitaApi|requestAnimationFrame|construirResumenMananaFluido/);
-  assert.doesNotMatch(openSummary, /fetch\(photo|\.blob\(|new File\(|navigator\.share/);
+  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
+  const request = sourceBetween("async function obtenerResumenManana()", "async function handleResumenMananaClick(event)");
+  assert.equal((request.match(/agendaFetch\(/g) || []).length, 1);
+  assert.match(request, /agendaFetch\("\/admin\/appointments\/tomorrow-summary"/);
+  assert.match(handler, /event\.preventDefault\(\)/);
+  assert.match(handler, /event\.stopPropagation\(\)/);
+  assert.doesNotMatch(handler, /citasAgenda|renderizarCitasAgenda|calendario|requestAnimationFrame|\.click\(|window\.open|foto|gallery|navigator\.share/);
 });
 
 test("la generacion evita concurrencia y siempre restaura el boton", () => {
-  const openSummary = sourceBetween("async function abrirResumenManana()", "function compartirFotosManana()");
-  assert.match(openSummary, /if \(resumenMananaEnProceso\) return/);
-  assert.match(openSummary, /trigger\.disabled = true/);
-  assert.match(openSummary, /finally/);
-  assert.match(openSummary, /trigger\.disabled = false/);
+  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
+  assert.match(handler, /if \(resumenMananaEnProceso\)/);
+  assert.match(handler, /trigger\.disabled = true/);
+  assert.match(handler, /finally/);
+  assert.match(handler, /trigger\.disabled = false/);
+  assert.match(handler, /No pudimos generar el resumen/);
 });
 
-test("las fotos solo crean una galeria manual bajo demanda", () => {
-  const sharePhotos = sourceBetween("function compartirFotosManana()", "async function configurarAgenda()");
-  assert.match(sharePhotos, /loading="lazy" decoding="async"/);
-  assert.doesNotMatch(sharePhotos, /fetch\(|\.blob\(|new File\(|navigator\.share|Promise\.allSettled/);
+test("el modal de resumen no contiene ni ejecuta fotografias", () => {
+  assert.doesNotMatch(html, /agendaTomorrowGallery|btnCompartirFotosManana/);
+  assert.doesNotMatch(agenda, /compartirFotosManana|agendaTomorrowGallery|btnCompartirFotosManana/);
+  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
+  assert.doesNotMatch(handler, /fetch\(photo|\.blob\(|new File\(|navigator\.share|MutationObserver/);
+});
+
+test("el modal conserva cierre independiente mientras la peticion esta pendiente", () => {
+  const config = sourceBetween("async function configurarAgenda()", "document.addEventListener(\"DOMContentLoaded\"");
+  assert.match(config, /btnCerrarResumenManana/);
+  assert.match(config, /modal\?\.classList\.add\("hidden"\)/);
+  assert.match(config, /document\.body\.classList\.remove\("agenda-modal-open"\)/);
 });
 
 test("WhatsApp usa el numero oficial y codifica el mensaje", () => {

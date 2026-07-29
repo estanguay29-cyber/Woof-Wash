@@ -1,5 +1,6 @@
 const AGENDA_API_URL = "https://woof-wash.onrender.com";
 const WOOF_WASH_WHATSAPP_NUMBER = "523337276934";
+console.log("[AGENDA] versión resumen diagnóstico 2");
 
 const AGENDA_SERVICE_ZONES_FALLBACK = [
   { value: "zona_1", label: "Zona 1", nombre: "Valle Real - Solares", mapImage: "img/Zona1.jpg" },
@@ -187,24 +188,6 @@ async function agendaFetch(path, options = {}) {
   }
 
   return data;
-}
-
-async function ejecutarPeticionConTimeout(executor, timeoutMs = 10000) {
-  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-  let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = window.setTimeout(() => {
-      controller?.abort();
-      const error = new Error("Tiempo de espera agotado");
-      error.name = "TimeoutError";
-      reject(error);
-    }, timeoutMs);
-  });
-  try {
-    return await Promise.race([executor(controller?.signal), timeoutPromise]);
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
 }
 
 function inicializarCalendarioAgenda() {
@@ -3815,64 +3798,72 @@ function construirResumenManana(appointments = []) {
   }).join("\n\n━━━━━━━━━━━━━\n\n");
 }
 
-async function abrirResumenManana() {
+function abrirModalResumenManana() {
   const modal = document.getElementById("agendaTomorrowModal");
-  const notice = document.getElementById("agendaTomorrowNotice");
-  const trigger = document.getElementById("btnResumenManana");
-  const textArea = document.getElementById("agendaTomorrowText");
-  const meta = document.getElementById("agendaTomorrowMeta");
-  const share = document.getElementById("btnCompartirFotosManana");
-  const gallery = document.getElementById("agendaTomorrowGallery");
   modal?.classList.remove("hidden");
   modal?.setAttribute("aria-hidden", "false");
   document.body.classList.add("agenda-modal-open");
-  if (resumenMananaEnProceso) return;
+}
+
+function mostrarEstadoResumenManana(message) {
+  const notice = document.getElementById("agendaTomorrowNotice");
+  if (notice) {
+    notice.textContent = message;
+    notice.classList.remove("hidden");
+  }
+}
+
+async function obtenerResumenManana() {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 9000);
+  try {
+    return await agendaFetch("/admin/appointments/tomorrow-summary", { signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function handleResumenMananaClick(event) {
+  console.time("[RESUMEN] total");
+  console.log("[RESUMEN] 1 click recibido");
+  console.log("[RESUMEN] 2 antes de preventDefault");
+  event.preventDefault();
+  event.stopPropagation();
+  if (resumenMananaEnProceso) {
+    console.timeEnd("[RESUMEN] total");
+    return;
+  }
   resumenMananaEnProceso = true;
+  const trigger = document.getElementById("btnResumenManana");
+  const textArea = document.getElementById("agendaTomorrowText");
+  const meta = document.getElementById("agendaTomorrowMeta");
+  const actionButtons = [document.getElementById("btnCopiarResumenManana"), document.getElementById("btnWhatsAppResumenManana")];
   if (trigger) { trigger.disabled = true; trigger.textContent = "Generando…"; }
-  if (notice) { notice.textContent = "Generando resumen…"; notice.classList.remove("hidden"); }
+  console.log("[RESUMEN] 3 antes de abrir modal");
+  abrirModalResumenManana();
+  console.log("[RESUMEN] 4 después de abrir modal");
+  mostrarEstadoResumenManana("Generando resumen…");
   if (meta) meta.textContent = "Mañana";
   if (textArea) textArea.value = "";
-  [document.getElementById("btnCopiarResumenManana"), document.getElementById("btnWhatsAppResumenManana")].forEach((button) => { if (button) button.disabled = true; });
-  if (share) { share.classList.add("hidden"); share._appointments = []; }
-  if (gallery) { gallery.classList.add("hidden"); gallery.replaceChildren(); }
+  actionButtons.forEach((button) => { if (button) button.disabled = true; });
   try {
-    const data = await ejecutarPeticionConTimeout(
-      (signal) => agendaFetch("/admin/appointments/tomorrow-summary", { signal }),
-      9000
-    );
+    console.log("[RESUMEN] 5 antes del fetch");
+    const data = await obtenerResumenManana();
+    console.log("[RESUMEN] 6 después del fetch");
     const appointments = Array.isArray(data.appointments) ? data.appointments : [];
     const text = construirResumenManana(appointments);
     if (meta) meta.textContent = `${formatearFechaAgenda(data.date)} - ${appointments.length} ${appointments.length === 1 ? "cita" : "citas"}`;
     if (textArea) textArea.value = text;
-    const hasPhotos = appointments.some((appointment) => (appointment.pets || []).some((pet) => pet.photoUrl));
-    share?.classList.toggle("hidden", !hasPhotos);
-    if (share) share._appointments = appointments;
-    [document.getElementById("btnCopiarResumenManana"), document.getElementById("btnWhatsAppResumenManana")].forEach((button) => { if (button) button.disabled = false; });
+    actionButtons.forEach((button) => { if (button) button.disabled = false; });
+    const notice = document.getElementById("agendaTomorrowNotice");
     if (notice) { notice.textContent = ""; notice.classList.add("hidden"); }
   } catch (error) {
-    console.error("No se pudo generar el resumen de mañana", { name: error?.name || "Error" });
-    if (notice) { notice.textContent = "No pudimos generar el resumen. Intenta nuevamente."; notice.classList.remove("hidden"); }
+    console.error("[RESUMEN] Error al generar resumen");
+    mostrarEstadoResumenManana("No pudimos generar el resumen. Intenta nuevamente.");
   } finally {
     resumenMananaEnProceso = false;
     if (trigger) { trigger.disabled = false; trigger.textContent = "Resumen de mañana"; }
-  }
-}
-
-function compartirFotosManana() {
-  const button = document.getElementById("btnCompartirFotosManana");
-  const photos = (button?._appointments || []).flatMap((appointment) => (appointment.pets || []).filter((pet) => pet.photoUrl).map((pet) => ({ ...pet, time: appointment.time })));
-  const gallery = document.getElementById("agendaTomorrowGallery");
-  const notice = document.getElementById("agendaTomorrowNotice");
-  if (!photos.length) {
-    if (!photos.length && notice) {
-      notice.textContent = "No hay fotografías disponibles para compartir.";
-      notice.classList.remove("hidden");
-    }
-    return;
-  }
-  if (gallery) {
-    gallery.innerHTML = photos.map((photo) => `<a href="${escapeHtml(photo.photoUrl)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" decoding="async" src="${escapeHtml(photo.photoUrl)}" alt="${escapeHtml(photo.name || "Mascota")} ${escapeHtml(photo.time || "")}"><span>${escapeHtml(photo.name || "Mascota")} - ${escapeHtml(photo.time || "")}</span></a>`).join("");
-    gallery.classList.remove("hidden");
+    console.timeEnd("[RESUMEN] total");
   }
 }
 
@@ -4047,7 +4038,7 @@ async function configurarAgenda() {
   elementos.editForm?.addEventListener("submit", guardarEdicionCita);
   const summaryButton = document.getElementById("btnResumenManana");
   if (summaryButton && summaryButton.dataset.listenerBound !== "true") {
-    summaryButton.addEventListener("click", abrirResumenManana);
+    summaryButton.addEventListener("click", handleResumenMananaClick);
     summaryButton.dataset.listenerBound = "true";
   }
   const cerrarResumen = () => {
@@ -4065,7 +4056,6 @@ async function configurarAgenda() {
     const popup = window.open(`https://wa.me/${WOOF_WASH_WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
     if (!popup) alert("WhatsApp no pudo abrirse. Revisa los permisos de ventanas emergentes.");
   });
-  document.getElementById("btnCompartirFotosManana")?.addEventListener("click", compartirFotosManana);
 
   document.querySelectorAll("[data-quick-filter]").forEach((button) => {
     button.addEventListener("click", () => aplicarFiltroRapido(button.dataset.quickFilter));
