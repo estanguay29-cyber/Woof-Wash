@@ -8,6 +8,7 @@ const vm = require("node:vm");
 
 const componentPath = path.join(__dirname, "..", "shared", "appointments-calendar.js");
 const source = fs.readFileSync(componentPath, "utf8");
+const componentCss = fs.readFileSync(path.join(__dirname, "..", "shared", "appointments-calendar.css"), "utf8");
 const context = { module: { exports: {} }, exports: {}, console, URL };
 vm.runInNewContext(source, context, { filename: componentPath });
 const calendar = context.module.exports;
@@ -89,4 +90,36 @@ test("deriva Google Maps solo desde direccion o coordenadas", () => {
   assert.equal(calendar.locationUrlFromAddress("Coordenadas 20.6736, -103.4054"), "https://www.google.com/maps?q=20.6736%2C-103.4054");
   assert.equal(calendar.locationUrlFromAddress("Calle sin enlace"), "");
   assert.equal(calendar.locationUrlFromAddress("https://example.com/no-es-maps"), "");
+});
+
+test("prioriza locationUrl HTTPS y conserva el fallback de dirección", () => {
+  assert.equal(calendar.resolveLocationUrl("https://maps.google.com/new", "Calle https://maps.app.goo.gl/old"), "https://maps.google.com/new");
+  assert.equal(calendar.resolveLocationUrl("javascript:alert(1)", "Calle https://maps.app.goo.gl/old"), "https://maps.app.goo.gl/old");
+  assert.equal(calendar.resolveLocationUrl("blob:https://example.com/id", "Sin enlace"), "");
+  assert.equal(calendar.resolveLocationUrl("https://example.com/map", "Sin enlace"), "");
+});
+
+test("el visor compartido cubre fotos de agenda, calendario y empleados", () => {
+  for (const selector of ["agenda-pet-photo-preview", "agenda-pet-thumb", "appointments-calendar-pet-photo", "employee-pet-photo"]) {
+    assert.match(source, new RegExp(`\\.${selector} img`));
+  }
+  assert.match(source, /document\.documentElement\.dataset\.wwImageLightboxBound/);
+  assert.match(source, /image\.src = source\.currentSrc \|\| source\.src/);
+  assert.doesNotMatch(source.slice(source.indexOf("function initializeImageLightbox"), source.indexOf("function civilDateParts")), /fetch\(|Blob|base64|createObjectURL/);
+});
+
+test("el visor cierra por botón, Escape y fondo y restaura el foco", () => {
+  assert.match(source, /close\.addEventListener\("click", closeLightbox\)/);
+  assert.match(source, /event\.key === "Escape"/);
+  assert.match(source, /event\.target === overlay \|\| event\.target === dialog/);
+  assert.match(source, /document\.body\.classList\.remove\("ww-image-lightbox-open"\)/);
+  assert.match(source, /trigger\?\.focus\?\.\(\)/);
+  assert.match(source, /event\.key === "Enter" \|\| event\.key === " "/);
+});
+
+test("el visor mantiene proporción, margen móvil y cursor de ampliación", () => {
+  assert.match(componentCss, /cursor:zoom-in/);
+  assert.match(componentCss, /\.ww-image-lightbox-image\{[^}]*max-width:100%;[^}]*max-height:[^}]*width:auto;[^}]*height:auto;[^}]*object-fit:contain/);
+  assert.match(componentCss, /touch-action:pinch-zoom/);
+  assert.match(componentCss, /@media\(max-width:430px\)\{\.ww-image-lightbox\{padding:10px\}/);
 });

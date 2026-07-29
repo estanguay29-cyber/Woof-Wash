@@ -204,6 +204,33 @@ function locationUrlFromAddress(address) {
   return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
 }
 
+function normalizeExplicitLocationUrl(value) {
+  const candidate = String(value || "").trim();
+  if (!candidate) return "";
+  if (candidate.length > 1000) throw new CalendarValidationError("locationUrl excede el máximo de 1000 caracteres");
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== "https:") throw new Error("protocol");
+    const host = parsed.hostname.toLowerCase();
+    if (!(host === "maps.app.goo.gl" || host === "goo.gl" || host === "maps.google.com" || host.endsWith(".google.com"))) {
+      throw new Error("host");
+    }
+    return parsed.href;
+  } catch {
+    throw new CalendarValidationError("locationUrl debe ser una URL HTTPS válida de Google Maps");
+  }
+}
+
+function resolveLocationUrl(locationUrl, address) {
+  try {
+    const explicit = normalizeExplicitLocationUrl(locationUrl);
+    if (explicit) return explicit;
+  } catch {
+    // Los DTO toleran documentos históricos inválidos y usan la dirección como respaldo.
+  }
+  return locationUrlFromAddress(address);
+}
+
 function toCalendarEvent(appointment = {}) {
   const source = typeof appointment.toObject === "function" ? appointment.toObject() : appointment;
   const status = String(source.estado || "pendiente").trim() || "pendiente";
@@ -237,7 +264,7 @@ function toCalendarEvent(appointment = {}) {
     clientEmail: String(source.clienteEmail || ""),
     ...subject,
     address: String(source.direccion || ""),
-    locationUrl: locationUrlFromAddress(source.direccion),
+    locationUrl: resolveLocationUrl(source.locationUrl, source.direccion),
     zone: String(source.zona || ""),
     assignedEmployees: normalizeAssignedEmployees(source),
     totalCharged: Number.isFinite(source.totalCobrado) ? source.totalCobrado : null,
@@ -357,6 +384,8 @@ module.exports = {
   normalizeAssignedEmployees,
   normalizeVisibleStatus,
   locationUrlFromAddress,
+  normalizeExplicitLocationUrl,
+  resolveLocationUrl,
   toCalendarEvent,
   deduplicateCalendarEvents,
   sortCalendarEvents,

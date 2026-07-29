@@ -982,6 +982,7 @@ const APPOINTMENT_CREATE_FIELDS = Object.freeze([
   "hora",
   "zona",
   "direccion",
+  "locationUrl",
   "notas",
   "atendidoPor",
   "empleadoAsignadoId",
@@ -1021,6 +1022,7 @@ const APPOINTMENT_UPDATE_FIELDS = Object.freeze([
   "hora",
   "zona",
   "direccion",
+  "locationUrl",
   "notas",
   "atendidoPor",
   "empleadoAsignadoId",
@@ -2707,6 +2709,14 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(body || {}, "locationUrl")) {
+    try {
+      datos.locationUrl = appointmentCalendarService.normalizeExplicitLocationUrl(body.locationUrl);
+    } catch (error) {
+      errores.push(error.message || "locationUrl no es válido");
+    }
+  }
+
   const zonaAutomatica = obtenerZonaAutomaticaAgenda(datos.fecha);
   if (zonaAutomatica) {
     datos.zona = zonaAutomatica;
@@ -2874,6 +2884,7 @@ function construirCitaAdmin(cita) {
     finBloque: obj.finBloque || 0,
     zona: obj.zona || "",
     direccion: obj.direccion || "",
+    locationUrl: String(obj.locationUrl || "").trim(),
     notas: obj.notas || "",
     atendidoPor: obj.atendidoPor || "",
     empleadoAsignadoId: obj.empleadoAsignadoId ? obtenerIdEmpleadoAsignadoValor(obj.empleadoAsignadoId) : (empleadosAsignadosIds[0] || ""),
@@ -2938,6 +2949,7 @@ function construirCitaEmpleado(cita) {
     hora: base.hora,
     zona: base.zona,
     direccion: base.direccion,
+    locationUrl: appointmentCalendarService.resolveLocationUrl(base.locationUrl, base.direccion),
     notas: base.notas,
     empleadoAsignadoId: base.empleadoAsignadoId,
     empleadoAsignadoNombre: base.empleadoAsignadoNombre,
@@ -6967,6 +6979,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       "finBloque",
       "zona",
       "direccion",
+      "locationUrl",
       "notas",
       "atendidoPor",
       "empleadoAsignadoId",

@@ -134,6 +134,17 @@ test("DTO deriva ubicacion desde el campo direccion existente", () => {
   assert.equal(unavailable.locationUrl, "");
 });
 
+test("DTO prioriza locationUrl explícito sin exponer identificadores de foto", () => {
+  const event = calendar.toCalendarEvent(appointment({
+    locationUrl: "https://maps.google.com/new-place",
+    direccion: "Calle https://maps.app.goo.gl/legacy",
+    serviciosDetalle: [{ tipo: "auto", categoria: "SUV", paquete: "Lavado", fotoUrl: "https://example.com/car.jpg", fotoPublicId: "secret" }]
+  }));
+  assert.equal(event.locationUrl, "https://maps.google.com/new-place");
+  assert.equal(event.pets[0].photoUrl, "https://example.com/car.jpg");
+  assert.equal(Object.hasOwn(event.pets[0], "fotoPublicId"), false);
+});
+
 test("DTO agrega fotos y detalles de mascotas sin exponer publicId", () => {
   const event = calendar.toCalendarEvent(appointment({
     clienteEmail: "cliente@example.com",

@@ -491,7 +491,8 @@ function renderMascotasCitaEmpleado(cita = {}) {
   const pets = serviciosCita(cita);
   if (!pets.length) return "";
   const id = `employee-pets-${String(cita.id || cita._id || "item").replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver más</button><div id="${id}" class="employee-pets-detail hidden">${pets.map((pet, index) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${pet.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoEmpleado()}</span><div><strong>${escapeHtml(pet.tipo === "auto" ? `Vehículo ${index + 1}` : pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} años` : "", pet.paquete].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
+  const tipo = pets[0]?.tipo === "auto" ? "vehículos" : "mascotas";
+  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver más</button><div id="${id}" class="employee-pets-detail hidden"><p><strong>${pets.length} ${pets.length === 1 ? tipo.slice(0, -1) : tipo}</strong></p>${cita.notas ? `<p><strong>Indicaciones de la cita:</strong> ${escapeHtml(cita.notas)}</p>` : ""}${pets.map((pet, index) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${pet.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoEmpleado()}</span><div><strong>${escapeHtml(pet.tipo === "auto" ? `Vehículo ${index + 1}` : pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} años` : "", pet.paquete || pet.nombre].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
 }
 
 function renderAdminEmployeeAppointmentPhone(value) {
@@ -502,9 +503,9 @@ function renderAdminEmployeeAppointmentPhone(value) {
   return `<a class="appointment-phone" href="tel:${escapeHtml(telValue)}" aria-label="Llamar al cliente al ${escapeHtml(display)}">&#128222; ${escapeHtml(display)}</a>`;
 }
 
-function renderAdminEmployeeLocation(address) {
-  const url = window.WoofWashAppointmentsCalendar?.locationUrlFromAddress?.(address || "") || "";
-  return url ? `<a class="appointment-location" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps</a>` : "";
+function renderAdminEmployeeLocation(cita = {}) {
+  const url = window.WoofWashAppointmentsCalendar?.resolveLocationUrl?.(cita.locationUrl || "", cita.direccion || "") || "";
+  return url ? `<a class="appointment-location" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Ver ubicación</a>` : "";
 }
 
 function metricState(value, type = "neutral") {
@@ -865,7 +866,7 @@ function renderCitasDashboard(citas = [], fecha = fechaLocalISO()) {
         <div class="appointment-meta">
           ${tieneDato(cita.totalCobrado) ? `<span class="appointment-total">${escapeHtml(formatoMoneda(cita.totalCobrado))}</span>` : ""}
           ${cita.direccion ? `<p>${escapeHtml(cita.direccion)}</p>` : ""}
-          ${renderAdminEmployeeLocation(cita.direccion)}
+          ${renderAdminEmployeeLocation(cita)}
         </div>
         <ul>
           ${servicios.map((servicio, index) => `<li>${escapeHtml(textoServicio(servicio, index))}</li>`).join("")}

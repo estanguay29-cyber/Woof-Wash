@@ -8,6 +8,99 @@
   const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
   const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
   const MOBILE_BREAKPOINT = 700;
+  const ZOOMABLE_IMAGE_SELECTOR = [
+    ".agenda-pet-photo-preview img",
+    ".agenda-pet-thumb img",
+    ".appointments-calendar-pet-photo img",
+    ".employee-pet-photo img"
+  ].join(",");
+
+  function initializeImageLightbox() {
+    if (typeof document === "undefined" || document.documentElement.dataset.wwImageLightboxBound === "true") return;
+    document.documentElement.dataset.wwImageLightboxBound = "true";
+    const overlay = document.createElement("div");
+    overlay.className = "ww-image-lightbox hidden";
+    overlay.setAttribute("aria-hidden", "true");
+    const dialog = document.createElement("div");
+    dialog.className = "ww-image-lightbox-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-label", "Visor de fotografía");
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "ww-image-lightbox-close";
+    close.setAttribute("aria-label", "Cerrar fotografía ampliada");
+    close.textContent = "×";
+    const image = document.createElement("img");
+    image.className = "ww-image-lightbox-image";
+    dialog.append(close, image);
+    overlay.append(dialog);
+    document.body.append(overlay);
+    let trigger = null;
+
+    const decorate = (candidate) => {
+      if (!candidate?.matches?.(ZOOMABLE_IMAGE_SELECTOR)) return;
+      candidate.tabIndex = 0;
+      candidate.setAttribute("role", "button");
+      candidate.setAttribute("aria-label", `Ampliar ${candidate.alt || "fotografía"}`);
+    };
+    const open = (source) => {
+      if (!source?.currentSrc && !source?.src) return;
+      trigger = source;
+      image.src = source.currentSrc || source.src;
+      image.alt = source.alt || "Fotografía ampliada";
+      overlay.classList.remove("hidden");
+      overlay.setAttribute("aria-hidden", "false");
+      document.body.classList.add("ww-image-lightbox-open");
+      close.focus();
+    };
+    const closeLightbox = () => {
+      if (overlay.classList.contains("hidden")) return;
+      overlay.classList.add("hidden");
+      overlay.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("ww-image-lightbox-open");
+      image.removeAttribute("src");
+      trigger?.focus?.();
+      trigger = null;
+    };
+
+    document.querySelectorAll(ZOOMABLE_IMAGE_SELECTOR).forEach(decorate);
+    if (typeof MutationObserver !== "undefined") {
+      new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => mutation.addedNodes.forEach((node) => {
+          decorate(node);
+          node.querySelectorAll?.(ZOOMABLE_IMAGE_SELECTOR).forEach(decorate);
+        }));
+      }).observe(document.body, { childList: true, subtree: true });
+    }
+    document.addEventListener("click", (event) => {
+      const source = event.target.closest?.(ZOOMABLE_IMAGE_SELECTOR);
+      if (source) open(source);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !overlay.classList.contains("hidden")) {
+        event.preventDefault();
+        closeLightbox();
+        return;
+      }
+      if (event.key === "Tab" && !overlay.classList.contains("hidden")) {
+        event.preventDefault();
+        close.focus();
+        return;
+      }
+      const source = event.target.matches?.(ZOOMABLE_IMAGE_SELECTOR) ? event.target : null;
+      if (source && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        open(source);
+      }
+    });
+    document.addEventListener("mouseover", (event) => decorate(event.target));
+    document.addEventListener("focusin", (event) => decorate(event.target));
+    close.addEventListener("click", closeLightbox);
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay || event.target === dialog) closeLightbox();
+    });
+  }
 
   function civilDateParts(value) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
@@ -114,6 +207,20 @@
     const longitude = Number(coordinates[2]);
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return "";
     return `https://www.google.com/maps?q=${encodeURIComponent(`${latitude},${longitude}`)}`;
+  }
+
+  function resolveLocationUrl(locationUrl, address) {
+    const candidate = String(locationUrl || "").trim();
+    if (candidate) {
+      try {
+        const parsed = new URL(candidate);
+        const host = parsed.hostname.toLowerCase();
+        if (parsed.protocol === "https:" && (host === "maps.app.goo.gl" || host === "goo.gl" || host === "maps.google.com" || host.endsWith(".google.com"))) return parsed.href;
+      } catch {
+        // Usa la dirección como respaldo si el enlace explícito no es seguro.
+      }
+    }
+    return locationUrlFromAddress(address);
   }
 
   function noPhotoPlaceholderHtml() {
@@ -223,7 +330,7 @@
       link.href = value;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
-      link.textContent = "Abrir en Google Maps";
+      link.textContent = "Ver ubicación";
       description.append(link);
     } else description.textContent = "No disponible";
     wrapper.append(term, description);
@@ -330,7 +437,7 @@
         ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(appointment.totalCharged)
         : "Sin monto registrado";
       const subjectLabel = appointment.subjectType === "mascota" ? "Mascota" : appointment.subjectType === "vehiculo" ? "Vehículo" : "Servicio";
-      const locationUrl = appointment.locationUrl || locationUrlFromAddress(appointment.address);
+      const locationUrl = resolveLocationUrl(appointment.locationUrl, appointment.address);
       content.replaceChildren(
         sharedDetailField("Fecha", formatDetailDate(appointment.date)),
         sharedDetailField("Horario", appointment.endTime ? `${appointment.time} a ${appointment.endTime}` : appointment.time),
@@ -564,6 +671,8 @@
     return api;
   }
 
+  if (typeof document !== "undefined") initializeImageLightbox();
+
   return {
     addCivilDays,
     visibleRangeToInclusive,
@@ -572,6 +681,7 @@
     normalizePhoneForTel,
     formatPhoneDisplay,
     locationUrlFromAddress,
+    resolveLocationUrl,
     noPhotoPlaceholderHtml,
     replaceWithNoPhotoPlaceholder,
     deduplicateEvents,

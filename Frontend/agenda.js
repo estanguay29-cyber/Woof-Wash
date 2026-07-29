@@ -1887,6 +1887,7 @@ function mapearCitaApi(cita) {
     hora: cita.hora || "",
     zona: normalizarZonaAgenda(cita.zona),
     direccion: cita.direccion || "",
+    locationUrl: String(cita.locationUrl || ""),
     notas: cita.notas || "",
     atendidoPor: cita.atendidoPor || "",
     empleadoAsignadoId: empleadosAsignados[0] || "",
@@ -2398,13 +2399,16 @@ function formatearServicio(servicio) {
 }
 
 function obtenerUrlUbicacionCita(cita = {}) {
-  return window.WoofWashAppointmentsCalendar?.locationUrlFromAddress?.(cita.direccion || cita.address || "") || "";
+  return window.WoofWashAppointmentsCalendar?.resolveLocationUrl?.(
+    cita.locationUrl || "",
+    cita.direccion || cita.address || ""
+  ) || "";
 }
 
 function crearEnlaceUbicacionAgenda(cita = {}) {
   const url = obtenerUrlUbicacionCita(cita);
   if (!url) return "No disponible";
-  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Abrir en Google Maps</a>`;
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Ver ubicación</a>`;
 }
 
 function normalizarServiciosDetalleCita(cita) {
@@ -2739,6 +2743,7 @@ function construirPayloadFormulario(form, prefijo = "") {
         fecha: "editFechaCita",
         hora: "editHoraCita",
         direccion: "editDireccionCita",
+        locationUrl: "editLocationUrlCita",
         notas: "editNotasCita"
       }
     : {
@@ -2754,6 +2759,7 @@ function construirPayloadFormulario(form, prefijo = "") {
         fecha: "fechaCita",
         hora: "horaCita",
         direccion: "direccionCita",
+        locationUrl: "locationUrlCita",
         notas: "notasCita"
       };
   const get = (name) => String(data.get(names[name]) || "").trim();
@@ -2812,6 +2818,7 @@ function construirPayloadFormulario(form, prefijo = "") {
     hora: get("hora"),
     zona: zonaAutomatica || zonaFormulario,
     direccion: get("direccion"),
+    locationUrl: get("locationUrl"),
     notas: get("notas")
   };
 
@@ -2947,6 +2954,7 @@ function abrirModalEdicion(id) {
   editForm.elements.editFechaCita.value = cita.fecha;
   editForm.elements.editZonaCita.value = obtenerZonaAutomaticaFormulario(cita.fecha) || normalizarZonaAgenda(cita.zona);
   editForm.elements.editDireccionCita.value = cita.direccion;
+  editForm.elements.editLocationUrlCita.value = cita.locationUrl || "";
   editForm.elements.editNotasCita.value = cita.notas;
   const editAtendidoPor = editForm.elements.namedItem("editAtendidoPor");
   if (editAtendidoPor) {

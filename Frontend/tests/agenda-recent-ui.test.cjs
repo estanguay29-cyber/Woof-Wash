@@ -175,3 +175,41 @@ test("Camioneta pickup conserva el valor interno histórico Pick Up", () => {
   assert.match(clientPortalHtml, /<option value="Pick Up">Camioneta pickup<\/option>/);
   assert.doesNotMatch(agenda, /label: "Levantar"/);
 });
+
+test("formularios crean y editan locationUrl sin reemplazar dirección", () => {
+  assert.match(html, /id="locationUrlCita"[^>]*type="url"[^>]*maxlength="1000"/);
+  assert.match(html, /id="editLocationUrlCita"[^>]*type="url"[^>]*maxlength="1000"/);
+  const payload = sourceBetween("function construirPayloadFormulario", "async function crearCitaDesdeFormulario");
+  assert.match(payload, /locationUrl: "editLocationUrlCita"/);
+  assert.match(payload, /locationUrl: "locationUrlCita"/);
+  assert.match(payload, /direccion: get\("direccion"\)/);
+  assert.match(payload, /locationUrl: get\("locationUrl"\)/);
+  assert.match(agenda, /editLocationUrlCita\.value = cita\.locationUrl \|\| ""/);
+});
+
+test("Agenda resuelve ubicación centralmente y genera un enlace seguro", () => {
+  const location = sourceBetween("function obtenerUrlUbicacionCita", "function crearDetalleServiciosHistorialHtml");
+  assert.match(location, /resolveLocationUrl/);
+  assert.match(location, /cita\.locationUrl/);
+  assert.match(location, /target="_blank"/);
+  assert.match(location, /rel="noopener noreferrer"/);
+  assert.match(location, />Ver ubicación<\/a>/);
+});
+
+test("empleados muestran información enriquecida sin consultas al expandir", () => {
+  for (const sourceFile of [employeeJs, employeePortal]) {
+    assert.match(sourceFile, /data-employee-pets-toggle/);
+    assert.match(sourceFile, /Ver más/);
+    assert.match(sourceFile, /Ver menos/);
+    assert.match(sourceFile, /Indicaciones de la cita:/);
+    assert.match(sourceFile, /employee-pet-photo/);
+    assert.match(sourceFile, /placeholderSinFotoEmpleado\(\)/);
+    assert.match(sourceFile, /resolveLocationUrl/);
+    assert.match(sourceFile, /target="_blank" rel="noopener noreferrer">Ver ubicación/);
+    const toggleStart = sourceFile.indexOf('event.target.closest("[data-employee-pets-toggle]")');
+    assert.ok(toggleStart > 0);
+    assert.doesNotMatch(sourceFile.slice(toggleStart, toggleStart + 500), /fetch\(/);
+  }
+  assert.match(calendar, /\.employee-pet-photo img/);
+  assert.equal((calendar.match(/function initializeImageLightbox\(/g) || []).length, 1);
+});

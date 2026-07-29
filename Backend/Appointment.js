@@ -229,6 +229,12 @@ const AppointmentSchema = new mongoose.Schema(
       trim: true,
       maxlength: 240
     },
+    locationUrl: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: ""
+    },
     notas: {
       type: String,
       trim: true,
