@@ -1095,6 +1095,24 @@ input {
   background: var(--green);
 }
 
+.appointment-card.is-confirmada::before {
+  background: #2563eb;
+}
+
+.appointment-card.is-confirmada .appointment-head span {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.appointment-card.is-completada::before {
+  background: #5c9424;
+}
+
+.appointment-card.is-completada .appointment-head span {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .appointment-head {
   display: flex;
   align-items: center;

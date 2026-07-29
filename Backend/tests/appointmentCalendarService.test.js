@@ -2,6 +2,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const calendar = require("../services/appointmentCalendarService");
 
 function appointment(overrides = {}) {
@@ -209,4 +211,41 @@ test("rechaza rol desconocido y empleado sin identidad", async () => {
     calendar.queryCalendarAppointments({ AppointmentModel: model, startDate: "2026-07-21", endDate: "2026-07-21", role: "empleado" }),
     /empleado es obligatorio/
   );
+});
+
+test("resumen de manana consulta un solo dia, excluye canceladas y usa proyeccion lean", async () => {
+  const calls = { filter: null, projection: "", sort: null, lean: 0 };
+  const rows = [
+    appointment({ _id: "late", fecha: "2026-07-29", hora: "17:00" }),
+    appointment({ _id: "early", fecha: "2026-07-29", hora: "08:00", serviciosDetalle: [{ tipo: "mascota", mascotaNombre: "Kayse", mascotaEdad: 9, categoria: "Husky", paquete: "Esencial", fotoUrl: "https://example.com/kayse.jpg", fotoPublicId: "secret" }] })
+  ];
+  const model = {
+    find(filter) {
+      calls.filter = filter;
+      const query = {
+        select(value) { calls.projection = value; return query; },
+        sort(value) { calls.sort = value; return query; },
+        lean() { calls.lean += 1; return Promise.resolve(rows); }
+      };
+      return query;
+    }
+  };
+  const result = await calendar.queryTomorrowSummary({
+    AppointmentModel: model,
+    now: new Date("2026-07-28T18:00:00.000Z")
+  });
+  assert.equal(result.date, "2026-07-29");
+  assert.deepEqual(calls.filter, { fecha: "2026-07-29", estado: { $ne: "cancelada" } });
+  assert.deepEqual(calls.sort, { hora: 1, _id: 1 });
+  assert.equal(calls.lean, 1);
+  assert.match(calls.projection, /clienteNombre/);
+  assert.doesNotMatch(calls.projection, /fotoPublicId/);
+  assert.equal(result.appointments.length, 2);
+  assert.equal(result.appointments[1].pets[0].name, "Kayse");
+  assert.equal(Object.hasOwn(result.appointments[1].pets[0], "fotoPublicId"), false);
+});
+
+test("endpoint de resumen requiere autenticacion administrativa", () => {
+  const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+  assert.match(server, /app\.get\("\/admin\/appointments\/tomorrow-summary", auth, requireAdmin,/);
 });

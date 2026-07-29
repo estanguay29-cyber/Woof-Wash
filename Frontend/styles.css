@@ -8009,6 +8009,14 @@ body {
   background: #0b2a6b;
 }
 
+.agenda-appointment-card.is-confirmada::before {
+  background: #2563eb;
+}
+
+.agenda-appointment-card.is-completada::before {
+  background: #5c9424;
+}
+
 .agenda-appointment-main {
   display: flex;
   justify-content: space-between;
@@ -8234,8 +8242,8 @@ body {
 }
 
 .agenda-status-badge.is-confirmada {
-  background: rgba(140, 198, 63, 0.16);
-  color: #4f7f19;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .agenda-status-badge.is-en_camino {

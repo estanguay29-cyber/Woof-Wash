@@ -6,6 +6,13 @@ const BUSINESS_TIME_ZONE = "America/Mexico_City";
 const MAX_CALENDAR_RANGE_DAYS = 62;
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const TOMORROW_SUMMARY_FIELDS = [
+  "fecha", "hora", "estado", "clienteNombre", "clienteTelefono", "direccion", "notas",
+  "servicioTipo", "servicioNombre", "servicioCategoria", "servicioPaquete", "mascotaNombre",
+  "mascotaEdad", "serviciosDetalle.tipo", "serviciosDetalle.categoria", "serviciosDetalle.paquete",
+  "serviciosDetalle.nombre", "serviciosDetalle.mascotaNombre", "serviciosDetalle.mascotaEdad",
+  "serviciosDetalle.fotoUrl"
+].join(" ");
 
 class CalendarValidationError extends Error {
   constructor(message, status = 400) {
@@ -292,6 +299,50 @@ async function queryCalendarAppointments({
   return { ...range, timeZone: BUSINESS_TIME_ZONE, events: sortCalendarEvents(deduplicateCalendarEvents(events)) };
 }
 
+function toTomorrowSummaryAppointment(appointment = {}) {
+  const source = typeof appointment.toObject === "function" ? appointment.toObject() : appointment;
+  const details = Array.isArray(source.serviciosDetalle) ? source.serviciosDetalle : [];
+  const pets = details.filter((item) => item?.tipo === "mascota").map((item) => ({
+    name: String(item.mascotaNombre || ""),
+    breed: String(item.categoria || ""),
+    age: Number.isInteger(item.mascotaEdad) ? item.mascotaEdad : null,
+    package: String(item.paquete || item.nombre || ""),
+    photoUrl: String(item.fotoUrl || "")
+  }));
+  if (!pets.length && source.servicioTipo === "mascota") {
+    pets.push({
+      name: String(source.mascotaNombre || ""),
+      breed: String(source.servicioCategoria || ""),
+      age: Number.isInteger(source.mascotaEdad) ? source.mascotaEdad : null,
+      package: String(source.servicioPaquete || source.servicioNombre || ""),
+      photoUrl: ""
+    });
+  }
+  return {
+    date: String(source.fecha || ""),
+    time: String(source.hora || ""),
+    status: String(source.estado || ""),
+    clientName: String(source.clienteNombre || ""),
+    clientPhone: String(source.clienteTelefono || ""),
+    address: String(source.direccion || ""),
+    service: String(source.servicioPaquete || source.servicioNombre || ""),
+    notes: String(source.notas || ""),
+    pets
+  };
+}
+
+async function queryTomorrowSummary({ AppointmentModel, now = new Date() }) {
+  if (!AppointmentModel || typeof AppointmentModel.find !== "function") {
+    throw new CalendarValidationError("El modelo de citas no esta disponible.", 500);
+  }
+  const date = addCivilDays(getBusinessToday(now), 1);
+  const appointments = await AppointmentModel.find({ fecha: date, estado: { $ne: "cancelada" } })
+    .select(TOMORROW_SUMMARY_FIELDS)
+    .sort({ hora: 1, _id: 1 })
+    .lean();
+  return { ok: true, date, appointments: appointments.map(toTomorrowSummaryAppointment) };
+}
+
 module.exports = {
   BUSINESS_TIME_ZONE,
   MAX_CALENDAR_RANGE_DAYS,
@@ -308,5 +359,8 @@ module.exports = {
   toCalendarEvent,
   deduplicateCalendarEvents,
   sortCalendarEvents,
-  queryCalendarAppointments
+  queryCalendarAppointments,
+  toTomorrowSummaryAppointment,
+  queryTomorrowSummary,
+  TOMORROW_SUMMARY_FIELDS
 };

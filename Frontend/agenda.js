@@ -1,4 +1,5 @@
 const AGENDA_API_URL = "https://woof-wash.onrender.com";
+const WOOF_WASH_WHATSAPP_NUMBER = "523337276934";
 
 const AGENDA_SERVICE_ZONES_FALLBACK = [
   { value: "zona_1", label: "Zona 1", nombre: "Valle Real - Solares", mapImage: "img/Zona1.jpg" },
@@ -128,7 +129,6 @@ let duracionBloqueadaManualCrear = false;
 let duracionBloqueadaManualEditar = false;
 let empleadosAgenda = [];
 let calendarioAgendaVisual = null;
-let rangoCitasAgendaCargado = null;
 let resumenMananaEnProceso = false;
 
 function obtenerApiBaseAgenda() {
@@ -1920,22 +1920,6 @@ function construirQueryCitas() {
   return params.toString();
 }
 
-function obtenerRangoConsultaCitasActual() {
-  if (filtroRangoActual?.desde && filtroRangoActual?.hasta) {
-    return { desde: filtroRangoActual.desde, hasta: filtroRangoActual.hasta };
-  }
-  const dia = filtroDiaActual || obtenerFechaLocalISO();
-  return { desde: dia, hasta: dia };
-}
-
-function citasEnMemoriaIncluyenFecha(fecha) {
-  return Boolean(
-    rangoCitasAgendaCargado
-    && fecha >= rangoCitasAgendaCargado.desde
-    && fecha <= rangoCitasAgendaCargado.hasta
-  );
-}
-
 function limpiarAvisoRangoAgenda() {
   const { rangeNotice } = obtenerElementosAgenda();
   if (!rangeNotice) return;
@@ -2016,16 +2000,13 @@ async function cargarCitasAgenda() {
     lista.innerHTML = `<div class="agenda-empty-state"><h3>Cargando citas...</h3></div>`;
   }
 
-  const rangoSolicitado = obtenerRangoConsultaCitasActual();
   try {
     const data = await agendaFetch(`/admin/appointments?${construirQueryCitas()}`);
     citasAgenda = Array.isArray(data.citas) ? data.citas.map(mapearCitaApi) : [];
-    rangoCitasAgendaCargado = rangoSolicitado;
     await cargarRewardsParaCitas(citasAgenda);
     await cargarEmpleadosAgenda();
   } catch (error) {
     citasAgenda = [];
-    rangoCitasAgendaCargado = null;
     if (lista) {
       lista.innerHTML = `<div class="agenda-empty-state"><h3>No se pudo cargar la agenda</h3><p>${escapeHtml(error.message)}</p></div>`;
     }
@@ -2149,7 +2130,7 @@ function crearCardCita(cita) {
     : "";
 
   return `
-    <article class="agenda-appointment-card ${cita.estado === "cancelada" ? "is-cancelled" : ""} ${cita.rewardGratisAplicado ? "is-reward-free" : ""}">
+    <article class="agenda-appointment-card is-${escapeHtml(cita.estado)} ${cita.estado === "cancelada" ? "is-cancelled" : ""} ${cita.rewardGratisAplicado ? "is-reward-free" : ""}">
       <div class="agenda-appointment-main">
         <div class="agenda-appointment-title">
           <span class="agenda-status-badge is-${escapeHtml(cita.estado)}">${escapeHtml(AGENDA_ESTADOS[cita.estado] || cita.estado)}</span>
@@ -3805,36 +3786,33 @@ async function manejarFotoMascotaFormulario(event) {
   }
 }
 
-function fechaMananaNegocio(now = new Date()) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now).map((part) => [part.type, part.value]));
-  const next = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + 1));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+function formatearHoraResumen(value) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(value || ""));
+  if (!match) return "No disponible";
+  const hour = Number(match[1]);
+  return `${hour % 12 || 12}:${match[2]} ${hour >= 12 ? "PM" : "AM"}`;
 }
 
-function construirResumenManana(citas) {
-  return citas.map((cita) => {
-    const pets = obtenerServiciosVisualesCita(cita).filter((item) => item.tipo === "mascota");
-    const petLines = pets.map((pet) => `* ${pet.mascotaNombre || "Mascota sin nombre"}${[pet.categoria, formatearEdadMascota(pet.mascotaEdad)].filter(Boolean).length ? ` (${[pet.categoria, formatearEdadMascota(pet.mascotaEdad)].filter(Boolean).join(", ")})` : ""}`);
-    const services = [...new Set(obtenerServiciosVisualesCita(cita).map((item) => item.paquete || item.nombre).filter(Boolean))];
-    return [`*${new Date(`2000-01-01T${cita.hora || "00:00"}:00`).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit", hour12: true })}*`, "", `*${pets.length} ${pets.length === 1 ? "MASCOTA" : "MASCOTAS"}*`, "", ...petLines, "", "*SERVICIO*", "", `* ${services.join(", ") || cita.detalle || "No disponible"}`, "", "*CLIENTE*", "", `* ${cita.cliente || "No disponible"}`, "", "*CELULAR*", "", `* ${cita.telefono || "No disponible"}`, "", "*DIRECCIÓN*", "", `* ${cita.direccion || "No disponible"}`, "", "*UBICACIÓN*", "", `* ${obtenerUrlUbicacionCita(cita) || "No disponible"}`, "", "*COMENTARIOS*", "", `* ${cita.notas || "Sin comentarios"}`].join("\n");
-  }).join("\n\n--------------\n\n");
-}
-
-async function construirResumenMananaFluido(citas, batchSize = 40) {
-  const partes = [];
-  for (let index = 0; index < citas.length; index += batchSize) {
-    partes.push(construirResumenManana(citas.slice(index, index + batchSize)));
-    if (index + batchSize < citas.length) {
-      await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    }
-  }
-  return partes.filter(Boolean).join("\n\n--------------\n\n");
-}
-
-function obtenerUrlFotoCompartida(url, anchoMaximo = 1200) {
-  const value = String(url || "");
-  if (!value.includes("res.cloudinary.com") || !value.includes("/image/upload/")) return value;
-  return value.replace("/image/upload/", `/image/upload/w_${anchoMaximo},c_limit,q_auto,f_auto/`);
+function construirResumenManana(appointments = []) {
+  if (!appointments.length) return "No hay citas programadas para mañana.";
+  return appointments.map((appointment) => {
+    const pets = Array.isArray(appointment.pets) ? appointment.pets : [];
+    const petLines = pets.map((pet) => {
+      const details = [pet.breed, formatearEdadMascota(pet.age)].filter(Boolean);
+      return `* ${pet.name || "Mascota sin nombre"}${details.length ? ` (${details.join(", ")})` : ""}`;
+    });
+    const services = [...new Set([appointment.service, ...pets.map((pet) => pet.package)].filter(Boolean))];
+    return [
+      `*${formatearHoraResumen(appointment.time)}*`, "",
+      `*${pets.length} ${pets.length === 1 ? "MASCOTA" : "MASCOTAS"}*`, "",
+      ...petLines, "", "*SERVICIO*", "", `* ${services.join(", ") || "No disponible"}`, "",
+      "*CLIENTE*", "", `* ${appointment.clientName || "No disponible"}`, "",
+      "*CELULAR*", "", `* ${appointment.clientPhone || "No disponible"}`, "",
+      "*DIRECCIÓN*", "", `* ${appointment.address || "No disponible"}`, "",
+      "*UBICACIÓN*", "", `* ${obtenerUrlUbicacionCita(appointment) || "No disponible"}`, "",
+      "*COMENTARIOS*", "", `* ${appointment.notes || "Sin comentarios"}`
+    ].join("\n");
+  }).join("\n\n━━━━━━━━━━━━━\n\n");
 }
 
 async function abrirResumenManana() {
@@ -3845,7 +3823,6 @@ async function abrirResumenManana() {
   const meta = document.getElementById("agendaTomorrowMeta");
   const share = document.getElementById("btnCompartirFotosManana");
   const gallery = document.getElementById("agendaTomorrowGallery");
-  const date = fechaMananaNegocio();
   modal?.classList.remove("hidden");
   modal?.setAttribute("aria-hidden", "false");
   document.body.classList.add("agenda-modal-open");
@@ -3853,30 +3830,25 @@ async function abrirResumenManana() {
   resumenMananaEnProceso = true;
   if (trigger) { trigger.disabled = true; trigger.textContent = "Generando…"; }
   if (notice) { notice.textContent = "Generando resumen…"; notice.classList.remove("hidden"); }
-  if (meta) meta.textContent = formatearFechaAgenda(date);
+  if (meta) meta.textContent = "Mañana";
   if (textArea) textArea.value = "";
-  if (share) { share.classList.add("hidden"); share._photos = []; }
+  [document.getElementById("btnCopiarResumenManana"), document.getElementById("btnWhatsAppResumenManana")].forEach((button) => { if (button) button.disabled = true; });
+  if (share) { share.classList.add("hidden"); share._appointments = []; }
   if (gallery) { gallery.classList.add("hidden"); gallery.replaceChildren(); }
   try {
-    await new Promise((resolve) => window.requestAnimationFrame(resolve));
-    let citasFuente;
-    if (citasEnMemoriaIncluyenFecha(date)) {
-      citasFuente = citasAgenda.filter((cita) => cita.fecha === date);
-    } else {
-      const data = await ejecutarPeticionConTimeout(
-        (signal) => agendaFetch(`/admin/appointments?fecha=${encodeURIComponent(date)}`, { signal }),
-        10000
-      );
-      citasFuente = (Array.isArray(data.citas) ? data.citas : []).map(mapearCitaApi);
-    }
-    const citas = citasFuente.filter((cita) => cita.estado !== "cancelada").sort((a, b) => a.hora.localeCompare(b.hora));
-    const text = await construirResumenMananaFluido(citas);
-    if (meta) meta.textContent = `${formatearFechaAgenda(date)} - ${citas.length} ${citas.length === 1 ? "cita" : "citas"}`;
+    const data = await ejecutarPeticionConTimeout(
+      (signal) => agendaFetch("/admin/appointments/tomorrow-summary", { signal }),
+      9000
+    );
+    const appointments = Array.isArray(data.appointments) ? data.appointments : [];
+    const text = construirResumenManana(appointments);
+    if (meta) meta.textContent = `${formatearFechaAgenda(data.date)} - ${appointments.length} ${appointments.length === 1 ? "cita" : "citas"}`;
     if (textArea) textArea.value = text;
-    const photos = citas.flatMap((cita) => obtenerServiciosVisualesCita(cita).filter((pet) => pet.fotoUrl).map((pet) => ({ ...pet, hora: cita.hora })));
-    share?.classList.toggle("hidden", !photos.length);
-    if (share) share._photos = photos;
-    if (notice) { notice.textContent = citas.length ? "" : "No existen citas activas para mañana."; notice.classList.toggle("hidden", Boolean(citas.length)); }
+    const hasPhotos = appointments.some((appointment) => (appointment.pets || []).some((pet) => pet.photoUrl));
+    share?.classList.toggle("hidden", !hasPhotos);
+    if (share) share._appointments = appointments;
+    [document.getElementById("btnCopiarResumenManana"), document.getElementById("btnWhatsAppResumenManana")].forEach((button) => { if (button) button.disabled = false; });
+    if (notice) { notice.textContent = ""; notice.classList.add("hidden"); }
   } catch (error) {
     console.error("No se pudo generar el resumen de mañana", { name: error?.name || "Error" });
     if (notice) { notice.textContent = "No pudimos generar el resumen. Intenta nuevamente."; notice.classList.remove("hidden"); }
@@ -3886,48 +3858,21 @@ async function abrirResumenManana() {
   }
 }
 
-async function compartirFotosManana() {
+function compartirFotosManana() {
   const button = document.getElementById("btnCompartirFotosManana");
-  const photos = button?._photos || [];
+  const photos = (button?._appointments || []).flatMap((appointment) => (appointment.pets || []).filter((pet) => pet.photoUrl).map((pet) => ({ ...pet, time: appointment.time })));
   const gallery = document.getElementById("agendaTomorrowGallery");
   const notice = document.getElementById("agendaTomorrowNotice");
-  if (!photos.length || button?.disabled) {
+  if (!photos.length) {
     if (!photos.length && notice) {
       notice.textContent = "No hay fotografías disponibles para compartir.";
       notice.classList.remove("hidden");
     }
     return;
   }
-  const originalText = button.textContent;
-  button.disabled = true;
-  button.textContent = "Preparando fotos…";
-  try {
-    const results = await Promise.allSettled(photos.map(async (photo, index) => {
-      const response = await ejecutarPeticionConTimeout(
-        (signal) => fetch(obtenerUrlFotoCompartida(photo.fotoUrl), { mode: "cors", signal }),
-        15000
-      );
-      if (!response.ok) throw new Error("Imagen no disponible");
-      const blob = await response.blob();
-      return new File([blob], `${photo.hora || "cita"}-${photo.mascotaNombre || `mascota-${index + 1}`}.${blob.type.split("/")[1] || "jpg"}`, { type: blob.type });
-    }));
-    const files = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
-    if (!files.length) throw new Error("Ninguna imagen pudo prepararse para compartir.");
-    if (!navigator.share || !navigator.canShare?.({ files })) throw new Error("El navegador no soporta compartir archivos.");
-    await navigator.share({ files, title: "Fotografías de citas de mañana" });
-  } catch (error) {
-    if (gallery) {
-      gallery.innerHTML = photos.map((photo) => {
-        const photoUrl = obtenerUrlFotoCompartida(photo.fotoUrl);
-        return `<a href="${escapeHtml(photoUrl)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" decoding="async" src="${escapeHtml(photoUrl)}" alt="${escapeHtml(photo.mascotaNombre || "Mascota")} ${escapeHtml(photo.hora || "")}"><span>${escapeHtml(photo.mascotaNombre || "Mascota")} - ${escapeHtml(photo.hora || "")}</span></a>`;
-      }).join("");
-      gallery.classList.remove("hidden");
-    }
-    console.error("No se pudieron compartir las fotografías de mañana", { name: error?.name || "Error" });
-    if (notice) { notice.textContent = "No pudimos preparar todas las fotografías. Puedes abrir o descargar las disponibles desde la galería."; notice.classList.remove("hidden"); }
-  } finally {
-    button.disabled = false;
-    button.textContent = originalText || "Compartir fotos";
+  if (gallery) {
+    gallery.innerHTML = photos.map((photo) => `<a href="${escapeHtml(photo.photoUrl)}" target="_blank" rel="noopener noreferrer"><img loading="lazy" decoding="async" src="${escapeHtml(photo.photoUrl)}" alt="${escapeHtml(photo.name || "Mascota")} ${escapeHtml(photo.time || "")}"><span>${escapeHtml(photo.name || "Mascota")} - ${escapeHtml(photo.time || "")}</span></a>`).join("");
+    gallery.classList.remove("hidden");
   }
 }
 
@@ -4117,7 +4062,7 @@ async function configurarAgenda() {
   document.getElementById("btnWhatsAppResumenManana")?.addEventListener("click", () => {
     const text = document.getElementById("agendaTomorrowText")?.value || "";
     if (!text) return alert("No hay citas para compartir.");
-    const popup = window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    const popup = window.open(`https://wa.me/${WOOF_WASH_WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
     if (!popup) alert("WhatsApp no pudo abrirse. Revisa los permisos de ventanas emergentes.");
   });
   document.getElementById("btnCompartirFotosManana")?.addEventListener("click", compartirFotosManana);

@@ -5732,6 +5732,15 @@ app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado,
   }
 });
 
+app.get("/admin/appointments/tomorrow-summary", auth, requireAdmin, async (req, res) => {
+  try {
+    const summary = await appointmentCalendarService.queryTomorrowSummary({ AppointmentModel: Appointment });
+    return res.json(summary);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: "No se pudo generar el resumen de mañana" });
+  }
+});
+
 app.get("/admin/appointments/calendar", auth, requireAdmin, async (req, res) => {
   try {
     const fallbackDate = appointmentCalendarService.getBusinessToday();

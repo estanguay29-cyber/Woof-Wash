@@ -9,6 +9,11 @@ const frontend = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(frontend, "agenda.html"), "utf8");
 const agenda = fs.readFileSync(path.join(frontend, "agenda.js"), "utf8");
 const calendar = fs.readFileSync(path.join(frontend, "shared", "appointments-calendar.js"), "utf8");
+const calendarCss = fs.readFileSync(path.join(frontend, "shared", "appointments-calendar.css"), "utf8");
+const styles = fs.readFileSync(path.join(frontend, "styles.css"), "utf8");
+const employeeJs = fs.readFileSync(path.join(frontend, "empleados", "dashboard.js"), "utf8");
+const employeePortal = fs.readFileSync(path.join(frontend, "empleados", "portal.js"), "utf8");
+const employeeCss = fs.readFileSync(path.join(frontend, "empleados", "dashboard.css"), "utf8");
 
 function sourceBetween(startMarker, endMarker) {
   const start = agenda.indexOf(startMarker);
@@ -50,47 +55,48 @@ test("el placeholder compartido y el bloqueo de carga estan conectados", () => {
 });
 
 test("el modal de manana abre antes de esperar datos o renderizado", () => {
-  const openSummary = sourceBetween("async function abrirResumenManana()", "async function compartirFotosManana()");
+  const openSummary = sourceBetween("async function abrirResumenManana()", "function compartirFotosManana()");
   assert.ok(openSummary.indexOf('modal?.classList.remove("hidden")') < openSummary.indexOf("await "));
   assert.match(openSummary, /Generando resumen/);
 });
 
-test("generar el resumen no descarga ni convierte fotografias", () => {
-  const openSummary = sourceBetween("async function abrirResumenManana()", "async function compartirFotosManana()");
+test("generar el resumen hace una sola consulta dedicada y no usa la agenda cargada", () => {
+  const openSummary = sourceBetween("async function abrirResumenManana()", "function compartirFotosManana()");
+  assert.equal((openSummary.match(/agendaFetch\(/g) || []).length, 1);
+  assert.match(openSummary, /agendaFetch\("\/admin\/appointments\/tomorrow-summary"/);
+  assert.doesNotMatch(openSummary, /citasAgenda|mapearCitaApi|requestAnimationFrame|construirResumenMananaFluido/);
   assert.doesNotMatch(openSummary, /fetch\(photo|\.blob\(|new File\(|navigator\.share/);
-  assert.match(openSummary, /citasEnMemoriaIncluyenFecha/);
-  assert.match(openSummary, /ejecutarPeticionConTimeout/);
 });
 
 test("la generacion evita concurrencia y siempre restaura el boton", () => {
-  const openSummary = sourceBetween("async function abrirResumenManana()", "async function compartirFotosManana()");
+  const openSummary = sourceBetween("async function abrirResumenManana()", "function compartirFotosManana()");
   assert.match(openSummary, /if \(resumenMananaEnProceso\) return/);
   assert.match(openSummary, /trigger\.disabled = true/);
   assert.match(openSummary, /finally/);
   assert.match(openSummary, /trigger\.disabled = false/);
 });
 
-test("las fotos se preparan solo al compartir y toleran fallos individuales", () => {
-  const sharePhotos = sourceBetween("async function compartirFotosManana()", "async function configurarAgenda()");
-  assert.match(sharePhotos, /Preparando fotos/);
-  assert.match(sharePhotos, /Promise\.allSettled/);
-  assert.match(sharePhotos, /fetch\(obtenerUrlFotoCompartida/);
-  assert.match(sharePhotos, /response\.blob\(\)/);
-  assert.match(sharePhotos, /new File/);
-  assert.match(sharePhotos, /if \(!files\.length\)/);
-  assert.match(sharePhotos, /finally/);
-  assert.match(sharePhotos, /button\.disabled = false/);
-});
-
-test("las fotos Cloudinary se limitan y la galeria carga bajo demanda", () => {
-  assert.match(agenda, /w_\$\{anchoMaximo\},c_limit,q_auto,f_auto/);
-  const sharePhotos = sourceBetween("async function compartirFotosManana()", "async function configurarAgenda()");
+test("las fotos solo crean una galeria manual bajo demanda", () => {
+  const sharePhotos = sourceBetween("function compartirFotosManana()", "async function configurarAgenda()");
   assert.match(sharePhotos, /loading="lazy" decoding="async"/);
-  assert.match(sharePhotos, /No hay fotograf/);
+  assert.doesNotMatch(sharePhotos, /fetch\(|\.blob\(|new File\(|navigator\.share|Promise\.allSettled/);
 });
 
-test("un resumen con muchas citas cede el control al navegador por lotes", () => {
-  const fluidSummary = sourceBetween("async function construirResumenMananaFluido", "function obtenerUrlFotoCompartida");
-  assert.match(fluidSummary, /batchSize = 40/);
-  assert.match(fluidSummary, /requestAnimationFrame/);
+test("WhatsApp usa el numero oficial y codifica el mensaje", () => {
+  assert.match(agenda, /WOOF_WASH_WHATSAPP_NUMBER = "523337276934"/);
+  assert.match(agenda, /https:\/\/wa\.me\/\$\{WOOF_WASH_WHATSAPP_NUMBER\}\?text=\$\{encodeURIComponent\(text\)\}/);
+  assert.doesNotMatch(agenda, /https:\/\/wa\.me\/\?text=/);
+});
+
+test("confirmada es azul y completada verde en agenda, calendario y empleado", () => {
+  assert.match(styles, /agenda-status-badge\.is-confirmada[\s\S]*?background: #dbeafe;[\s\S]*?color: #1d4ed8;/);
+  assert.match(styles, /agenda-status-badge\.is-completada[\s\S]*?background: #dcfce7;[\s\S]*?color: #166534;/);
+  assert.match(styles, /agenda-appointment-card\.is-confirmada::before[\s\S]*?#2563eb/);
+  assert.match(styles, /agenda-appointment-card\.is-completada::before[\s\S]*?#5c9424/);
+  assert.match(calendarCss, /ww-calendar-status-confirmada[^\n]*#2e72c4;[^\n]*#eaf3ff;/);
+  assert.match(calendarCss, /ww-calendar-status-completada[\s\S]*?#5c9424;[^\n]*#edf8df;/);
+  assert.match(employeeCss, /appointment-card\.is-confirmada::before[\s\S]*?#2563eb/);
+  assert.match(employeeCss, /appointment-card\.is-completada::before[\s\S]*?#5c9424/);
+  assert.match(employeeJs, /appointment-card is-\$\{escapeHtml\(estadoVisual\)\}/);
+  assert.match(employeePortal, /appointment-card is-\$\{escapeHtml\(estadoVisual\)\}/);
 });

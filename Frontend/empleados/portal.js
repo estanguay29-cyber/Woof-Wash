@@ -851,11 +851,12 @@ function renderCitasDashboard(citas = [], fecha = fechaLocalISO()) {
   return items.map((cita) => {
     const servicios = serviciosCita(cita);
     const descripcion = cita.mascotaNombre || cita.vehiculoModelo || cita.direccion || "Servicio asignado";
+    const estadoVisual = estadoVisibleCita(cita);
     return `
-      <article class="appointment-card">
+      <article class="appointment-card is-${escapeHtml(estadoVisual)}">
         <div class="appointment-head">
           <strong>${escapeHtml(formatoFecha(cita.fecha))} - ${escapeHtml(cita.hora || "-")}</strong>
-          <span>${escapeHtml(estadoTexto(estadoVisibleCita(cita)))}</span>
+          <span>${escapeHtml(estadoTexto(estadoVisual))}</span>
         </div>
         <h3>${escapeHtml(cita.clienteNombre || "Cliente")}</h3>
         ${renderAdminEmployeeAppointmentPhone(cita.clientPhone || cita.clienteTelefono)}
