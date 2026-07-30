@@ -558,3 +558,17 @@ input {
 /* Variante del portal sobre la tarjeta compartida del panel de empleados. */
 .employee-portal-panel .appointment-card{border-radius:17px;background:rgba(255,255,255,.97)}.employee-portal-panel .appointment-meta{background:rgba(255,250,232,.7)}.employee-portal-panel .employee-pets-detail article{background:rgba(255,250,232,.5)}
 @media(max-width:560px){.employee-portal-panel .appointment-card{border-radius:15px}}
+
+.employee-portal-panel .appointment-card {
+  border-radius: 20px;
+  box-shadow: 0 13px 32px rgba(11, 42, 107, 0.1);
+}
+
+.employee-portal-panel .appointment-head {
+  background: #edf4ff;
+}
+
+.employee-portal-panel .employee-pets-detail article {
+  border-left: 4px solid #8cc63f;
+  background: #fffdf4;
+}

@@ -99,3 +99,35 @@ test("DTO administrativo y de empleado incluyen ubicación sin ampliar datos sen
   assert.match(serverSource, /map\(\(\{ fotoPublicId, \.\.\.servicio \}\) => servicio\)/);
   assert.match(serverSource, /"locationUrl",\s*"notas"/);
 });
+
+test("raza es opcional e independiente por mascota", () => {
+  const antigua = appointmentWithService({ tipo: "mascota", categoria: "Grande", paquete: "Esencial" });
+  assert.equal(antigua.validateSync(), undefined);
+  assert.equal(antigua.serviciosDetalle[0].raza, "");
+
+  const cita = new Appointment({
+    clienteNombre: "Cliente",
+    clienteTelefono: "3312345678",
+    servicioTipo: "mascota",
+    servicioNombre: "Servicio",
+    servicioKey: "servicio",
+    fecha: "2026-07-30",
+    hora: "10:00",
+    zona: "zona_1",
+    direccion: "Dirección de prueba",
+    serviciosDetalle: [
+      { tipo: "mascota", categoria: "Chico", paquete: "Esencial", raza: "  Shih Tzu  " },
+      { tipo: "mascota", categoria: "Grande", paquete: "Premium", raza: "Pastor Alemán / Mestizo" }
+    ]
+  });
+  assert.equal(cita.validateSync(), undefined);
+  assert.deepEqual(cita.serviciosDetalle.map((item) => item.raza), ["Shih Tzu", "Pastor Alemán / Mestizo"]);
+  cita.serviciosDetalle[0].raza = "";
+  assert.equal(cita.validateSync(), undefined);
+});
+
+test("normalización y DTO de empleado conservan raza sin exponer fotoPublicId", () => {
+  assert.match(serverSource, /raza: tipo === "mascota" \? normalizarTextoPlano\(servicio\?\.raza, 80\) : ""/);
+  assert.match(serverSource, /raza: servicio\.tipo === "mascota" \? String\(servicio\.raza \|\| ""\)\.trim\(\) : ""/);
+  assert.match(serverSource, /map\(\(\{ fotoPublicId, \.\.\.servicio \}\) => servicio\)/);
+});

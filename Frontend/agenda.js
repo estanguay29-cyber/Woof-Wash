@@ -891,6 +891,7 @@ function obtenerServiciosDesdeBloques(prefijo = "") {
     servicio._clientId = bloque.dataset.clientId || "";
     if (tipo === "mascota") {
       servicio.mascotaNombre = bloque.querySelector("[data-pet-name]")?.value || "";
+      servicio.raza = bloque.querySelector("[data-pet-breed]")?.value || "";
       servicio.mascotaEdad = bloque.querySelector("[data-pet-age]")?.value || "";
     }
 
@@ -958,6 +959,10 @@ function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
         <label>
           Nombre de mascota
           <input type="text" maxlength="80" autocomplete="off" data-pet-name value="${escapeHtml(servicio.mascotaNombre || "")}">
+        </label>
+        <label>
+          Raza (opcional)
+          <input type="text" maxlength="80" autocomplete="off" data-pet-breed value="${escapeHtml(servicio.raza || "")}">
         </label>
         <label>
           Edad de mascota
@@ -1066,6 +1071,7 @@ function construirServiciosDetalleFormulario(prefijo = "") {
 
     if (normalizado.servicioTipo === "mascota") {
       detalle.mascotaNombre = String(servicio.mascotaNombre || "").trim().slice(0, 80);
+      detalle.raza = String(servicio.raza || "").trim().slice(0, 80);
       detalle.mascotaEdad = normalizarEdadMascotaServicio(servicio.mascotaEdad, index);
     }
 
@@ -1445,9 +1451,9 @@ function obtenerTextoMascotaCita(cita = {}) {
       .filter((servicio) => servicio?.tipo === "mascota")
       .map((servicio) => {
         const nombreServicio = String(servicio.mascotaNombre || "").trim();
+        const razaServicio = String(servicio.raza || "").trim();
         const edadServicio = formatearEdadMascota(servicio.mascotaEdad);
-        if (nombreServicio && edadServicio) return `${nombreServicio}, ${edadServicio}`;
-        return nombreServicio || edadServicio || "";
+        return [nombreServicio, razaServicio, edadServicio].filter(Boolean).join(", ");
       })
       .filter(Boolean)
     : [];
@@ -2130,7 +2136,7 @@ function crearCardCita(cita) {
   const badgeServicios = crearBadgeServiciosCita(cita);
   const mascotas = obtenerServiciosVisualesCita(cita);
   const detailsId = `agenda-pets-${String(cita.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((item, index) => `<article><span class="agenda-pet-thumb">${item.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(item.fotoUrl)}" alt="Foto de ${item.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(item.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span><div><strong>${escapeHtml(item.tipo === "auto" ? `Vehículo ${index + 1}` : item.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([item.categoria, item.tipo === "mascota" ? formatearEdadMascota(item.mascotaEdad) : ""].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${item.paquete ? `<p>Paquete: ${escapeHtml(item.paquete)}</p>` : ""}${item.notas ? `<p>Indicaciones: ${escapeHtml(item.notas)}</p>` : ""}</div></article>`).join("")}</div>` : "";
+  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((item, index) => `<article><span class="agenda-pet-thumb">${item.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(item.fotoUrl)}" alt="Foto de ${item.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(item.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span><div><strong>${escapeHtml(item.tipo === "auto" ? `Vehículo ${index + 1}` : item.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([item.tipo === "mascota" && item.raza ? `Raza: ${item.raza}` : "", item.categoria, item.tipo === "mascota" ? formatearEdadMascota(item.mascotaEdad) : ""].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${item.paquete ? `<p>Paquete: ${escapeHtml(item.paquete)}</p>` : ""}${item.notas ? `<p>Indicaciones: ${escapeHtml(item.notas)}</p>` : ""}</div></article>`).join("")}</div>` : "";
   const detalleBloque = cita.duracionMinutos
     ? `<p class="agenda-appointment-notes">Duración: ${escapeHtml(cita.duracionMinutos)} min + ${escapeHtml(cita.trasladoMinutos || 0)} min traslado</p>`
     : "";
@@ -2423,6 +2429,7 @@ function normalizarServiciosDetalleCita(cita) {
       nombre: servicio.nombre || "",
       key: servicio.key || "",
       notas: servicio.notas || "",
+      raza: servicio.tipo === "mascota" ? String(servicio.raza || "") : "",
       duracionMinutos: Number(servicio.duracionMinutos) || 0,
       mascotaNombre: servicio.mascotaNombre || (index === 0 ? cita?.mascotaNombre || "" : ""),
       mascotaEdad: Number.isInteger(servicio.mascotaEdad)
@@ -2446,6 +2453,7 @@ function obtenerServiciosVisualesCita(cita) {
     nombre: cita?.detalle || "",
     key: cita?.servicioKey || "",
     notas: "",
+    raza: "",
     duracionMinutos: Number(cita?.duracionMinutos) || 0,
     mascotaNombre: cita?.mascotaNombre || "",
     mascotaEdad: Number.isInteger(cita?.mascotaEdad) ? cita.mascotaEdad : null,
@@ -2519,8 +2527,8 @@ function crearMiniCardsServiciosHtml(cita) {
             <span class="agenda-pet-thumb">${servicio.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(servicio.fotoUrl)}" alt="Foto de ${servicio.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(servicio.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span>
             <span>${escapeHtml(`${formatearServicio(servicio.tipo)} ${index + 1}`)}</span>
             <strong>${escapeHtml(crearDetalleCortoServicio(servicio))}</strong>
-            ${servicio.tipo === "mascota" && (servicio.mascotaNombre || Number.isInteger(servicio.mascotaEdad))
-              ? `<p>${escapeHtml([servicio.mascotaNombre, formatearEdadMascota(servicio.mascotaEdad)].filter(Boolean).join(", "))}</p>`
+            ${servicio.tipo === "mascota" && (servicio.mascotaNombre || servicio.raza || Number.isInteger(servicio.mascotaEdad))
+              ? `<p>${escapeHtml([servicio.mascotaNombre, servicio.raza ? `Raza: ${servicio.raza}` : "", formatearEdadMascota(servicio.mascotaEdad)].filter(Boolean).join(" / "))}</p>`
               : ""}
             ${servicio.notas ? `<p>${escapeHtml(servicio.notas)}</p>` : ""}
           </article>
@@ -2598,6 +2606,7 @@ function obtenerServiciosEdicionCita(cita) {
       categoria: servicio.categoria || "",
       paquete: servicio.paquete || "",
       notas: servicio.notas || "",
+      raza: servicio.tipo === "mascota" ? String(servicio.raza || "") : "",
       mascotaNombre: servicio.mascotaNombre || (index === 0 ? cita.mascotaNombre || "" : ""),
       mascotaEdad: Number.isInteger(servicio.mascotaEdad)
         ? servicio.mascotaEdad

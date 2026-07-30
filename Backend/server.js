@@ -2181,6 +2181,7 @@ function normalizarServicioDetalleAgenda(servicio, index = 0) {
       key: servicioSeguro.servicioKey,
       notas: normalizarTextoPlano(servicio?.notas, 300),
       mascotaNombre: tipo === "mascota" ? normalizarTextoPlano(servicio?.mascotaNombre, 80) : "",
+      raza: tipo === "mascota" ? normalizarTextoPlano(servicio?.raza, 80) : "",
       mascotaEdad: tipo === "mascota" ? mascotaEdad.value : null,
       fotoUrl,
       fotoPublicId: fotoUrl ? fotoPublicId : "",
@@ -2224,6 +2225,7 @@ function construirServiciosDetalleCompatibles(cita) {
       key: servicio.key || "",
       notas: servicio.notas || "",
       mascotaNombre: servicio.tipo === "mascota" ? servicio.mascotaNombre || (index === 0 ? obj.mascotaNombre || "" : "") : "",
+      raza: servicio.tipo === "mascota" ? String(servicio.raza || "").trim() : "",
       mascotaEdad: servicio.tipo === "mascota"
         ? (Number.isInteger(servicio.mascotaEdad)
           ? servicio.mascotaEdad
@@ -2695,6 +2697,7 @@ function construirDatosCitaSeguro(body, { parcial = false } = {}) {
       datos.serviciosDetalle = datos.serviciosDetalle.map((servicio) => ({
         ...servicio,
         mascotaNombre: "",
+        raza: "",
         mascotaEdad: null
       }));
     }

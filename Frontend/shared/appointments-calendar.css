@@ -331,3 +331,59 @@ body.appointments-calendar-modal-open { overflow: hidden; }
 .appointments-calendar-dialog{border:1px solid rgba(11,42,107,.1);border-radius:19px;box-shadow:0 24px 64px rgba(5,20,50,.28)}.appointments-calendar-dialog-head{padding:1.1rem 1.2rem;background:#fef9e7}.appointments-calendar-detail{gap:.7rem;padding:1rem 1.2rem}.appointments-calendar-detail-item{padding:.7rem .8rem;border-color:rgba(11,42,107,.1);border-radius:12px;background:rgba(255,250,232,.45);box-shadow:0 4px 12px rgba(11,42,107,.035)}.appointments-calendar-detail-close-button,.appointments-calendar-pets-toggle{transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease}.appointments-calendar-detail-close-button:hover,.appointments-calendar-pets-toggle:hover{border-color:rgba(11,42,107,.3);background:#fffae8}.appointments-calendar-detail-close-button:focus-visible,.appointments-calendar-pets-toggle:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:2px}.appointments-calendar-pets-list article{border-color:rgba(11,42,107,.1);background:rgba(255,250,232,.45);box-shadow:0 4px 12px rgba(11,42,107,.035)}.appointments-calendar-pet-photo{border:1px solid rgba(11,42,107,.12);box-shadow:0 4px 10px rgba(11,42,107,.08)}.appointments-calendar-pet-photo img{transition:transform .16s ease,filter .16s ease}.appointments-calendar-pet-photo img:hover{filter:brightness(.96);transform:scale(1.025)}
 @media(max-width:430px){.appointments-calendar-dialog-head,.appointments-calendar-detail{padding-left:.85rem;padding-right:.85rem}.appointments-calendar-dialog-actions{padding-right:.85rem;padding-left:.85rem}.appointments-calendar-detail-close-button,.appointments-calendar-pets-toggle{width:100%;min-height:44px}}
 @media(prefers-reduced-motion:reduce){.appointments-calendar-detail-close-button,.appointments-calendar-pets-toggle,.appointments-calendar-pet-photo img{transition:none}.appointments-calendar-pet-photo img:hover{transform:none}}
+
+/* El visor amplía la imagen ya cargada; las miniaturas permanecen intactas. */
+.ww-image-lightbox {
+  padding: 3vh 2vw;
+}
+
+.ww-image-lightbox-dialog {
+  width: 96vw;
+  height: 94vh;
+}
+
+.ww-image-lightbox-image {
+  width: 96vw;
+  height: 92vh;
+  max-width: 96vw;
+  max-height: 92vh;
+  object-fit: contain;
+}
+
+@media (max-width: 430px) {
+  .ww-image-lightbox {
+    padding: 4vh 2vw;
+  }
+
+  .ww-image-lightbox-dialog {
+    width: 96vw;
+    height: 92dvh;
+  }
+
+  .ww-image-lightbox-image {
+    width: 96vw;
+    height: 88dvh;
+    max-width: 96vw;
+    max-height: 88dvh;
+  }
+}
+
+/* Subtarjetas del calendario con jerarquía más visible. */
+.appointments-calendar-dialog-head {
+  border-bottom: 3px solid rgba(11, 42, 107, 0.12);
+  background: #edf4ff;
+}
+
+.appointments-calendar-dialog-head h2 {
+  font-size: 1.4rem;
+}
+
+.appointments-calendar-detail-item {
+  border-left: 3px solid rgba(140, 198, 63, 0.48);
+}
+
+.appointments-calendar-pets-list article {
+  padding: 0.9rem;
+  border-left: 4px solid #8cc63f;
+  background: #fffdf4;
+}

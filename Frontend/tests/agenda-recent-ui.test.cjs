@@ -213,3 +213,13 @@ test("empleados muestran información enriquecida sin consultas al expandir", ()
   assert.match(calendar, /\.employee-pet-photo img/);
   assert.equal((calendar.match(/function initializeImageLightbox\(/g) || []).length, 1);
 });
+
+test("raza opcional se conserva por mascota en crear, editar y vistas", () => {
+  assert.match(agenda, /data-pet-breed/);
+  assert.match(agenda, /Raza \(opcional\)/);
+  assert.match(agenda, /detalle\.raza = String\(servicio\.raza \|\| ""\)\.trim\(\)\.slice\(0, 80\)/);
+  assert.match(agenda, /raza: servicio\.tipo === "mascota" \? String\(servicio\.raza \|\| ""\) : ""/);
+  assert.match(agenda, /item\.raza \? `Raza: \$\{item\.raza\}`/);
+  assert.match(employeeJs, /pet\.raza \? `Raza: \$\{pet\.raza\}`/);
+  assert.match(employeePortal, /pet\.raza \? `Raza: \$\{pet\.raza\}`/);
+});

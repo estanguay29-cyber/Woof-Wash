@@ -1650,3 +1650,59 @@ input {
 .appointment-card{min-width:0;gap:11px;padding:16px 16px 16px 20px;border-color:rgba(11,42,107,.12);border-radius:17px;box-shadow:0 7px 20px rgba(11,42,107,.065);overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}.appointment-card:hover{border-color:rgba(11,42,107,.2);box-shadow:0 11px 26px rgba(11,42,107,.095);transform:translateY(-1px)}.appointment-card::before{top:0;bottom:0;border-radius:0}.appointment-head{min-width:0;padding-bottom:10px;border-bottom:1px solid rgba(11,42,107,.08)}.appointment-head strong{min-width:0;font-size:1.05rem;overflow-wrap:anywhere}.appointment-head span{flex:0 0 auto}.appointment-card h3{font-size:1.12rem;line-height:1.3;overflow-wrap:anywhere}.appointment-meta{min-width:0;padding:9px 10px;border:1px solid rgba(11,42,107,.07);border-radius:12px;background:rgba(255,250,232,.62)}.appointment-card ul{padding-top:2px}.appointment-card li{border:1px solid rgba(140,198,63,.18)}.appointment-phone:focus-visible,.appointment-location:focus-visible,.employee-pets-toggle:focus-visible{outline:3px solid rgba(37,99,235,.3);outline-offset:2px}.employee-pets-toggle{width:fit-content;max-width:100%;border-color:rgba(11,42,107,.16);transition:border-color .15s ease,background-color .15s ease,box-shadow .15s ease}.employee-pets-toggle:hover{border-color:rgba(11,42,107,.3);background:#fffae8}.employee-pets-detail{padding-top:2px}.employee-pets-detail article{border-color:rgba(11,42,107,.1);background:rgba(255,250,232,.45);box-shadow:0 4px 12px rgba(11,42,107,.035)}.employee-pet-photo{border:1px solid rgba(11,42,107,.12);box-shadow:0 4px 10px rgba(11,42,107,.08)}.employee-pet-photo img{transition:transform .16s ease,filter .16s ease}.employee-pet-photo img:hover{filter:brightness(.96);transform:scale(1.025)}
 @media(max-width:560px){.appointment-card{padding:14px 13px 14px 17px;border-radius:15px}.appointment-head{align-items:flex-start}.appointment-head span,.employee-pets-toggle,.appointment-location{min-height:44px}.employee-pets-toggle{width:100%}.appointment-meta{align-items:stretch}.appointment-meta>*{max-width:100%}}
 @media(prefers-reduced-motion:reduce){.appointment-card,.employee-pets-toggle,.employee-pet-photo img{transition:none}.appointment-card:hover,.employee-pet-photo img:hover{transform:none}}
+
+/* Rediseño visible y consistente de citas para empleados. */
+.appointment-card {
+  gap: 12px;
+  border: 1px solid rgba(11, 42, 107, 0.16);
+  border-radius: 20px;
+  box-shadow: 0 13px 32px rgba(11, 42, 107, 0.1);
+}
+
+.appointment-head {
+  margin: -16px -16px 2px -20px;
+  padding: 15px 16px 14px 20px;
+  border-bottom: 3px solid rgba(11, 42, 107, 0.1);
+  background: #edf4ff;
+}
+
+.appointment-head strong {
+  color: #071f50;
+  font-size: 1.12rem;
+}
+
+.appointment-head span {
+  min-height: 34px;
+  border: 1px solid rgba(11, 42, 107, 0.12);
+}
+
+.appointment-card h3 {
+  padding-top: 2px;
+  color: #071f50;
+  font-size: 1.23rem;
+}
+
+.appointment-meta {
+  border-left: 4px solid rgba(140, 198, 63, 0.58);
+  background: #fffdf4;
+}
+
+.appointment-card ul {
+  padding: 10px;
+  border-radius: 13px;
+  background: rgba(237, 244, 255, 0.65);
+}
+
+.employee-pets-detail article {
+  padding: 13px;
+  border-left: 4px solid #8cc63f;
+  border-radius: 15px;
+  background: #fffdf4;
+}
+
+@media (max-width: 560px) {
+  .appointment-head {
+    margin: -14px -13px 2px -17px;
+    padding: 14px 13px 13px 17px;
+  }
+}

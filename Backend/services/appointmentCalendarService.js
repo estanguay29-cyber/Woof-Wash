@@ -241,6 +241,7 @@ function toCalendarEvent(appointment = {}) {
     ? source.serviciosDetalle.filter((service) => ["mascota", "auto"].includes(service?.tipo)).map((service, index) => ({
       type: service.tipo,
       name: service.tipo === "auto" ? `Vehículo ${index + 1}` : String(service.mascotaNombre || (index === 0 ? source.mascotaNombre || "" : "")),
+      breed: service.tipo === "mascota" ? String(service.raza || "") : "",
       age: service.tipo === "mascota" && Number.isInteger(service.mascotaEdad) ? service.mascotaEdad : (service.tipo === "mascota" && index === 0 && Number.isInteger(source.mascotaEdad) ? source.mascotaEdad : null),
       category: String(service.categoria || ""),
       package: String(service.paquete || ""),
@@ -270,7 +271,7 @@ function toCalendarEvent(appointment = {}) {
     totalCharged: Number.isFinite(source.totalCobrado) ? source.totalCobrado : null,
     notes: String(source.notas || ""),
     pets: petServices.length ? petServices : (source.servicioTipo === "mascota" ? [{
-      type: "mascota", name: String(source.mascotaNombre || ""), age: Number.isInteger(source.mascotaEdad) ? source.mascotaEdad : null,
+      type: "mascota", name: String(source.mascotaNombre || ""), breed: "", age: Number.isInteger(source.mascotaEdad) ? source.mascotaEdad : null,
       category: String(source.servicioCategoria || ""), package: String(source.servicioPaquete || ""),
       serviceName: String(source.servicioNombre || ""), notes: "", photoUrl: ""
     }] : []),

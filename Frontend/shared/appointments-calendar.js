@@ -366,7 +366,7 @@
       const name = document.createElement("strong");
       name.textContent = pet.name || (pet.type === "auto" ? "Vehículo" : "Mascota sin nombre");
       const detail = document.createElement("p");
-      detail.textContent = [pet.category, Number.isInteger(pet.age) ? `${pet.age} ${pet.age === 1 ? "año" : "años"}` : "", pet.package].filter(Boolean).join(" / ") || "Sin datos adicionales";
+      detail.textContent = [pet.breed ? `Raza: ${pet.breed}` : "", pet.category, Number.isInteger(pet.age) ? `${pet.age} ${pet.age === 1 ? "año" : "años"}` : "", pet.package].filter(Boolean).join(" / ") || "Sin datos adicionales";
       copy.append(name, detail);
       if (pet.notes) { const notes = document.createElement("p"); notes.textContent = `Indicaciones: ${pet.notes}`; copy.append(notes); }
       card.append(media, copy);

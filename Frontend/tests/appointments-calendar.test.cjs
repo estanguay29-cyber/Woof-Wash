@@ -123,3 +123,10 @@ test("el visor mantiene proporción, margen móvil y cursor de ampliación", () 
   assert.match(componentCss, /touch-action:pinch-zoom/);
   assert.match(componentCss, /@media\(max-width:430px\)\{\.ww-image-lightbox\{padding:10px\}/);
 });
+
+test("el visor ocupa casi toda la pantalla sin cambiar miniaturas", () => {
+  assert.match(componentCss, /\.ww-image-lightbox-dialog\s*\{[^}]*width:\s*96vw;[^}]*height:\s*94vh/);
+  assert.match(componentCss, /\.ww-image-lightbox-image\s*\{[^}]*width:\s*96vw;[^}]*height:\s*92vh;[^}]*object-fit:\s*contain/);
+  assert.match(componentCss, /\.appointments-calendar-pet-photo\{width:64px;height:64px/);
+  assert.match(source, /pet\.breed \? `Raza: \$\{pet\.breed\}`/);
+});
