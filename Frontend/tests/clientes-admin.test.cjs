@@ -17,10 +17,12 @@ test("Agenda ofrece navegación directa y reversible hacia Clientes", () => {
 });
 
 test("Clientes muestra carga desde el primer render y errores comprensibles", () => {
-  assert.match(clientesHtml, /id="customersAccessMessage"[^>]*role="status"[^>]*>Validando permisos y cargando clientes/);
+  assert.match(clientesHtml, /id="customersAccessMessage"[^>]*role="status"[^>]*>.*Validando permisos y cargando clientes/);
   assert.match(clientesJs, /Cargando clientes\.\.\./);
   assert.match(clientesJs, /mostrarAccesoCustomers\(error\.message \|\| "No se pudo cargar el modulo de clientes\."\)/);
   assert.match(clientesJs, /No hay clientes con esos filtros/);
+  assert.match(clientesHtml, /id="btnRetryCustomers"/);
+  assert.match(clientesJs, /btnRetryCustomers"\)\?\.addEventListener\("click", iniciarCustomers\)/);
 });
 
 test("la carga de clientes deduplica solicitudes concurrentes y no escribe datos", () => {
@@ -29,6 +31,23 @@ test("la carga de clientes deduplica solicitudes concurrentes y no escribe datos
   const loadBlock = clientesJs.slice(clientesJs.indexOf("async function loadCustomers"), clientesJs.indexOf("async function selectCustomer"));
   assert.equal((loadBlock.match(/customersFetch\(/g) || []).length, 1);
   assert.doesNotMatch(loadBlock, /method:\s*"(?:POST|PATCH|PUT|DELETE)"/);
+});
+
+test("acepta los tres contratos compatibles y trata una lista vacía como éxito", () => {
+  assert.match(clientesJs, /Array\.isArray\(data\) \? data : \(data\.customers \|\| data\.clientes\)/);
+  assert.match(clientesJs, /if \(!Array\.isArray\(receivedCustomers\)\)/);
+  assert.doesNotMatch(clientesJs, /if \(!receivedCustomers\.length\).*throw/);
+});
+
+test("distingue 401, 403, 500, JSON inválido y timeout", () => {
+  assert.match(clientesJs, /new AbortController\(\)/);
+  assert.match(clientesJs, /controller\.abort\(\), 15000/);
+  assert.match(clientesJs, /Tu sesión expiró/);
+  assert.match(clientesJs, /No tienes permisos para consultar clientes/);
+  assert.match(clientesJs, /Ocurrió un error al consultar clientes/);
+  assert.match(clientesJs, /respuesta inválida/);
+  assert.match(clientesJs, /Authorization: `Bearer \$\{customersToken\}`/);
+  assert.match(clientesJs, /\[CUSTOMERS\] Error HTTP:/);
 });
 
 test("listeners principales se registran una sola vez", () => {

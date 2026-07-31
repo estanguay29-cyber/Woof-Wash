@@ -6310,9 +6310,21 @@ async function construirResumenCustomerProfile(customer, { incluirClientItems = 
   const telefonoVisible = obtenerTelefonoVisibleCustomer({ customer, user: userVinculado, citasCustomer, citasPortal });
   const emailVisible = obtenerEmailVisibleCustomer({ customer, user: userVinculado, citasCustomer, citasPortal });
   const posibleDuplicado = duplicadosEmail > 0 || duplicadosTelefono > 0;
-  const seguimientoMascota = customerReminderService.buildPetServiceReminder(citasConfirmadas, {
-    reminderWeeks: customer.petServiceReminderWeeks
-  });
+  let seguimientoMascota;
+  try {
+    seguimientoMascota = customerReminderService.buildPetServiceReminder(citasConfirmadas, {
+      reminderWeeks: customer.petServiceReminderWeeks
+    });
+  } catch (error) {
+    console.error("[CUSTOMERS] Error al calcular seguimiento:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code
+    });
+    seguimientoMascota = customerReminderService.buildPetServiceReminder([], {
+      reminderWeeks: customer.petServiceReminderWeeks
+    });
+  }
   const estado = customer.userId
     ? "vinculado"
     : posibleDuplicado
@@ -6369,6 +6381,55 @@ async function construirResumenCustomerProfile(customer, { incluirClientItems = 
     citasAsociadas: citasCustomer.map((cita) => construirCitaResumenCustomer(cita, customer)),
     citasVisiblesPortal: citasPortal.map((cita) => construirCitaResumenCustomer(cita, customer))
   };
+}
+
+function construirResumenCustomerProfileNeutral(customer = {}) {
+  const seguimientoMascota = customerReminderService.buildPetServiceReminder([], {
+    reminderWeeks: customer?.petServiceReminderWeeks
+  });
+  return {
+    id: customer?._id ? String(customer._id) : "",
+    nombre: customer?.nombre || "",
+    telefono: customer?.telefono || customer?.telefonoNormalizado || "",
+    telefonoNormalizado: customer?.telefonoNormalizado || "",
+    email: customer?.email || customer?.emailNormalizado || "",
+    emailNormalizado: customer?.emailNormalizado || "",
+    userId: customer?.userId ? String(customer.userId) : "",
+    tieneCuentaWeb: Boolean(customer?.userId),
+    activo: customer?.activo !== false,
+    creadoDesde: customer?.creadoDesde || "",
+    estado: customer?.userId ? "vinculado" : (customer?.estadoRevision || "sin_cuenta"),
+    petServiceReminderWeeks: seguimientoMascota.reminderWeeks,
+    seguimientoMascota,
+    notasAdmin: customer?.notasAdmin || "",
+    citasTotales: 0,
+    citasCompletadas: 0,
+    premiosDisponibles: 0,
+    premiosUsados: 0,
+    posiblesCitasSinVincular: []
+  };
+}
+
+async function construirResumenesCustomerTolerantes(customers = [], concurrency = 8) {
+  const resumenes = [];
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  for (let index = 0; index < safeCustomers.length; index += concurrency) {
+    const lote = safeCustomers.slice(index, index + concurrency);
+    const resultados = await Promise.allSettled(lote.map((customer) => construirResumenCustomerProfile(customer)));
+    resultados.forEach((resultado, offset) => {
+      if (resultado.status === "fulfilled") {
+        resumenes.push(resultado.value);
+        return;
+      }
+      console.error("[CUSTOMERS] Error al construir cliente:", {
+        name: resultado.reason?.name,
+        message: resultado.reason?.message,
+        code: resultado.reason?.code
+      });
+      resumenes.push(construirResumenCustomerProfileNeutral(lote[offset]));
+    });
+  }
+  return resumenes;
 }
 
 async function buscarCuentasCoincidentesCustomer(customer = {}) {
@@ -6429,7 +6490,7 @@ app.get("/admin/customers", auth, requireAdmin, async (req, res) => {
     const customers = await CustomerProfile.find(condiciones)
       .sort({ updatedAt: -1, createdAt: -1 })
       .limit(150);
-    const resumenes = await Promise.all(customers.map(construirResumenCustomerProfile));
+    const resumenes = await construirResumenesCustomerTolerantes(customers);
     let clientes = resumenes;
 
     if (filtro === "pendientes") clientes = clientes.filter((item) => item.posiblesCitasSinVincular.length > 0);
@@ -6438,6 +6499,11 @@ app.get("/admin/customers", auth, requireAdmin, async (req, res) => {
 
     res.json({ clientes });
   } catch (error) {
+    console.error("[CUSTOMERS] Error al obtener clientes:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code
+    });
     res.status(500).json({ message: "No se pudieron obtener los clientes" });
   }
 });

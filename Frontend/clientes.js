@@ -91,9 +91,11 @@ function mostrarAccesoCustomers(texto) {
   byId("customersPanel")?.classList.add("hidden");
   const mensaje = byId("customersAccessMessage");
   if (mensaje) {
-    mensaje.textContent = texto;
     mensaje.classList.remove("hidden");
   }
+  const accessText = byId("customersAccessText");
+  if (accessText) accessText.textContent = texto;
+  byId("btnRetryCustomers")?.classList.remove("hidden");
   const status = byId("customersStatus");
   if (status) status.textContent = texto;
 }
@@ -107,18 +109,42 @@ function cerrarSesionCustomers() {
 }
 
 async function customersFetch(path, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 15000);
   const headers = {
     Authorization: `Bearer ${customersToken}`,
     ...(options.headers || {})
   };
   if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(`${customersApiBase()}${path}`, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
+  const url = `${customersApiBase()}${path}`;
+  let res;
+  try {
+    res = await fetch(url, { ...options, headers, signal: options.signal || controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") throw { status: 0, message: "La consulta tardó demasiado. Intenta nuevamente." };
+    throw { status: 0, message: "No fue posible conectar con el servidor." };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+  const responseText = await res.text();
+  let data;
+  try {
+    data = responseText ? JSON.parse(responseText) : {};
+  } catch {
+    console.error("[CUSTOMERS] Respuesta no JSON:", { status: res.status, url });
+    throw { status: res.status, message: "El servidor devolvió una respuesta inválida." };
+  }
 
   if (!res.ok) {
+    console.error("[CUSTOMERS] Error HTTP:", { status: res.status, message: data.message || "Sin detalle", url });
     if (res.status === 401) cerrarSesionCustomers();
-    throw { status: res.status, message: data.message || "No se pudo completar la solicitud" };
+    const safeMessages = {
+      401: "Tu sesión expiró. Inicia sesión nuevamente.",
+      403: "No tienes permisos para consultar clientes.",
+      500: "Ocurrió un error al consultar clientes."
+    };
+    throw { status: res.status, message: safeMessages[res.status] || "No se pudo completar la solicitud." };
   }
 
   return data;
@@ -688,7 +714,9 @@ async function loadCustomers() {
   const list = byId("customersList");
   if (list) list.innerHTML = "<p class='customer-empty' role='status'>Cargando clientes...</p>";
   const data = await customersFetch(`/admin/customers?filtro=${encodeURIComponent(filtro)}`);
-  customers = data.clientes || [];
+  const receivedCustomers = Array.isArray(data) ? data : (data.customers || data.clientes);
+  if (!Array.isArray(receivedCustomers)) throw { status: 200, message: "El servidor devolvió una estructura de clientes inesperada." };
+  customers = receivedCustomers;
   if (selectedCustomerId && !customers.some((item) => item.id === selectedCustomerId)) selectedCustomerId = "";
   renderCustomersList();
   if (selectedCustomerId) await selectCustomer(selectedCustomerId);
@@ -849,6 +877,7 @@ async function iniciarCustomers() {
     const admin = await customersFetch("/admin/me");
     byId("customersPanel")?.classList.remove("hidden");
     byId("customersAccessMessage")?.classList.add("hidden");
+    byId("btnRetryCustomers")?.classList.add("hidden");
     const status = byId("customersStatus");
     if (status) status.textContent = `Sesion admin activa: ${admin.usuario}`;
     await loadCustomers();
@@ -867,6 +896,7 @@ document.addEventListener("DOMContentLoaded", () => {
   byId("btnReloadCustomers")?.addEventListener("click", () => {
     loadCustomers().catch((error) => mostrarCustomersFeedback(error.message || "No se pudo actualizar", "error"));
   });
+  byId("btnRetryCustomers")?.addEventListener("click", iniciarCustomers);
   byId("customersList")?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-customer-id]");
     if (!row) return;

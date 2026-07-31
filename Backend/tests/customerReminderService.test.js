@@ -97,6 +97,21 @@ test("pendientes, confirmadas, canceladas, futuras, vehículos y fechas inválid
   assert.equal(empty.reminderEligible, false);
 });
 
+test("tolera citas antiguas parciales y serviciosDetalle ausente, vacío o no iterable", () => {
+  const partials = [
+    {},
+    { fecha: "2026-07-01", servicioTipo: "mascota" },
+    appointment({ serviciosDetalle: undefined }),
+    appointment({ serviciosDetalle: [] }),
+    appointment({ serviciosDetalle: { tipo: "mascota" } }),
+    appointment({ estado: undefined })
+  ];
+  assert.doesNotThrow(() => reminder.buildPetServiceReminder(partials, { today: TODAY }));
+  const result = reminder.buildPetServiceReminder(partials, { today: TODAY });
+  assert.equal(result.lastPetServiceDate, "2026-07-09");
+  assert.deepEqual(result.lastPetNames, ["Bongo"]);
+});
+
 test("el cálculo usa fechas civiles y rechaza futuro o fechas inválidas", () => {
   assert.equal(reminder.civilDaysBetween("2026-07-09", TODAY), 21);
   assert.equal(reminder.civilDaysBetween("2026-07-31", TODAY), null);
@@ -122,4 +137,15 @@ test("PATCH de frecuencia exige admin, valida el único campo y usa $set limitad
   assert.match(route, /\{ \$set: \{ petServiceReminderWeeks: weeks \} \}/);
   assert.match(route, /runValidators: true/);
   assert.doesNotMatch(route, /replaceOne|updateMany/);
+});
+
+test("el listado limita concurrencia, tolera un cliente defectuoso y conserva GET sin escrituras", () => {
+  const start = serverSource.indexOf('app.get("/admin/customers"');
+  const route = serverSource.slice(start, serverSource.indexOf('app.post("/admin/customers"', start));
+  assert.match(serverSource, /async function construirResumenesCustomerTolerantes/);
+  assert.match(serverSource, /Promise\.allSettled/);
+  assert.match(serverSource, /construirResumenCustomerProfileNeutral/);
+  assert.match(route, /construirResumenesCustomerTolerantes\(customers\)/);
+  assert.match(route, /\[CUSTOMERS\] Error al obtener clientes:/);
+  assert.doesNotMatch(route, /\.save\(|create\(|insert|updateOne|updateMany|findOneAnd|replaceOne/);
 });
