@@ -21,6 +21,7 @@ const PerformanceAttendance = require("./PerformanceAttendance");
 const PerformanceMetricRecord = require("./PerformanceMetricRecord");
 const employeeService = require("./services/employeeService");
 const appointmentCalendarService = require("./services/appointmentCalendarService");
+const customerReminderService = require("./services/customerReminderService");
 
 const app = express();
 app.disable("x-powered-by");
@@ -6309,6 +6310,9 @@ async function construirResumenCustomerProfile(customer, { incluirClientItems = 
   const telefonoVisible = obtenerTelefonoVisibleCustomer({ customer, user: userVinculado, citasCustomer, citasPortal });
   const emailVisible = obtenerEmailVisibleCustomer({ customer, user: userVinculado, citasCustomer, citasPortal });
   const posibleDuplicado = duplicadosEmail > 0 || duplicadosTelefono > 0;
+  const seguimientoMascota = customerReminderService.buildPetServiceReminder(citasConfirmadas, {
+    reminderWeeks: customer.petServiceReminderWeeks
+  });
   const estado = customer.userId
     ? "vinculado"
     : posibleDuplicado
@@ -6329,6 +6333,8 @@ async function construirResumenCustomerProfile(customer, { incluirClientItems = 
     activo: customer.activo !== false,
     creadoDesde: customer.creadoDesde || "",
     estado,
+    petServiceReminderWeeks: seguimientoMascota.reminderWeeks,
+    seguimientoMascota,
     notasAdmin: customer.notasAdmin || "",
     fechaPrimerServicio: customer.fechaPrimerServicio || citasCompletadasOrdenAsc[0]?.fecha || "",
     fechaUltimoServicio: customer.fechaUltimoServicio || ultimaCompletada?.fecha || "",
@@ -6396,9 +6402,6 @@ async function buscarCuentasCoincidentesCustomer(customer = {}) {
 
 app.get("/admin/customers", auth, requireAdmin, async (req, res) => {
   try {
-    const usuariosCliente = await User.find({ role: "cliente" }).select("_id usuario email role telefono nombreCompleto").limit(300);
-    await Promise.all(usuariosCliente.map((user) => asegurarCustomerProfileCuentaWeb(user)));
-
     const busqueda = normalizarTextoPlano(req.query?.q || "", 80).toLowerCase();
     const filtro = normalizarTextoPlano(req.query?.filtro || "todos", 40);
     const condiciones = {};
@@ -6645,6 +6648,30 @@ app.post("/admin/customers/:id/loyalty-adjustments", auth, requireAdmin, adminWr
     res.json({ message: "Ajuste registrado", cliente: await construirResumenCustomerProfile(customer) });
   } catch (error) {
     res.status(500).json({ message: "No se pudo registrar el ajuste" });
+  }
+});
+
+app.patch("/admin/customers/:id/reminder-frequency", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const customerId = obtenerObjectIdSeguro(req.params.id);
+    const bodyKeys = Object.keys(req.body || {});
+    const weeks = req.body?.petServiceReminderWeeks;
+    if (!customerId) return res.status(400).json({ message: "id de cliente no válido" });
+    if (bodyKeys.length !== 1 || bodyKeys[0] !== "petServiceReminderWeeks"
+      || typeof weeks !== "number" || !Number.isInteger(weeks)
+      || weeks < customerReminderService.MIN_REMINDER_WEEKS
+      || weeks > customerReminderService.MAX_REMINDER_WEEKS) {
+      return res.status(400).json({ message: "La frecuencia debe ser un número entero entre 1 y 52 semanas" });
+    }
+    const customer = await CustomerProfile.findByIdAndUpdate(
+      customerId,
+      { $set: { petServiceReminderWeeks: weeks } },
+      { new: true, runValidators: true }
+    );
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+    res.json({ message: "Frecuencia actualizada", cliente: await construirResumenCustomerProfile(customer, { incluirClientItems: true }) });
+  } catch (error) {
+    res.status(500).json({ message: "No se pudo actualizar la frecuencia" });
   }
 });
 

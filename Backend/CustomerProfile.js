@@ -137,6 +137,18 @@ const CustomerProfileSchema = new mongoose.Schema(
       maxlength: 2000,
       default: ""
     },
+    petServiceReminderWeeks: {
+      type: Number,
+      min: 1,
+      max: 52,
+      validate: {
+        validator(value) {
+          return value === undefined || Number.isInteger(value);
+        },
+        message: "petServiceReminderWeeks debe ser un entero entre 1 y 52"
+      },
+      default: undefined
+    },
     direccionesUsadas: {
       type: [DireccionClienteSchema],
       default: []

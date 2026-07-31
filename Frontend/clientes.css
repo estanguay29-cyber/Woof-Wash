@@ -394,6 +394,162 @@
   cursor: not-allowed;
 }
 
+.customer-reminder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(11, 42, 107, 0.12);
+  border-radius: 14px;
+  background: #fef9e7;
+  overflow-wrap: anywhere;
+}
+
+.customer-elapsed-label {
+  margin-top: 5px;
+  color: #0b2a6b;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.customer-reminder-summary {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.customer-reminder-summary .customer-reminder-button {
+  margin-top: 10px;
+}
+
+.customer-reminder-frequency {
+  min-width: min(100%, 280px);
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid rgba(11, 42, 107, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.customer-reminder-frequency label {
+  display: grid;
+  grid-template-columns: auto minmax(70px, 92px) auto;
+  align-items: center;
+  gap: 7px;
+  color: #0b2a6b;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.customer-reminder-frequency .customer-reminder-frequency-title {
+  grid-column: 1 / -1;
+  font-weight: 950;
+}
+
+.customer-reminder-frequency input {
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid rgba(11, 42, 107, 0.18);
+  border-radius: 10px;
+  padding: 0 10px;
+  color: #0b2a6b;
+  background: #ffffff;
+  font: inherit;
+  font-weight: 900;
+}
+
+.customer-reminder-frequency input:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.28);
+  outline-offset: 2px;
+}
+
+.customer-reminder-frequency-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.customer-reminder-frequency-actions > * {
+  flex: 1 1 120px;
+  min-height: 44px;
+}
+
+.customer-reminder-save-status {
+  min-height: 1.2em;
+  margin: 0;
+  color: #52607a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.customer-reminder.is-eligible {
+  border-color: rgba(140, 198, 63, 0.4);
+  background: #edf4ff;
+}
+
+.customer-reminder span,
+.customer-reminder strong,
+.customer-reminder p {
+  display: block;
+}
+
+.customer-reminder span {
+  color: #4f7f19;
+  font-size: 0.76rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.customer-reminder strong {
+  margin-top: 3px;
+  color: #0b2a6b;
+}
+
+.customer-reminder p {
+  margin: 4px 0 0;
+  color: #52607a;
+  font-size: 0.84rem;
+}
+
+.customer-reminder-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border: 1px solid #0b2a6b;
+  border-radius: 11px;
+  background: #0b2a6b;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.customer-reminder-button:hover {
+  background: #123b8a;
+  transform: translateY(-1px);
+}
+
+.customer-reminder-button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.3);
+  outline-offset: 2px;
+}
+
+.customer-reminder-button:disabled {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
 .customer-action-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -639,6 +795,24 @@
 
   .customer-header-actions {
     justify-content: flex-start;
+  }
+
+  .customer-reminder {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .customer-reminder-frequency {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .customer-reminder-frequency label {
+    grid-template-columns: auto minmax(64px, 1fr) auto;
+  }
+
+  .customer-reminder-button {
+    width: 100%;
   }
 
   .customer-table-head {

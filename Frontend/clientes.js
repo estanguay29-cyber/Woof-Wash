@@ -3,6 +3,8 @@ const CUSTOMERS_API_URL = "https://woof-wash.onrender.com";
 let customersToken = localStorage.getItem("token") || "";
 let customers = [];
 let selectedCustomerId = "";
+let selectedCustomerAccounts = [];
+let customersLoadPromise = null;
 
 function customersApiBase() {
   const hostname = window.location.hostname;
@@ -211,6 +213,7 @@ function renderCustomersList() {
         <span class="customer-row-name">
           <strong>${esc(valor(cliente.nombre, "Cliente sin nombre"))}</strong>
           <small>${esc(valor(cliente.creadoDesde, "perfil"))}</small>
+          <small class="customer-elapsed-label">${esc(cliente.seguimientoMascota?.elapsedTimeLabel || "Aún no tiene servicios de mascota completados.")}</small>
         </span>
         ${renderTableValue(cliente.telefono, "Sin telefono")}
         ${renderTableValue(cliente.email, "Sin email")}
@@ -228,7 +231,83 @@ function renderField(label, valueText) {
 }
 
 function obtenerTelefonoWhatsApp(cliente = {}) {
-  return String(cliente.telefonoNormalizado || cliente.telefono || "").replace(/\D/g, "");
+  const digits = String(cliente.telefonoNormalizado || cliente.telefono || "").replace(/\D/g, "");
+  if (digits.length === 13 && digits.startsWith("521")) return `52${digits.slice(3)}`;
+  if (digits.length === 12 && digits.startsWith("52")) return digits;
+  if (digits.length === 11 && digits.startsWith("1")) return digits;
+  if (digits.length === 10) return `52${digits}`;
+  return "";
+}
+
+function unirNombresMascotas(nombres = []) {
+  const unicos = [...new Set(nombres.map((name) => String(name || "").trim()).filter(Boolean))];
+  if (!unicos.length) return "su perrito";
+  if (unicos.length === 1) return unicos[0];
+  if (unicos.length === 2) return `${unicos[0]} y ${unicos[1]}`;
+  return `${unicos.slice(0, -1).join(", ")} y ${unicos.at(-1)}`;
+}
+
+function construirMensajeRecordatorio(cliente = {}) {
+  const seguimiento = cliente.seguimientoMascota || {};
+  const nombres = unirNombresMascotas(seguimiento.lastPetNames || []);
+  const varios = (seguimiento.lastPetNames || []).filter(Boolean).length > 1;
+  const saludo = String(cliente.nombre || "").trim() ? `Hola, ${String(cliente.nombre).trim()} 😊🐾` : "Hola 😊🐾";
+  const tiempo = String(seguimiento.elapsedTimeLabel || "").replace(/\.$/, "").toLowerCase();
+  return [
+    saludo,
+    "",
+    `Esperamos que usted y ${nombres} se encuentren muy bien.`,
+    "",
+    `De acuerdo con la frecuencia de servicio que tenemos registrada, ${tiempo || "ya corresponde su seguimiento"}, por lo que quizá sea un buen momento para volver a consentir a ${varios ? "sus perritos" : nombres}. 💙`,
+    "",
+    `¿Le gustaría volver a agendar ${varios ? "sus servicios" : "su servicio"}?`,
+    "",
+    "Con gusto podemos ayudarle a encontrar el día y horario que mejor le funcione.",
+    "",
+    "Woof & Wash",
+    "Cuidamos lo que te mueve y lo que amas. 🐶✨"
+  ].join("\n");
+}
+
+function formatearPeriodoDias(value) {
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 0) return "";
+  if (days === 0) return "hoy";
+  const weeks = Math.floor(days / 7);
+  const remainder = days % 7;
+  if (!weeks) return `${days} ${days === 1 ? "día" : "días"}`;
+  return `${weeks} ${weeks === 1 ? "semana" : "semanas"}${remainder ? ` y ${remainder} ${remainder === 1 ? "día" : "días"}` : ""}`;
+}
+
+function renderSeguimientoMascota(cliente = {}) {
+  const seguimiento = cliente.seguimientoMascota || {};
+  const fecha = seguimiento.lastPetServiceDate || "";
+  const weeks = Number.isInteger(seguimiento.reminderWeeks) ? seguimiento.reminderWeeks : 3;
+  const frequencyForm = `
+    <form class="customer-reminder-frequency" data-form="reminder-frequency">
+      <label><span class="customer-reminder-frequency-title">Frecuencia de servicio</span><span>Cada</span><input name="petServiceReminderWeeks" type="number" min="1" max="52" step="1" value="${esc(weeks)}" data-current-weeks="${esc(weeks)}" required><span>semanas</span></label>
+      <div class="customer-reminder-frequency-actions">
+        <button class="customer-reminder-button" type="submit">Guardar frecuencia</button>
+        <button class="customer-action-button is-light" type="button" data-action="cancel-reminder-frequency">Cancelar</button>
+      </div>
+      <p class="customer-reminder-save-status" data-reminder-frequency-status role="status" aria-live="polite"></p>
+    </form>`;
+  if (!fecha) return `<section class="customer-reminder is-muted"><div><span>Cada ${esc(weeks)} semanas</span><strong>Aún no tiene servicios de mascota completados.</strong><p>La frecuencia está lista para aplicarse después de un servicio válido.</p></div>${frequencyForm}</section>`;
+  const nombres = unirNombresMascotas(seguimiento.lastPetNames || []);
+  const elapsed = seguimiento.elapsedTimeLabel || "Tiempo de servicio no disponible.";
+  const nextDate = seguimiento.nextSuggestedDate ? formatearFecha(seguimiento.nextSuggestedDate) : "No disponible";
+  const remaining = formatearPeriodoDias(seguimiento.daysUntilReminder);
+  const state = seguimiento.reminderEligible
+    ? "Seguimiento disponible."
+    : `Faltan ${remaining || "algunos días"} para el próximo seguimiento.`;
+  const telefono = obtenerTelefonoWhatsApp(cliente);
+  const message = construirMensajeRecordatorio(cliente);
+  const reminderButton = seguimiento.reminderEligible
+    ? (telefono
+      ? `<a class="customer-reminder-button" href="https://wa.me/${esc(telefono)}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer" aria-label="Enviar recordatorio de servicio por WhatsApp">Enviar recordatorio</a>`
+      : `<button class="customer-reminder-button" type="button" disabled aria-label="Recordatorio no disponible: falta teléfono válido">Sin teléfono disponible</button>`)
+    : "";
+  return `<section class="customer-reminder ${seguimiento.reminderEligible ? "is-eligible" : "is-muted"}"><div class="customer-reminder-summary"><span>Cada ${esc(weeks)} semanas</span><strong>${esc(elapsed)}</strong><p>Mascotas: ${esc(nombres)}</p><p>Último servicio: ${esc(formatearFecha(fecha))}</p><p>Próximo seguimiento: ${esc(nextDate)}</p><p>${esc(state)}</p>${reminderButton}</div>${frequencyForm}</section>`;
 }
 
 function renderWhatsappButton(cliente = {}) {
@@ -509,6 +588,8 @@ function renderCustomerDetail(cliente, cuentas = []) {
       ${renderField("Portal visible", `${numero(cliente.citasPortalTotales)} citas`)}
     </section>
 
+    ${renderSeguimientoMascota(cliente)}
+
     <section class="customer-section">
       <h3>Resumen operativo</h3>
       <div class="customer-metrics is-operational">
@@ -601,19 +682,30 @@ function renderCustomerDetail(cliente, cuentas = []) {
 }
 
 async function loadCustomers() {
+  if (customersLoadPromise) return customersLoadPromise;
+  customersLoadPromise = (async () => {
   const filtro = byId("customersFilter")?.value || "todos";
+  const list = byId("customersList");
+  if (list) list.innerHTML = "<p class='customer-empty' role='status'>Cargando clientes...</p>";
   const data = await customersFetch(`/admin/customers?filtro=${encodeURIComponent(filtro)}`);
   customers = data.clientes || [];
   if (selectedCustomerId && !customers.some((item) => item.id === selectedCustomerId)) selectedCustomerId = "";
   renderCustomersList();
   if (selectedCustomerId) await selectCustomer(selectedCustomerId);
+  })();
+  try {
+    return await customersLoadPromise;
+  } finally {
+    customersLoadPromise = null;
+  }
 }
 
 async function selectCustomer(id) {
   selectedCustomerId = id;
   renderCustomersList();
   const data = await customersFetch(`/admin/customers/${encodeURIComponent(id)}`);
-  renderCustomerDetail(data.cliente, data.cuentasCoincidentes || []);
+  selectedCustomerAccounts = data.cuentasCoincidentes || [];
+  renderCustomerDetail(data.cliente, selectedCustomerAccounts);
 }
 
 async function postCustomerAction(path, body = {}) {
@@ -656,6 +748,12 @@ async function handleDetailClick(event) {
   try {
     if (action === "open-whatsapp") {
       abrirWhatsAppCliente(actionButton.dataset.phone);
+    } else if (action === "cancel-reminder-frequency") {
+      const form = actionButton.closest('form[data-form="reminder-frequency"]');
+      const input = form?.elements?.petServiceReminderWeeks;
+      if (input) input.value = input.dataset.currentWeeks || "3";
+      const status = form?.querySelector("[data-reminder-frequency-status]");
+      if (status) status.textContent = "Edición cancelada";
     } else if (action === "copy-email") {
       await copiarEmailCliente(actionButton.dataset.email);
     } else if (action === "link-user" && selectedCustomerId) {
@@ -676,12 +774,47 @@ async function handleDetailClick(event) {
   }
 }
 
+async function guardarFrecuenciaRecordatorio(form) {
+  const input = form.elements.petServiceReminderWeeks;
+  const status = form.querySelector("[data-reminder-frequency-status]");
+  const controls = [...form.querySelectorAll("input, button")];
+  const weeks = Number(input?.value);
+  if (!Number.isInteger(weeks) || weeks < 1 || weeks > 52) {
+    if (status) status.textContent = "Valor inválido. Usa un entero entre 1 y 52.";
+    input?.focus();
+    return;
+  }
+  controls.forEach((control) => { control.disabled = true; });
+  if (status) status.textContent = "Guardando…";
+  try {
+    const result = await customersFetch(`/admin/customers/${encodeURIComponent(selectedCustomerId)}/reminder-frequency`, {
+      method: "PATCH",
+      body: JSON.stringify({ petServiceReminderWeeks: weeks })
+    });
+    const index = customers.findIndex((customer) => customer.id === selectedCustomerId);
+    if (index >= 0) customers[index] = result.cliente;
+    renderCustomersList();
+    renderCustomerDetail(result.cliente, selectedCustomerAccounts);
+    mostrarCustomersFeedback(result.message || "Frecuencia actualizada");
+  } catch (error) {
+    controls.forEach((control) => { control.disabled = false; });
+    if (status) status.textContent = error.message || "No se pudo actualizar";
+  } finally {
+    controls.forEach((control) => { control.disabled = false; });
+  }
+}
+
 async function handleDetailSubmit(event) {
   const form = event.target.closest("form[data-form]");
   if (!form || !selectedCustomerId) return;
   event.preventDefault();
   const data = collectForm(form);
   const formType = form.dataset.form;
+
+  if (formType === "reminder-frequency") {
+    await guardarFrecuenciaRecordatorio(form);
+    return;
+  }
 
   try {
     if (formType === "reward-used") {
