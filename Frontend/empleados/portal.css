@@ -581,3 +581,5 @@ input {
   object-fit: contain;
   object-position: center;
 }
+
+.employee-pet-behavior { margin-top: 6px; color: #334155; overflow-wrap: anywhere; }

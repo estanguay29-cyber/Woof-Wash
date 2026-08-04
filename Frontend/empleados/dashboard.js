@@ -416,12 +416,18 @@ function placeholderSinFotoEmpleado() {
     || '<span class="ww-no-photo" role="img" aria-label="Sin foto"><small>Sin foto</small></span>';
 }
 
+function renderComportamientoEmpleado(pet = {}) {
+  if (pet.tipo !== "mascota") return "";
+  const labels = { green: "🟢 Se deja trabajar", orange: "🟠 Poco inquieto", red: "🔴 No se deja / agresivo" };
+  return `<p class="employee-pet-behavior"><strong>Comportamiento:</strong> ${escapeHtml(labels[pet.behaviorFlag] || "Sin clasificación")}</p>`;
+}
+
 function renderMascotasCita(cita = {}) {
   const pets = serviciosCita(cita);
   if (!pets.length) return "";
   const id = `employee-pets-${String(cita.id || cita._id || "item").replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const tipo = pets[0]?.tipo === "auto" ? "vehículos" : "mascotas";
-  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver más</button><div id="${id}" class="employee-pets-detail hidden"><p><strong>${pets.length} ${pets.length === 1 ? tipo.slice(0, -1) : tipo}</strong></p>${cita.notas ? `<p><strong>Indicaciones de la cita:</strong> ${escapeHtml(cita.notas)}</p>` : ""}${pets.map((pet, index) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${pet.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoEmpleado()}</span><div><strong>${escapeHtml(pet.tipo === "auto" ? `Vehículo ${index + 1}` : pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.tipo === "mascota" && pet.raza ? `Raza: ${pet.raza}` : "", pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} años` : "", pet.paquete || pet.nombre].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}</div></article>`).join("")}</div>`;
+  return `<button class="employee-pets-toggle" type="button" data-employee-pets-toggle aria-expanded="false" aria-controls="${id}">Ver más</button><div id="${id}" class="employee-pets-detail hidden"><p><strong>${pets.length} ${pets.length === 1 ? tipo.slice(0, -1) : tipo}</strong></p>${cita.notas ? `<p><strong>Indicaciones de la cita:</strong> ${escapeHtml(cita.notas)}</p>` : ""}${pets.map((pet, index) => `<article><span class="employee-pet-photo">${pet.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(pet.fotoUrl)}" alt="Foto de ${pet.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(pet.mascotaNombre || "mascota")}">` : placeholderSinFotoEmpleado()}</span><div><strong>${escapeHtml(pet.tipo === "auto" ? `Vehículo ${index + 1}` : pet.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([pet.tipo === "mascota" && pet.raza ? `Raza: ${pet.raza}` : "", pet.categoria, Number.isInteger(pet.mascotaEdad) ? `${pet.mascotaEdad} años` : "", pet.paquete || pet.nombre].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${pet.notas ? `<p>Indicaciones: ${escapeHtml(pet.notas)}</p>` : ""}${renderComportamientoEmpleado(pet)}</div></article>`).join("")}</div>`;
 }
 
 function renderEmployeeAppointmentPhone(value) {

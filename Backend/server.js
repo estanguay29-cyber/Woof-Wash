@@ -2992,7 +2992,7 @@ const { contarServiciosCita, calcularMetricasEmpleado, calcularPuntualidadCita, 
 function construirCitaEmpleado(cita) {
   const base = construirCitaAdmin(cita);
   const serviciosSinFotoPrivada = base.serviciosDetalle.map(({ fotoPublicId, ...servicio }) => servicio);
-  const serviciosDetalleEmpleado = serviciosSinFotoPrivada.map(({ clientItemId, behaviorFlag, serviceRef, ...servicio }) => servicio);
+  const serviciosDetalleEmpleado = serviciosSinFotoPrivada.map(({ clientItemId, serviceRef, ...servicio }) => servicio);
   return {
     id: base.id,
     clienteNombre: base.clienteNombre,
@@ -4880,6 +4880,7 @@ async function construirAppointmentsEmpleadoRespuesta(employeeId, fecha, options
   })
     .populate("empleadoAsignadoId", "nombreCompleto fotoPerfilUrl")
     .populate("empleadosAsignados", "nombreCompleto fotoPerfilUrl")
+    .populate("serviciosDetalle.clientItemId", "tipo behaviorFlag")
     .sort({ fecha: 1, hora: 1 });
   const metricas = calcularMetricasEmpleado(await Appointment.find(filtroEmpleado));
 

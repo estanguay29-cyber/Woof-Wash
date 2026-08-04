@@ -36,17 +36,17 @@ test("cada servicio puede conservar un ClientItem estable independiente", () => 
   assert.equal(String(appointment.serviciosDetalle[1].clientItemId), String(second));
 });
 
-test("calendario incluye comportamiento solo cuando se solicita para admin", () => {
+test("calendario entrega comportamiento a admin y empleado, pero ID solo a admin", () => {
   const source = {
     _id: new mongoose.Types.ObjectId(), fecha: "2026-08-03", hora: "10:00", estado: "confirmada",
     servicioTipo: "mascota", servicioNombre: "SPA", clienteNombre: "Cliente",
     serviciosDetalle: [{ tipo: "mascota", mascotaNombre: "Pet", clientItemId: { _id: new mongoose.Types.ObjectId(), behaviorFlag: "orange" } }]
   };
   const admin = calendar.toCalendarEvent(source, { includeBehavior: true });
-  const employee = calendar.toCalendarEvent(source);
+  const employee = calendar.toCalendarEvent(source, { includeBehavior: true, includeBehaviorId: false });
   assert.equal(admin.pets[0].behaviorFlag, "orange");
   assert.ok(admin.pets[0].clientItemId);
-  assert.equal(Object.hasOwn(employee.pets[0], "behaviorFlag"), false);
+  assert.equal(employee.pets[0].behaviorFlag, "orange");
   assert.equal(Object.hasOwn(employee.pets[0], "clientItemId"), false);
 });
 
@@ -61,8 +61,9 @@ test("endpoint de comportamiento está limitado a admin y a un único campo", ()
   assert.doesNotMatch(route, /replaceOne|updateMany|delete/);
 });
 
-test("DTO de empleado y cliente eliminan identificador y comportamiento", () => {
+test("DTO de empleado elimina identificadores y cliente elimina también comportamiento", () => {
   assert.match(serverSource, /map\(\(\{ clientItemId, behaviorFlag, serviceRef, \.\.\.servicio \}\) => servicio\)/);
+  assert.match(serverSource, /map\(\(\{ clientItemId, serviceRef, \.\.\.servicio \}\) => servicio\)/);
   const clientDto = serverSource.slice(serverSource.indexOf("function construirClientItemRespuesta"), serverSource.indexOf("function limpiarClientItemPayload"));
   const adminDto = serverSource.slice(serverSource.indexOf("function construirClientItemAdminRespuesta"), serverSource.indexOf("async function obtenerCitasPosiblesCustomer"));
   assert.doesNotMatch(clientDto, /behaviorFlag/);

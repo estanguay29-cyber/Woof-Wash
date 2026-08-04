@@ -1,5 +1,6 @@
 const AGENDA_API_URL = "https://woof-wash.onrender.com";
 const WOOF_WASH_WHATSAPP_NUMBER = "523337276934";
+console.log("[AGENDA] pet behavior render version 3");
 console.log("[AGENDA] versión resumen diagnóstico 2");
 
 const AGENDA_SERVICE_ZONES_FALLBACK = [
@@ -2167,7 +2168,7 @@ function crearCardCita(cita) {
   const badgeServicios = crearBadgeServiciosCita(cita);
   const mascotas = obtenerServiciosVisualesCita(cita);
   const detailsId = `agenda-pets-${String(cita.id).replace(/[^a-zA-Z0-9_-]/g, "")}`;
-  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((item, index) => `<article><span class="agenda-pet-thumb">${item.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(item.fotoUrl)}" alt="Foto de ${item.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(item.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span><div><strong>${escapeHtml(item.tipo === "auto" ? `Vehículo ${index + 1}` : item.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([item.tipo === "mascota" && item.raza ? `Raza: ${item.raza}` : "", item.categoria, item.tipo === "mascota" ? formatearEdadMascota(item.mascotaEdad) : ""].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${item.paquete ? `<p>Paquete: ${escapeHtml(item.paquete)}</p>` : ""}${item.notas ? `<p>Indicaciones: ${escapeHtml(item.notas)}</p>` : ""}</div></article>`).join("")}</div>` : "";
+  const detallesMascotas = mascotas.length ? `<div id="${detailsId}" class="agenda-pet-details hidden">${mascotas.map((item, index) => `<article><span class="agenda-pet-thumb">${item.fotoUrl ? `<img loading="lazy" decoding="async" src="${escapeHtml(item.fotoUrl)}" alt="Foto de ${item.tipo === "auto" ? `vehículo ${index + 1}` : escapeHtml(item.mascotaNombre || "mascota")}">` : placeholderSinFotoHtml()}</span><div><strong>${escapeHtml(item.tipo === "auto" ? `Vehículo ${index + 1}` : item.mascotaNombre || "Mascota sin nombre")}</strong><p>${escapeHtml([item.tipo === "mascota" && item.raza ? `Raza: ${item.raza}` : "", item.categoria, item.tipo === "mascota" ? formatearEdadMascota(item.mascotaEdad) : ""].filter(Boolean).join(" / ") || "Sin datos adicionales")}</p>${item.paquete ? `<p>Paquete: ${escapeHtml(item.paquete)}</p>` : ""}${item.notas ? `<p>Indicaciones: ${escapeHtml(item.notas)}</p>` : ""}${crearControlComportamientoMascota(item, cita, index)}</div></article>`).join("")}</div>` : "";
   const detalleBloque = cita.duracionMinutos
     ? `<p class="agenda-appointment-notes">Duración: ${escapeHtml(cita.duracionMinutos)} min + ${escapeHtml(cita.trasladoMinutos || 0)} min traslado</p>`
     : "";

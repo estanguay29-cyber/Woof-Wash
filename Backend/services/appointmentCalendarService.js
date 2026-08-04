@@ -231,7 +231,7 @@ function resolveLocationUrl(locationUrl, address) {
   return locationUrlFromAddress(address);
 }
 
-function toCalendarEvent(appointment = {}, { includeBehavior = false } = {}) {
+function toCalendarEvent(appointment = {}, { includeBehavior = false, includeBehaviorId = includeBehavior } = {}) {
   const source = typeof appointment.toObject === "function" ? appointment.toObject() : appointment;
   const status = String(source.estado || "pendiente").trim() || "pendiente";
   const operationalStatus = String(source.estadoOperativo || "").trim() || null;
@@ -249,8 +249,8 @@ function toCalendarEvent(appointment = {}, { includeBehavior = false } = {}) {
       notes: String(service.notas || ""),
       photoUrl: String(service.fotoUrl || ""),
       ...(includeBehavior ? {
-        clientItemId: objectIdString(service.clientItemId),
-        behaviorFlag: ["green", "orange", "red"].includes(service.clientItemId?.behaviorFlag) ? service.clientItemId.behaviorFlag : ""
+        behaviorFlag: ["green", "orange", "red"].includes(service.clientItemId?.behaviorFlag) ? service.clientItemId.behaviorFlag : "",
+        ...(includeBehaviorId ? { clientItemId: objectIdString(service.clientItemId) } : {})
       } : {})
     }))
     : [];
@@ -329,7 +329,10 @@ async function queryCalendarAppointments({
     .populate("empleadosAsignados", "nombreCompleto")
     .populate("serviciosDetalle.clientItemId", "tipo behaviorFlag")
     .sort({ fecha: 1, hora: 1, createdAt: -1 });
-  const events = appointments.map((appointment) => toCalendarEvent(appointment, { includeBehavior: role === "admin" }));
+  const events = appointments.map((appointment) => toCalendarEvent(appointment, {
+    includeBehavior: true,
+    includeBehaviorId: role === "admin"
+  }));
   return { ...range, timeZone: BUSINESS_TIME_ZONE, events: sortCalendarEvents(deduplicateCalendarEvents(events)) };
 }
 

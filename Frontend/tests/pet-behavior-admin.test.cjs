@@ -70,7 +70,25 @@ test("Clientes muestra y permite editar cada mascota persistente", () => {
   assert.match(clientes, /\/admin\/pets\/\$\{encodeURIComponent\(petId\)\}\/behavior/);
 });
 
-test("portal de empleado y portal cliente no renderizan behaviorFlag", () => {
-  assert.doesNotMatch(employee, /behaviorFlag|Comportamiento durante el servicio/);
+test("empleado muestra solo lectura y portal cliente no renderiza comportamiento", () => {
+  assert.match(employee, /renderComportamientoEmpleado/);
+  assert.match(employee, /pet\.behaviorFlag/);
+  assert.match(employee, /Comportamiento:<\/strong>/);
+  assert.doesNotMatch(employee, /data-behavior-form|Guardar comportamiento|clientItemId|serviceRef/);
   assert.doesNotMatch(client, /behaviorFlag|Comportamiento durante el servicio/);
+});
+
+test("crearCardCita, renderizador real de Ver más, inserta el control", () => {
+  const start = agenda.indexOf("function crearCardCita(cita)");
+  const end = agenda.indexOf("function limpiarTextoConfirmacionAgenda", start);
+  const cardSource = agenda.slice(start, end);
+  assert.match(cardSource, /crearControlComportamientoMascota\(item, cita, index\)/);
+  assert.match(cardSource, /data-action="toggle-pets"/);
+  assert.match(cardSource, /agenda-pet-details hidden/);
+});
+
+test("Agenda publica la versión 3 para invalidar caché", () => {
+  const html = fs.readFileSync(path.join(frontend, "agenda.html"), "utf8");
+  assert.match(html, /agenda\.js\?v=20260804-pet-behavior-v3/);
+  assert.match(agenda, /\[AGENDA\] pet behavior render version 3/);
 });
