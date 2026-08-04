@@ -572,3 +572,12 @@ input {
   border-left: 4px solid #8cc63f;
   background: #fffdf4;
 }
+
+/* Mantiene completa la foto de la cita sin alterar el tamano de la miniatura. */
+.employee-pet-photo img {
+  box-sizing: border-box;
+  padding: 3px;
+  background: #fff;
+  object-fit: contain;
+  object-position: center;
+}

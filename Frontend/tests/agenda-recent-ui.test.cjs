@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const frontend = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(frontend, "agenda.html"), "utf8");
@@ -22,6 +23,23 @@ function sourceBetween(startMarker, endMarker) {
   assert.notEqual(start, -1, `No se encontro ${startMarker}`);
   assert.notEqual(end, -1, `No se encontro ${endMarker}`);
   return agenda.slice(start, end);
+}
+
+function buildTomorrowSummary(appointments, date = "2026-08-05") {
+  const source = sourceBetween("function formatearHoraResumen(value)", "function abrirModalResumenManana()");
+  const context = {
+    Date,
+    Intl,
+    formatearEdadMascota(value) {
+      return Number.isInteger(value) ? `${value} ${value === 1 ? "año" : "años"}` : "";
+    },
+    obtenerUrlUbicacionCita(appointment) {
+      return appointment?.locationUrl || "";
+    }
+  };
+  const sandbox = { ...context, input: appointments, inputDate: date };
+  vm.runInNewContext(`${source}\nthis.result = construirResumenManana(input, inputDate);`, sandbox);
+  return sandbox.result;
 }
 
 test("el control de resumen existe una vez y queda fuera del contenido dinamico", () => {
@@ -75,6 +93,61 @@ test("generar el resumen hace una sola consulta dedicada y no usa la agenda carg
   assert.match(handler, /event\.preventDefault\(\)/);
   assert.match(handler, /event\.stopPropagation\(\)/);
   assert.doesNotMatch(handler, /citasAgenda|renderizarCitasAgenda|calendario|requestAnimationFrame|\.click\(|window\.open|foto|gallery|navigator\.share/);
+});
+
+test("el resumen de manana muestra encabezado, fecha, razas y datos faltantes limpios", () => {
+  const text = buildTomorrowSummary([{
+    time: "15:00",
+    pets: [
+      { name: "Kayse", breed: "Husky", age: 9, package: "Esencial" },
+      { name: "Mila", breed: "", age: 5, package: "SPA" },
+      { name: "Bongo", breed: "Shih Tzu", age: null, package: "Baño" }
+    ],
+    vehicles: [],
+    clientName: "Aracely",
+    clientPhone: "3323829025",
+    address: "Zapopan",
+    locationUrl: "",
+    notes: ""
+  }]);
+
+  assert.match(text, /^🐾 \*CITAS PARA MAÑANA\* 🐾\n📅 Miércoles 5 de agosto de 2026/);
+  assert.match(text, /Tenemos 1 cita programada:/);
+  assert.match(text, /🐶 \*MASCOTAS \(3\)\*/);
+  assert.match(text, /• Kayse — Husky, 9 años/);
+  assert.match(text, /• Mila — 5 años/);
+  assert.match(text, /• Bongo — Shih Tzu/);
+  assert.match(text, /📝 \*COMENTARIOS\*\nSin comentarios/);
+  assert.match(text, /🗺️ \*UBICACIÓN\*\nNo disponible/);
+  assert.doesNotMatch(text, /undefined|null|Ã|Â|�/);
+});
+
+test("el resumen incluye todos los vehiculos, conserva servicios y ordena por hora", () => {
+  const text = buildTomorrowSummary([
+    { time: "15:00", pets: [], vehicles: [{ name: "", type: "Camioneta pickup", package: "Lavado básico" }], clientName: "Tarde" },
+    {
+      time: "09:00",
+      pets: [{ name: "Kayse", breed: "Husky", age: 9, package: "Esencial" }],
+      vehicles: [
+        { name: "Mazda 3", type: "Sedán", package: "Lavado básico" },
+        { name: "Kia Sportage", type: "Camioneta/SUV", package: "Lavado completo" },
+        { name: "Ford Ranger", type: "Camioneta pickup", package: "Lavado básico" }
+      ],
+      clientName: "Temprano"
+    }
+  ]);
+
+  assert.ok(text.indexOf("*9:00 AM*") < text.indexOf("*3:00 PM*"));
+  assert.match(text, /🚗 \*VEHÍCULOS \(3\)\*/);
+  assert.match(text, /• Mazda 3 — Sedán/);
+  assert.match(text, /• Kia Sportage: Lavado completo/);
+  assert.match(text, /🛁 \*SERVICIOS DE MASCOTAS\*/);
+  assert.match(text, /🧼 \*SERVICIOS DE VEHÍCULOS\*/);
+  assert.match(text, /🚗 \*1 VEHÍCULO\*/);
+});
+
+test("el resumen vacio conserva el encabezado profesional", () => {
+  assert.equal(buildTomorrowSummary([]), "🐾 *CITAS PARA MAÑANA* 🐾\n\nNo hay citas programadas para mañana.");
 });
 
 test("la generacion evita concurrencia y siempre restaura el boton", () => {

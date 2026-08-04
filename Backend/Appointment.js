@@ -86,6 +86,11 @@ const ServicioDetalleSchema = new mongoose.Schema(
       maxlength: 500,
       default: ""
     },
+    clientItemId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ClientItem",
+      default: null
+    },
     duracionMinutos: {
       type: Number,
       min: 0,

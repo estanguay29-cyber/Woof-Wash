@@ -369,6 +369,14 @@
       detail.textContent = [pet.breed ? `Raza: ${pet.breed}` : "", pet.category, Number.isInteger(pet.age) ? `${pet.age} ${pet.age === 1 ? "año" : "años"}` : "", pet.package].filter(Boolean).join(" / ") || "Sin datos adicionales";
       copy.append(name, detail);
       if (pet.notes) { const notes = document.createElement("p"); notes.textContent = `Indicaciones: ${pet.notes}`; copy.append(notes); }
+      if (Object.prototype.hasOwnProperty.call(pet, "behaviorFlag")) {
+        const labels = { green: "Se deja trabajar", orange: "Poco inquieto", red: "No se deja o es agresivo" };
+        const flag = labels[pet.behaviorFlag] ? pet.behaviorFlag : "unclassified";
+        const behavior = document.createElement("span");
+        behavior.className = `appointments-calendar-behavior is-${flag}`;
+        behavior.textContent = `Comportamiento: ${labels[pet.behaviorFlag] || "Sin clasificación"}`;
+        copy.append(behavior);
+      }
       card.append(media, copy);
       list.append(card);
     });

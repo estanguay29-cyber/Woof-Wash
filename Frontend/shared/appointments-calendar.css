@@ -258,6 +258,11 @@
 .appointments-calendar-detail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; padding: 1.25rem 1.35rem; }
 .appointments-calendar-detail-item { min-width: 0; padding: 0.75rem; border: 1px solid #e1e7f0; border-radius: 13px; color: #334155; background: #fff; }
 .appointments-calendar-detail-item.is-wide { grid-column: 1 / -1; }
+.appointments-calendar-behavior { display: inline-flex; margin-top: .45rem; padding: .35rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 850; line-height: 1.35; white-space: normal; }
+.appointments-calendar-behavior.is-green { color: #166534; background: #dcfce7; }
+.appointments-calendar-behavior.is-orange { color: #9a3412; background: #ffedd5; }
+.appointments-calendar-behavior.is-red { color: #991b1b; background: #fee2e2; }
+.appointments-calendar-behavior.is-unclassified { color: #475569; background: #f1f5f9; }
 .appointments-calendar-detail-item dt { margin-bottom: 0.2rem; color: #66738a; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
 .appointments-calendar-detail-item dd { overflow-wrap: anywhere; color: #18243b; font-weight: 700; }
 .appointments-calendar-phone-link {
@@ -386,4 +391,17 @@ body.appointments-calendar-modal-open { overflow: hidden; }
   padding: 0.9rem;
   border-left: 4px solid #8cc63f;
   background: #fffdf4;
+}
+
+/* Mantiene completa la foto de la cita sin alterar el tamano de la miniatura. */
+.appointments-calendar-pet-photo img {
+  box-sizing: border-box;
+  padding: 3px;
+  background: #fff;
+  object-fit: contain;
+  object-position: center;
+}
+
+.appointments-calendar-pet-photo img:hover {
+  transform: none;
 }

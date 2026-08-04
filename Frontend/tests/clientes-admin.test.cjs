@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 
 const frontend = path.join(__dirname, "..");
 const agendaHtml = fs.readFileSync(path.join(frontend, "agenda.html"), "utf8");
@@ -41,19 +42,86 @@ test("acepta los tres contratos compatibles y trata una lista vacía como éxito
 
 test("distingue 401, 403, 500, JSON inválido y timeout", () => {
   assert.match(clientesJs, /new AbortController\(\)/);
-  assert.match(clientesJs, /controller\.abort\(\), 15000/);
+  assert.match(clientesJs, /timedOut = true;\s*controller\.abort\(\);\s*}, 15000\)/);
   assert.match(clientesJs, /Tu sesión expiró/);
   assert.match(clientesJs, /No tienes permisos para consultar clientes/);
+  assert.match(clientesJs, /El cliente solicitado no existe/);
   assert.match(clientesJs, /Ocurrió un error al consultar clientes/);
   assert.match(clientesJs, /respuesta inválida/);
   assert.match(clientesJs, /Authorization: `Bearer \$\{customersToken\}`/);
   assert.match(clientesJs, /\[CUSTOMERS\] Error HTTP:/);
 });
 
+test("cambiar rápidamente de cliente cancela solicitudes y solo renderiza la última", async () => {
+  const start = clientesJs.indexOf("async function selectCustomer(id");
+  const end = clientesJs.indexOf("async function postCustomerAction", start);
+  const selectSource = clientesJs.slice(start, end);
+  const context = { AbortController, requests: [], renders: [], loading: 0 };
+  vm.runInNewContext(`
+    let selectedCustomerId = "";
+    let selectedCustomerAccounts = [];
+    let activeCustomerRequestController = null;
+    let activeCustomerRequestId = 0;
+    let activeCustomerRequestPromise = null;
+    let loadedCustomerId = "";
+    function renderCustomersList() {}
+    function renderCustomerLoadingState() { loading += 1; }
+    function renderCustomerErrorState(message) { renders.push({ error: message }); }
+    function renderCustomerDetail(cliente) { renders.push(cliente.id); }
+    function customersFetch(path, { signal }) {
+      return new Promise((resolve, reject) => {
+        const request = { path, signal, resolve, reject };
+        requests.push(request);
+        signal.addEventListener("abort", () => reject({ name: "AbortError", code: "ABORTED" }), { once: true });
+      });
+    }
+    ${selectSource}
+    this.api = { selectCustomer, state: () => ({ selectedCustomerId, loadedCustomerId }) };
+  `, context);
+
+  const first = context.api.selectCustomer("cliente-a");
+  const second = context.api.selectCustomer("cliente-b");
+  const third = context.api.selectCustomer("cliente-c");
+  assert.equal(context.requests.length, 3);
+  assert.equal(context.requests[0].signal.aborted, true);
+  assert.equal(context.requests[1].signal.aborted, true);
+  context.requests[2].resolve({ cliente: { id: "cliente-c" }, cuentasCoincidentes: [] });
+  await Promise.all([first, second, third]);
+  assert.deepEqual(context.renders, ["cliente-c"]);
+  assert.equal(context.api.state().selectedCustomerId, "cliente-c");
+  assert.equal(context.api.state().loadedCustomerId, "cliente-c");
+});
+
+test("seleccionar el mismo cliente no duplica la petición y reintentar fuerza una sola", async () => {
+  const selectBlock = clientesJs.slice(clientesJs.indexOf("async function selectCustomer(id"), clientesJs.indexOf("async function postCustomerAction"));
+  assert.match(selectBlock, /customerId === selectedCustomerId && activeCustomerRequestPromise/);
+  assert.match(selectBlock, /customerId === selectedCustomerId && loadedCustomerId === customerId/);
+  assert.equal((selectBlock.match(/customersFetch\(/g) || []).length, 1);
+  assert.match(clientesJs, /data-action="retry-customer"/);
+  assert.match(clientesJs, /selectCustomer\(selectedCustomerId, \{ force: true \}\)/);
+});
+
+test("la selección es de solo lectura, limpia el panel y no muestra AbortError", () => {
+  const selectBlock = clientesJs.slice(clientesJs.indexOf("async function selectCustomer(id"), clientesJs.indexOf("async function postCustomerAction"));
+  assert.match(selectBlock, /renderCustomerLoadingState\(\)/);
+  assert.match(clientesJs, /Cargando información del cliente…/);
+  assert.match(clientesJs, /aria-live="polite" aria-busy="true"/);
+  assert.match(selectBlock, /error\?\.name === "AbortError"/);
+  assert.doesNotMatch(selectBlock, /method:\s*"(?:POST|PATCH|PUT|DELETE)"|localStorage|sessionStorage|\.save\(|update/);
+  assert.doesNotMatch(clientesJs, /innerHTML\s*\+=/);
+});
+
 test("listeners principales se registran una sola vez", () => {
   for (const id of ["customersSearch", "customersFilter", "btnReloadCustomers", "customersList", "customerDetail"]) {
-    assert.equal((clientesJs.match(new RegExp(`byId\\("${id}"\\)\\?\\.addEventListener`, "g")) || []).length, id === "customerDetail" ? 2 : 1);
+    assert.equal((clientesJs.match(new RegExp(`byId\\("${id}"\\)\\?\\.addEventListener`, "g")) || []).length, id === "customerDetail" ? 3 : 1);
   }
+});
+
+test("las fotos usan URL remota diferida y fallback delegado", () => {
+  assert.match(clientesJs, /loading="lazy" decoding="async"/);
+  assert.match(clientesJs, /addEventListener\("error", handleCustomerDetailImageError, true\)/);
+  assert.match(clientesJs, /placeholder\.textContent = "Sin foto"/);
+  assert.doesNotMatch(clientesJs, /FileReader|createObjectURL|\.blob\(|base64/);
 });
 
 test("recordatorio usa teléfono seguro, WhatsApp codificado y no envía automáticamente", () => {
@@ -92,7 +160,7 @@ test("la frecuencia se edita con guardado y cancelación explícitos", () => {
 
 test("guardar frecuencia hace un solo PATCH numérico y restaura controles", () => {
   const start = clientesJs.indexOf("async function guardarFrecuenciaRecordatorio");
-  const block = clientesJs.slice(start, clientesJs.indexOf("async function handleDetailSubmit", start));
+  const block = clientesJs.slice(start, clientesJs.indexOf("async function guardarComportamientoMascotaCliente", start));
   assert.equal((block.match(/customersFetch\(/g) || []).length, 1);
   assert.match(block, /method: "PATCH"/);
   assert.match(block, /JSON\.stringify\(\{ petServiceReminderWeeks: weeks \}\)/);

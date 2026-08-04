@@ -269,6 +269,48 @@ test("resumen de manana consulta un solo dia, excluye canceladas y usa proyeccio
   assert.equal(Object.hasOwn(result.appointments[1].pets[0], "fotoPublicId"), false);
 });
 
+test("resumen de manana conserva raza y todos los vehiculos con su servicio", () => {
+  const dto = calendar.toTomorrowSummaryAppointment(appointment({
+    servicioTipo: "mascota",
+    serviciosDetalle: [
+      { tipo: "mascota", mascotaNombre: "Kayse", raza: "Husky", mascotaEdad: 9, paquete: "Esencial" },
+      { tipo: "mascota", mascotaNombre: "Mila", raza: "Border Collie", paquete: "SPA" },
+      { tipo: "auto", categoria: "Sedán", paquete: "Lavado básico" },
+      { tipo: "auto", categoria: "Camioneta/SUV", paquete: "Lavado completo" },
+      { tipo: "auto", categoria: "Camioneta pickup", paquete: "Lavado básico" }
+    ]
+  }));
+
+  assert.deepEqual(dto.pets.map((pet) => [pet.name, pet.breed, pet.age, pet.package]), [
+    ["Kayse", "Husky", 9, "Esencial"],
+    ["Mila", "Border Collie", null, "SPA"]
+  ]);
+  assert.deepEqual(dto.vehicles.map((vehicle) => [vehicle.type, vehicle.package]), [
+    ["Sedán", "Lavado básico"],
+    ["Camioneta/SUV", "Lavado completo"],
+    ["Camioneta pickup", "Lavado básico"]
+  ]);
+});
+
+test("resumen de manana mantiene fallbacks de citas antiguas", () => {
+  const pet = calendar.toTomorrowSummaryAppointment(appointment({
+    serviciosDetalle: undefined,
+    mascotaNombre: "Bongo",
+    mascotaEdad: 3,
+    servicioCategoria: "Shih Tzu",
+    servicioPaquete: "SPA"
+  }));
+  const vehicle = calendar.toTomorrowSummaryAppointment(appointment({
+    servicioTipo: "auto",
+    serviciosDetalle: [],
+    servicioCategoria: "Camioneta/SUV",
+    servicioPaquete: "Lavado completo"
+  }));
+
+  assert.deepEqual([pet.pets[0].name, pet.pets[0].breed, pet.pets[0].age], ["Bongo", "Shih Tzu", 3]);
+  assert.deepEqual([vehicle.vehicles[0].type, vehicle.vehicles[0].package], ["Camioneta/SUV", "Lavado completo"]);
+});
+
 test("endpoint de resumen requiere autenticacion administrativa", () => {
   const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   assert.match(server, /app\.get\("\/admin\/appointments\/tomorrow-summary", auth, requireAdmin,/);

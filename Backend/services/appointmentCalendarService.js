@@ -7,10 +7,10 @@ const MAX_CALENDAR_RANGE_DAYS = 62;
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const TOMORROW_SUMMARY_FIELDS = [
-  "fecha", "hora", "estado", "clienteNombre", "clienteTelefono", "direccion", "notas",
+  "fecha", "hora", "estado", "clienteNombre", "clienteTelefono", "direccion", "locationUrl", "notas",
   "servicioTipo", "servicioNombre", "servicioCategoria", "servicioPaquete", "mascotaNombre",
   "mascotaEdad", "serviciosDetalle.tipo", "serviciosDetalle.categoria", "serviciosDetalle.paquete",
-  "serviciosDetalle.nombre", "serviciosDetalle.mascotaNombre", "serviciosDetalle.mascotaEdad",
+  "serviciosDetalle.nombre", "serviciosDetalle.mascotaNombre", "serviciosDetalle.raza", "serviciosDetalle.mascotaEdad",
   "serviciosDetalle.fotoUrl"
 ].join(" ");
 
@@ -231,7 +231,7 @@ function resolveLocationUrl(locationUrl, address) {
   return locationUrlFromAddress(address);
 }
 
-function toCalendarEvent(appointment = {}) {
+function toCalendarEvent(appointment = {}, { includeBehavior = false } = {}) {
   const source = typeof appointment.toObject === "function" ? appointment.toObject() : appointment;
   const status = String(source.estado || "pendiente").trim() || "pendiente";
   const operationalStatus = String(source.estadoOperativo || "").trim() || null;
@@ -247,7 +247,11 @@ function toCalendarEvent(appointment = {}) {
       package: String(service.paquete || ""),
       serviceName: String(service.nombre || ""),
       notes: String(service.notas || ""),
-      photoUrl: String(service.fotoUrl || "")
+      photoUrl: String(service.fotoUrl || ""),
+      ...(includeBehavior ? {
+        clientItemId: objectIdString(service.clientItemId),
+        behaviorFlag: ["green", "orange", "red"].includes(service.clientItemId?.behaviorFlag) ? service.clientItemId.behaviorFlag : ""
+      } : {})
     }))
     : [];
   return {
@@ -323,8 +327,9 @@ async function queryCalendarAppointments({
   const appointments = await AppointmentModel.find(filter)
     .populate("empleadoAsignadoId", "nombreCompleto")
     .populate("empleadosAsignados", "nombreCompleto")
+    .populate("serviciosDetalle.clientItemId", "tipo behaviorFlag")
     .sort({ fecha: 1, hora: 1, createdAt: -1 });
-  const events = appointments.map(toCalendarEvent);
+  const events = appointments.map((appointment) => toCalendarEvent(appointment, { includeBehavior: role === "admin" }));
   return { ...range, timeZone: BUSINESS_TIME_ZONE, events: sortCalendarEvents(deduplicateCalendarEvents(events)) };
 }
 
@@ -333,10 +338,15 @@ function toTomorrowSummaryAppointment(appointment = {}) {
   const details = Array.isArray(source.serviciosDetalle) ? source.serviciosDetalle : [];
   const pets = details.filter((item) => item?.tipo === "mascota").map((item) => ({
     name: String(item.mascotaNombre || ""),
-    breed: String(item.categoria || ""),
+    breed: String(item.raza || item.categoria || ""),
     age: Number.isInteger(item.mascotaEdad) ? item.mascotaEdad : null,
     package: String(item.paquete || item.nombre || ""),
     photoUrl: String(item.fotoUrl || "")
+  }));
+  const vehicles = details.filter((item) => item?.tipo === "auto").map((item) => ({
+    name: String(item.vehiculoNombre || item.identificacion || ""),
+    type: String(item.categoria || ""),
+    package: String(item.paquete || item.nombre || "")
   }));
   if (!pets.length && source.servicioTipo === "mascota") {
     pets.push({
@@ -347,6 +357,13 @@ function toTomorrowSummaryAppointment(appointment = {}) {
       photoUrl: ""
     });
   }
+  if (!vehicles.length && source.servicioTipo === "auto") {
+    vehicles.push({
+      name: "",
+      type: String(source.servicioCategoria || ""),
+      package: String(source.servicioPaquete || source.servicioNombre || "")
+    });
+  }
   return {
     date: String(source.fecha || ""),
     time: String(source.hora || ""),
@@ -354,9 +371,11 @@ function toTomorrowSummaryAppointment(appointment = {}) {
     clientName: String(source.clienteNombre || ""),
     clientPhone: String(source.clienteTelefono || ""),
     address: String(source.direccion || ""),
+    locationUrl: resolveLocationUrl(source.locationUrl, source.direccion),
     service: String(source.servicioPaquete || source.servicioNombre || ""),
     notes: String(source.notas || ""),
-    pets
+    pets,
+    vehicles
   };
 }
 

@@ -10050,3 +10050,79 @@ body {
     transform: none;
   }
 }
+
+.agenda-behavior-badge,
+.customer-behavior-badge {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+.agenda-behavior-badge.is-green { background: #dcfce7; color: #166534; }
+.agenda-behavior-badge.is-orange { background: #ffedd5; color: #9a3412; }
+.agenda-behavior-badge.is-red { background: #fee2e2; color: #991b1b; }
+.agenda-behavior-badge.is-unclassified { background: #f1f5f9; color: #475569; }
+
+.agenda-behavior-note {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.agenda-behavior-form {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  margin-top: 8px;
+}
+
+.agenda-behavior-form fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.agenda-behavior-form legend { margin-bottom: 7px; font-weight: 800; }
+.agenda-behavior-option { display: block; min-width: 0; cursor: pointer; }
+.agenda-behavior-option input { position: absolute; opacity: 0; pointer-events: none; }
+.agenda-behavior-option span {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 2px solid #dbe3ef;
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.agenda-behavior-option input:checked + span { border-color: #0b2a6b; box-shadow: 0 0 0 2px rgba(11,42,107,.14); }
+.agenda-behavior-option input:focus-visible + span { outline: 3px solid rgba(37,99,235,.35); outline-offset: 2px; }
+.agenda-behavior-form [data-behavior-status] { min-height: 1.2em; margin: 0; }
+
+@media (max-width: 430px) {
+  .agenda-behavior-form fieldset { grid-template-columns: minmax(0, 1fr); }
+  .agenda-behavior-form button { width: 100%; min-height: 44px; }
+}
+
+/* Mantiene completas las fotos de mascotas y vehiculos dentro de su marco. */
+.agenda-pet-photo-preview img,
+.agenda-pet-thumb img {
+  box-sizing: border-box;
+  padding: 3px;
+  background: #fff;
+  object-fit: contain;
+  object-position: center;
+}
+
+.agenda-pet-thumb img:hover {
+  transform: none;
+}

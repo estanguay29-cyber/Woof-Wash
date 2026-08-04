@@ -1643,6 +1643,25 @@ async function completarClienteInternoCita(datos = {}) {
   return resolucion;
 }
 
+async function validarClientItemsCita(serviciosDetalle = [], clientUserId = null) {
+  const ids = [...new Set((Array.isArray(serviciosDetalle) ? serviciosDetalle : [])
+    .map((servicio) => String(servicio?.clientItemId || "").trim())
+    .filter(Boolean))];
+  if (!ids.length) return { ok: true };
+  if (!mongoose.Types.ObjectId.isValid(String(clientUserId || ""))) {
+    return { ok: false, status: 400, message: "La mascota seleccionada no pertenece a una cuenta de cliente vinculada" };
+  }
+  const items = await ClientItem.find({
+    _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
+    userId: new mongoose.Types.ObjectId(String(clientUserId)),
+    tipo: "mascota"
+  }).select("_id");
+  if (items.length !== ids.length) {
+    return { ok: false, status: 400, message: "Una mascota seleccionada no es válida para este cliente" };
+  }
+  return { ok: true };
+}
+
 function aplicarAjustesCustomerFidelidad(resumen = {}, customer = null) {
   const resultado = {
     mascota: { ...(resumen.mascota || { completados: 0, objetivo: 8 }) },
@@ -1772,7 +1791,8 @@ async function construirFidelidadClientePorUserId(userId) {
 
 function construirCitaClientePortal(cita) {
   const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
-  const serviciosDetalle = construirServiciosDetalleCompatibles(obj);
+  const serviciosDetalle = construirServiciosDetalleCompatibles(obj)
+    .map(({ clientItemId, behaviorFlag, ...servicio }) => servicio);
   const tipo = obtenerTipoGeneralServicioAgenda(obj);
   const direccionTexto = typeof obj.direccion === "string" ? obj.direccion : "";
   const empleadosAsignadosNombres = Array.isArray(obj.empleadosAsignadosNombres)
@@ -2151,6 +2171,10 @@ function normalizarServicioDetalleAgenda(servicio, index = 0) {
 
   const fotoUrl = normalizarTextoPlano(servicio?.fotoUrl, 1000);
   const fotoPublicId = normalizarTextoPlano(servicio?.fotoPublicId, 500);
+  const clientItemIdInput = normalizarTextoPlano(servicio?.clientItemId, 40);
+  if (clientItemIdInput && !mongoose.Types.ObjectId.isValid(clientItemIdInput)) {
+    return { error: `serviciosDetalle[${index}].clientItemId no es valido` };
+  }
   if (fotoUrl) {
     try {
       const parsedPhotoUrl = new URL(fotoUrl);
@@ -2186,6 +2210,7 @@ function normalizarServicioDetalleAgenda(servicio, index = 0) {
       mascotaEdad: tipo === "mascota" ? mascotaEdad.value : null,
       fotoUrl,
       fotoPublicId: fotoUrl ? fotoPublicId : "",
+      clientItemId: tipo === "mascota" && clientItemIdInput ? new mongoose.Types.ObjectId(clientItemIdInput) : null,
       duracionMinutos: duracionNumero
     }
   };
@@ -2218,7 +2243,11 @@ function normalizarServiciosDetalleAgenda(value) {
 function construirServiciosDetalleCompatibles(cita) {
   const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
   if (Array.isArray(obj?.serviciosDetalle) && obj.serviciosDetalle.length) {
-    return obj.serviciosDetalle.map((servicio, index) => ({
+    return obj.serviciosDetalle.map((servicio, index) => {
+      const clientItem = servicio?.clientItemId && typeof servicio.clientItemId === "object" && servicio.clientItemId._id
+        ? servicio.clientItemId
+        : null;
+      return ({
       tipo: servicio.tipo || "",
       categoria: servicio.categoria || "",
       paquete: servicio.paquete || "",
@@ -2234,8 +2263,11 @@ function construirServiciosDetalleCompatibles(cita) {
         : null,
       fotoUrl: String(servicio.fotoUrl || "").trim(),
       fotoPublicId: String(servicio.fotoPublicId || "").trim(),
+      clientItemId: clientItem ? String(clientItem._id) : (servicio.clientItemId ? String(servicio.clientItemId) : ""),
+      behaviorFlag: ["green", "orange", "red"].includes(clientItem?.behaviorFlag) ? clientItem.behaviorFlag : "",
       duracionMinutos: Number(servicio.duracionMinutos) || 0
-    }));
+      });
+    });
   }
 
   return [];
@@ -2936,7 +2968,8 @@ const { contarServiciosCita, calcularMetricasEmpleado, calcularPuntualidadCita, 
 
 function construirCitaEmpleado(cita) {
   const base = construirCitaAdmin(cita);
-  const serviciosDetalleEmpleado = base.serviciosDetalle.map(({ fotoPublicId, ...servicio }) => servicio);
+  const serviciosSinFotoPrivada = base.serviciosDetalle.map(({ fotoPublicId, ...servicio }) => servicio);
+  const serviciosDetalleEmpleado = serviciosSinFotoPrivada.map(({ clientItemId, behaviorFlag, ...servicio }) => servicio);
   return {
     id: base.id,
     clienteNombre: base.clienteNombre,
@@ -5828,6 +5861,7 @@ app.get("/admin/appointments", auth, requireAdmin, async (req, res) => {
     const citas = await Appointment.find(filtro)
       .populate("empleadoAsignadoId", "nombreCompleto fotoPerfilUrl")
       .populate("empleadosAsignados", "nombreCompleto fotoPerfilUrl")
+      .populate("serviciosDetalle.clientItemId", "tipo behaviorFlag")
       .sort({ fecha: 1, hora: 1, createdAt: -1 });
     res.json({ citas: citas.map(construirCitaAdmin) });
   } catch (error) {
@@ -5931,6 +5965,7 @@ app.get("/admin/appointments/customer-history", auth, requireAdmin, async (req, 
     }
 
     const citas = await Appointment.find(filtro)
+      .populate("serviciosDetalle.clientItemId", "tipo behaviorFlag")
       .sort({ fecha: -1, hora: -1, createdAt: -1 });
 
     const estadosCompletados = new Set(["completada", "completado"]);
@@ -6008,24 +6043,33 @@ app.get("/admin/customers/lookup", auth, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: "telefono es obligatorio" });
     }
 
-    const cita = await Appointment.findOne(filtroTelefono)
-      .sort({ fecha: -1, hora: -1, createdAt: -1 })
-      .select("clienteNombre clienteTelefono clienteEmail direccion zona notas");
+    const [cita, profiles] = await Promise.all([
+      Appointment.findOne(filtroTelefono)
+        .sort({ fecha: -1, hora: -1, createdAt: -1 })
+        .select("clienteNombre clienteTelefono clienteEmail direccion zona notas clientUserId"),
+      CustomerProfile.find({ telefonoNormalizado: telefono }).select("nombre telefono email userId").limit(2)
+    ]);
+    const profile = profiles.length === 1 ? profiles[0] : null;
+    const clientUserId = cita?.clientUserId || profile?.userId || null;
+    const mascotas = clientUserId
+      ? await ClientItem.find({ userId: clientUserId, tipo: "mascota" }).sort({ updatedAt: -1, createdAt: -1 })
+      : [];
 
-    if (!cita) {
-      return res.json({ found: false, cliente: null });
+    if (!cita && !profile) {
+      return res.json({ found: false, cliente: null, mascotas: [] });
     }
 
     res.json({
       found: true,
       cliente: {
-        clienteNombre: cita.clienteNombre || "",
-        clienteTelefono: cita.clienteTelefono || telefono,
-        clienteEmail: cita.clienteEmail || "",
-        direccion: cita.direccion || "",
-        zona: cita.zona || "",
-        notas: cita.notas || ""
-      }
+        clienteNombre: cita?.clienteNombre || profile?.nombre || "",
+        clienteTelefono: cita?.clienteTelefono || profile?.telefono || telefono,
+        clienteEmail: cita?.clienteEmail || profile?.email || "",
+        direccion: cita?.direccion || "",
+        zona: cita?.zona || "",
+        notas: cita?.notas || ""
+      },
+      mascotas: mascotas.map(construirClientItemAdminRespuesta)
     });
   } catch (error) {
     res.status(500).json({ message: "No se pudo buscar el cliente" });
@@ -6232,6 +6276,7 @@ function construirClientItemAdminRespuesta(item = {}) {
     tipoVehiculo: obj.tipoVehiculo || "",
     fotoUrl: obj.fotoUrl || "",
     fotoNombre: obj.fotoNombre || "",
+    behaviorFlag: ["green", "orange", "red"].includes(obj.behaviorFlag) ? obj.behaviorFlag : "",
     createdAt: obj.createdAt || null,
     updatedAt: obj.updatedAt || null
   };
@@ -6717,6 +6762,40 @@ app.post("/admin/customers/:id/loyalty-adjustments", auth, requireAdmin, adminWr
   }
 });
 
+app.patch("/admin/pets/:petId/behavior", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const petId = obtenerObjectIdSeguro(req.params.petId);
+    const bodyKeys = Object.keys(req.body || {});
+    const behaviorFlag = req.body?.behaviorFlag;
+    if (!petId) return res.status(400).json({ message: "id de mascota no válido" });
+    if (bodyKeys.length !== 1 || bodyKeys[0] !== "behaviorFlag"
+      || typeof behaviorFlag !== "string"
+      || !["", "green", "orange", "red"].includes(behaviorFlag)) {
+      return res.status(400).json({ message: "behaviorFlag debe ser green, orange, red o vacío" });
+    }
+    const update = behaviorFlag
+      ? { $set: { behaviorFlag } }
+      : { $unset: { behaviorFlag: 1 } };
+    const pet = await ClientItem.findOneAndUpdate(
+      { _id: petId, tipo: "mascota" },
+      update,
+      { new: true, runValidators: true }
+    );
+    if (!pet) return res.status(404).json({ message: "Mascota no encontrada" });
+    res.json({
+      message: "Comportamiento actualizado",
+      pet: { id: String(pet._id), behaviorFlag: pet.behaviorFlag || "" }
+    });
+  } catch (error) {
+    console.error("[PET_BEHAVIOR] No se pudo actualizar:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code
+    });
+    res.status(500).json({ message: "No se pudo actualizar el comportamiento" });
+  }
+});
+
 app.patch("/admin/customers/:id/reminder-frequency", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const customerId = obtenerObjectIdSeguro(req.params.id);
@@ -6802,6 +6881,10 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
     }
 
     await completarClienteInternoCita(datos);
+    const vinculosMascota = await validarClientItemsCita(datos.serviciosDetalle, datos.clientUserId);
+    if (!vinculosMascota.ok) {
+      return res.status(vinculosMascota.status).json({ message: vinculosMascota.message });
+    }
 
     if (datos.rewardGratisAplicado) {
       const rewardTipo = datos.rewardTipo || datos.servicioTipo;
@@ -6859,7 +6942,8 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
 
     await cita.populate([
       { path: "empleadoAsignadoId", select: "nombreCompleto fotoPerfilUrl" },
-      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" }
+      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" },
+      { path: "serviciosDetalle.clientItemId", select: "tipo behaviorFlag" }
     ]);
     res.status(201).json({ message: "Cita creada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
@@ -6951,6 +7035,16 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
       await completarClienteInternoCita(datosClienteFinal);
       datos.customerId = datosClienteFinal.customerId || null;
       datos.clientUserId = datosClienteFinal.clientUserId || null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(datos, "serviciosDetalle")) {
+      const vinculosMascota = await validarClientItemsCita(
+        datos.serviciosDetalle,
+        Object.prototype.hasOwnProperty.call(datos, "clientUserId") ? datos.clientUserId : cita.clientUserId
+      );
+      if (!vinculosMascota.ok) {
+        return res.status(vinculosMascota.status).json({ message: vinculosMascota.message });
+      }
     }
 
     const rewardAplicadoFinal = Object.prototype.hasOwnProperty.call(datos, "rewardGratisAplicado")
@@ -7125,7 +7219,8 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
 
     await cita.populate([
       { path: "empleadoAsignadoId", select: "nombreCompleto fotoPerfilUrl" },
-      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" }
+      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" },
+      { path: "serviciosDetalle.clientItemId", select: "tipo behaviorFlag" }
     ]);
     res.json({ message: "Cita actualizada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
@@ -7215,7 +7310,8 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
 
     await cita.populate([
       { path: "empleadoAsignadoId", select: "nombreCompleto fotoPerfilUrl" },
-      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" }
+      { path: "empleadosAsignados", select: "nombreCompleto fotoPerfilUrl" },
+      { path: "serviciosDetalle.clientItemId", select: "tipo behaviorFlag" }
     ]);
     res.json({ message: "Estado actualizado correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {

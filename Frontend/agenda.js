@@ -126,6 +126,7 @@ let lookupClienteTimer = null;
 let lookupClienteRequestId = 0;
 let lookupClienteTelefono = "";
 let rewardClienteActual = null;
+let mascotasPersistentesCliente = [];
 let duracionBloqueadaManualCrear = false;
 let duracionBloqueadaManualEditar = false;
 let empleadosAgenda = [];
@@ -697,6 +698,7 @@ async function buscarYAutollenarClientePorTelefono() {
   if (!telefono.valido) {
     lookupClienteTelefono = "";
     rewardClienteActual = null;
+    mascotasPersistentesCliente = [];
     mostrarAvisoLookupCliente("");
     mostrarAvisoProgresoRecompensa(null);
     actualizarPanelAplicarRecompensa();
@@ -730,6 +732,8 @@ async function buscarYAutollenarClientePorTelefono() {
 
     if (lookupResult.status !== "fulfilled") return;
     const data = lookupResult.value;
+    mascotasPersistentesCliente = Array.isArray(data?.mascotas) ? data.mascotas : [];
+    renderizarBloquesServicios("", obtenerServiciosDesdeBloques(""));
 
     if (!data?.found || !data.cliente) {
       mostrarAvisoLookupCliente("");
@@ -890,6 +894,7 @@ function obtenerServiciosDesdeBloques(prefijo = "") {
     servicio.fotoPublicId = bloque.dataset.photoPublicId || "";
     servicio._clientId = bloque.dataset.clientId || "";
     if (tipo === "mascota") {
+      servicio.clientItemId = bloque.querySelector("[data-client-item-id]")?.value || "";
       servicio.mascotaNombre = bloque.querySelector("[data-pet-name]")?.value || "";
       servicio.raza = bloque.querySelector("[data-pet-breed]")?.value || "";
       servicio.mascotaEdad = bloque.querySelector("[data-pet-age]")?.value || "";
@@ -956,6 +961,14 @@ function renderizarBloquesServicios(prefijo = "", serviciosIniciales = null) {
     const fotoUrl = String(servicio.fotoUrl || "");
     const camposMascota = tipo === "mascota"
       ? `
+        ${mascotasPersistentesCliente.length || servicio.clientItemId ? `<label>
+          Mascota registrada
+          <select data-client-item-id>
+            <option value="">Sin vincular</option>
+            ${servicio.clientItemId && !mascotasPersistentesCliente.some((pet) => String(pet.id) === String(servicio.clientItemId)) ? `<option value="${escapeHtml(servicio.clientItemId)}" selected>${escapeHtml(servicio.mascotaNombre || "Mascota vinculada")}</option>` : ""}
+            ${mascotasPersistentesCliente.map((pet) => `<option value="${escapeHtml(pet.id)}" ${String(servicio.clientItemId || "") === String(pet.id) ? "selected" : ""}>${escapeHtml(pet.nombre || "Mascota")}</option>`).join("")}
+          </select>
+        </label>` : ""}
         <label>
           Nombre de mascota
           <input type="text" maxlength="80" autocomplete="off" data-pet-name value="${escapeHtml(servicio.mascotaNombre || "")}">
@@ -1070,6 +1083,7 @@ function construirServiciosDetalleFormulario(prefijo = "") {
     }
 
     if (normalizado.servicioTipo === "mascota") {
+      detalle.clientItemId = String(servicio.clientItemId || "").trim();
       detalle.mascotaNombre = String(servicio.mascotaNombre || "").trim().slice(0, 80);
       detalle.raza = String(servicio.raza || "").trim().slice(0, 80);
       detalle.mascotaEdad = normalizarEdadMascotaServicio(servicio.mascotaEdad, index);
@@ -1077,6 +1091,20 @@ function construirServiciosDetalleFormulario(prefijo = "") {
 
     return detalle;
   });
+}
+
+function aplicarMascotaPersistenteSeleccionada(select) {
+  if (!select?.matches("[data-client-item-id]")) return;
+  const pet = mascotasPersistentesCliente.find((item) => String(item.id) === String(select.value));
+  if (!pet) return;
+  const bloque = select.closest("[data-service-block]");
+  if (!bloque) return;
+  const name = bloque.querySelector("[data-pet-name]");
+  const breed = bloque.querySelector("[data-pet-breed]");
+  const age = bloque.querySelector("[data-pet-age]");
+  if (name) name.value = pet.nombre || "";
+  if (breed) breed.value = pet.raza || "";
+  if (age) age.value = /^\d+$/.test(String(pet.edad || "")) ? pet.edad : "";
 }
 
 function actualizarCatalogoServicio({ tipoSelect, categoriaSelect, paqueteSelect, categoriaValue = "", paqueteValue = "" }) {
@@ -2437,6 +2465,7 @@ function normalizarServiciosDetalleCita(cita) {
         : (index === 0 && Number.isInteger(cita?.mascotaEdad) ? cita.mascotaEdad : null),
       fotoUrl: String(servicio.fotoUrl || ""),
       fotoPublicId: String(servicio.fotoPublicId || ""),
+      clientItemId: String(servicio.clientItemId || ""),
       _clientId: String(servicio._clientId || `saved-${index}-${servicio.fotoPublicId || servicio.mascotaNombre || "pet"}`)
     }));
 }
@@ -2513,7 +2542,7 @@ function crearBadgeServiciosCita(cita) {
 
 function crearMiniCardsServiciosHtml(cita) {
   const servicios = obtenerServiciosVisualesCita(cita);
-  if (servicios.length <= 1) return "";
+  if (!servicios.length) return "";
 
   return `
     <section class="agenda-detail-services">
@@ -2531,11 +2560,83 @@ function crearMiniCardsServiciosHtml(cita) {
               ? `<p>${escapeHtml([servicio.mascotaNombre, servicio.raza ? `Raza: ${servicio.raza}` : "", formatearEdadMascota(servicio.mascotaEdad)].filter(Boolean).join(" / "))}</p>`
               : ""}
             ${servicio.notas ? `<p>${escapeHtml(servicio.notas)}</p>` : ""}
+            ${crearControlComportamientoMascota(servicio, cita, index)}
           </article>
         `).join("")}
       </div>
     </section>
   `;
+}
+
+const AGENDA_BEHAVIOR_LABELS = {
+  green: "Se deja trabajar",
+  orange: "Poco inquieto",
+  red: "No se deja o es agresivo"
+};
+
+function crearInsigniaComportamiento(behaviorFlag = "") {
+  const flag = AGENDA_BEHAVIOR_LABELS[behaviorFlag] ? behaviorFlag : "";
+  return `<span class="agenda-behavior-badge is-${escapeHtml(flag || "unclassified")}">Comportamiento: ${escapeHtml(flag ? AGENDA_BEHAVIOR_LABELS[flag] : "Sin clasificación")}</span>`;
+}
+
+function crearControlComportamientoMascota(servicio = {}, cita = {}, index = 0) {
+  if (servicio.tipo !== "mascota") return "";
+  const petId = String(servicio.clientItemId || "");
+  const badge = crearInsigniaComportamiento(servicio.behaviorFlag || "");
+  if (!petId) return `${badge}<small class="agenda-behavior-note">Vincula una mascota registrada para clasificarla.</small>`;
+  if (cita.estado !== "completada") return badge;
+  const name = `behavior-${String(cita.id || "appointment")}-${index}`;
+  const options = [
+    ["green", "Verde — Se deja trabajar"],
+    ["orange", "Naranja — Es poco inquieto"],
+    ["red", "Roja — No se deja o es agresivo"],
+    ["", "Sin clasificación"]
+  ];
+  return `
+    <form class="agenda-behavior-form" data-behavior-form data-pet-id="${escapeHtml(petId)}">
+      ${badge}
+      <fieldset><legend>Comportamiento durante el servicio</legend>
+        ${options.map(([value, label]) => `<label class="agenda-behavior-option is-${escapeHtml(value || "unclassified")}"><input type="radio" name="${escapeHtml(name)}" value="${escapeHtml(value)}" ${String(servicio.behaviorFlag || "") === value ? "checked" : ""}><span>${escapeHtml(label)}</span></label>`).join("")}
+      </fieldset>
+      <button type="submit" class="admin-button admin-button-dark">Guardar comportamiento</button>
+      <p data-behavior-status role="status" aria-live="polite"></p>
+    </form>`;
+}
+
+async function guardarComportamientoMascota(form) {
+  const petId = String(form?.dataset.petId || "");
+  const selected = form?.querySelector('input[type="radio"]:checked');
+  const status = form?.querySelector("[data-behavior-status]");
+  const controls = [...(form?.querySelectorAll("input, button") || [])];
+  if (!petId || !selected) return;
+  controls.forEach((control) => { control.disabled = true; });
+  if (status) status.textContent = "Guardando…";
+  try {
+    const data = await agendaFetch(`/admin/pets/${encodeURIComponent(petId)}/behavior`, {
+      method: "PATCH",
+      body: JSON.stringify({ behaviorFlag: selected.value })
+    });
+    citasAgenda.forEach((cita) => {
+      (Array.isArray(cita.serviciosDetalle) ? cita.serviciosDetalle : []).forEach((servicio) => {
+        if (String(servicio.clientItemId || "") === petId) servicio.behaviorFlag = data.pet?.behaviorFlag || "";
+      });
+    });
+    calendarioAgendaVisual?.refresh();
+    const cita = citasAgenda.find((item) => item.id === citaEnDetalleId);
+    if (cita) renderizarDetalleCita(cita);
+    mostrarFeedbackDetalle("Comportamiento actualizado");
+  } catch (error) {
+    if (status) status.textContent = error.message || "No se pudo actualizar";
+  } finally {
+    controls.forEach((control) => { control.disabled = false; });
+  }
+}
+
+function manejarComportamientoDetalle(event) {
+  const form = event.target.closest("[data-behavior-form]");
+  if (!form) return;
+  event.preventDefault();
+  guardarComportamientoMascota(form);
 }
 
 function crearDetalleServiciosHistorialHtml(cita) {
@@ -3816,26 +3917,90 @@ function formatearHoraResumen(value) {
   return `${hour % 12 || 12}:${match[2]} ${hour >= 12 ? "PM" : "AM"}`;
 }
 
-function construirResumenManana(appointments = []) {
-  if (!appointments.length) return "No hay citas programadas para mañana.";
-  return appointments.map((appointment) => {
-    const pets = Array.isArray(appointment.pets) ? appointment.pets : [];
-    const petLines = pets.map((pet) => {
-      const details = [pet.breed, formatearEdadMascota(pet.age)].filter(Boolean);
-      return `* ${pet.name || "Mascota sin nombre"}${details.length ? ` (${details.join(", ")})` : ""}`;
-    });
-    const services = [...new Set([appointment.service, ...pets.map((pet) => pet.package)].filter(Boolean))];
-    return [
-      `*${formatearHoraResumen(appointment.time)}*`, "",
-      `*${pets.length} ${pets.length === 1 ? "MASCOTA" : "MASCOTAS"}*`, "",
-      ...petLines, "", "*SERVICIO*", "", `* ${services.join(", ") || "No disponible"}`, "",
-      "*CLIENTE*", "", `* ${appointment.clientName || "No disponible"}`, "",
-      "*CELULAR*", "", `* ${appointment.clientPhone || "No disponible"}`, "",
-      "*DIRECCIÓN*", "", `* ${appointment.address || "No disponible"}`, "",
-      "*UBICACIÓN*", "", `* ${obtenerUrlUbicacionCita(appointment) || "No disponible"}`, "",
-      "*COMENTARIOS*", "", `* ${appointment.notes || "Sin comentarios"}`
-    ].join("\n");
-  }).join("\n\n━━━━━━━━━━━━━\n\n");
+function normalizarTextoResumen(value) {
+  const text = String(value ?? "").trim();
+  return ["undefined", "null"].includes(text.toLowerCase()) ? "" : text;
+}
+
+function formatearFechaResumenManana(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+  if (!match) return "";
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+  const formatted = new Intl.DateTimeFormat("es-MX", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Mexico_City"
+  }).format(date).replace(",", "");
+  return formatted ? `${formatted.charAt(0).toUpperCase()}${formatted.slice(1)}` : "";
+}
+
+function construirResumenManana(appointments = [], summaryDate = "") {
+  const header = "🐾 *CITAS PARA MAÑANA* 🐾";
+  if (!appointments.length) return `${header}\n\nNo hay citas programadas para mañana.`;
+
+  const dateLabel = formatearFechaResumenManana(summaryDate);
+  const sortedAppointments = [...appointments].sort((left, right) => {
+    const leftTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(left?.time || "")) ? left.time : "99:99";
+    const rightTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(right?.time || "")) ? right.time : "99:99";
+    return leftTime.localeCompare(rightTime);
+  });
+  const countLine = `Tenemos ${sortedAppointments.length} ${sortedAppointments.length === 1 ? "cita programada" : "citas programadas"}:`;
+  const heading = [header, dateLabel ? `📅 ${dateLabel}` : "", "", countLine].join("\n");
+
+  const appointmentBlocks = sortedAppointments.map((appointment) => {
+    const pets = Array.isArray(appointment?.pets) ? appointment.pets : [];
+    const vehicles = Array.isArray(appointment?.vehicles) ? appointment.vehicles : [];
+    const sections = ["──────────────", `🕒 *${formatearHoraResumen(appointment?.time)}*`];
+
+    if (pets.length) {
+      sections.push("", pets.length === 1 ? "🐶 *1 MASCOTA*" : `🐶 *MASCOTAS (${pets.length})*`);
+      pets.forEach((pet) => {
+        const name = normalizarTextoResumen(pet?.name) || "Mascota sin nombre";
+        const details = [normalizarTextoResumen(pet?.breed), formatearEdadMascota(pet?.age)].filter(Boolean);
+        sections.push(`• ${name}${details.length ? ` — ${details.join(", ")}` : ""}`);
+      });
+    }
+
+    if (vehicles.length) {
+      sections.push("", vehicles.length === 1 ? "🚗 *1 VEHÍCULO*" : `🚗 *VEHÍCULOS (${vehicles.length})*`);
+      vehicles.forEach((vehicle, index) => {
+        const name = normalizarTextoResumen(vehicle?.name) || `Vehículo ${index + 1}`;
+        const type = normalizarTextoResumen(vehicle?.type);
+        sections.push(`• ${name}${type && type !== name ? ` — ${type}` : ""}`);
+      });
+    }
+
+    const petServices = pets.map((pet) => ({
+      subject: normalizarTextoResumen(pet?.name) || "Mascota sin nombre",
+      service: normalizarTextoResumen(pet?.package)
+    })).filter((item) => item.service);
+    const vehicleServices = vehicles.map((vehicle, index) => ({
+      subject: normalizarTextoResumen(vehicle?.name) || `Vehículo ${index + 1}`,
+      service: normalizarTextoResumen(vehicle?.package)
+    })).filter((item) => item.service);
+
+    if (petServices.length) {
+      sections.push("", vehicles.length ? "🛁 *SERVICIOS DE MASCOTAS*" : "🛁 *SERVICIOS*");
+      petServices.forEach((item) => sections.push(`• ${item.subject}: ${item.service}`));
+    }
+    if (vehicleServices.length) {
+      sections.push("", pets.length ? "🧼 *SERVICIOS DE VEHÍCULOS*" : "🧼 *SERVICIOS*");
+      vehicleServices.forEach((item) => sections.push(`• ${item.subject}: ${item.service}`));
+    }
+
+    sections.push(
+      "", "👤 *CLIENTE*", normalizarTextoResumen(appointment?.clientName) || "No disponible",
+      "", "📞 *CELULAR*", normalizarTextoResumen(appointment?.clientPhone) || "No disponible",
+      "", "📍 *DIRECCIÓN*", normalizarTextoResumen(appointment?.address) || "No disponible",
+      "", "🗺️ *UBICACIÓN*", normalizarTextoResumen(obtenerUrlUbicacionCita(appointment)) || "No disponible",
+      "", "📝 *COMENTARIOS*", normalizarTextoResumen(appointment?.notes) || "Sin comentarios"
+    );
+    return sections.join("\n");
+  });
+
+  return `${heading}\n\n${appointmentBlocks.join("\n\n")}`;
 }
 
 function abrirModalResumenManana() {
@@ -4036,7 +4201,7 @@ async function handleResumenMananaClick(event) {
     const data = await obtenerResumenManana();
     console.log("[RESUMEN] 6 después del fetch");
     const appointments = Array.isArray(data.appointments) ? data.appointments : [];
-    const text = construirResumenManana(appointments);
+    const text = construirResumenManana(appointments, data.date);
     actualizarAccionesAdjuntosResumen(appointments);
     if (meta) meta.textContent = `${formatearFechaAgenda(data.date)} - ${appointments.length} ${appointments.length === 1 ? "cita" : "citas"}`;
     if (textArea) textArea.value = text;
@@ -4118,6 +4283,7 @@ async function configurarAgenda() {
   elementos.clienteTelefono?.addEventListener("input", () => {
     lookupClienteTelefono = "";
     rewardClienteActual = null;
+    mascotasPersistentesCliente = [];
     mostrarAvisoLookupCliente("");
     mostrarAvisoProgresoRecompensa(null);
     actualizarPanelAplicarRecompensa();
@@ -4132,6 +4298,7 @@ async function configurarAgenda() {
   elementos.clienteTelefonoPais?.addEventListener("change", () => {
     lookupClienteTelefono = "";
     rewardClienteActual = null;
+    mascotasPersistentesCliente = [];
     mostrarAvisoLookupCliente("");
     mostrarAvisoProgresoRecompensa(null);
     actualizarPanelAplicarRecompensa();
@@ -4155,6 +4322,7 @@ async function configurarAgenda() {
   elementos.serviciosDetalleContainer?.addEventListener("change", (event) => {
     const bloque = event.target.closest("[data-service-block]");
     if (!bloque) return;
+    aplicarMascotaPersistenteSeleccionada(event.target);
     sincronizarServicioPrincipalDesdeBloques("");
     actualizarDuracionFormulario("");
     actualizarDisponibilidadCrear();
@@ -4191,6 +4359,7 @@ async function configurarAgenda() {
   elementos.editServiciosDetalleContainer?.addEventListener("change", (event) => {
     const bloque = event.target.closest("[data-service-block]");
     if (!bloque) return;
+    aplicarMascotaPersistenteSeleccionada(event.target);
     servicioEdicionActualizado = true;
     sincronizarServicioPrincipalDesdeBloques("edit");
     actualizarDuracionFormulario("edit");
@@ -4278,6 +4447,7 @@ async function configurarAgenda() {
     cambiarEstadoDesdeDetalle(event.target.value);
   });
   elementos.detailGuardarCalificacion?.addEventListener("click", guardarCalificacionDesdeDetalle);
+  elementos.detailContent?.addEventListener("submit", manejarComportamientoDetalle);
   elementos.detailEditar?.addEventListener("click", editarDesdeDetalle);
   elementos.detailCopiarResumen?.addEventListener("click", () => {
     const cita = obtenerCitaDetalleActual();

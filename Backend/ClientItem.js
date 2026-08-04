@@ -96,6 +96,11 @@ const ClientItemSchema = new mongoose.Schema(
       trim: true,
       maxlength: 180,
       default: ""
+    },
+    behaviorFlag: {
+      type: String,
+      enum: ["green", "orange", "red"],
+      default: undefined
     }
   },
   { timestamps: true }

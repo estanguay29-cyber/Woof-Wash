@@ -5,6 +5,10 @@ let customers = [];
 let selectedCustomerId = "";
 let selectedCustomerAccounts = [];
 let customersLoadPromise = null;
+let activeCustomerRequestController = null;
+let activeCustomerRequestId = 0;
+let activeCustomerRequestPromise = null;
+let loadedCustomerId = "";
 
 function customersApiBase() {
   const hostname = window.location.hostname;
@@ -110,7 +114,15 @@ function cerrarSesionCustomers() {
 
 async function customersFetch(path, options = {}) {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+  const externalSignal = options.signal;
+  let timedOut = false;
+  const abortFromExternal = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 15000);
   const headers = {
     Authorization: `Bearer ${customersToken}`,
     ...(options.headers || {})
@@ -120,28 +132,35 @@ async function customersFetch(path, options = {}) {
   const url = `${customersApiBase()}${path}`;
   let res;
   try {
-    res = await fetch(url, { ...options, headers, signal: options.signal || controller.signal });
+    res = await fetch(url, { ...options, headers, signal: controller.signal });
   } catch (error) {
-    if (error?.name === "AbortError") throw { status: 0, message: "La consulta tardó demasiado. Intenta nuevamente." };
+    if (error?.name === "AbortError" && !timedOut) {
+      throw { name: "AbortError", status: 0, code: "ABORTED", message: "Solicitud cancelada." };
+    }
+    if (error?.name === "AbortError") {
+      throw { status: 0, code: "TIMEOUT", message: "La consulta tardó demasiado. Intenta nuevamente." };
+    }
     throw { status: 0, message: "No fue posible conectar con el servidor." };
   } finally {
     window.clearTimeout(timeoutId);
+    externalSignal?.removeEventListener("abort", abortFromExternal);
   }
   const responseText = await res.text();
   let data;
   try {
     data = responseText ? JSON.parse(responseText) : {};
   } catch {
-    console.error("[CUSTOMERS] Respuesta no JSON:", { status: res.status, url });
+    console.error("[CUSTOMERS] Respuesta no JSON:", { status: res.status });
     throw { status: res.status, message: "El servidor devolvió una respuesta inválida." };
   }
 
   if (!res.ok) {
-    console.error("[CUSTOMERS] Error HTTP:", { status: res.status, message: data.message || "Sin detalle", url });
+    console.error("[CUSTOMERS] Error HTTP:", { status: res.status });
     if (res.status === 401) cerrarSesionCustomers();
     const safeMessages = {
       401: "Tu sesión expiró. Inicia sesión nuevamente.",
       403: "No tienes permisos para consultar clientes.",
+      404: "El cliente solicitado no existe o ya no está disponible.",
       500: "Ocurrió un error al consultar clientes."
     };
     throw { status: res.status, message: safeMessages[res.status] || "No se pudo completar la solicitud." };
@@ -536,10 +555,25 @@ function renderClientItem(item = {}) {
         ["Pelo", item.tipoPelo],
         ["Notas", item.cuidados]
       ];
+  const behaviorLabels = {
+    green: "Se deja trabajar",
+    orange: "Poco inquieto",
+    red: "No se deja o es agresivo"
+  };
+  const behaviorFlag = behaviorLabels[item.behaviorFlag] ? item.behaviorFlag : "";
+  const behavior = esAuto ? "" : `
+    <form class="customer-behavior-form" data-form="pet-behavior" data-pet-id="${esc(item.id)}">
+      <span class="customer-behavior-badge is-${esc(behaviorFlag || "unclassified")}">Comportamiento: ${esc(behaviorLabels[behaviorFlag] || "Sin clasificación")}</span>
+      <fieldset><legend>Clasificación de comportamiento</legend>
+        ${[["green", "Verde — Se deja trabajar"], ["orange", "Naranja — Es poco inquieto"], ["red", "Roja — No se deja o es agresivo"], ["", "Sin clasificación"]].map(([value, label]) => `<label class="customer-behavior-option is-${esc(value || "unclassified")}"><input type="radio" name="behaviorFlag" value="${esc(value)}" ${behaviorFlag === value ? "checked" : ""}><span>${esc(label)}</span></label>`).join("")}
+      </fieldset>
+      <button class="customer-action-button" type="submit">Guardar comportamiento</button>
+      <p data-behavior-status role="status" aria-live="polite"></p>
+    </form>`;
   return `
     <article class="customer-item-card">
       <div class="customer-item-photo">
-        ${item.fotoUrl ? `<img src="${esc(item.fotoUrl)}" alt="${esc(titulo)}">` : `<span>${esc(esAuto ? "Auto" : "Mascota")}</span>`}
+        ${item.fotoUrl ? `<img src="${esc(item.fotoUrl)}" alt="${esc(titulo)}" loading="lazy" decoding="async">` : `<span>${esc(esAuto ? "Auto" : "Mascota")}</span>`}
       </div>
       <div>
         <strong>${esc(titulo)}</strong>
@@ -547,6 +581,7 @@ function renderClientItem(item = {}) {
         <div class="customer-item-grid">
           ${detalles.filter(([, value]) => String(value || "").trim()).map(([label, value]) => `<span><strong>${esc(label)}</strong>${esc(value)}</span>`).join("") || "<span>Sin detalles adicionales</span>"}
         </div>
+        ${behavior}
       </div>
     </article>
   `;
@@ -707,6 +742,27 @@ function renderCustomerDetail(cliente, cuentas = []) {
   `;
 }
 
+function renderCustomerLoadingState() {
+  const detail = byId("customerDetail");
+  if (!detail) return;
+  detail.innerHTML = `
+    <div class="customer-empty" role="status" aria-live="polite" aria-busy="true">
+      Cargando información del cliente…
+    </div>
+  `;
+}
+
+function renderCustomerErrorState(message) {
+  const detail = byId("customerDetail");
+  if (!detail) return;
+  detail.innerHTML = `
+    <div class="customer-empty" role="alert" aria-live="assertive">
+      <p>${esc(message || "No se pudo cargar la información del cliente.")}</p>
+      <button type="button" class="customer-action-button" data-action="retry-customer">Reintentar</button>
+    </div>
+  `;
+}
+
 async function loadCustomers() {
   if (customersLoadPromise) return customersLoadPromise;
   customersLoadPromise = (async () => {
@@ -719,7 +775,7 @@ async function loadCustomers() {
   customers = receivedCustomers;
   if (selectedCustomerId && !customers.some((item) => item.id === selectedCustomerId)) selectedCustomerId = "";
   renderCustomersList();
-  if (selectedCustomerId) await selectCustomer(selectedCustomerId);
+  if (selectedCustomerId) await selectCustomer(selectedCustomerId, { force: true });
   })();
   try {
     return await customersLoadPromise;
@@ -728,12 +784,43 @@ async function loadCustomers() {
   }
 }
 
-async function selectCustomer(id) {
-  selectedCustomerId = id;
+async function selectCustomer(id, { force = false } = {}) {
+  const customerId = String(id || "").trim();
+  if (!customerId) return;
+  if (!force && customerId === selectedCustomerId && loadedCustomerId === customerId) return;
+  if (!force && customerId === selectedCustomerId && activeCustomerRequestPromise) {
+    return activeCustomerRequestPromise;
+  }
+
+  activeCustomerRequestController?.abort();
+  const requestId = ++activeCustomerRequestId;
+  const controller = new AbortController();
+  activeCustomerRequestController = controller;
+  selectedCustomerId = customerId;
+  loadedCustomerId = "";
+  selectedCustomerAccounts = [];
   renderCustomersList();
-  const data = await customersFetch(`/admin/customers/${encodeURIComponent(id)}`);
-  selectedCustomerAccounts = data.cuentasCoincidentes || [];
-  renderCustomerDetail(data.cliente, selectedCustomerAccounts);
+  renderCustomerLoadingState();
+
+  const requestPromise = (async () => {
+    try {
+      const data = await customersFetch(`/admin/customers/${encodeURIComponent(customerId)}`, { signal: controller.signal });
+      if (requestId !== activeCustomerRequestId || customerId !== selectedCustomerId) return;
+      selectedCustomerAccounts = Array.isArray(data.cuentasCoincidentes) ? data.cuentasCoincidentes : [];
+      loadedCustomerId = customerId;
+      renderCustomerDetail(data.cliente || {}, selectedCustomerAccounts);
+    } catch (error) {
+      if (error?.name === "AbortError" || error?.code === "ABORTED" || requestId !== activeCustomerRequestId) return;
+      renderCustomerErrorState(error?.message || "No se pudo cargar la información del cliente.");
+    } finally {
+      if (requestId === activeCustomerRequestId) {
+        activeCustomerRequestController = null;
+        activeCustomerRequestPromise = null;
+      }
+    }
+  })();
+  activeCustomerRequestPromise = requestPromise;
+  return requestPromise;
 }
 
 async function postCustomerAction(path, body = {}) {
@@ -743,7 +830,6 @@ async function postCustomerAction(path, body = {}) {
   });
   mostrarCustomersFeedback(data.message || "Accion completada");
   await loadCustomers();
-  if (selectedCustomerId) await selectCustomer(selectedCustomerId);
 }
 
 function collectForm(form) {
@@ -774,7 +860,9 @@ async function handleDetailClick(event) {
   const action = actionButton.dataset.action;
 
   try {
-    if (action === "open-whatsapp") {
+    if (action === "retry-customer" && selectedCustomerId) {
+      await selectCustomer(selectedCustomerId, { force: true });
+    } else if (action === "open-whatsapp") {
       abrirWhatsAppCliente(actionButton.dataset.phone);
     } else if (action === "cancel-reminder-frequency") {
       const form = actionButton.closest('form[data-form="reminder-frequency"]');
@@ -832,6 +920,31 @@ async function guardarFrecuenciaRecordatorio(form) {
   }
 }
 
+async function guardarComportamientoMascotaCliente(form) {
+  const petId = String(form.dataset.petId || "");
+  const selected = form.querySelector('input[name="behaviorFlag"]:checked');
+  const status = form.querySelector("[data-behavior-status]");
+  const controls = [...form.querySelectorAll("input, button")];
+  if (!petId || !selected) return;
+  controls.forEach((control) => { control.disabled = true; });
+  if (status) status.textContent = "Guardando…";
+  try {
+    const result = await customersFetch(`/admin/pets/${encodeURIComponent(petId)}/behavior`, {
+      method: "PATCH",
+      body: JSON.stringify({ behaviorFlag: selected.value })
+    });
+    const customer = customers.find((item) => item.id === selectedCustomerId);
+    const pet = customer?.clientItemsMascotas?.find((item) => String(item.id) === petId);
+    if (pet) pet.behaviorFlag = result.pet?.behaviorFlag || "";
+    await selectCustomer(selectedCustomerId, { force: true });
+    mostrarCustomersFeedback(result.message || "Comportamiento actualizado");
+  } catch (error) {
+    if (status) status.textContent = error.message || "No se pudo actualizar";
+  } finally {
+    controls.forEach((control) => { control.disabled = false; });
+  }
+}
+
 async function handleDetailSubmit(event) {
   const form = event.target.closest("form[data-form]");
   if (!form || !selectedCustomerId) return;
@@ -841,6 +954,10 @@ async function handleDetailSubmit(event) {
 
   if (formType === "reminder-frequency") {
     await guardarFrecuenciaRecordatorio(form);
+    return;
+  }
+  if (formType === "pet-behavior") {
+    await guardarComportamientoMascotaCliente(form);
     return;
   }
 
@@ -858,11 +975,18 @@ async function handleDetailSubmit(event) {
       });
       mostrarCustomersFeedback(result.message || "Notas actualizadas");
       await loadCustomers();
-      await selectCustomer(selectedCustomerId);
     }
   } catch (error) {
     mostrarCustomersFeedback(error.message || "No se pudo guardar", "error");
   }
+}
+
+function handleCustomerDetailImageError(event) {
+  const image = event.target.closest?.(".customer-item-photo img");
+  if (!image) return;
+  const placeholder = document.createElement("span");
+  placeholder.textContent = "Sin foto";
+  image.replaceWith(placeholder);
 }
 
 async function iniciarCustomers() {
@@ -904,5 +1028,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   byId("customerDetail")?.addEventListener("click", handleDetailClick);
   byId("customerDetail")?.addEventListener("submit", handleDetailSubmit);
+  byId("customerDetail")?.addEventListener("error", handleCustomerDetailImageError, true);
   iniciarCustomers();
 });
