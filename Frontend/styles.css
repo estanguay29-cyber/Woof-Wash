@@ -10107,6 +10107,12 @@ body {
 .agenda-behavior-option input:checked + span { border-color: #0b2a6b; box-shadow: 0 0 0 2px rgba(11,42,107,.14); }
 .agenda-behavior-option input:focus-visible + span { outline: 3px solid rgba(37,99,235,.35); outline-offset: 2px; }
 .agenda-behavior-form [data-behavior-status] { min-height: 1.2em; margin: 0; }
+.agenda-behavior-readonly { display: grid; gap: 6px; min-width: 0; margin-top: 8px; }
+.agenda-behavior-existing { display: grid; gap: 6px; min-width: 0; font-weight: 700; }
+.agenda-behavior-existing select { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; }
+.agenda-behavior-create-confirm { display: flex; min-width: 0; align-items: flex-start; gap: 9px; padding: 9px; border: 1px solid #dbe3ef; border-radius: 10px; background: #f8fafc; cursor: pointer; }
+.agenda-behavior-create-confirm input { flex: 0 0 auto; width: 20px; height: 20px; margin-top: 1px; }
+.agenda-behavior-create-confirm span { min-width: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 430px) {
   .agenda-behavior-form fieldset { grid-template-columns: minmax(0, 1fr); }

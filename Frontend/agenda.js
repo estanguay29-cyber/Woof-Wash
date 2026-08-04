@@ -182,7 +182,10 @@ async function agendaFetch(path, options = {}) {
 
   if (!res.ok) {
     manejarRespuestaAuthAgenda(res, data);
-    throw new Error(data.message || data.error || "No se pudo completar la solicitud");
+    const error = new Error(data.message || data.error || "No se pudo completar la solicitud");
+    error.status = res.status;
+    error.data = data;
+    throw error;
   }
 
   const method = String(options.method || "GET").toUpperCase();
@@ -2466,6 +2469,8 @@ function normalizarServiciosDetalleCita(cita) {
       fotoUrl: String(servicio.fotoUrl || ""),
       fotoPublicId: String(servicio.fotoPublicId || ""),
       clientItemId: String(servicio.clientItemId || ""),
+      behaviorFlag: ["green", "orange", "red"].includes(servicio.behaviorFlag) ? servicio.behaviorFlag : "",
+      serviceRef: String(servicio.serviceRef || ""),
       _clientId: String(servicio._clientId || `saved-${index}-${servicio.fotoPublicId || servicio.mascotaNombre || "pet"}`)
     }));
 }
@@ -2579,53 +2584,91 @@ function crearInsigniaComportamiento(behaviorFlag = "") {
   return `<span class="agenda-behavior-badge is-${escapeHtml(flag || "unclassified")}">Comportamiento: ${escapeHtml(flag ? AGENDA_BEHAVIOR_LABELS[flag] : "Sin clasificación")}</span>`;
 }
 
+function normalizarEstadoComportamiento(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+}
+
+function citaEstaCompletadaParaComportamiento(cita = {}) {
+  return [cita.estado, cita.estadoOperativo]
+    .map(normalizarEstadoComportamiento)
+    .some((estado) => ["completada", "completado", "finalizada", "finalizado"].includes(estado));
+}
+
 function crearControlComportamientoMascota(servicio = {}, cita = {}, index = 0) {
   if (servicio.tipo !== "mascota") return "";
   const petId = String(servicio.clientItemId || "");
+  const serviceRef = String(servicio.serviceRef || "");
   const badge = crearInsigniaComportamiento(servicio.behaviorFlag || "");
-  if (!petId) return `${badge}<small class="agenda-behavior-note">Vincula una mascota registrada para clasificarla.</small>`;
-  if (cita.estado !== "completada") return badge;
+  if (!citaEstaCompletadaParaComportamiento(cita)) {
+    return `<div class="agenda-behavior-readonly"><strong>Comportamiento</strong>${badge}<small class="agenda-behavior-note">Solo puede modificarse desde una cita completada.</small></div>`;
+  }
   const name = `behavior-${String(cita.id || "appointment")}-${index}`;
   const options = [
     ["green", "Verde — Se deja trabajar"],
-    ["orange", "Naranja — Es poco inquieto"],
-    ["red", "Roja — No se deja o es agresivo"],
+    ["orange", "Naranja — Poco inquieto"],
+    ["red", "Roja — No se deja / agresivo"],
     ["", "Sin clasificación"]
   ];
   return `
-    <form class="agenda-behavior-form" data-behavior-form data-pet-id="${escapeHtml(petId)}">
+    <form class="agenda-behavior-form" data-behavior-form data-pet-id="${escapeHtml(petId)}" data-appointment-id="${escapeHtml(cita.id || "")}" data-service-ref="${escapeHtml(serviceRef)}">
       ${badge}
       <fieldset><legend>Comportamiento durante el servicio</legend>
         ${options.map(([value, label]) => `<label class="agenda-behavior-option is-${escapeHtml(value || "unclassified")}"><input type="radio" name="${escapeHtml(name)}" value="${escapeHtml(value)}" ${String(servicio.behaviorFlag || "") === value ? "checked" : ""}><span>${escapeHtml(label)}</span></label>`).join("")}
       </fieldset>
-      <button type="submit" class="admin-button admin-button-dark">Guardar comportamiento</button>
+      ${petId ? "" : `
+        <small class="agenda-behavior-note">Esta mascota todavía no está vinculada a un perfil persistente.</small>
+        <label class="agenda-behavior-existing hidden" data-pet-candidates-wrapper>Mascota persistente<select data-pet-candidates><option value="">Selecciona la mascota correcta</option></select></label>
+        <label class="agenda-behavior-create-confirm"><input type="checkbox" data-confirm-pet-create><span>Confirmo que deseo crear la mascota si no existe una coincidencia segura usando: ${escapeHtml(servicio.mascotaNombre || "Sin nombre")}, ${escapeHtml(servicio.raza || "sin raza")}, ${escapeHtml(formatearEdadMascota(servicio.mascotaEdad) || "sin edad")}.</span></label>
+      `}
+      <button type="submit" class="admin-button admin-button-dark" ${!petId && !serviceRef ? "disabled" : ""}>${petId ? "Guardar comportamiento" : "Vincular y guardar comportamiento"}</button>
+      ${!petId && !serviceRef ? '<small class="agenda-behavior-note">Esta cita antigua no tiene un identificador seguro de servicio.</small>' : ""}
       <p data-behavior-status role="status" aria-live="polite"></p>
     </form>`;
 }
 
+function mostrarCandidatosComportamiento(form, candidates = []) {
+  const wrapper = form?.querySelector("[data-pet-candidates-wrapper]");
+  const select = form?.querySelector("[data-pet-candidates]");
+  if (!wrapper || !select || !Array.isArray(candidates) || !candidates.length) return;
+  select.innerHTML = `<option value="">Selecciona la mascota correcta</option>${candidates.map((pet) => `<option value="${escapeHtml(pet.id || "")}">${escapeHtml([pet.nombre, pet.raza, pet.edad].filter(Boolean).join(" · ") || "Mascota")}</option>`).join("")}`;
+  wrapper.classList.remove("hidden");
+}
+
 async function guardarComportamientoMascota(form) {
   const petId = String(form?.dataset.petId || "");
+  const appointmentId = String(form?.dataset.appointmentId || "");
+  const serviceRef = String(form?.dataset.serviceRef || "");
   const selected = form?.querySelector('input[type="radio"]:checked');
   const status = form?.querySelector("[data-behavior-status]");
-  const controls = [...(form?.querySelectorAll("input, button") || [])];
-  if (!petId || !selected) return;
+  const controls = [...(form?.querySelectorAll("input, select, button") || [])];
+  if (!selected || (!petId && (!appointmentId || !serviceRef))) return;
   controls.forEach((control) => { control.disabled = true; });
   if (status) status.textContent = "Guardando…";
   try {
-    const data = await agendaFetch(`/admin/pets/${encodeURIComponent(petId)}/behavior`, {
-      method: "PATCH",
-      body: JSON.stringify({ behaviorFlag: selected.value })
-    });
+    const candidateId = String(form.querySelector("[data-pet-candidates]")?.value || "");
+    const createIfMissing = Boolean(form.querySelector("[data-confirm-pet-create]")?.checked);
+    const data = petId
+      ? await agendaFetch(`/admin/pets/${encodeURIComponent(petId)}/behavior`, { method: "PATCH", body: JSON.stringify({ behaviorFlag: selected.value }) })
+      : await agendaFetch(`/admin/appointments/${encodeURIComponent(appointmentId)}/link-pet-behavior`, {
+        method: "POST",
+        body: JSON.stringify({ serviceRef, behaviorFlag: selected.value, ...(candidateId ? { petId: candidateId } : {}), createIfMissing })
+      });
+    const resolvedPetId = String(data.pet?.id || petId);
     citasAgenda.forEach((cita) => {
       (Array.isArray(cita.serviciosDetalle) ? cita.serviciosDetalle : []).forEach((servicio) => {
-        if (String(servicio.clientItemId || "") === petId) servicio.behaviorFlag = data.pet?.behaviorFlag || "";
+        if ((petId && String(servicio.clientItemId || "") === petId)
+          || (!petId && String(cita.id || "") === appointmentId && String(servicio.serviceRef || "") === serviceRef)) {
+          servicio.clientItemId = resolvedPetId;
+          servicio.behaviorFlag = data.pet?.behaviorFlag || "";
+        }
       });
     });
     calendarioAgendaVisual?.refresh();
     const cita = citasAgenda.find((item) => item.id === citaEnDetalleId);
     if (cita) renderizarDetalleCita(cita);
-    mostrarFeedbackDetalle("Comportamiento actualizado");
+    mostrarFeedbackDetalle(data.message || "Comportamiento actualizado");
   } catch (error) {
+    mostrarCandidatosComportamiento(form, error?.data?.candidates);
     if (status) status.textContent = error.message || "No se pudo actualizar";
   } finally {
     controls.forEach((control) => { control.disabled = false; });

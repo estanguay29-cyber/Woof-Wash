@@ -62,12 +62,34 @@ test("endpoint de comportamiento está limitado a admin y a un único campo", ()
 });
 
 test("DTO de empleado y cliente eliminan identificador y comportamiento", () => {
-  assert.match(serverSource, /map\(\(\{ clientItemId, behaviorFlag, \.\.\.servicio \}\) => servicio\)/);
-  assert.match(serverSource, /map\(\(\{ clientItemId, behaviorFlag, \.\.\.servicio \}\) => servicio\)/);
+  assert.match(serverSource, /map\(\(\{ clientItemId, behaviorFlag, serviceRef, \.\.\.servicio \}\) => servicio\)/);
   const clientDto = serverSource.slice(serverSource.indexOf("function construirClientItemRespuesta"), serverSource.indexOf("function limpiarClientItemPayload"));
   const adminDto = serverSource.slice(serverSource.indexOf("function construirClientItemAdminRespuesta"), serverSource.indexOf("async function obtenerCitasPosiblesCustomer"));
   assert.doesNotMatch(clientDto, /behaviorFlag/);
   assert.match(adminDto, /behaviorFlag/);
+});
+
+test("vinculación administrativa valida servicio, cliente y escritura acotada", () => {
+  const start = serverSource.indexOf('app.post("/admin/appointments/:appointmentId/link-pet-behavior"');
+  const route = serverSource.slice(start, serverSource.indexOf('app.patch("/admin/pets/:petId/behavior"', start));
+  assert.match(route, /auth, requireAdmin, adminWriteLimiter/);
+  assert.match(route, /resolverReferenciaServicioMascota\(appointment, serviceRef\)/);
+  assert.match(route, /target\.servicio\.clientItemId/);
+  assert.match(route, /userId: clientUserId, tipo: "mascota"/);
+  assert.match(route, /code: "AMBIGUOUS_PET"/);
+  assert.match(route, /createIfMissing/);
+  assert.match(route, /`\$\{prefix\}\.clientItemId`\]: pet\._id/);
+  assert.match(route, /ClientItem\.deleteOne/);
+  assert.doesNotMatch(route, /updateMany|replaceOne|appointment\.save\(/);
+});
+
+test("referencia de servicio combina índice con huella verificable", () => {
+  const start = serverSource.indexOf("function crearReferenciaServicioMascota");
+  const block = serverSource.slice(start, serverSource.indexOf("function construirServiciosDetalleCompatibles", start));
+  assert.match(block, /createHash\("sha256"\)/);
+  assert.match(block, /mascotaNombre/);
+  assert.match(block, /mascotaEdad/);
+  assert.match(block, /crearReferenciaServicioMascota\(cita\?\._id, servicio, index\) === serviceRef/);
 });
 
 test("las consultas GET no crean mascotas ni escriben behaviorFlag", () => {

@@ -1792,7 +1792,7 @@ async function construirFidelidadClientePorUserId(userId) {
 function construirCitaClientePortal(cita) {
   const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
   const serviciosDetalle = construirServiciosDetalleCompatibles(obj)
-    .map(({ clientItemId, behaviorFlag, ...servicio }) => servicio);
+    .map(({ clientItemId, behaviorFlag, serviceRef, ...servicio }) => servicio);
   const tipo = obtenerTipoGeneralServicioAgenda(obj);
   const direccionTexto = typeof obj.direccion === "string" ? obj.direccion : "";
   const empleadosAsignadosNombres = Array.isArray(obj.empleadosAsignadosNombres)
@@ -2240,6 +2240,28 @@ function normalizarServiciosDetalleAgenda(value) {
   return { servicios };
 }
 
+function crearReferenciaServicioMascota(citaId, servicio = {}, index = 0) {
+  const payload = JSON.stringify([
+    String(citaId || ""), Number(index), String(servicio.tipo || ""),
+    String(servicio.mascotaNombre || "").trim().toLowerCase(),
+    String(servicio.raza || "").trim().toLowerCase(),
+    Number.isInteger(servicio.mascotaEdad) ? servicio.mascotaEdad : null,
+    String(servicio.categoria || ""), String(servicio.paquete || "")
+  ]);
+  const digest = crypto.createHash("sha256").update(payload).digest("hex").slice(0, 20);
+  return `${index}.${digest}`;
+}
+
+function resolverReferenciaServicioMascota(cita, serviceRef) {
+  const match = /^(\d+)\.([a-f0-9]{20})$/.exec(String(serviceRef || ""));
+  if (!match) return null;
+  const index = Number(match[1]);
+  const servicios = Array.isArray(cita?.serviciosDetalle) ? cita.serviciosDetalle : [];
+  const servicio = servicios[index];
+  if (!servicio || servicio.tipo !== "mascota") return null;
+  return crearReferenciaServicioMascota(cita?._id, servicio, index) === serviceRef ? { index, servicio } : null;
+}
+
 function construirServiciosDetalleCompatibles(cita) {
   const obj = typeof cita?.toObject === "function" ? cita.toObject() : cita;
   if (Array.isArray(obj?.serviciosDetalle) && obj.serviciosDetalle.length) {
@@ -2265,7 +2287,8 @@ function construirServiciosDetalleCompatibles(cita) {
       fotoPublicId: String(servicio.fotoPublicId || "").trim(),
       clientItemId: clientItem ? String(clientItem._id) : (servicio.clientItemId ? String(servicio.clientItemId) : ""),
       behaviorFlag: ["green", "orange", "red"].includes(clientItem?.behaviorFlag) ? clientItem.behaviorFlag : "",
-      duracionMinutos: Number(servicio.duracionMinutos) || 0
+      duracionMinutos: Number(servicio.duracionMinutos) || 0,
+      serviceRef: servicio.tipo === "mascota" ? crearReferenciaServicioMascota(obj._id, servicio, index) : ""
       });
     });
   }
@@ -2969,7 +2992,7 @@ const { contarServiciosCita, calcularMetricasEmpleado, calcularPuntualidadCita, 
 function construirCitaEmpleado(cita) {
   const base = construirCitaAdmin(cita);
   const serviciosSinFotoPrivada = base.serviciosDetalle.map(({ fotoPublicId, ...servicio }) => servicio);
-  const serviciosDetalleEmpleado = serviciosSinFotoPrivada.map(({ clientItemId, behaviorFlag, ...servicio }) => servicio);
+  const serviciosDetalleEmpleado = serviciosSinFotoPrivada.map(({ clientItemId, behaviorFlag, serviceRef, ...servicio }) => servicio);
   return {
     id: base.id,
     clienteNombre: base.clienteNombre,
@@ -6759,6 +6782,158 @@ app.post("/admin/customers/:id/loyalty-adjustments", auth, requireAdmin, adminWr
     res.json({ message: "Ajuste registrado", cliente: await construirResumenCustomerProfile(customer) });
   } catch (error) {
     res.status(500).json({ message: "No se pudo registrar el ajuste" });
+  }
+});
+
+function normalizarCoincidenciaMascota(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function citaPermiteComportamiento(cita = {}) {
+  const estados = [cita.estado, cita.estadoOperativo].map(normalizarCoincidenciaMascota);
+  return estados.some((estado) => ["completada", "completado", "finalizada", "finalizado"].includes(estado));
+}
+
+function candidatosMascotaAdmin(items = []) {
+  return items.map((item) => ({
+    id: String(item._id),
+    nombre: item.nombre || "Mascota sin nombre",
+    raza: item.raza || "",
+    edad: item.edad || ""
+  }));
+}
+
+app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  let createdPet = null;
+  try {
+    const appointmentId = obtenerObjectIdSeguro(req.params.appointmentId);
+    const allowedKeys = ["serviceRef", "behaviorFlag", "petId", "createIfMissing"];
+    const bodyKeys = Object.keys(req.body || {});
+    const serviceRef = String(req.body?.serviceRef || "");
+    const behaviorFlag = req.body?.behaviorFlag;
+    const selectedPetId = req.body?.petId ? obtenerObjectIdSeguro(req.body.petId) : null;
+    const createIfMissing = req.body?.createIfMissing === true;
+    if (!appointmentId) return res.status(400).json({ message: "id de cita no válido" });
+    if (bodyKeys.some((key) => !allowedKeys.includes(key))
+      || typeof behaviorFlag !== "string"
+      || !["", "green", "orange", "red"].includes(behaviorFlag)
+      || (req.body?.petId && !selectedPetId)
+      || (Object.prototype.hasOwnProperty.call(req.body || {}, "createIfMissing") && typeof req.body.createIfMissing !== "boolean")) {
+      return res.status(400).json({ message: "Datos de vinculación no válidos" });
+    }
+
+    const appointment = await Appointment.findById(appointmentId).select("_id customerId clientUserId estado estadoOperativo serviciosDetalle");
+    if (!appointment) return res.status(404).json({ message: "Cita no encontrada" });
+    if (!citaPermiteComportamiento(appointment)) {
+      return res.status(409).json({ message: "El comportamiento solo puede registrarse desde una cita completada" });
+    }
+    const target = resolverReferenciaServicioMascota(appointment, serviceRef);
+    if (!target) return res.status(409).json({ message: "El servicio cambió; vuelve a abrir el detalle de la cita" });
+    if (target.servicio.clientItemId) {
+      return res.status(409).json({ message: "La mascota ya está vinculada; vuelve a abrir el detalle de la cita" });
+    }
+
+    let clientUserId = obtenerObjectIdSeguro(appointment.clientUserId);
+    if (!clientUserId && appointment.customerId) {
+      const profile = await CustomerProfile.findById(appointment.customerId).select("userId");
+      clientUserId = obtenerObjectIdSeguro(profile?.userId);
+    }
+    if (!clientUserId) {
+      return res.status(409).json({ message: "El cliente necesita una cuenta vinculada antes de guardar una mascota persistente" });
+    }
+
+    const allPets = await ClientItem.find({ userId: clientUserId, tipo: "mascota" }).select("_id nombre raza edad behaviorFlag");
+    const serviceName = normalizarCoincidenciaMascota(target.servicio.mascotaNombre);
+    const serviceBreed = normalizarCoincidenciaMascota(target.servicio.raza);
+    const serviceAge = Number.isInteger(target.servicio.mascotaEdad) ? String(target.servicio.mascotaEdad) : "";
+    let pet = selectedPetId
+      ? allPets.find((item) => String(item._id) === String(selectedPetId))
+      : null;
+    if (selectedPetId && !pet) return res.status(409).json({ message: "La mascota elegida no pertenece a este cliente" });
+
+    if (!pet) {
+      const sameName = allPets.filter((item) => normalizarCoincidenciaMascota(item.nombre) === serviceName);
+      if (sameName.length === 1) pet = sameName[0];
+      if (sameName.length > 1) {
+        const narrowed = sameName.filter((item) => (
+          (!serviceBreed || normalizarCoincidenciaMascota(item.raza) === serviceBreed)
+          && (!serviceAge || String(item.edad || "").trim() === serviceAge)
+        ));
+        if (narrowed.length === 1) pet = narrowed[0];
+        else return res.status(409).json({
+          code: "AMBIGUOUS_PET",
+          message: "Hay varias mascotas posibles. Selecciona la correcta.",
+          candidates: candidatosMascotaAdmin(sameName)
+        });
+      }
+    }
+
+    if (!pet && !createIfMissing) {
+      return res.status(409).json({
+        code: "PET_NOT_FOUND",
+        message: "No existe una coincidencia segura. Confirma si deseas crear esta mascota.",
+        candidates: candidatosMascotaAdmin(allPets)
+      });
+    }
+    if (!pet) {
+      if (!String(target.servicio.mascotaNombre || "").trim()) {
+        return res.status(400).json({ message: "La mascota necesita un nombre antes de crear su perfil persistente" });
+      }
+      createdPet = await ClientItem.create({
+        userId: clientUserId,
+        tipo: "mascota",
+        nombre: String(target.servicio.mascotaNombre).trim(),
+        especie: "Perro",
+        raza: String(target.servicio.raza || "").trim(),
+        edad: serviceAge,
+        fotoUrl: String(target.servicio.fotoUrl || "").trim(),
+        ...(behaviorFlag ? { behaviorFlag } : {})
+      });
+      pet = createdPet;
+    }
+
+    const prefix = `serviciosDetalle.${target.index}`;
+    const linkResult = await Appointment.updateOne({
+      _id: appointmentId,
+      [`${prefix}.tipo`]: "mascota",
+      [`${prefix}.mascotaNombre`]: target.servicio.mascotaNombre,
+      [`${prefix}.raza`]: target.servicio.raza || "",
+      [`${prefix}.mascotaEdad`]: Number.isInteger(target.servicio.mascotaEdad) ? target.servicio.mascotaEdad : null,
+      [`${prefix}.categoria`]: target.servicio.categoria || "",
+      [`${prefix}.paquete`]: target.servicio.paquete || "",
+      $or: [
+        { [`${prefix}.clientItemId`]: null },
+        { [`${prefix}.clientItemId`]: { $exists: false } }
+      ]
+    }, { $set: { [`${prefix}.clientItemId`]: pet._id } });
+
+    if (linkResult.modifiedCount !== 1) {
+      if (createdPet) await ClientItem.deleteOne({ _id: createdPet._id });
+      return res.status(409).json({ message: "La mascota fue vinculada en otra operación; vuelve a abrir la cita" });
+    }
+
+    if (!createdPet) {
+      const behaviorUpdate = behaviorFlag ? { $set: { behaviorFlag } } : { $unset: { behaviorFlag: 1 } };
+      const behaviorResult = await ClientItem.updateOne({ _id: pet._id, userId: clientUserId, tipo: "mascota" }, behaviorUpdate);
+      if (behaviorResult.matchedCount !== 1) {
+        await Appointment.updateOne(
+          { _id: appointmentId, [`${prefix}.clientItemId`]: pet._id },
+          { $unset: { [`${prefix}.clientItemId`]: 1 } }
+        );
+        return res.status(409).json({ message: "No se pudo guardar el comportamiento; la vinculación fue revertida" });
+      }
+    }
+    return res.json({
+      message: createdPet ? "Mascota guardada y comportamiento actualizado" : "Mascota vinculada y comportamiento actualizado",
+      pet: { id: String(pet._id), behaviorFlag },
+      serviceRef
+    });
+  } catch (error) {
+    if (createdPet?._id) {
+      await ClientItem.deleteOne({ _id: createdPet._id }).catch(() => {});
+    }
+    console.error("[PET_BEHAVIOR_LINK] No se pudo vincular:", { name: error?.name, code: error?.code });
+    return res.status(500).json({ message: "No se pudo vincular la mascota y guardar el comportamiento" });
   }
 });
 
