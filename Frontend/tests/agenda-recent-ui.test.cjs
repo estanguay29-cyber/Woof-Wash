@@ -49,7 +49,7 @@ test("el control de resumen existe una vez y queda fuera del contenido dinamico"
   assert.ok(html.indexOf('id="btnResumenManana"') < html.indexOf('id="agendaListView"'));
   assert.ok(html.indexOf('id="btnResumenManana"') < html.indexOf('id="agendaAppointmentsList"'));
   assert.ok(html.indexOf('id="btnResumenManana"') < html.indexOf("<form"));
-  assert.match(html, /agenda\.js\?v=20260804-pet-behavior-v3/);
+  assert.match(html, /agenda\.js\?v=20260804-pet-behavior-v4/);
 });
 
 test("la configuracion del resumen evita duplicar su listener", () => {

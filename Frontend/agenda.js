@@ -1,6 +1,6 @@
 const AGENDA_API_URL = "https://woof-wash.onrender.com";
 const WOOF_WASH_WHATSAPP_NUMBER = "523337276934";
-console.log("[AGENDA] pet behavior render version 3");
+console.log("[AGENDA] pet behavior render version 4");
 console.log("[AGENDA] versión resumen diagnóstico 2");
 
 const AGENDA_SERVICE_ZONES_FALLBACK = [
@@ -2590,7 +2590,7 @@ function normalizarEstadoComportamiento(value) {
 }
 
 function citaEstaCompletadaParaComportamiento(cita = {}) {
-  return [cita.estado, cita.estadoOperativo]
+  return [cita.estado, cita.status, cita.estadoOperativo, cita.operationalStatus, cita.estadoVisible, cita.visibleStatus]
     .map(normalizarEstadoComportamiento)
     .some((estado) => ["completada", "completado", "finalizada", "finalizado"].includes(estado));
 }
@@ -2600,31 +2600,40 @@ function crearControlComportamientoMascota(servicio = {}, cita = {}, index = 0) 
   const petId = String(servicio.clientItemId || "");
   const serviceRef = String(servicio.serviceRef || "");
   const badge = crearInsigniaComportamiento(servicio.behaviorFlag || "");
-  if (!citaEstaCompletadaParaComportamiento(cita)) {
-    return `<div class="agenda-behavior-readonly"><strong>Comportamiento</strong>${badge}<small class="agenda-behavior-note">Solo puede modificarse desde una cita completada.</small></div>`;
-  }
-  const name = `behavior-${String(cita.id || "appointment")}-${index}`;
-  const options = [
-    ["green", "Verde — Se deja trabajar"],
-    ["orange", "Naranja — Poco inquieto"],
-    ["red", "Roja — No se deja / agresivo"],
-    ["", "Sin clasificación"]
-  ];
-  return `
-    <form class="agenda-behavior-form" data-behavior-form data-pet-id="${escapeHtml(petId)}" data-appointment-id="${escapeHtml(cita.id || "")}" data-service-ref="${escapeHtml(serviceRef)}">
-      ${badge}
-      <fieldset><legend>Comportamiento durante el servicio</legend>
-        ${options.map(([value, label]) => `<label class="agenda-behavior-option is-${escapeHtml(value || "unclassified")}"><input type="radio" name="${escapeHtml(name)}" value="${escapeHtml(value)}" ${String(servicio.behaviorFlag || "") === value ? "checked" : ""}><span>${escapeHtml(label)}</span></label>`).join("")}
-      </fieldset>
-      ${petId ? "" : `
-        <small class="agenda-behavior-note">Esta mascota todavía no está vinculada a un perfil persistente.</small>
-        <label class="agenda-behavior-existing hidden" data-pet-candidates-wrapper>Mascota persistente<select data-pet-candidates><option value="">Selecciona la mascota correcta</option></select></label>
-        <label class="agenda-behavior-create-confirm"><input type="checkbox" data-confirm-pet-create><span>Confirmo que deseo crear la mascota si no existe una coincidencia segura usando: ${escapeHtml(servicio.mascotaNombre || "Sin nombre")}, ${escapeHtml(servicio.raza || "sin raza")}, ${escapeHtml(formatearEdadMascota(servicio.mascotaEdad) || "sin edad")}.</span></label>
-      `}
-      <button type="submit" class="admin-button admin-button-dark" ${!petId && !serviceRef ? "disabled" : ""}>${petId ? "Guardar comportamiento" : "Vincular y guardar comportamiento"}</button>
-      ${!petId && !serviceRef ? '<small class="agenda-behavior-note">Esta cita antigua no tiene un identificador seguro de servicio.</small>' : ""}
-      <p data-behavior-status role="status" aria-live="polite"></p>
-    </form>`;
+  const editable = citaEstaCompletadaParaComportamiento(cita);
+  return `<div class="agenda-behavior-control" data-behavior-control>${badge}<button type="button" class="agenda-behavior-trigger" data-action="open-behavior" data-pet-id="${escapeHtml(petId)}" data-appointment-id="${escapeHtml(cita.id || "")}" data-service-ref="${escapeHtml(serviceRef)}" data-behavior-flag="${escapeHtml(servicio.behaviorFlag || "")}" data-pet-name="${escapeHtml(servicio.mascotaNombre || `Mascota ${index + 1}`)}" data-behavior-editable="${editable ? "true" : "false"}">🚩 Comportamiento</button></div>`;
+}
+
+function cerrarModalComportamiento() {
+  const modal = document.getElementById("agendaBehaviorModal");
+  modal?.classList.add("hidden");
+  modal?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("agenda-modal-open");
+}
+
+function abrirModalComportamiento(button) {
+  const modal = document.getElementById("agendaBehaviorModal");
+  const form = document.getElementById("agendaBehaviorForm");
+  if (!modal || !form || !button) return;
+  const flag = AGENDA_BEHAVIOR_LABELS[button.dataset.behaviorFlag] ? button.dataset.behaviorFlag : "";
+  const editable = button.dataset.behaviorEditable === "true";
+  const linked = Boolean(button.dataset.petId);
+  form.reset();
+  Object.assign(form.dataset, { petId: button.dataset.petId || "", appointmentId: button.dataset.appointmentId || "", serviceRef: button.dataset.serviceRef || "" });
+  form.querySelector(`[name="behaviorFlag"][value="${flag}"]`)?.click();
+  form.querySelector("[data-behavior-current]").textContent = flag ? AGENDA_BEHAVIOR_LABELS[flag] : "Sin clasificación";
+  form.querySelector("[data-behavior-status]").textContent = "";
+  form.querySelector("[data-behavior-unlinked]")?.classList.toggle("hidden", linked || !editable);
+  form.querySelector("[data-behavior-readonly]")?.classList.toggle("hidden", editable);
+  form.querySelector("[data-behavior-options]").disabled = !editable;
+  const save = form.querySelector("[data-behavior-save]");
+  save.classList.toggle("hidden", !editable);
+  save.disabled = !editable || (!linked && !button.dataset.serviceRef);
+  save.textContent = linked ? "Guardar comportamiento" : "Vincular mascota y guardar comportamiento";
+  modal.querySelector("#agendaBehaviorTitle").textContent = `Comportamiento de ${button.dataset.petName || "la mascota"}`;
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("agenda-modal-open");
 }
 
 function mostrarCandidatosComportamiento(form, candidates = []) {
@@ -2654,23 +2663,41 @@ async function guardarComportamientoMascota(form) {
         method: "POST",
         body: JSON.stringify({ serviceRef, behaviorFlag: selected.value, ...(candidateId ? { petId: candidateId } : {}), createIfMissing })
       });
-    const resolvedPetId = String(data.pet?.id || petId);
+    const resolvedPetId = String(data.clientItemId || data.pet?.id || petId);
+    const returnedFlag = data.behaviorFlag ?? data.pet?.behaviorFlag;
+    const persistedFlag = ["green", "orange", "red"].includes(returnedFlag) ? returnedFlag : "";
     citasAgenda.forEach((cita) => {
       (Array.isArray(cita.serviciosDetalle) ? cita.serviciosDetalle : []).forEach((servicio) => {
         if ((petId && String(servicio.clientItemId || "") === petId)
           || (!petId && String(cita.id || "") === appointmentId && String(servicio.serviceRef || "") === serviceRef)) {
           servicio.clientItemId = resolvedPetId;
-          servicio.behaviorFlag = data.pet?.behaviorFlag || "";
+          servicio.behaviorFlag = persistedFlag;
         }
       });
     });
-    calendarioAgendaVisual?.refresh();
-    const cita = citasAgenda.find((item) => item.id === citaEnDetalleId);
-    if (cita) renderizarDetalleCita(cita);
-    mostrarFeedbackDetalle(data.message || "Comportamiento actualizado");
+    document.querySelectorAll("[data-action='open-behavior']").forEach((button) => {
+      if ((petId && button.dataset.petId === petId)
+        || (!petId && button.dataset.appointmentId === appointmentId && button.dataset.serviceRef === serviceRef)) {
+        button.dataset.petId = resolvedPetId;
+        button.dataset.behaviorFlag = persistedFlag;
+        const badge = button.closest("[data-behavior-control]")?.querySelector(".agenda-behavior-badge");
+        if (badge) badge.outerHTML = crearInsigniaComportamiento(persistedFlag);
+      }
+    });
+    if (status) status.textContent = "Comportamiento guardado";
+    setTimeout(cerrarModalComportamiento, 450);
   } catch (error) {
     mostrarCandidatosComportamiento(form, error?.data?.candidates);
-    if (status) status.textContent = error.message || "No se pudo actualizar";
+    const messages = {
+      400: "Valor o datos de mascota inválidos.",
+      401: "La sesión expiró.",
+      403: "No tienes permisos para guardar.",
+      404: "No se encontró la mascota o la cita.",
+      409: error.message || "La mascota cambió; vuelve a intentarlo.",
+      429: "Demasiadas solicitudes. Espera un momento.",
+      500: "El servidor no pudo guardar el comportamiento."
+    };
+    if (status) status.textContent = messages[error?.status] || error.message || "No se pudo guardar";
   } finally {
     controls.forEach((control) => { control.disabled = false; });
   }
@@ -2681,6 +2708,20 @@ function manejarComportamientoDetalle(event) {
   if (!form) return;
   event.preventDefault();
   guardarComportamientoMascota(form);
+}
+
+function manejarClickComportamiento(event) {
+  const trigger = event.target.closest?.("[data-action='open-behavior']");
+  if (trigger) {
+    event.preventDefault();
+    abrirModalComportamiento(trigger);
+    return true;
+  }
+  if (event.target.closest?.("[data-behavior-cancel]")) {
+    cerrarModalComportamiento();
+    return true;
+  }
+  return false;
 }
 
 function crearDetalleServiciosHistorialHtml(cita) {
@@ -4430,6 +4471,7 @@ async function configurarAgenda() {
   elementos.form?.addEventListener("submit", crearCitaDesdeFormulario);
   elementos.lista?.addEventListener("change", manejarAccionesLista);
   elementos.lista?.addEventListener("click", manejarAccionesLista);
+  elementos.lista?.addEventListener("click", manejarClickComportamiento);
   elementos.lista?.addEventListener("error", (event) => {
     const image = event.target.closest?.(".agenda-pet-thumb img");
     if (!image) return;
@@ -4492,6 +4534,12 @@ async function configurarAgenda() {
   });
   elementos.detailGuardarCalificacion?.addEventListener("click", guardarCalificacionDesdeDetalle);
   elementos.detailContent?.addEventListener("submit", manejarComportamientoDetalle);
+  elementos.detailContent?.addEventListener("click", manejarClickComportamiento);
+  document.getElementById("agendaBehaviorForm")?.addEventListener("submit", manejarComportamientoDetalle);
+  document.getElementById("agendaBehaviorModal")?.addEventListener("click", (event) => {
+    if (event.target.id === "agendaBehaviorModal") cerrarModalComportamiento();
+    else if (event.target.closest?.("[data-behavior-cancel]")) manejarClickComportamiento(event);
+  });
   elementos.detailEditar?.addEventListener("click", editarDesdeDetalle);
   elementos.detailCopiarResumen?.addEventListener("click", () => {
     const cita = obtenerCitaDetalleActual();

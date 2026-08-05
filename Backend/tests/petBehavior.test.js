@@ -58,6 +58,8 @@ test("endpoint de comportamiento está limitado a admin y a un único campo", ()
   assert.match(route, /\["", "green", "orange", "red"\]/);
   assert.match(route, /\$set: \{ behaviorFlag \}/);
   assert.match(route, /\$unset: \{ behaviorFlag: 1 \}/);
+  assert.match(route, /const persistedPet = await ClientItem\.findOne/);
+  assert.match(route, /behaviorFlag: persistedBehaviorFlag/);
   assert.doesNotMatch(route, /replaceOne|updateMany|delete/);
 });
 

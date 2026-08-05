@@ -19,13 +19,13 @@ test("Agenda muestra texto y colores para las tres clasificaciones", () => {
   assert.match(agenda, /Comportamiento: \$\{escapeHtml/);
 });
 
-test("solo una cita completada renderiza el formulario editable", () => {
+test("solo una cita completada habilita edición en el modal", () => {
   assert.match(agenda, /citaEstaCompletadaParaComportamiento/);
   assert.match(agenda, /"completada", "completado", "finalizada", "finalizado"/);
   assert.match(agenda, /Guardar comportamiento/);
   assert.match(agenda, /Guardando…/);
-  assert.match(agenda, /Comportamiento actualizado/);
-  assert.match(agenda, /No se pudo actualizar/);
+  assert.match(agenda, /Comportamiento guardado/);
+  assert.match(agenda, /No se pudo guardar/);
 });
 
 test("guardado usa petId o serviceRef estable y finally local", () => {
@@ -40,7 +40,7 @@ test("guardado usa petId o serviceRef estable y finally local", () => {
   assert.doesNotMatch(block, /localStorage|sessionStorage/);
 });
 
-test("Ver más muestra comportamiento para vinculadas, no vinculadas y modo lectura", () => {
+test("cada mascota renderiza un botón estable para abrir comportamiento", () => {
   const start = agenda.indexOf("function crearInsigniaComportamiento");
   const end = agenda.indexOf("function mostrarCandidatosComportamiento", start);
   const source = agenda.slice(start, end);
@@ -54,12 +54,11 @@ test("Ver más muestra comportamiento para vinculadas, no vinculadas y modo lect
   const unlinked = context.render({ tipo: "mascota", mascotaNombre: "Kayse", raza: "Husky", mascotaEdad: 9, serviceRef: "0.hash" }, { id: "a", estadoOperativo: "finalizada" }, 0);
   const readonly = context.render({ tipo: "mascota", behaviorFlag: "orange" }, { estado: "confirmada" }, 0);
   const vehicle = context.render({ tipo: "auto" }, { estado: "completada" }, 0);
-  assert.match(linked, /Guardar comportamiento/);
-  assert.match(unlinked, /todavía no está vinculada/);
-  assert.match(unlinked, /Vincular y guardar comportamiento/);
-  assert.match(unlinked, /Confirmo que deseo crear/);
-  assert.match(readonly, /Solo puede modificarse desde una cita completada/);
-  assert.doesNotMatch(readonly, /type="submit"/);
+  assert.match(linked, /data-action="open-behavior"/);
+  assert.match(linked, /data-pet-id="pet-1"/);
+  assert.match(unlinked, /data-service-ref="0\.hash"/);
+  assert.match(readonly, /data-behavior-editable="false"/);
+  assert.match(readonly, /Comportamiento/);
   assert.equal(vehicle, "");
 });
 
@@ -87,8 +86,17 @@ test("crearCardCita, renderizador real de Ver más, inserta el control", () => {
   assert.match(cardSource, /agenda-pet-details hidden/);
 });
 
-test("Agenda publica la versión 3 para invalidar caché", () => {
+test("Agenda publica la versión 4 para invalidar caché", () => {
   const html = fs.readFileSync(path.join(frontend, "agenda.html"), "utf8");
-  assert.match(html, /agenda\.js\?v=20260804-pet-behavior-v3/);
-  assert.match(agenda, /\[AGENDA\] pet behavior render version 3/);
+  assert.match(html, /agenda\.js\?v=20260804-pet-behavior-v4/);
+  assert.match(agenda, /\[AGENDA\] pet behavior render version 4/);
+});
+
+test("el modal reutilizable tiene un solo flujo delegado de abrir, guardar y cancelar", () => {
+  const html = fs.readFileSync(path.join(frontend, "agenda.html"), "utf8");
+  assert.match(html, /id="agendaBehaviorModal"/);
+  assert.match(html, /id="agendaBehaviorForm"/);
+  assert.match(agenda, /elementos\.lista\?\.addEventListener\("click", manejarClickComportamiento\)/);
+  assert.match(agenda, /agendaBehaviorForm"\)\?\.addEventListener\("submit", manejarComportamientoDetalle\)/);
+  assert.match(agenda, /data\.behaviorFlag \?\? data\.pet\?\.behaviorFlag/);
 });

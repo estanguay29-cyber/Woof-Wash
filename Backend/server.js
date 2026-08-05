@@ -6791,7 +6791,14 @@ function normalizarCoincidenciaMascota(value) {
 }
 
 function citaPermiteComportamiento(cita = {}) {
-  const estados = [cita.estado, cita.estadoOperativo].map(normalizarCoincidenciaMascota);
+  const estados = [
+    cita.estado,
+    cita.status,
+    cita.estadoOperativo,
+    cita.operationalStatus,
+    cita.estadoVisible,
+    cita.visibleStatus
+  ].map(normalizarCoincidenciaMascota);
   return estados.some((estado) => ["completada", "completado", "finalizada", "finalizado"].includes(estado));
 }
 
@@ -6924,16 +6931,25 @@ app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAd
         return res.status(409).json({ message: "No se pudo guardar el comportamiento; la vinculación fue revertida" });
       }
     }
+    const persistedPet = await ClientItem.findOne({ _id: pet._id, userId: clientUserId, tipo: "mascota" })
+      .select("_id behaviorFlag")
+      .lean();
+    if (!persistedPet) {
+      return res.status(409).json({ message: "La mascota se vinculó, pero no fue posible confirmar el comportamiento guardado" });
+    }
+    const persistedBehaviorFlag = persistedPet.behaviorFlag || "";
     return res.json({
       message: createdPet ? "Mascota guardada y comportamiento actualizado" : "Mascota vinculada y comportamiento actualizado",
-      pet: { id: String(pet._id), behaviorFlag },
+      clientItemId: String(persistedPet._id),
+      behaviorFlag: persistedBehaviorFlag,
+      pet: { id: String(persistedPet._id), behaviorFlag: persistedBehaviorFlag },
       serviceRef
     });
   } catch (error) {
     if (createdPet?._id) {
       await ClientItem.deleteOne({ _id: createdPet._id }).catch(() => {});
     }
-    console.error("[PET_BEHAVIOR_LINK] No se pudo vincular:", { name: error?.name, code: error?.code });
+    console.error("[PET_BEHAVIOR_LINK]", { operation: "link_pet_behavior", status: 500, name: error?.name, code: error?.code });
     return res.status(500).json({ message: "No se pudo vincular la mascota y guardar el comportamiento" });
   }
 });
@@ -6958,14 +6974,21 @@ app.patch("/admin/pets/:petId/behavior", auth, requireAdmin, adminWriteLimiter, 
       { new: true, runValidators: true }
     );
     if (!pet) return res.status(404).json({ message: "Mascota no encontrada" });
+    const persistedPet = await ClientItem.findOne({ _id: petId, tipo: "mascota" })
+      .select("_id behaviorFlag")
+      .lean();
+    if (!persistedPet) return res.status(409).json({ message: "No se pudo confirmar el comportamiento guardado" });
+    const persistedBehaviorFlag = persistedPet.behaviorFlag || "";
     res.json({
       message: "Comportamiento actualizado",
-      pet: { id: String(pet._id), behaviorFlag: pet.behaviorFlag || "" }
+      behaviorFlag: persistedBehaviorFlag,
+      pet: { id: String(persistedPet._id), behaviorFlag: persistedBehaviorFlag }
     });
   } catch (error) {
-    console.error("[PET_BEHAVIOR] No se pudo actualizar:", {
+    console.error("[PET_BEHAVIOR]", {
+      operation: "update_pet_behavior",
+      status: 500,
       name: error?.name,
-      message: error?.message,
       code: error?.code
     });
     res.status(500).json({ message: "No se pudo actualizar el comportamiento" });

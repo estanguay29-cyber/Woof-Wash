@@ -537,6 +537,35 @@
     </div>
   </div>
 
+  <div id="agendaBehaviorModal" class="agenda-edit-modal hidden" aria-hidden="true">
+    <div class="agenda-edit-panel agenda-behavior-panel" role="dialog" aria-modal="true" aria-labelledby="agendaBehaviorTitle">
+      <div class="agenda-edit-header">
+        <div><p class="admin-kicker">Mascota</p><h2 id="agendaBehaviorTitle">Comportamiento de la mascota</h2></div>
+        <button type="button" class="agenda-icon-button" data-behavior-cancel aria-label="Cerrar comportamiento">&times;</button>
+      </div>
+      <form id="agendaBehaviorForm" class="agenda-behavior-form" data-behavior-form>
+        <p><strong>Clasificación actual:</strong> <span data-behavior-current>Sin clasificación</span></p>
+        <fieldset data-behavior-options><legend>Selecciona una clasificación</legend>
+          <label class="agenda-behavior-option is-green"><input type="radio" name="behaviorFlag" value="green"><span>Verde — Se deja trabajar.</span></label>
+          <label class="agenda-behavior-option is-orange"><input type="radio" name="behaviorFlag" value="orange"><span>Naranja — Poco inquieto.</span></label>
+          <label class="agenda-behavior-option is-red"><input type="radio" name="behaviorFlag" value="red"><span>Roja — No se deja / agresivo.</span></label>
+          <label class="agenda-behavior-option is-unclassified"><input type="radio" name="behaviorFlag" value=""><span>Sin clasificación.</span></label>
+        </fieldset>
+        <div data-behavior-unlinked class="hidden">
+          <p class="agenda-behavior-note">Esta mascota todavía no está vinculada a un perfil persistente.</p>
+          <label class="agenda-behavior-existing hidden" data-pet-candidates-wrapper>Mascota persistente<select data-pet-candidates><option value="">Selecciona la mascota correcta</option></select></label>
+          <label class="agenda-behavior-create-confirm"><input type="checkbox" data-confirm-pet-create><span>Confirmo que deseo crear un perfil persistente si no existe una coincidencia segura.</span></label>
+        </div>
+        <p data-behavior-readonly class="agenda-behavior-note hidden">La clasificación puede modificarse cuando la cita esté completada.</p>
+        <div class="agenda-behavior-actions">
+          <button type="submit" class="admin-button admin-button-dark" data-behavior-save>Guardar comportamiento</button>
+          <button type="button" class="admin-button admin-button-light" data-behavior-cancel>Cancelar</button>
+        </div>
+        <p data-behavior-status role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
   <div id="agendaTomorrowModal" class="agenda-modal hidden" aria-hidden="true">
     <div class="agenda-modal-panel agenda-tomorrow-panel" role="dialog" aria-modal="true" aria-labelledby="agendaTomorrowTitle">
       <div class="agenda-modal-header">
@@ -563,6 +592,6 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales-all.global.min.js"></script>
   <script src="shared/appointments-calendar.js"></script>
-  <script src="agenda.js?v=20260804-pet-behavior-v3"></script>
+  <script src="agenda.js?v=20260804-pet-behavior-v4"></script>
 </body>
 </html>
