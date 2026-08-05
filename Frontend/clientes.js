@@ -590,9 +590,6 @@ function renderClientItem(item = {}) {
 function renderRegistrosCliente(cliente = {}) {
   const mascotas = cliente.clientItemsMascotas || [];
   const autos = cliente.clientItemsAutos || [];
-  if (!cliente.tieneCuentaWeb) {
-    return "<p class='customer-empty'>Este cliente aun no tiene cuenta vinculada, por eso no hay mascotas/autos registrados desde portal.</p>";
-  }
   return `
     <div class="customer-record-columns">
       <div>

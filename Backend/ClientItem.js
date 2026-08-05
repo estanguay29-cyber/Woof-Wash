@@ -5,7 +5,15 @@ const ClientItemSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
+      required() { return !this.customerProfileId; },
+      index: true
+    },
+    customerProfileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CustomerProfile",
+      default: null,
+      required() { return !this.userId; },
       index: true
     },
     tipo: {
@@ -107,5 +115,6 @@ const ClientItemSchema = new mongoose.Schema(
 );
 
 ClientItemSchema.index({ userId: 1, tipo: 1, updatedAt: -1 });
+ClientItemSchema.index({ customerProfileId: 1, tipo: 1, updatedAt: -1 });
 
 module.exports = mongoose.model("ClientItem", ClientItemSchema);

@@ -146,6 +146,20 @@ test("el resumen incluye todos los vehiculos, conserva servicios y ordena por ho
   assert.match(text, /🚗 \*1 VEHÍCULO\*/);
 });
 
+test("el resumen separa comentarios generales e indicaciones por mascota y vehículo", () => {
+  const text = buildTomorrowSummary([{
+    time: "15:00",
+    generalNotes: ["Regalarle un separador de libros.", "Regalarle un separador de libros."],
+    pets: [{ name: "Kayse", package: "SPA", notes: "No secar con aire fuerte." }],
+    vehicles: [{ name: "Vehículo 1", package: "Lavado", notes: "No poner almorol." }]
+  }]);
+  assert.match(text, /📝 \*COMENTARIOS GENERALES\*\n• Regalarle un separador de libros\./);
+  assert.equal((text.match(/Regalarle un separador/g) || []).length, 1);
+  assert.match(text, /📌 \*INDICACIONES POR MASCOTA\*\n• Kayse: No secar con aire fuerte\./);
+  assert.match(text, /📌 \*INDICACIONES POR VEHÍCULO\*\n• Vehículo 1: No poner almorol\./);
+  assert.doesNotMatch(text, /\[object Object\]|undefined|null/);
+});
+
 test("el resumen vacio conserva el encabezado profesional", () => {
   assert.equal(buildTomorrowSummary([]), "🐾 *CITAS PARA MAÑANA* 🐾\n\nNo hay citas programadas para mañana.");
 });

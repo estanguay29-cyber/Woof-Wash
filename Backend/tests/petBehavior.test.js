@@ -19,6 +19,14 @@ test("behaviorFlag es opcional y solo acepta green, orange o red", () => {
   assert.ok(new ClientItem({ userId: new mongoose.Types.ObjectId(), tipo: "mascota", nombre: "Pet", behaviorFlag: "blue" }).validateSync());
 });
 
+test("ClientItem admite un CustomerProfile sin cuenta y sigue exigiendo propietario", () => {
+  const customerProfileId = new mongoose.Types.ObjectId();
+  const withoutAccount = new ClientItem({ customerProfileId, tipo: "mascota", nombre: "Kayse", raza: "Husky", edad: "9", behaviorFlag: "orange" });
+  assert.equal(withoutAccount.validateSync(), undefined);
+  assert.equal(String(withoutAccount.customerProfileId), String(customerProfileId));
+  assert.ok(new ClientItem({ tipo: "mascota", nombre: "Sin dueño" }).validateSync());
+});
+
 test("cada servicio puede conservar un ClientItem estable independiente", () => {
   const first = new mongoose.Types.ObjectId();
   const second = new mongoose.Types.ObjectId();
@@ -78,11 +86,12 @@ test("vinculación administrativa valida servicio, cliente y escritura acotada",
   assert.match(route, /auth, requireAdmin, adminWriteLimiter/);
   assert.match(route, /resolverReferenciaServicioMascota\(appointment, serviceRef\)/);
   assert.match(route, /target\.servicio\.clientItemId/);
-  assert.match(route, /userId: clientUserId, tipo: "mascota"/);
+  assert.match(route, /construirFiltroPropiedadClientItem/);
+  assert.match(route, /customerProfileId: customer\._id/);
   assert.match(route, /code: "AMBIGUOUS_PET"/);
   assert.match(route, /createIfMissing/);
   assert.match(route, /`\$\{prefix\}\.clientItemId`\]: pet\._id/);
-  assert.match(route, /ClientItem\.deleteOne/);
+  assert.doesNotMatch(route, /ClientItem\.deleteOne/);
   assert.doesNotMatch(route, /updateMany|replaceOne|appointment\.save\(/);
 });
 

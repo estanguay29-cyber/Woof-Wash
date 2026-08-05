@@ -4003,8 +4003,23 @@ function formatearHoraResumen(value) {
 }
 
 function normalizarTextoResumen(value) {
+  if (value && typeof value === "object") return "";
   const text = String(value ?? "").trim();
   return ["undefined", "null"].includes(text.toLowerCase()) ? "" : text;
+}
+
+function notasUnicasResumen(values = []) {
+  const notes = [];
+  const seen = new Set();
+  (Array.isArray(values) ? values : [values]).flat().forEach((value) => {
+    const text = normalizarTextoResumen(value);
+    const key = text.toLocaleLowerCase("es-MX");
+    if (text && !seen.has(key)) {
+      seen.add(key);
+      notes.push(text);
+    }
+  });
+  return notes;
 }
 
 function formatearFechaResumenManana(value) {
@@ -4038,6 +4053,18 @@ function construirResumenManana(appointments = [], summaryDate = "") {
     const pets = Array.isArray(appointment?.pets) ? appointment.pets : [];
     const vehicles = Array.isArray(appointment?.vehicles) ? appointment.vehicles : [];
     const sections = ["──────────────", `🕒 *${formatearHoraResumen(appointment?.time)}*`];
+    const generalNotes = notasUnicasResumen(
+      Array.isArray(appointment?.generalNotes) ? appointment.generalNotes : [appointment?.notes]
+    );
+    const generalKeys = new Set(generalNotes.map((note) => note.toLocaleLowerCase("es-MX")));
+    const petNotes = pets.map((pet) => ({
+      subject: normalizarTextoResumen(pet?.name) || "Mascota sin nombre",
+      note: normalizarTextoResumen(pet?.notes)
+    })).filter((item) => item.note && !generalKeys.has(item.note.toLocaleLowerCase("es-MX")));
+    const vehicleNotes = vehicles.map((vehicle, index) => ({
+      subject: normalizarTextoResumen(vehicle?.name) || `Vehículo ${index + 1}`,
+      note: normalizarTextoResumen(vehicle?.notes)
+    })).filter((item) => item.note && !generalKeys.has(item.note.toLocaleLowerCase("es-MX")));
 
     if (pets.length) {
       sections.push("", pets.length === 1 ? "🐶 *1 MASCOTA*" : `🐶 *MASCOTAS (${pets.length})*`);
@@ -4079,9 +4106,24 @@ function construirResumenManana(appointments = [], summaryDate = "") {
       "", "👤 *CLIENTE*", normalizarTextoResumen(appointment?.clientName) || "No disponible",
       "", "📞 *CELULAR*", normalizarTextoResumen(appointment?.clientPhone) || "No disponible",
       "", "📍 *DIRECCIÓN*", normalizarTextoResumen(appointment?.address) || "No disponible",
-      "", "🗺️ *UBICACIÓN*", normalizarTextoResumen(obtenerUrlUbicacionCita(appointment)) || "No disponible",
-      "", "📝 *COMENTARIOS*", normalizarTextoResumen(appointment?.notes) || "Sin comentarios"
+      "", "🗺️ *UBICACIÓN*", normalizarTextoResumen(obtenerUrlUbicacionCita(appointment)) || "No disponible"
     );
+    if (!generalNotes.length && !petNotes.length && !vehicleNotes.length) {
+      sections.push("", "📝 *COMENTARIOS*", "Sin comentarios");
+    } else {
+      if (generalNotes.length) {
+        sections.push("", petNotes.length || vehicleNotes.length ? "📝 *COMENTARIOS GENERALES*" : "📝 *COMENTARIOS*");
+        generalNotes.forEach((note) => sections.push(`• ${note}`));
+      }
+      if (petNotes.length) {
+        sections.push("", "📌 *INDICACIONES POR MASCOTA*");
+        petNotes.forEach((item) => sections.push(`• ${item.subject}: ${item.note}`));
+      }
+      if (vehicleNotes.length) {
+        sections.push("", "📌 *INDICACIONES POR VEHÍCULO*");
+        vehicleNotes.forEach((item) => sections.push(`• ${item.subject}: ${item.note}`));
+      }
+    }
     return sections.join("\n");
   });
 

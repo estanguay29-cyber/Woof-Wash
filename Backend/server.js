@@ -1643,17 +1643,25 @@ async function completarClienteInternoCita(datos = {}) {
   return resolucion;
 }
 
-async function validarClientItemsCita(serviciosDetalle = [], clientUserId = null) {
+function construirFiltroPropiedadClientItem({ customerId = null, userId = null } = {}) {
+  const propietarios = [];
+  const customerObjectId = obtenerObjectIdSeguro(customerId);
+  const userObjectId = obtenerObjectIdSeguro(userId);
+  if (customerObjectId) propietarios.push({ customerProfileId: customerObjectId });
+  if (userObjectId) propietarios.push({ userId: userObjectId });
+  return propietarios.length ? { $or: propietarios } : null;
+}
+
+async function validarClientItemsCita(serviciosDetalle = [], clientUserId = null, customerId = null) {
   const ids = [...new Set((Array.isArray(serviciosDetalle) ? serviciosDetalle : [])
     .map((servicio) => String(servicio?.clientItemId || "").trim())
     .filter(Boolean))];
   if (!ids.length) return { ok: true };
-  if (!mongoose.Types.ObjectId.isValid(String(clientUserId || ""))) {
-    return { ok: false, status: 400, message: "La mascota seleccionada no pertenece a una cuenta de cliente vinculada" };
-  }
+  const ownership = construirFiltroPropiedadClientItem({ customerId, userId: clientUserId });
+  if (!ownership) return { ok: false, status: 400, message: "La mascota seleccionada no pertenece a un cliente administrativo persistente" };
   const items = await ClientItem.find({
     _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) },
-    userId: new mongoose.Types.ObjectId(String(clientUserId)),
+    ...ownership,
     tipo: "mascota"
   }).select("_id");
   if (items.length !== ids.length) {
@@ -6070,13 +6078,16 @@ app.get("/admin/customers/lookup", auth, requireAdmin, async (req, res) => {
     const [cita, profiles] = await Promise.all([
       Appointment.findOne(filtroTelefono)
         .sort({ fecha: -1, hora: -1, createdAt: -1 })
-        .select("clienteNombre clienteTelefono clienteEmail direccion zona notas clientUserId"),
-      CustomerProfile.find({ telefonoNormalizado: telefono }).select("nombre telefono email userId").limit(2)
+        .select("clienteNombre clienteTelefono clienteEmail direccion zona notas customerId clientUserId"),
+      CustomerProfile.find({ telefonoNormalizado: telefono }).select("_id nombre telefono email userId").limit(2)
     ]);
-    const profile = profiles.length === 1 ? profiles[0] : null;
+    const profile = cita?.customerId
+      ? profiles.find((item) => String(item._id) === String(cita.customerId)) || null
+      : (profiles.length === 1 ? profiles[0] : null);
     const clientUserId = cita?.clientUserId || profile?.userId || null;
-    const mascotas = clientUserId
-      ? await ClientItem.find({ userId: clientUserId, tipo: "mascota" }).sort({ updatedAt: -1, createdAt: -1 })
+    const ownership = profile ? construirFiltroPropiedadClientItem({ customerId: profile._id, userId: clientUserId }) : null;
+    const mascotas = ownership
+      ? await ClientItem.find({ ...ownership, tipo: "mascota" }).sort({ updatedAt: -1, createdAt: -1 })
       : [];
 
     if (!cita && !profile) {
@@ -6351,11 +6362,12 @@ function citaPuedeVincularseACustomer(cita = {}, customer = {}) {
 }
 
 async function construirResumenCustomerProfile(customer, { incluirClientItems = false } = {}) {
+  const filtroClientItems = construirFiltroPropiedadClientItem({ customerId: customer._id, userId: customer.userId });
   const [citasCustomer, citasPortal, userVinculado, clientItems, posiblesCitas, duplicadosEmail, duplicadosTelefono] = await Promise.all([
     Appointment.find({ customerId: customer._id }).sort({ fecha: -1, hora: -1, createdAt: -1 }),
     customer.userId ? Appointment.find({ clientUserId: customer.userId }).sort({ fecha: -1, hora: -1, createdAt: -1 }) : Promise.resolve([]),
     customer.userId ? User.findById(customer.userId).select("email telefono") : Promise.resolve(null),
-    incluirClientItems && customer.userId ? ClientItem.find({ userId: customer.userId }).sort({ updatedAt: -1, createdAt: -1 }) : Promise.resolve([]),
+    incluirClientItems && filtroClientItems ? ClientItem.find(filtroClientItems).sort({ updatedAt: -1, createdAt: -1 }) : Promise.resolve([]),
     obtenerCitasPosiblesCustomer(customer, { limit: 12 }),
     customer.emailNormalizado ? CustomerProfile.countDocuments({ emailNormalizado: customer.emailNormalizado, _id: { $ne: customer._id } }) : Promise.resolve(0),
     customer.telefonoNormalizado ? CustomerProfile.countDocuments({ telefonoNormalizado: customer.telefonoNormalizado, _id: { $ne: customer._id } }) : Promise.resolve(0)
@@ -6830,7 +6842,7 @@ app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAd
       return res.status(400).json({ message: "Datos de vinculación no válidos" });
     }
 
-    const appointment = await Appointment.findById(appointmentId).select("_id customerId clientUserId estado estadoOperativo serviciosDetalle");
+    const appointment = await Appointment.findById(appointmentId).select("_id customerId clientUserId clienteNombre clienteTelefono clienteEmail direccion zona fecha estado estadoOperativo serviciosDetalle");
     if (!appointment) return res.status(404).json({ message: "Cita no encontrada" });
     if (!citaPermiteComportamiento(appointment)) {
       return res.status(409).json({ message: "El comportamiento solo puede registrarse desde una cita completada" });
@@ -6841,16 +6853,17 @@ app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAd
       return res.status(409).json({ message: "La mascota ya está vinculada; vuelve a abrir el detalle de la cita" });
     }
 
-    let clientUserId = obtenerObjectIdSeguro(appointment.clientUserId);
-    if (!clientUserId && appointment.customerId) {
-      const profile = await CustomerProfile.findById(appointment.customerId).select("userId");
-      clientUserId = obtenerObjectIdSeguro(profile?.userId);
+    let customer = appointment.customerId
+      ? await CustomerProfile.findById(appointment.customerId).select("_id userId")
+      : null;
+    if (!customer) {
+      const resolution = await resolverCustomerProfileParaCita(appointment, { crearSiNoExiste: true });
+      customer = resolution.customer;
     }
-    if (!clientUserId) {
-      return res.status(409).json({ message: "El cliente necesita una cuenta vinculada antes de guardar una mascota persistente" });
-    }
-
-    const allPets = await ClientItem.find({ userId: clientUserId, tipo: "mascota" }).select("_id nombre raza edad behaviorFlag");
+    if (!customer?._id) return res.status(409).json({ message: "No fue posible identificar un perfil administrativo seguro para este cliente" });
+    const clientUserId = obtenerObjectIdSeguro(appointment.clientUserId || customer.userId);
+    const ownership = construirFiltroPropiedadClientItem({ customerId: customer._id, userId: clientUserId });
+    const allPets = await ClientItem.find({ ...ownership, tipo: "mascota" }).select("_id nombre raza edad behaviorFlag");
     const serviceName = normalizarCoincidenciaMascota(target.servicio.mascotaNombre);
     const serviceBreed = normalizarCoincidenciaMascota(target.servicio.raza);
     const serviceAge = Number.isInteger(target.servicio.mascotaEdad) ? String(target.servicio.mascotaEdad) : "";
@@ -6887,8 +6900,9 @@ app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAd
       if (!String(target.servicio.mascotaNombre || "").trim()) {
         return res.status(400).json({ message: "La mascota necesita un nombre antes de crear su perfil persistente" });
       }
-      createdPet = await ClientItem.create({
-        userId: clientUserId,
+      createdPet = new ClientItem({
+        customerProfileId: customer._id,
+        userId: clientUserId || null,
         tipo: "mascota",
         nombre: String(target.servicio.mascotaNombre).trim(),
         especie: "Perro",
@@ -6916,13 +6930,22 @@ app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAd
     }, { $set: { [`${prefix}.clientItemId`]: pet._id } });
 
     if (linkResult.modifiedCount !== 1) {
-      if (createdPet) await ClientItem.deleteOne({ _id: createdPet._id });
       return res.status(409).json({ message: "La mascota fue vinculada en otra operación; vuelve a abrir la cita" });
     }
 
-    if (!createdPet) {
+    if (createdPet) {
+      try {
+        await createdPet.save();
+      } catch (error) {
+        await Appointment.updateOne(
+          { _id: appointmentId, [`${prefix}.clientItemId`]: createdPet._id },
+          { $unset: { [`${prefix}.clientItemId`]: 1 } }
+        );
+        throw error;
+      }
+    } else {
       const behaviorUpdate = behaviorFlag ? { $set: { behaviorFlag } } : { $unset: { behaviorFlag: 1 } };
-      const behaviorResult = await ClientItem.updateOne({ _id: pet._id, userId: clientUserId, tipo: "mascota" }, behaviorUpdate);
+      const behaviorResult = await ClientItem.updateOne({ _id: pet._id, ...ownership, tipo: "mascota" }, behaviorUpdate);
       if (behaviorResult.matchedCount !== 1) {
         await Appointment.updateOne(
           { _id: appointmentId, [`${prefix}.clientItemId`]: pet._id },
@@ -6931,7 +6954,7 @@ app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAd
         return res.status(409).json({ message: "No se pudo guardar el comportamiento; la vinculación fue revertida" });
       }
     }
-    const persistedPet = await ClientItem.findOne({ _id: pet._id, userId: clientUserId, tipo: "mascota" })
+    const persistedPet = await ClientItem.findOne({ _id: pet._id, ...ownership, tipo: "mascota" })
       .select("_id behaviorFlag")
       .lean();
     if (!persistedPet) {
@@ -6946,9 +6969,6 @@ app.post("/admin/appointments/:appointmentId/link-pet-behavior", auth, requireAd
       serviceRef
     });
   } catch (error) {
-    if (createdPet?._id) {
-      await ClientItem.deleteOne({ _id: createdPet._id }).catch(() => {});
-    }
     console.error("[PET_BEHAVIOR_LINK]", { operation: "link_pet_behavior", status: 500, name: error?.name, code: error?.code });
     return res.status(500).json({ message: "No se pudo vincular la mascota y guardar el comportamiento" });
   }
@@ -7080,7 +7100,7 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
     }
 
     await completarClienteInternoCita(datos);
-    const vinculosMascota = await validarClientItemsCita(datos.serviciosDetalle, datos.clientUserId);
+    const vinculosMascota = await validarClientItemsCita(datos.serviciosDetalle, datos.clientUserId, datos.customerId);
     if (!vinculosMascota.ok) {
       return res.status(vinculosMascota.status).json({ message: vinculosMascota.message });
     }
@@ -7239,7 +7259,8 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
     if (Object.prototype.hasOwnProperty.call(datos, "serviciosDetalle")) {
       const vinculosMascota = await validarClientItemsCita(
         datos.serviciosDetalle,
-        Object.prototype.hasOwnProperty.call(datos, "clientUserId") ? datos.clientUserId : cita.clientUserId
+        Object.prototype.hasOwnProperty.call(datos, "clientUserId") ? datos.clientUserId : cita.clientUserId,
+        Object.prototype.hasOwnProperty.call(datos, "customerId") ? datos.customerId : cita.customerId
       );
       if (!vinculosMascota.ok) {
         return res.status(vinculosMascota.status).json({ message: vinculosMascota.message });

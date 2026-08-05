@@ -292,6 +292,25 @@ test("resumen de manana conserva raza y todos los vehiculos con su servicio", ()
   ]);
 });
 
+test("resumen conserva notas generales e indicaciones por servicio sin datos privados", () => {
+  const dto = calendar.toTomorrowSummaryAppointment(appointment({
+    notas: "Regalarle un separador de libros.",
+    observaciones: "Regalarle un separador de libros.",
+    serviciosDetalle: [
+      { tipo: "mascota", mascotaNombre: "Kayse", notas: "No secar con aire fuerte." },
+      { tipo: "mascota", mascotaNombre: "Mila", notas: "No utilizar perfume." },
+      { tipo: "auto", categoria: "SUV", notas: "No poner almorol." }
+    ]
+  }));
+  assert.deepEqual(dto.generalNotes, ["Regalarle un separador de libros."]);
+  assert.equal(dto.pets[0].notes, "No secar con aire fuerte.");
+  assert.equal(dto.pets[1].notes, "No utilizar perfume.");
+  assert.equal(dto.vehicles[0].notes, "No poner almorol.");
+  assert.equal(Object.hasOwn(dto, "notasAdmin"), false);
+  assert.match(calendar.TOMORROW_SUMMARY_FIELDS, /serviciosDetalle\.notas/);
+  assert.doesNotMatch(calendar.TOMORROW_SUMMARY_FIELDS, /notasAdmin|comentarioCliente/);
+});
+
 test("resumen de manana mantiene fallbacks de citas antiguas", () => {
   const pet = calendar.toTomorrowSummaryAppointment(appointment({
     serviciosDetalle: undefined,

@@ -8,10 +8,11 @@ const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const TOMORROW_SUMMARY_FIELDS = [
   "fecha", "hora", "estado", "clienteNombre", "clienteTelefono", "direccion", "locationUrl", "notas",
+  "indicacionesGenerales", "observaciones", "comentarios", "comentario", "nota",
   "servicioTipo", "servicioNombre", "servicioCategoria", "servicioPaquete", "mascotaNombre",
   "mascotaEdad", "serviciosDetalle.tipo", "serviciosDetalle.categoria", "serviciosDetalle.paquete",
   "serviciosDetalle.nombre", "serviciosDetalle.mascotaNombre", "serviciosDetalle.raza", "serviciosDetalle.mascotaEdad",
-  "serviciosDetalle.fotoUrl"
+  "serviciosDetalle.fotoUrl", "serviciosDetalle.notas"
 ].join(" ");
 
 class CalendarValidationError extends Error {
@@ -339,17 +340,27 @@ async function queryCalendarAppointments({
 function toTomorrowSummaryAppointment(appointment = {}) {
   const source = typeof appointment.toObject === "function" ? appointment.toObject() : appointment;
   const details = Array.isArray(source.serviciosDetalle) ? source.serviciosDetalle : [];
+  const generalNotes = uniqueSummaryNotes([
+    source.notas,
+    source.indicacionesGenerales,
+    source.observaciones,
+    source.comentarios,
+    source.comentario,
+    source.nota
+  ]);
   const pets = details.filter((item) => item?.tipo === "mascota").map((item) => ({
     name: String(item.mascotaNombre || ""),
     breed: String(item.raza || item.categoria || ""),
     age: Number.isInteger(item.mascotaEdad) ? item.mascotaEdad : null,
     package: String(item.paquete || item.nombre || ""),
-    photoUrl: String(item.fotoUrl || "")
+    photoUrl: String(item.fotoUrl || ""),
+    notes: summaryNoteText(item.notas)
   }));
   const vehicles = details.filter((item) => item?.tipo === "auto").map((item) => ({
     name: String(item.vehiculoNombre || item.identificacion || ""),
     type: String(item.categoria || ""),
-    package: String(item.paquete || item.nombre || "")
+    package: String(item.paquete || item.nombre || ""),
+    notes: summaryNoteText(item.notas)
   }));
   if (!pets.length && source.servicioTipo === "mascota") {
     pets.push({
@@ -376,10 +387,33 @@ function toTomorrowSummaryAppointment(appointment = {}) {
     address: String(source.direccion || ""),
     locationUrl: resolveLocationUrl(source.locationUrl, source.direccion),
     service: String(source.servicioPaquete || source.servicioNombre || ""),
-    notes: String(source.notas || ""),
+    notes: generalNotes[0] || "",
+    generalNotes,
     pets,
     vehicles
   };
+}
+
+function summaryNoteText(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function uniqueSummaryNotes(values = []) {
+  const result = [];
+  const seen = new Set();
+  for (const value of values) {
+    const candidates = Array.isArray(value) ? value : [value];
+    for (const candidate of candidates) {
+      const text = summaryNoteText(candidate);
+      const key = text.toLocaleLowerCase("es-MX");
+      if (text && !seen.has(key)) {
+        seen.add(key);
+        result.push(text);
+      }
+    }
+  }
+  return result;
 }
 
 async function queryTomorrowSummary({ AppointmentModel, now = new Date() }) {
