@@ -1721,3 +1721,29 @@ input {
 }
 
 .employee-pet-behavior { margin-top: 6px; color: #334155; overflow-wrap: anywhere; }
+
+/* El mismo lenguaje visual de estados usado en Agenda y calendario. */
+.appointment-card.is-pendiente,
+.appointment-card.is-Pendiente { border-color: rgba(217,119,6,.3); background: linear-gradient(90deg,rgba(255,247,237,.84),#fff 24%); box-shadow:0 9px 24px rgba(217,119,6,.1); }
+.appointment-card:is(.is-pendiente,.is-Pendiente)::before { background:#d97706; }
+.appointment-card:is(.is-pendiente,.is-Pendiente) .appointment-head span { border-color:#f59e0b; background:#fef3c7; color:#92400e; }
+
+.appointment-card:is(.is-confirmada,.is-confirmado) { border-color:rgba(37,99,235,.28); background:linear-gradient(90deg,rgba(239,246,255,.84),#fff 24%); box-shadow:0 9px 24px rgba(37,99,235,.1); }
+.appointment-card:is(.is-confirmada,.is-confirmado)::before { background:#2563eb; }
+.appointment-card:is(.is-confirmada,.is-confirmado) .appointment-head span { border-color:#60a5fa; background:#dbeafe; color:#1e40af; }
+
+.appointment-card:is(.is-completada,.is-completado) { border-color:rgba(92,148,36,.3); background:linear-gradient(90deg,rgba(247,254,231,.84),#fff 24%); box-shadow:0 9px 24px rgba(92,148,36,.1); }
+.appointment-card:is(.is-completada,.is-completado)::before { background:#5c9424; }
+.appointment-card:is(.is-completada,.is-completado) .appointment-head span { border-color:#86c35a; background:#dcfce7; color:#166534; }
+
+.appointment-card:is(.is-cancelada,.is-cancelado) { border-color:rgba(220,38,38,.28); background:linear-gradient(90deg,rgba(254,242,242,.84),#fff 24%); box-shadow:0 9px 24px rgba(220,38,38,.09); }
+.appointment-card:is(.is-cancelada,.is-cancelado)::before { background:#dc2626; }
+.appointment-card:is(.is-cancelada,.is-cancelado) .appointment-head span { border-color:#f87171; background:#fef2f2; color:#991b1b; }
+
+.appointment-card.is-pendiente:hover { box-shadow:0 12px 29px rgba(217,119,6,.17); }
+.appointment-card:is(.is-confirmada,.is-confirmado):hover { box-shadow:0 12px 29px rgba(37,99,235,.16); }
+.appointment-card:is(.is-completada,.is-completado):hover { box-shadow:0 12px 29px rgba(92,148,36,.16); }
+.appointment-card:is(.is-cancelada,.is-cancelado):hover { box-shadow:0 12px 29px rgba(220,38,38,.15); }
+.appointment-card:focus-within { outline:3px solid rgba(37,99,235,.34); outline-offset:3px; }
+
+@media(prefers-reduced-motion:reduce){.appointment-card{transition:none}.appointment-card:hover{transform:none}}

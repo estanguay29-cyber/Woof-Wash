@@ -215,6 +215,27 @@
 .appointments-calendar-host .ww-calendar-status-cancelada { border-left-color: #b43c4d; color: #692531; background: #fdecef; text-decoration-color: #8b1e2d; }
 .appointments-calendar-host .ww-calendar-status-no-asistio { border-left-color: #6b7280; color: #3f4652; background: #edf0f4; }
 
+/* Acento completo por estado sin cambiar eventos ni navegación. */
+.appointments-calendar-host .fc-event.ww-calendar-event { transition: box-shadow .16s ease, filter .16s ease, transform .16s ease; }
+.appointments-calendar-host .ww-calendar-status-pendiente { border-left-color: #d97706; background: #fff7ed; box-shadow: 0 2px 8px rgba(217, 119, 6, .13); }
+.appointments-calendar-host .ww-calendar-status-confirmada,
+.appointments-calendar-host .ww-calendar-status-confirmado { border-left-color: #2563eb; background: #eff6ff; box-shadow: 0 2px 8px rgba(37, 99, 235, .13); }
+.appointments-calendar-host .ww-calendar-status-completada,
+.appointments-calendar-host .ww-calendar-status-completado,
+.appointments-calendar-host .ww-calendar-status-finalizada { border-left-color: #5c9424; background: #f7fee7; box-shadow: 0 2px 8px rgba(92, 148, 36, .13); }
+.appointments-calendar-host .ww-calendar-status-cancelada,
+.appointments-calendar-host .ww-calendar-status-cancelado { border-left-color: #dc2626; color: #7f1d1d; background: #fef2f2; box-shadow: 0 2px 8px rgba(220, 38, 38, .12); }
+.appointments-calendar-host .ww-calendar-status-pendiente:hover { box-shadow: 0 4px 12px rgba(217, 119, 6, .2); }
+.appointments-calendar-host .ww-calendar-status-confirmada:hover { box-shadow: 0 4px 12px rgba(37, 99, 235, .2); }
+.appointments-calendar-host :is(.ww-calendar-status-completada, .ww-calendar-status-finalizada):hover { box-shadow: 0 4px 12px rgba(92, 148, 36, .2); }
+.appointments-calendar-host .ww-calendar-status-cancelada:hover { box-shadow: 0 4px 12px rgba(220, 38, 38, .19); }
+.appointments-calendar-host .fc-event.ww-calendar-event:focus-visible { outline: 3px solid rgba(37, 99, 235, .4); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .appointments-calendar-host .fc-event.ww-calendar-event { transition: none; }
+  .appointments-calendar-host .fc-event.ww-calendar-event:hover { transform: none; }
+}
+
 .appointments-calendar-modal {
   position: fixed;
   z-index: 10020;

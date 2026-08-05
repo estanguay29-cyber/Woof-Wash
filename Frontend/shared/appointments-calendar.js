@@ -138,7 +138,9 @@
 
   function statusClass(status) {
     const allowed = new Set(["pendiente", "confirmada", "en_camino", "en_proceso", "completada", "finalizada", "cancelada", "no_asistio"]);
-    const normalized = String(status || "pendiente").toLowerCase().trim();
+    const aliases = { confirmado: "confirmada", completado: "completada", cancelado: "cancelada", finalizado: "finalizada" };
+    const raw = String(status || "pendiente").toLowerCase().trim();
+    const normalized = aliases[raw] || raw;
     return `ww-calendar-status-${allowed.has(normalized) ? normalized.replace(/_/g, "-") : "pendiente"}`;
   }
 

@@ -65,6 +65,11 @@
           <strong id="statZonaDia">-</strong>
           <small id="statDiaSemana">Ruta activa</small>
         </article>
+        <button id="weeklyRevenueButton" type="button" class="agenda-summary-card agenda-revenue-card" aria-label="Abrir detalle de ingresos de la semana" aria-haspopup="dialog">
+          <span>Ingreso semanal</span>
+          <strong id="weeklyRevenueTotal">$0.00</strong>
+          <small id="weeklyRevenueRange">Lunes a domingo</small>
+        </button>
       </section>
 
       <section class="agenda-toolbar">
@@ -586,12 +591,34 @@
     </div>
   </div>
 
+  <div id="weeklyRevenueModal" class="agenda-modal hidden" aria-hidden="true">
+    <section class="agenda-modal-panel weekly-revenue-panel" role="dialog" aria-modal="true" aria-labelledby="weeklyRevenueTitle">
+      <header class="agenda-modal-header weekly-revenue-header">
+        <div>
+          <p class="admin-kicker">Recaudación comprobable</p>
+          <h2 id="weeklyRevenueTitle">Detalle de ingresos de la semana</h2>
+          <p id="weeklyRevenueDateRange">Cargando rango…</p>
+        </div>
+        <button id="weeklyRevenueClose" type="button" class="agenda-icon-button" aria-label="Cerrar detalle de ingresos">&times;</button>
+      </header>
+      <div id="weeklyRevenueStatus" class="weekly-revenue-status" role="status" aria-live="polite"></div>
+      <div class="weekly-revenue-total"><span>Total semanal</span><strong id="weeklyRevenueModalTotal">$0.00</strong></div>
+      <div class="weekly-revenue-metrics" aria-label="Resumen semanal">
+        <div><strong id="weeklyRevenueCompleted">0</strong><span>Completadas</span></div>
+        <div><strong id="weeklyRevenueRegistered">0</strong><span>Con monto</span></div>
+        <div><strong id="weeklyRevenueMissing">0</strong><span>Sin monto</span></div>
+      </div>
+      <p id="weeklyRevenueWarning" class="weekly-revenue-warning hidden" role="alert">Advertencia: el total calculado no coincide con el detalle.</p>
+      <div id="weeklyRevenueList" class="weekly-revenue-list"></div>
+    </section>
+  </div>
+
   <script src="admin-nav.js" defer></script>
   <script src="success-toast.js"></script>
   <!-- FullCalendar 6.1.21: bundle global fijo, sin bundler ni dependencias npm. -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales-all.global.min.js"></script>
   <script src="shared/appointments-calendar.js"></script>
-  <script src="agenda.js?v=20260804-pet-behavior-v4"></script>
+  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v1"></script>
 </body>
 </html>

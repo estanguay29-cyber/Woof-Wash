@@ -20,8 +20,17 @@ const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
 const PerformanceAttendance = require("./PerformanceAttendance");
 const PerformanceMetricRecord = require("./PerformanceMetricRecord");
 const employeeService = require("./services/employeeService");
+const weeklyRevenueService = require("./services/weeklyRevenueService");
 const appointmentCalendarService = require("./services/appointmentCalendarService");
 const customerReminderService = require("./services/customerReminderService");
+
+function sumarCobrosRealesCompletados(citas = []) {
+  return citas.reduce((total, cita) => {
+    if (cita?.estado !== "completada") return total;
+    const charged = weeklyRevenueService.parseHistoricalChargedAmount(cita.totalCobrado);
+    return total + (charged.valid ? charged.amount : 0);
+  }, 0);
+}
 
 const app = express();
 app.disable("x-powered-by");
@@ -2964,7 +2973,7 @@ function construirCitaAdmin(cita) {
     calificacionCliente: Number.isInteger(obj.calificacionCliente) ? obj.calificacionCliente : null,
     comentarioCliente: obj.comentarioCliente || "",
     fechaCalificacion: obj.fechaCalificacion || null,
-    totalCobrado: Number.isFinite(obj.totalCobrado) ? obj.totalCobrado : 0,
+    totalCobrado: Number.isFinite(obj.totalCobrado) ? obj.totalCobrado : null,
     ingresoAproximadoMxn: Number.isFinite(obj.ingresoAproximadoMxn) ? obj.ingresoAproximadoMxn : 0,
     inicioServicioAt: obj.inicioServicioAt || null,
     finServicioAt: obj.finServicioAt || null,
@@ -4202,8 +4211,8 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
       ? citas.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
       : [];
 
-    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
-    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+    const actualDia = sumarCobrosRealesCompletados(citasDia);
+    const actualSemana = sumarCobrosRealesCompletados(citasSemana);
 
     res.json({
       fecha,
@@ -4226,7 +4235,7 @@ app.get("/admin/employees", auth, requireAdmin, async (req, res) => {
 
         const metricas = calcularMetricasEmpleado(citasEmpleado);
         const metricasSemanal = calcularMetricasEmpleado(citasSemanaEmpleado);
-        const actualSemanaEmpleado = citasSemanaEmpleado.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+        const actualSemanaEmpleado = sumarCobrosRealesCompletados(citasSemanaEmpleado);
         const bonosSemana = calcularBonoSemanal(metricasSemanal, empleado, actualSemanaEmpleado, META_SEMANAL_EMPLEADOS_MXN);
 
         return {
@@ -4295,8 +4304,8 @@ app.get("/admin/employees/:id", auth, requireAdmin, async (req, res) => {
     const citasSemana = semana
       ? citas.filter((cita) => cita.fecha >= semana.inicio && cita.fecha <= semana.fin)
       : [];
-    const actualDia = citasDia.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
-    const actualSemana = citasSemana.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+    const actualDia = sumarCobrosRealesCompletados(citasDia);
+    const actualSemana = sumarCobrosRealesCompletados(citasSemana);
     const metricasSemanal = calcularMetricasEmpleado(citasSemana);
     const resenasPositivas = citas.filter((cita) => {
       const valor = Number.isInteger(cita.calificacionCliente) ? cita.calificacionCliente : cita.calificacionServicio;
@@ -4686,7 +4695,9 @@ function sumarVentasCitasUnicas(citas = []) {
     }
 
     citasContadas.add(id);
-    return total + (Number(cita.totalCobrado) || 0);
+    if (cita?.estado !== "completada") return total;
+    const charged = weeklyRevenueService.parseHistoricalChargedAmount(cita.totalCobrado);
+    return total + (charged.valid ? charged.amount : 0);
   }, 0);
 }
 
@@ -6111,6 +6122,69 @@ app.get("/admin/customers/lookup", auth, requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/admin/appointments/weekly-revenue", auth, requireAdmin, async (req, res) => {
+  try {
+    const referenceDate = normalizarTextoPlano(req.query?.date, 10) || weeklyRevenueService.getMexicoCityDate();
+    const range = weeklyRevenueService.getWeekRange(referenceDate);
+    if (!range) return res.status(400).json({ message: "Fecha no válida" });
+    const appointments = await Appointment.collection.find({
+      estado: "completada",
+      fecha: { $gte: range.start, $lte: range.end }
+    }).sort({ fecha: 1, hora: 1, createdAt: 1 }).toArray();
+    const employeeIds = [...new Set(appointments.flatMap((appointment) => [
+      appointment.empleadoAsignadoId,
+      ...(Array.isArray(appointment.empleadosAsignados) ? appointment.empleadosAsignados : [])
+    ]).filter((id) => mongoose.Types.ObjectId.isValid(String(id))).map(String))];
+    const employeeNames = new Map((employeeIds.length
+      ? await Employee.find({ _id: { $in: employeeIds } }).select("nombreCompleto").lean()
+      : []).map((employee) => [String(employee._id), employee.nombreCompleto || ""]));
+    const summary = weeklyRevenueService.summarizeWeeklyRevenue(appointments, { referenceDate });
+    const rows = summary.rows.map(({ appointment, charged }) => {
+      const assignedIds = [...new Set([
+        appointment.empleadoAsignadoId,
+        ...(Array.isArray(appointment.empleadosAsignados) ? appointment.empleadosAsignados : [])
+      ].filter(Boolean).map(String))];
+      const legacyNames = Array.isArray(appointment.empleadosAsignadosNombres)
+        ? appointment.empleadosAsignadosNombres.filter(Boolean) : [];
+      return {
+        id: String(appointment._id),
+        fecha: appointment.fecha,
+        hora: appointment.hora || "",
+        cliente: appointment.clienteNombre || appointment.cliente || "Cliente",
+        estado: appointment.estado,
+        servicio: appointment.servicioNombre || appointment.servicioPaquete || "Servicio",
+        serviciosDetalle: (Array.isArray(appointment.serviciosDetalle) ? appointment.serviciosDetalle : []).map((item) => ({
+          tipo: item.tipo || "",
+          nombre: item.mascotaNombre || item.vehiculoNombre || item.categoria || "",
+          paquete: item.paquete || item.servicioPaquete || ""
+        })),
+        empleados: [...new Set([...assignedIds.map((id) => employeeNames.get(id)).filter(Boolean), ...legacyNames])],
+        montoCobrado: charged.valid ? charged.amount : null,
+        montoEstado: charged.valid ? "registrado" : charged.reason,
+        rewardGratisAplicado: appointment.rewardGratisAplicado === true
+      };
+    });
+    const detailTotal = rows.reduce((sum, row) => sum + (Number.isFinite(row.montoCobrado) ? row.montoCobrado : 0), 0);
+    const consistent = Math.round(detailTotal * 100) === Math.round(summary.total * 100);
+    if (!consistent) console.error("[weekly-revenue] total mismatch", { operation: "weekly-detail", status: "mismatch" });
+    res.json({
+      semanaInicio: summary.start,
+      semanaFin: summary.end,
+      zonaHoraria: summary.timeZone,
+      totalSemanal: summary.total,
+      citasCompletadas: summary.completedCount,
+      citasConMonto: summary.registeredCount,
+      citasSinMonto: summary.missingCount,
+      sumaDetalle: detailTotal,
+      consistente: consistent,
+      citas: rows
+    });
+  } catch (error) {
+    console.error("[weekly-revenue] read failed", { operation: "weekly-read", status: "error" });
+    res.status(500).json({ message: "No se pudo calcular el ingreso semanal" });
+  }
+});
+
 function contarPremiosDisponiblesAdmin(progreso = {}) {
   return ["mascota", "auto"].reduce((total, tipo) => {
     const item = progreso[tipo] || {};
@@ -7170,6 +7244,40 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
       return res.status(error.status).json({ message: error.message });
     }
     res.status(500).json({ message: "No se pudo crear la cita" });
+  }
+});
+
+app.patch("/admin/appointments/:id/charged-amount", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
+    const keys = Object.keys(req.body || {});
+    if (keys.length !== 1 || keys[0] !== "totalCobrado") {
+      return res.status(400).json({ message: "Solo se permite modificar totalCobrado" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
+      return res.status(400).json({ message: "El id de la cita no es válido" });
+    }
+    const validation = weeklyRevenueService.validateChargedAmount(req.body.totalCobrado);
+    if (!validation.valid) return res.status(400).json({ message: validation.message });
+    const appointment = await Appointment.findOneAndUpdate(
+      { _id: appointmentId, estado: "completada" },
+      { $set: { totalCobrado: validation.amount } },
+      { new: true, runValidators: true }
+    ).select("estado totalCobrado");
+    if (!appointment) {
+      const exists = await Appointment.exists({ _id: appointmentId });
+      return res.status(exists ? 409 : 404).json({
+        message: exists ? "El monto cobrado solo puede editarse en citas completadas" : "Cita no encontrada"
+      });
+    }
+    res.json({ id: String(appointment._id), totalCobrado: appointment.totalCobrado });
+  } catch (error) {
+    console.error("[charged-amount] update failed", {
+      appointmentId: String(req.params?.id || "").slice(-6),
+      operation: "charged-amount",
+      status: "error"
+    });
+    res.status(500).json({ message: "No se pudo guardar el monto cobrado" });
   }
 });
 

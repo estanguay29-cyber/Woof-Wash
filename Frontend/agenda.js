@@ -135,6 +135,8 @@ let calendarioAgendaVisual = null;
 let resumenMananaEnProceso = false;
 let fotosResumenManana = [];
 let urlsObjetoFotosResumen = [];
+let weeklyRevenueData = null;
+let weeklyRevenueTrigger = null;
 
 function obtenerApiBaseAgenda() {
   const hostname = window.location.hostname;
@@ -195,6 +197,145 @@ async function agendaFetch(path, options = {}) {
   }
 
   return data;
+}
+
+function obtenerFechaMexicoAgenda() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function formatWeeklyDate(value, options = {}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return "Fecha inválida";
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City", day: "numeric", month: "long", ...options
+  }).format(new Date(`${value}T12:00:00-06:00`));
+}
+
+function weeklyServiceSummary(appointment = {}) {
+  const details = Array.isArray(appointment.serviciosDetalle) ? appointment.serviciosDetalle : [];
+  const labels = details.map((item) => [item.nombre, item.paquete].filter(Boolean).join(" — ")).filter(Boolean);
+  return labels.length ? labels.join(" · ") : appointment.servicio || "Servicio";
+}
+
+function renderWeeklyRevenue(data) {
+  weeklyRevenueData = data;
+  const money = (value) => formatMonedaMXN(Number(value) || 0);
+  const range = `${formatWeeklyDate(data.semanaInicio)} – ${formatWeeklyDate(data.semanaFin)}`;
+  document.getElementById("weeklyRevenueTotal").textContent = money(data.totalSemanal);
+  document.getElementById("weeklyRevenueRange").textContent = range;
+  document.getElementById("weeklyRevenueDateRange").textContent = `${range} · America/Mexico_City`;
+  document.getElementById("weeklyRevenueModalTotal").textContent = money(data.totalSemanal);
+  document.getElementById("weeklyRevenueCompleted").textContent = String(data.citasCompletadas || 0);
+  document.getElementById("weeklyRevenueRegistered").textContent = String(data.citasConMonto || 0);
+  document.getElementById("weeklyRevenueMissing").textContent = String(data.citasSinMonto || 0);
+  document.getElementById("weeklyRevenueWarning")?.classList.toggle("hidden", data.consistente !== false);
+  const list = document.getElementById("weeklyRevenueList");
+  if (!list) return;
+  if (!Array.isArray(data.citas) || !data.citas.length) {
+    list.innerHTML = `<div class="agenda-empty-state"><h3>Sin citas completadas</h3><p>No hay cobros que mostrar en esta semana.</p></div>`;
+    return;
+  }
+  list.innerHTML = data.citas.map((appointment) => {
+    const registered = Number.isFinite(appointment.montoCobrado);
+    const amountLabel = registered
+      ? `Cobrado: ${money(appointment.montoCobrado)}${appointment.montoCobrado === 0 && appointment.rewardGratisAplicado ? " — Canje o cortesía" : ""}`
+      : appointment.montoEstado === "invalid" ? "Monto inválido — requiere corrección" : "Monto no registrado";
+    const employees = Array.isArray(appointment.empleados) && appointment.empleados.length
+      ? appointment.empleados.join(", ") : "Sin asignar";
+    return `<article class="weekly-revenue-row" data-weekly-appointment="${escapeHtml(appointment.id)}">
+      <div class="weekly-revenue-row-main">
+        <strong>${escapeHtml(formatWeeklyDate(appointment.fecha, { weekday: "long" }))} · ${escapeHtml(appointment.hora || "Sin hora")}</strong>
+        <span>${escapeHtml(appointment.cliente || "Cliente")}</span>
+        <span>${escapeHtml(weeklyServiceSummary(appointment))}</span>
+        <small>Completada · ${escapeHtml(employees)}</small>
+      </div>
+      <div class="weekly-revenue-row-action">
+        <strong class="${registered ? "" : "is-missing"}">${escapeHtml(amountLabel)}</strong>
+        <button type="button" class="admin-button admin-button-light" data-weekly-edit>${registered ? "Editar monto" : "Registrar monto"}</button>
+      </div>
+      <form class="weekly-revenue-edit hidden" data-weekly-form>
+        <label>Monto cobrado
+          <input name="totalCobrado" type="number" inputmode="decimal" min="0" max="1000000" step="0.01" value="${registered ? escapeHtml(String(appointment.montoCobrado)) : ""}" required>
+        </label>
+        <button type="submit" class="admin-button admin-button-dark">Guardar</button>
+        <button type="button" class="admin-button admin-button-light" data-weekly-cancel>Cancelar</button>
+        <span class="weekly-revenue-row-status" role="status" aria-live="polite"></span>
+      </form>
+    </article>`;
+  }).join("");
+}
+
+async function cargarIngresoSemanal({ silent = false } = {}) {
+  const status = document.getElementById("weeklyRevenueStatus");
+  if (!silent && status) status.textContent = "Cargando ingresos…";
+  try {
+    const data = await agendaFetch(`/admin/appointments/weekly-revenue?date=${encodeURIComponent(obtenerFechaMexicoAgenda())}`);
+    renderWeeklyRevenue(data);
+    if (status) status.textContent = "";
+  } catch (error) {
+    if (status) status.textContent = error.message || "No se pudieron cargar los ingresos.";
+  }
+}
+
+async function manejarWeeklyRevenue(event) {
+  const row = event.target.closest("[data-weekly-appointment]");
+  if (!row) return;
+  if (event.target.closest("[data-weekly-edit]")) {
+    row.querySelector("[data-weekly-form]")?.classList.remove("hidden");
+    row.querySelector("[data-weekly-edit]").disabled = true;
+    row.querySelector("input")?.focus();
+  } else if (event.target.closest("[data-weekly-cancel]")) {
+    row.querySelector("[data-weekly-form]")?.classList.add("hidden");
+    row.querySelector("[data-weekly-edit]").disabled = false;
+  }
+}
+
+async function guardarWeeklyRevenue(event) {
+  if (!event.target.matches("[data-weekly-form]")) return;
+  event.preventDefault();
+  const form = event.target;
+  const row = form.closest("[data-weekly-appointment]");
+  const input = form.elements.totalCobrado;
+  const status = form.querySelector("[role=status]");
+  if (!input.checkValidity()) return input.reportValidity();
+  const text = String(input.value || "");
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) {
+    status.textContent = "Usa un monto válido con máximo dos decimales.";
+    return;
+  }
+  form.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
+  status.textContent = "Guardando…";
+  try {
+    await agendaFetch(`/admin/appointments/${encodeURIComponent(row.dataset.weeklyAppointment)}/charged-amount`, {
+      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text) })
+    });
+    await cargarIngresoSemanal({ silent: true });
+    document.getElementById("weeklyRevenueStatus").textContent = "Monto guardado correctamente.";
+  } catch (error) {
+    form.querySelectorAll("button, input").forEach((control) => { control.disabled = false; });
+    status.textContent = error.message || "No se pudo guardar el monto.";
+  }
+}
+
+function abrirWeeklyRevenue() {
+  weeklyRevenueTrigger = document.activeElement;
+  const modal = document.getElementById("weeklyRevenueModal");
+  modal?.classList.remove("hidden");
+  modal?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("agenda-modal-open");
+  document.getElementById("weeklyRevenueClose")?.focus();
+  cargarIngresoSemanal();
+}
+
+function cerrarWeeklyRevenue() {
+  const modal = document.getElementById("weeklyRevenueModal");
+  modal?.classList.add("hidden");
+  modal?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("agenda-modal-open");
+  weeklyRevenueTrigger?.focus?.();
 }
 
 function inicializarCalendarioAgenda() {
@@ -2062,6 +2203,7 @@ async function cargarCitasAgenda() {
 
 async function cargarStatsAgenda() {
   renderizarResumenAgenda();
+  await cargarIngresoSemanal({ silent: true });
 }
 
 function obtenerCitasFiltradasLocal() {
@@ -4521,6 +4663,13 @@ async function configurarAgenda() {
     if (shell) shell.innerHTML = placeholderSinFotoHtml();
   }, true);
   elementos.editForm?.addEventListener("submit", guardarEdicionCita);
+  document.getElementById("weeklyRevenueButton")?.addEventListener("click", abrirWeeklyRevenue);
+  document.getElementById("weeklyRevenueClose")?.addEventListener("click", cerrarWeeklyRevenue);
+  document.getElementById("weeklyRevenueModal")?.addEventListener("click", (event) => {
+    if (event.target.id === "weeklyRevenueModal") cerrarWeeklyRevenue();
+  });
+  document.getElementById("weeklyRevenueList")?.addEventListener("click", manejarWeeklyRevenue);
+  document.getElementById("weeklyRevenueList")?.addEventListener("submit", guardarWeeklyRevenue);
   const summaryButton = document.getElementById("btnResumenManana");
   if (summaryButton && summaryButton.dataset.listenerBound !== "true") {
     summaryButton.addEventListener("click", handleResumenMananaClick);
@@ -4614,6 +4763,7 @@ async function configurarAgenda() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    if (!document.getElementById("weeklyRevenueModal")?.classList.contains("hidden")) cerrarWeeklyRevenue();
     if (citaPendienteCompletar) cerrarModalCompletarCita();
     if (citaEnDetalleId) cerrarModalDetalle();
   });

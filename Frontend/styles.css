@@ -7440,7 +7440,7 @@ body {
 
 .agenda-summary-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -7459,6 +7459,59 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.agenda-revenue-card {
+  width: 100%;
+  border: 1px solid rgba(11, 42, 107, 0.08);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.agenda-revenue-card:hover { transform: translateY(-2px); border-color: rgba(92, 148, 36, .45); }
+.agenda-revenue-card:focus-visible { outline: 3px solid rgba(37, 99, 235, .35); outline-offset: 3px; }
+
+.weekly-revenue-panel { width: min(920px, 100%); }
+.weekly-revenue-header { position: sticky; top: -22px; z-index: 2; margin: -22px -22px 18px; padding: 22px; background: #fff; border-bottom: 1px solid #e6ebf3; }
+.weekly-revenue-status { min-height: 24px; color: #475569; font-weight: 700; }
+.weekly-revenue-total { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding: 20px; border-radius: 20px; color: #fff; background: linear-gradient(135deg, #0b2a6b, #174891); }
+.weekly-revenue-total span { font-weight: 800; }
+.weekly-revenue-total strong { font-size: clamp(2rem, 7vw, 3rem); }
+.weekly-revenue-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+.weekly-revenue-metrics div { display: grid; gap: 4px; padding: 14px; border: 1px solid #e1e8f1; border-radius: 16px; background: #f8fafc; }
+.weekly-revenue-metrics strong { color: #0b2a6b; font-size: 1.4rem; }
+.weekly-revenue-metrics span { color: #64748b; font-size: .82rem; font-weight: 800; }
+.weekly-revenue-warning { padding: 12px; border-radius: 12px; background: #fff4e5; color: #92400e; font-weight: 800; }
+.weekly-revenue-warning.hidden, .weekly-revenue-edit.hidden { display: none; }
+.weekly-revenue-list { display: grid; gap: 12px; }
+.weekly-revenue-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 16px; border: 1px solid #dfe6ef; border-radius: 18px; }
+.weekly-revenue-row-main { min-width: 0; display: grid; gap: 5px; }
+.weekly-revenue-row-main span, .weekly-revenue-row-main small { overflow-wrap: anywhere; color: #475569; }
+.weekly-revenue-row-action { display: grid; justify-items: end; align-content: center; gap: 10px; }
+.weekly-revenue-row-action strong { color: #166534; }
+.weekly-revenue-row-action strong.is-missing { color: #92400e; }
+.weekly-revenue-edit { grid-column: 1 / -1; display: flex; align-items: end; gap: 10px; padding-top: 12px; border-top: 1px solid #e5eaf1; }
+.weekly-revenue-edit label { display: grid; flex: 1; gap: 6px; color: #334155; font-weight: 800; }
+.weekly-revenue-edit input { width: 100%; min-height: 44px; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 12px; font: inherit; }
+.weekly-revenue-row-status { flex-basis: 100%; color: #475569; font-weight: 700; }
+
+@media (max-width: 768px) {
+  .weekly-revenue-row { grid-template-columns: 1fr; }
+  .weekly-revenue-row-action { justify-items: stretch; }
+  .weekly-revenue-row-action .admin-button { min-height: 44px; }
+  .weekly-revenue-edit { flex-wrap: wrap; }
+  .weekly-revenue-edit label { flex-basis: 100%; }
+  .weekly-revenue-edit .admin-button { flex: 1; min-height: 44px; }
+}
+
+@media (max-width: 430px) {
+  .agenda-modal { padding: 8px; }
+  .weekly-revenue-panel { max-height: calc(100dvh - 16px); padding: 16px; border-radius: 20px; overflow-x: hidden; }
+  .weekly-revenue-header { top: -16px; margin: -16px -16px 14px; padding: 16px; }
+  .weekly-revenue-metrics { grid-template-columns: 1fr; }
+  .weekly-revenue-total { align-items: start; flex-direction: column; }
 }
 
 .agenda-summary-card span {
@@ -10132,6 +10185,69 @@ body {
 .agenda-behavior-readonly { display: grid; gap: 6px; min-width: 0; margin-top: 8px; }
 .agenda-behavior-existing { display: grid; gap: 6px; min-width: 0; font-weight: 700; }
 .agenda-behavior-existing select { width: 100%; min-height: 44px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; }
+
+/* Sistema visual de estados de cita. Mantiene intactas las clases funcionales. */
+.agenda-appointment-card.is-pendiente,
+.agenda-appointment-card.is-Pendiente {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: linear-gradient(90deg, rgba(255, 247, 237, 0.82), #fff 22%);
+  box-shadow: 0 8px 22px rgba(217, 119, 6, 0.09);
+}
+
+.agenda-appointment-card.is-pendiente::before,
+.agenda-appointment-card.is-Pendiente::before { background: #d97706; }
+
+.agenda-appointment-card.is-confirmada,
+.agenda-appointment-card.is-confirmado {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: linear-gradient(90deg, rgba(239, 246, 255, 0.82), #fff 22%);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.09);
+}
+
+.agenda-appointment-card.is-confirmada::before,
+.agenda-appointment-card.is-confirmado::before { background: #2563eb; }
+
+.agenda-appointment-card.is-completada,
+.agenda-appointment-card.is-completado {
+  border-color: rgba(92, 148, 36, 0.3);
+  background: linear-gradient(90deg, rgba(247, 254, 231, 0.82), #fff 22%);
+  box-shadow: 0 8px 22px rgba(92, 148, 36, 0.09);
+}
+
+.agenda-appointment-card.is-completada::before,
+.agenda-appointment-card.is-completado::before { background: #5c9424; }
+
+.agenda-appointment-card.is-cancelada,
+.agenda-appointment-card.is-cancelado,
+.agenda-appointment-card.is-cancelled {
+  border-color: rgba(220, 38, 38, 0.28);
+  background: linear-gradient(90deg, rgba(254, 242, 242, 0.84), #fff 22%);
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.08);
+}
+
+.agenda-appointment-card.is-cancelada::before,
+.agenda-appointment-card.is-cancelado::before,
+.agenda-appointment-card.is-cancelled::before { background: #dc2626; }
+
+.agenda-appointment-card.is-pendiente:hover { box-shadow: 0 11px 27px rgba(217, 119, 6, 0.16); }
+.agenda-appointment-card:is(.is-confirmada, .is-confirmado):hover { box-shadow: 0 11px 27px rgba(37, 99, 235, 0.15); }
+.agenda-appointment-card:is(.is-completada, .is-completado):hover { box-shadow: 0 11px 27px rgba(92, 148, 36, 0.15); }
+.agenda-appointment-card:is(.is-cancelada, .is-cancelado, .is-cancelled):hover { box-shadow: 0 11px 27px rgba(220, 38, 38, 0.14); }
+
+.agenda-status-badge:is(.is-pendiente, .is-Pendiente) { border: 1px solid #f59e0b; background: #fef3c7; color: #92400e; }
+.agenda-status-badge:is(.is-confirmada, .is-confirmado) { border: 1px solid #60a5fa; background: #dbeafe; color: #1e40af; }
+.agenda-status-badge:is(.is-completada, .is-completado) { border: 1px solid #86c35a; background: #dcfce7; color: #166534; }
+.agenda-status-badge:is(.is-cancelada, .is-cancelado) { border: 1px solid #f87171; background: #fef2f2; color: #991b1b; }
+
+.agenda-appointment-card:focus-within {
+  outline: 3px solid rgba(37, 99, 235, 0.34);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agenda-appointment-card { transition: none; }
+  .agenda-appointment-card:hover { transform: none; }
+}
 .agenda-behavior-create-confirm { display: flex; min-width: 0; align-items: flex-start; gap: 9px; padding: 9px; border: 1px solid #dbe3ef; border-radius: 10px; background: #f8fafc; cursor: pointer; }
 .agenda-behavior-create-confirm input { flex: 0 0 auto; width: 20px; height: 20px; margin-top: 1px; }
 .agenda-behavior-create-confirm span { min-width: 0; overflow-wrap: anywhere; }

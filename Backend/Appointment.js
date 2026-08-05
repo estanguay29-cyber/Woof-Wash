@@ -322,7 +322,7 @@ const AppointmentSchema = new mongoose.Schema(
     totalCobrado: {
       type: Number,
       min: 0,
-      default: 0
+      default: null
     },
     ingresoAproximadoMxn: {
       type: Number,

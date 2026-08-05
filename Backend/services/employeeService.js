@@ -1,3 +1,4 @@
+const { parseHistoricalChargedAmount } = require("./weeklyRevenueService");
 const { contarServiciosCita: _contarServiciosCitaFallback } = {};
 
 function contarServiciosCita(obj = {}) {
@@ -23,7 +24,10 @@ function calcularMetricasEmpleado(citas = []) {
     .filter((valor) => Number.isInteger(valor));
   const puntuales = puntualidades.filter((valor) => valor <= 5).length;
 
-  const ingresosGeneradosAproximados = citas.reduce((total, cita) => total + (Number(cita.totalCobrado) || 0), 0);
+  const ingresosGeneradosAproximados = completadas.reduce((total, cita) => {
+    const charged = parseHistoricalChargedAmount(cita.totalCobrado);
+    return total + (charged.valid ? charged.amount : 0);
+  }, 0);
 
   return {
     serviciosCompletados: completadas.reduce((total, cita) => total + contarServiciosCita(cita), 0),
@@ -86,17 +90,17 @@ function obtenerRangoSemana(fecha = "") {
     return null;
   }
 
-  const fechaBase = new Date(`${fecha}T00:00:00`);
+  const fechaBase = new Date(`${fecha}T00:00:00Z`);
   if (Number.isNaN(fechaBase.getTime())) {
     return null;
   }
 
-  const dia = fechaBase.getDay();
+  const dia = fechaBase.getUTCDay();
   const diasDesdeLunes = (dia + 6) % 7;
   const inicio = new Date(fechaBase);
-  inicio.setDate(fechaBase.getDate() - diasDesdeLunes);
+  inicio.setUTCDate(fechaBase.getUTCDate() - diasDesdeLunes);
   const fin = new Date(inicio);
-  fin.setDate(inicio.getDate() + 5);
+  fin.setUTCDate(inicio.getUTCDate() + 6);
 
   return {
     inicio: formatoFechaISO(inicio),
