@@ -137,6 +137,7 @@ let fotosResumenManana = [];
 let urlsObjetoFotosResumen = [];
 let weeklyRevenueData = null;
 let weeklyRevenueTrigger = null;
+let weeklyRevenueRequest = null;
 
 function obtenerApiBaseAgenda() {
   const hostname = window.location.hostname;
@@ -270,14 +271,20 @@ function renderWeeklyRevenue(data) {
 
 async function cargarIngresoSemanal({ silent = false } = {}) {
   const status = document.getElementById("weeklyRevenueStatus");
-  if (!silent && status) status.textContent = "Cargando ingresos…";
-  try {
-    const data = await agendaFetch(`/admin/appointments/weekly-revenue?date=${encodeURIComponent(obtenerFechaMexicoAgenda())}`);
-    renderWeeklyRevenue(data);
-    if (status) status.textContent = "";
-  } catch (error) {
-    if (status) status.textContent = error.message || "No se pudieron cargar los ingresos.";
-  }
+  if (!silent && status) status.textContent = "Cargando ingresos de la semana...";
+  if (weeklyRevenueRequest) return weeklyRevenueRequest;
+  weeklyRevenueRequest = (async () => {
+    try {
+      const data = await agendaFetch("/admin/appointments/weekly-revenue");
+      renderWeeklyRevenue(data);
+      if (status) status.textContent = "";
+    } catch (error) {
+      if (status) status.textContent = error.message || "No se pudieron cargar los ingresos.";
+    } finally {
+      weeklyRevenueRequest = null;
+    }
+  })();
+  return weeklyRevenueRequest;
 }
 
 async function manejarWeeklyRevenue(event) {
@@ -321,11 +328,12 @@ async function guardarWeeklyRevenue(event) {
 }
 
 function abrirWeeklyRevenue() {
-  weeklyRevenueTrigger = document.activeElement;
   const modal = document.getElementById("weeklyRevenueModal");
-  modal?.classList.remove("hidden");
-  modal?.setAttribute("aria-hidden", "false");
-  document.body.classList.add("agenda-modal-open");
+  if (!modal || !modal.classList.contains("hidden")) return;
+  weeklyRevenueTrigger = document.activeElement;
+  document.getElementById("weeklyRevenueStatus").textContent = "Cargando ingresos de la semana...";
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
   document.getElementById("weeklyRevenueClose")?.focus();
   cargarIngresoSemanal();
 }
@@ -334,8 +342,26 @@ function cerrarWeeklyRevenue() {
   const modal = document.getElementById("weeklyRevenueModal");
   modal?.classList.add("hidden");
   modal?.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("agenda-modal-open");
   weeklyRevenueTrigger?.focus?.();
+}
+
+function configurarWeeklyRevenue() {
+  const button = document.getElementById("weeklyRevenueButton");
+  const close = document.getElementById("weeklyRevenueClose");
+  const modal = document.getElementById("weeklyRevenueModal");
+  const list = document.getElementById("weeklyRevenueList");
+  if (!button || button.dataset.listenerBound === "true") return;
+  document.getElementById("weeklyRevenueButton")?.addEventListener("click", abrirWeeklyRevenue);
+  close?.addEventListener("click", cerrarWeeklyRevenue);
+  modal?.addEventListener("click", (event) => {
+    if (event.target === modal) cerrarWeeklyRevenue();
+  });
+  list?.addEventListener("click", manejarWeeklyRevenue);
+  list?.addEventListener("submit", guardarWeeklyRevenue);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal?.classList.contains("hidden")) cerrarWeeklyRevenue();
+  });
+  button.dataset.listenerBound = "true";
 }
 
 function inicializarCalendarioAgenda() {
@@ -4489,6 +4515,7 @@ async function handleResumenMananaClick(event) {
 
 async function configurarAgenda() {
   const elementos = obtenerElementosAgenda();
+  configurarWeeklyRevenue();
   configurarCalendarioAgenda();
   await cargarConfigZonasAgenda();
   poblarSelectZonasAgenda();
@@ -4663,13 +4690,6 @@ async function configurarAgenda() {
     if (shell) shell.innerHTML = placeholderSinFotoHtml();
   }, true);
   elementos.editForm?.addEventListener("submit", guardarEdicionCita);
-  document.getElementById("weeklyRevenueButton")?.addEventListener("click", abrirWeeklyRevenue);
-  document.getElementById("weeklyRevenueClose")?.addEventListener("click", cerrarWeeklyRevenue);
-  document.getElementById("weeklyRevenueModal")?.addEventListener("click", (event) => {
-    if (event.target.id === "weeklyRevenueModal") cerrarWeeklyRevenue();
-  });
-  document.getElementById("weeklyRevenueList")?.addEventListener("click", manejarWeeklyRevenue);
-  document.getElementById("weeklyRevenueList")?.addEventListener("submit", guardarWeeklyRevenue);
   const summaryButton = document.getElementById("btnResumenManana");
   if (summaryButton && summaryButton.dataset.listenerBound !== "true") {
     summaryButton.addEventListener("click", handleResumenMananaClick);
@@ -4763,7 +4783,6 @@ async function configurarAgenda() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    if (!document.getElementById("weeklyRevenueModal")?.classList.contains("hidden")) cerrarWeeklyRevenue();
     if (citaPendienteCompletar) cerrarModalCompletarCita();
     if (citaEnDetalleId) cerrarModalDetalle();
   });

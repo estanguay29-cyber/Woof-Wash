@@ -15,6 +15,13 @@ const MANUALES_PORTAL = [
     estado: "Disponible"
   },
   {
+    titulo: "📘 Reglamento interno y manual de procesos",
+    tipo: "PDF",
+    descripcion: "Reglas, procesos y lineamientos operativos de Woof & Wash.",
+    url: "../manuales/Reglamento interno y manual de procesos W&W.pdf",
+    estado: "Disponible"
+  },
+  {
     titulo: "Atención al cliente",
     tipo: "Guía",
     descripcion: "Protocolos de comunicación, confirmación y trato con clientes.",
