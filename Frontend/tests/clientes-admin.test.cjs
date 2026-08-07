@@ -65,6 +65,7 @@ test("cambiar rápidamente de cliente cancela solicitudes y solo renderiza la ú
     let activeCustomerRequestPromise = null;
     let loadedCustomerId = "";
     function renderCustomersList() {}
+    function openCustomerModal() {}
     function renderCustomerLoadingState() { loading += 1; }
     function renderCustomerErrorState(message) { renders.push({ error: message }); }
     function renderCustomerDetail(cliente) { renders.push(cliente.id); }
@@ -115,6 +116,45 @@ test("listeners principales se registran una sola vez", () => {
   for (const id of ["customersSearch", "customersFilter", "btnReloadCustomers", "customersList", "customerDetail"]) {
     assert.equal((clientesJs.match(new RegExp(`byId\\("${id}"\\)\\?\\.addEventListener`, "g")) || []).length, id === "customerDetail" ? 3 : 1);
   }
+});
+
+test("Clientes usa lista completa y un único modal accesible de detalle", () => {
+  const css = fs.readFileSync(path.join(frontend, "clientes.css"), "utf8");
+  assert.match(clientesHtml, /id="customerModal"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="customerModalTitle"/);
+  assert.match(clientesHtml, /id="btnCloseCustomerModal"[^>]*aria-label="Cerrar detalle del cliente"/);
+  assert.equal((clientesHtml.match(/id="customerDetail"/g) || []).length, 1);
+  assert.match(css, /\.customers-layout\s*\{[^}]*display:\s*block/);
+  assert.doesNotMatch(css, /\.customers-layout\s*\{[^}]*grid-template-columns:\s*minmax\(620px/);
+  assert.match(css, /\.customer-modal\s*\{[^}]*position:\s*fixed/);
+  assert.match(css, /\.customer-modal-panel\s*\{[^}]*width:\s*min\(1100px, 94vw\)/);
+  assert.match(css, /max-height:\s*90vh/);
+  assert.match(css, /@media \(max-width: 820px\)[\s\S]+max-height:\s*94dvh/);
+});
+
+test("el modal abre antes de consultar, cierra por X, exterior y Escape y restaura foco y scroll", () => {
+  const selectBlock = clientesJs.slice(clientesJs.indexOf("async function selectCustomer(id"), clientesJs.indexOf("async function postCustomerAction"));
+  assert.ok(selectBlock.indexOf("openCustomerModal(customerId)") < selectBlock.indexOf("customersFetch("));
+  assert.match(clientesJs, /document\.body\.style\.overflow = "hidden"/);
+  assert.match(clientesJs, /document\.body\.style\.overflow = customerBodyOverflow/);
+  assert.match(clientesJs, /activeCustomerRequestController\?\.abort\(\)/);
+  assert.match(clientesJs, /trigger\?\.focus\?\.\(\)/);
+  assert.match(clientesJs, /event\.target === event\.currentTarget/);
+  assert.match(clientesJs, /event\.key === "Escape"/);
+  assert.equal((clientesJs.match(/btnCloseCustomerModal"\)\?\.addEventListener/g) || []).length, 1);
+  assert.equal((clientesJs.match(/customerModal"\)\?\.addEventListener/g) || []).length, 1);
+});
+
+test("las filas son botones nativos y el modal conserva carga, errores y detalle completo", () => {
+  assert.match(clientesJs, /<button type="button" class="customer-row[^>]*data-customer-id=/);
+  assert.match(clientesJs, /Cargando información del cliente…/);
+  for (const message of ["Tu sesión expiró.", "No tienes permisos.", "Cliente no encontrado.", "No se pudo obtener la información.", "La consulta tardó demasiado."]) {
+    assert.match(clientesJs, new RegExp(message.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  for (const content of ["Resumen operativo", "Registros del cliente", "Fidelidad", "Timeline de citas", "Posibles citas por vincular", "Cuenta web", "Notas administrativas"]) {
+    assert.match(clientesJs, new RegExp(content));
+  }
+  assert.match(clientesJs, /data-form="reminder-frequency"/);
+  assert.match(clientesJs, /data-form="pet-behavior"/);
 });
 
 test("exportación administrativa usa botón real, una descarga y restaura el estado", () => {

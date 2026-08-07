@@ -76,15 +76,23 @@
           </div>
           <div id="customersList" class="customers-list"></div>
         </div>
-
-        <aside id="customerDetail" class="customer-detail">
-          <div class="customer-empty">
-            Selecciona un cliente para ver su detalle.
-          </div>
-        </aside>
       </section>
     </section>
   </main>
+
+  <div id="customerModal" class="customer-modal hidden" role="dialog" aria-modal="true" aria-labelledby="customerModalTitle">
+    <section class="customer-modal-panel" role="document">
+      <header class="customer-modal-header">
+        <div>
+          <p class="admin-kicker">Detalle del cliente</p>
+          <h2 id="customerModalTitle">Cliente</h2>
+          <p id="customerModalStatus" class="customer-modal-status">Información administrativa</p>
+        </div>
+        <button id="btnCloseCustomerModal" type="button" class="customer-modal-close" aria-label="Cerrar detalle del cliente">×</button>
+      </header>
+      <div id="customerDetail" class="customer-detail"></div>
+    </section>
+  </div>
 
   <script src="admin-nav.js" defer></script>
   <script src="clientes.js"></script>

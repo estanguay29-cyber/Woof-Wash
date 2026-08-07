@@ -120,22 +120,102 @@
 }
 
 .customers-layout {
-  display: grid;
-  grid-template-columns: minmax(620px, 1fr) minmax(480px, 560px);
-  gap: 14px;
-  align-items: start;
+  display: block;
 }
 
-.customers-list-card,
-.customer-detail {
+.customers-list-card {
   padding: 14px;
 }
 
+.customer-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(7, 20, 48, 0.56);
+  overscroll-behavior: contain;
+}
+
+.customer-modal.hidden {
+  display: none;
+}
+
+.customer-modal-panel {
+  display: flex;
+  width: min(1100px, 94vw);
+  max-width: 100%;
+  max-height: 90vh;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(11, 42, 107, 0.18);
+  border-radius: 16px;
+  background: #fef9e7;
+  box-shadow: 0 28px 80px rgba(7, 20, 48, 0.34);
+}
+
+.customer-modal-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(11, 42, 107, 0.12);
+  background: #fff;
+}
+
+.customer-modal-header h2,
+.customer-modal-header p {
+  margin: 0;
+}
+
+.customer-modal-header h2 {
+  color: #0b2a6b;
+}
+
+.customer-modal-status {
+  margin-top: 4px !important;
+  color: #52607a;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.customer-modal-close {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border: 1px solid rgba(11, 42, 107, 0.16);
+  border-radius: 12px;
+  background: #f3f6fa;
+  color: #0b2a6b;
+  font: inherit;
+  font-size: 1.65rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.customer-modal-close:hover {
+  background: #eaf6da;
+}
+
+.customer-modal-close:focus-visible,
+.customer-row:focus-visible {
+  outline: 3px solid rgba(140, 198, 63, 0.55);
+  outline-offset: 3px;
+}
+
 .customer-detail {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 32px);
-  overflow: auto;
+  min-height: 180px;
+  padding: 18px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .customers-list-header,
@@ -183,8 +263,7 @@
 .customers-list {
   display: grid;
   gap: 6px;
-  max-height: 72vh;
-  overflow: auto;
+  width: 100%;
   padding-right: 2px;
 }
 
@@ -226,12 +305,17 @@
   background: #fff;
   text-align: left;
   cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .customer-row:hover,
 .customer-row.is-active {
   border-color: #8cc63f;
   box-shadow: inset 4px 0 0 #8cc63f;
+}
+
+.customer-row:hover {
+  transform: translateY(-1px);
 }
 
 .customer-row strong {
@@ -808,17 +892,8 @@
 }
 
 @media (max-width: 1180px) {
-  .customers-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .customer-detail {
-    position: static;
-    max-height: none;
-  }
-
-  .customers-list {
-    max-height: none;
+  .customer-modal-panel {
+    width: min(1040px, 95vw);
   }
 }
 
@@ -840,6 +915,37 @@
 
   .customers-export-button {
     white-space: normal;
+  }
+
+  .customer-modal {
+    padding: 10px;
+  }
+
+  .customer-modal-panel {
+    width: 96vw;
+    max-height: 94dvh;
+    border-radius: 14px;
+  }
+
+  .customer-modal-header {
+    align-items: flex-start;
+    padding: 13px 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .customer-table-head {
+    display: none;
+  }
+
+  .customer-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+  }
+
+  .customer-row-name,
+  .customer-status {
+    grid-column: 1 / -1;
   }
 }
 
@@ -883,13 +989,7 @@
     width: 100%;
   }
 
-  .customer-table-head {
-    display: none;
-  }
-
   .customer-row {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
     padding: 12px;
   }
 
@@ -902,6 +1002,26 @@
   .customer-row-name small,
   .customer-table-value {
     white-space: normal;
+  }
+}
+
+@media (max-width: 430px) {
+  .customer-modal {
+    padding: 6px;
+  }
+
+  .customer-modal-panel {
+    width: 100%;
+    max-height: 96dvh;
+    border-radius: 12px;
+  }
+
+  .customer-detail {
+    padding: 12px;
+  }
+
+  .customer-modal-header {
+    padding: 11px 12px;
   }
 }
 
@@ -944,5 +1064,6 @@
   .customer-behavior-form button { width: 100%; min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .customer-behavior-option span { transition: none; }
+  .customer-behavior-option span,
+  .customer-row { transition: none; }
 }

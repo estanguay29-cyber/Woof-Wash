@@ -10,6 +10,8 @@ let activeCustomerRequestId = 0;
 let activeCustomerRequestPromise = null;
 let loadedCustomerId = "";
 let customersExportPromise = null;
+let customerModalTrigger = null;
+let customerBodyOverflow = "";
 
 function customersApiBase() {
   const hostname = window.location.hostname;
@@ -326,6 +328,60 @@ function renderCustomersList() {
       </button>
     `).join("")}
   `;
+}
+
+function customerSummaryById(customerId) {
+  return customers.find((customer) => String(customer.id) === String(customerId)) || {};
+}
+
+function updateCustomerModalHeading(customer = {}) {
+  const title = byId("customerModalTitle");
+  const status = byId("customerModalStatus");
+  if (title) title.textContent = valor(customer.nombre, "Cliente");
+  if (status) status.textContent = customer.tieneCuentaWeb ? "Con cuenta" : "Sin cuenta";
+}
+
+function openCustomerModal(customerId) {
+  const modal = byId("customerModal");
+  if (!modal) return;
+  const wasClosed = modal.classList.contains("hidden");
+  customerModalTrigger = [...document.querySelectorAll("[data-customer-id]")]
+    .find((element) => element.dataset.customerId === String(customerId)) || document.activeElement;
+  updateCustomerModalHeading(customerSummaryById(customerId));
+  modal.classList.remove("hidden");
+  if (wasClosed) {
+    customerBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    byId("btnCloseCustomerModal")?.focus();
+  }
+}
+
+function closeCustomerModal() {
+  const modal = byId("customerModal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  activeCustomerRequestController?.abort();
+  activeCustomerRequestId += 1;
+  activeCustomerRequestController = null;
+  activeCustomerRequestPromise = null;
+  loadedCustomerId = "";
+  selectedCustomerId = "";
+  modal.classList.add("hidden");
+  document.body.style.overflow = customerBodyOverflow;
+  const detail = byId("customerDetail");
+  if (detail) detail.replaceChildren();
+  renderCustomersList();
+  const trigger = customerModalTrigger;
+  customerModalTrigger = null;
+  trigger?.focus?.();
+}
+
+function customerModalErrorMessage(error = {}) {
+  if (error.code === "TIMEOUT") return "La consulta tardó demasiado.";
+  if (error.status === 401) return "Tu sesión expiró.";
+  if (error.status === 403) return "No tienes permisos.";
+  if (error.status === 404) return "Cliente no encontrado.";
+  if (error.status >= 500) return "No se pudo obtener la información.";
+  return error.message || "No se pudo obtener la información.";
 }
 
 function renderField(label, valueText) {
@@ -668,6 +724,7 @@ function renderCustomerDetail(cliente, cuentas = []) {
   const citas = combinarCitasTimeline(cliente);
   const citasAgrupadas = agruparCitasCliente(citas);
   const candidatas = cliente.posiblesCitasSinVincular || [];
+  updateCustomerModalHeading(cliente);
   const candidatos = cuentas.length ? cuentas.map((cuenta) => `
     <article class="customer-card">
       <div class="customer-card-head">
@@ -853,6 +910,7 @@ async function selectCustomer(id, { force = false } = {}) {
   selectedCustomerId = customerId;
   loadedCustomerId = "";
   selectedCustomerAccounts = [];
+  openCustomerModal(customerId);
   renderCustomersList();
   renderCustomerLoadingState();
 
@@ -865,7 +923,7 @@ async function selectCustomer(id, { force = false } = {}) {
       renderCustomerDetail(data.cliente || {}, selectedCustomerAccounts);
     } catch (error) {
       if (error?.name === "AbortError" || error?.code === "ABORTED" || requestId !== activeCustomerRequestId) return;
-      renderCustomerErrorState(error?.message || "No se pudo cargar la información del cliente.");
+      renderCustomerErrorState(customerModalErrorMessage(error));
     } finally {
       if (requestId === activeCustomerRequestId) {
         activeCustomerRequestController = null;
@@ -1075,6 +1133,10 @@ document.addEventListener("DOMContentLoaded", () => {
     loadCustomers().catch((error) => mostrarCustomersFeedback(error.message || "No se pudo actualizar", "error"));
   });
   byId("btnExportCustomers")?.addEventListener("click", exportCustomersExcel);
+  byId("btnCloseCustomerModal")?.addEventListener("click", closeCustomerModal);
+  byId("customerModal")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) closeCustomerModal();
+  });
   byId("btnRetryCustomers")?.addEventListener("click", iniciarCustomers);
   byId("customersList")?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-customer-id]");
@@ -1084,5 +1146,8 @@ document.addEventListener("DOMContentLoaded", () => {
   byId("customerDetail")?.addEventListener("click", handleDetailClick);
   byId("customerDetail")?.addEventListener("submit", handleDetailSubmit);
   byId("customerDetail")?.addEventListener("error", handleCustomerDetailImageError, true);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !byId("customerModal")?.classList.contains("hidden")) closeCustomerModal();
+  });
   iniciarCustomers();
 });
