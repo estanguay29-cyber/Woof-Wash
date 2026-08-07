@@ -23,6 +23,7 @@ const employeeService = require("./services/employeeService");
 const weeklyRevenueService = require("./services/weeklyRevenueService");
 const appointmentCalendarService = require("./services/appointmentCalendarService");
 const customerReminderService = require("./services/customerReminderService");
+const customerExportService = require("./services/customerExportService");
 
 function sumarCobrosRealesCompletados(citas = []) {
   return citas.reduce((total, cita) => {
@@ -194,6 +195,7 @@ function crearRateLimiter(nombre, maxRequests, windowMs = SENSITIVE_RATE_LIMIT_W
 const checkoutLimiter = crearRateLimiter("checkout", 20);
 const customerActionLimiter = crearRateLimiter("customer-action", 30);
 const adminWriteLimiter = crearRateLimiter("admin-write", 120);
+const adminExportLimiter = crearRateLimiter("admin-export", 10);
 
 function validarTextoSeguro(value, maxLength = 120) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= maxLength;
@@ -6615,6 +6617,54 @@ async function buscarCuentasCoincidentesCustomer(customer = {}) {
     };
   });
 }
+
+app.get("/admin/customers/export.xlsx", auth, requireAdmin, adminExportLimiter, async (req, res) => {
+  let workbookBuffer = null;
+  try {
+    const today = customerExportService.mexicoCityDate();
+    const customers = await CustomerProfile.find({})
+      .select("_id nombre userId petServiceReminderWeeks direccionesUsadas")
+      .lean();
+    const customerIds = customers.map((customer) => customer._id);
+    const userIds = customers.map((customer) => customer.userId).filter(Boolean);
+    const ownerConditions = [];
+    if (customerIds.length) ownerConditions.push({ customerId: { $in: customerIds } });
+    if (userIds.length) ownerConditions.push({ clientUserId: { $in: userIds } });
+    const itemOwnerConditions = [];
+    if (customerIds.length) itemOwnerConditions.push({ customerProfileId: { $in: customerIds } });
+    if (userIds.length) itemOwnerConditions.push({ userId: { $in: userIds } });
+    const [appointments, clientItems] = await Promise.all([
+      ownerConditions.length
+        ? Appointment.find({ estado: "completada", fecha: { $lte: today }, $or: ownerConditions })
+          .select("_id customerId clientUserId clienteNombre estado fecha hora servicioTipo serviciosDetalle.tipo direccion zona locationUrl")
+          .lean()
+        : [],
+      itemOwnerConditions.length
+        ? ClientItem.find({ $or: itemOwnerConditions })
+          .select("_id customerProfileId userId tipo nombre")
+          .lean()
+        : []
+    ]);
+    const rows = customerExportService.buildCustomerExportRows(customers, appointments, clientItems, { today });
+    workbookBuffer = await customerExportService.buildCustomerWorkbookBuffer(rows, { generatedDate: today });
+    const filename = `clientes_woof_wash_${today}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.send(Buffer.from(workbookBuffer));
+  } catch (error) {
+    console.error("[CUSTOMER-EXPORT] Error al generar XLSX:", {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code
+    });
+    if (!res.headersSent) res.status(500).json({ error: "No fue posible generar la exportación." });
+  } finally {
+    workbookBuffer = null;
+  }
+});
 
 app.get("/admin/customers", auth, requireAdmin, async (req, res) => {
   try {

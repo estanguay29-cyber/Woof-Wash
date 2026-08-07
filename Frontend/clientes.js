@@ -9,6 +9,7 @@ let activeCustomerRequestController = null;
 let activeCustomerRequestId = 0;
 let activeCustomerRequestPromise = null;
 let loadedCustomerId = "";
+let customersExportPromise = null;
 
 function customersApiBase() {
   const hostname = window.location.hostname;
@@ -167,6 +168,62 @@ async function customersFetch(path, options = {}) {
   }
 
   return data;
+}
+
+function customersExportFilename() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `clientes_woof_wash_${values.year}-${values.month}-${values.day}.xlsx`;
+}
+
+async function exportCustomersExcel() {
+  if (customersExportPromise) return customersExportPromise;
+  const button = byId("btnExportCustomers");
+  customersExportPromise = (async () => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Generando Excel…";
+      button.setAttribute("aria-busy", "true");
+    }
+    try {
+      const response = await fetch(`${customersApiBase()}/admin/customers/export.xlsx`, {
+        headers: { Authorization: `Bearer ${customersToken}` },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        if (response.status === 401) cerrarSesionCustomers();
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "No se pudo generar el Excel. Intenta nuevamente.");
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = customersExportFilename();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      const message = error?.name === "AbortError"
+        ? "La generación tardó demasiado. Intenta nuevamente."
+        : "No se pudo generar el Excel. Intenta nuevamente.";
+      mostrarCustomersFeedback(message, "error");
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (button) {
+        button.disabled = false;
+        button.textContent = "📊 Exportar clientes a Excel";
+        button.removeAttribute("aria-busy");
+      }
+      customersExportPromise = null;
+    }
+  })();
+  return customersExportPromise;
 }
 
 function etiquetaEstado(estado, tieneCuentaWeb = false) {
@@ -1017,6 +1074,7 @@ document.addEventListener("DOMContentLoaded", () => {
   byId("btnReloadCustomers")?.addEventListener("click", () => {
     loadCustomers().catch((error) => mostrarCustomersFeedback(error.message || "No se pudo actualizar", "error"));
   });
+  byId("btnExportCustomers")?.addEventListener("click", exportCustomersExcel);
   byId("btnRetryCustomers")?.addEventListener("click", iniciarCustomers);
   byId("customersList")?.addEventListener("click", (event) => {
     const row = event.target.closest("[data-customer-id]");

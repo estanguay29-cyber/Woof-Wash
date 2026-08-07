@@ -117,11 +117,37 @@ test("listeners principales se registran una sola vez", () => {
   }
 });
 
+test("exportación administrativa usa botón real, una descarga y restaura el estado", () => {
+  assert.match(clientesHtml, /<button id="btnExportCustomers" type="button"[^>]*>📊 Exportar clientes a Excel<\/button>/);
+  const hero = clientesHtml.slice(clientesHtml.indexOf('<section class="customers-hero">'), clientesHtml.indexOf('<section class="customers-toolbar">'));
+  const toolbar = clientesHtml.slice(clientesHtml.indexOf('<section class="customers-toolbar">'), clientesHtml.indexOf('<section class="customers-layout">'));
+  assert.match(hero, /id="btnExportCustomers"/);
+  assert.doesNotMatch(toolbar, /id="btnExportCustomers"/);
+  assert.match(clientesJs, /if \(customersExportPromise\) return customersExportPromise/);
+  assert.match(clientesJs, /\/admin\/customers\/export\.xlsx/);
+  assert.match(clientesJs, /button\.textContent = "Generando Excel…"/);
+  assert.match(clientesJs, /response\.blob\(\)/);
+  assert.match(clientesJs, /link\.download = customersExportFilename\(\)/);
+  assert.match(clientesJs, /finally \{/);
+  assert.match(clientesJs, /button\.disabled = false/);
+  assert.equal((clientesJs.match(/byId\("btnExportCustomers"\)\?\.addEventListener/g) || []).length, 1);
+});
+
+test("botón de exportación conserva presentación administrativa y respuesta móvil", () => {
+  const css = fs.readFileSync(path.join(frontend, "clientes.css"), "utf8");
+  assert.match(css, /\.customers-export-button\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.customers-export-button\s*\{[^}]*background:\s*#0b2a6b/);
+  assert.match(css, /\.customers-export-button:focus-visible\s*\{/);
+  assert.match(css, /\.customers-export-button:disabled\s*\{[^}]*cursor:\s*wait/);
+  assert.match(css, /@media \(max-width: 820px\)[\s\S]+\.customers-export-button\s*\{[^}]*width:\s*100%/);
+});
+
 test("las fotos usan URL remota diferida y fallback delegado", () => {
+  const photoFlow = clientesJs.slice(clientesJs.indexOf("function renderClientItem"), clientesJs.indexOf("async function iniciarCustomers"));
   assert.match(clientesJs, /loading="lazy" decoding="async"/);
   assert.match(clientesJs, /addEventListener\("error", handleCustomerDetailImageError, true\)/);
   assert.match(clientesJs, /placeholder\.textContent = "Sin foto"/);
-  assert.doesNotMatch(clientesJs, /FileReader|createObjectURL|\.blob\(|base64/);
+  assert.doesNotMatch(photoFlow, /FileReader|createObjectURL|\.blob\(|base64/);
 });
 
 test("recordatorio usa teléfono seguro, WhatsApp codificado y no envía automáticamente", () => {
