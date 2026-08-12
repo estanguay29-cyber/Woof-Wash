@@ -9,6 +9,9 @@ const vm = require("node:vm");
 const componentPath = path.join(__dirname, "..", "shared", "appointments-calendar.js");
 const source = fs.readFileSync(componentPath, "utf8");
 const componentCss = fs.readFileSync(path.join(__dirname, "..", "shared", "appointments-calendar.css"), "utf8");
+const agendaHtml = fs.readFileSync(path.join(__dirname, "..", "agenda.html"), "utf8");
+const employeeDashboardHtml = fs.readFileSync(path.join(__dirname, "..", "empleados", "dashboard.html"), "utf8");
+const employeePortalHtml = fs.readFileSync(path.join(__dirname, "..", "empleados", "portal.html"), "utf8");
 const context = { module: { exports: {} }, exports: {}, console, URL };
 vm.runInNewContext(source, context, { filename: componentPath });
 const calendar = context.module.exports;
@@ -57,6 +60,47 @@ test("deduplica eventos por ID conservando el primero", () => {
   ]);
   assert.equal(events.length, 2);
   assert.equal(events[0].title, "Primero");
+});
+
+test("un rango visitado conserva el mismo contrato al volver desde cache", () => {
+  const events = [{ id: "one" }, { id: "two" }];
+  const cache = new Map([["2026-08-03:2026-08-09", events]]);
+  assert.deepEqual(
+    { ...calendar.cachedRangeResult(cache, "2026-08-03:2026-08-09") },
+    { stale: false, events }
+  );
+  assert.equal(calendar.cachedRangeResult(cache, "2026-07-27:2026-08-02"), null);
+});
+
+test("loadRange nunca devuelve directamente el arreglo cacheado", () => {
+  assert.match(source, /const cached = cachedRangeResult\(cache, key\);\s*if \(cached\) return cached;/);
+  assert.doesNotMatch(source, /if \(cache\.has\(key\)\) return cache\.get\(key\)/);
+});
+
+test("cada instancia conserva controller, secuencia, cache y promesa propios", () => {
+  const start = source.indexOf("function createAppointmentsCalendar");
+  const createBlock = source.slice(start, source.indexOf("if (typeof document", start));
+  for (const declaration of ["const cache = new Map()", "let requestSequence = 0", "let activeController = null", "let activePromise = null"]) {
+    assert.ok(createBlock.includes(declaration));
+  }
+  assert.match(createBlock, /activeController\?\.abort\(\)/);
+  assert.match(createBlock, /sequence !== requestSequence/);
+  assert.match(createBlock, /error\?\.name === "AbortError"/);
+  assert.match(createBlock, /\.finally\(\(\) => \{/);
+});
+
+test("la navegación y cambio de vista pertenecen a una única instancia FullCalendar", () => {
+  const start = source.indexOf("function createAppointmentsCalendar");
+  const createBlock = source.slice(start, source.indexOf("if (typeof document", start));
+  assert.equal((createBlock.match(/new globalThis\.FullCalendar\.Calendar/g) || []).length, 1);
+  assert.equal((createBlock.match(/eventClick\(info\)/g) || []).length, 1);
+  assert.doesNotMatch(createBlock, /datesSet|changeView\(|gotoDate\(/);
+});
+
+test("las tres superficies cargan la versión corregida del calendario compartido", () => {
+  for (const html of [agendaHtml, employeeDashboardHtml, employeePortalHtml]) {
+    assert.match(html, /shared\/appointments-calendar\.js\?v=20260810-calendar-cache-v1/);
+  }
 });
 
 test("asigna clases semanticas a estados conocidos y fallback seguro", () => {

@@ -643,6 +643,27 @@
   font-size: 0.84rem;
 }
 
+.customer-reminder .customer-reward-available {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  margin-top: 10px;
+  padding: 5px 10px;
+  border: 1px solid rgba(11, 42, 107, 0.18);
+  border-radius: 999px;
+  color: #0b2a6b;
+  background: #e8eef8;
+  font-size: 0.76rem;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.customer-reward-available + .customer-reminder-button {
+  margin-left: 8px;
+}
+
 .customer-reminder-button {
   display: inline-flex;
   flex: 0 0 auto;
@@ -987,6 +1008,14 @@
 
   .customer-reminder-button {
     width: 100%;
+  }
+
+  .customer-reminder .customer-reward-available {
+    max-width: 100%;
+  }
+
+  .customer-reward-available + .customer-reminder-button {
+    margin-left: 0;
   }
 
   .customer-row {

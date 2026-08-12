@@ -118,11 +118,48 @@ test("el cálculo usa fechas civiles y rechaza futuro o fechas inválidas", () =
   assert.equal(reminder.civilDaysBetween("fecha", TODAY), null);
 });
 
+test("proyecta el progreso real de fidelidad de mascotas sin recalcularlo", () => {
+  const cases = [
+    [{ completados: 0, objetivo: 8, restantes: 8, rewardEligible: false }, [0, 8, false]],
+    [{ completados: 1, objetivo: 8, restantes: 7, rewardEligible: false }, [1, 7, false]],
+    [{ completados: 5, objetivo: 8, restantes: 3, rewardEligible: false }, [5, 3, false]],
+    [{ completados: 7, objetivo: 8, restantes: 1, rewardEligible: false }, [7, 1, false]],
+    [{ completados: 8, objetivo: 8, restantes: 0, rewardEligible: true }, [8, 0, true]],
+    [{ completados: 10, objetivo: 8, restantes: 0, rewardEligible: true }, [10, 0, true]]
+  ];
+
+  cases.forEach(([source, expected]) => {
+    const result = reminder.buildPetLoyaltyReminder(source);
+    assert.deepEqual([result.accumulatedUnits, result.remainingUnitsForNextReward, result.rewardAvailable], expected);
+    assert.equal(result.objective, 8);
+  });
+});
+
+test("la proyección de fidelidad es de solo lectura y tolera datos ausentes", () => {
+  const source = { completados: 5, objetivo: 8, restantes: 3, rewardEligible: false };
+  const before = structuredClone(source);
+  assert.deepEqual(reminder.buildPetLoyaltyReminder(source), {
+    accumulatedUnits: 5,
+    remainingUnitsForNextReward: 3,
+    rewardAvailable: false,
+    objective: 8
+  });
+  assert.deepEqual(source, before);
+  assert.deepEqual(reminder.buildPetLoyaltyReminder(), {
+    accumulatedUnits: 0,
+    remainingUnitsForNextReward: 8,
+    rewardAvailable: false,
+    objective: 8
+  });
+});
+
 test("GET de clientes sigue siendo de solo lectura y no migra frecuencias", () => {
   const route = serverSource.slice(serverSource.indexOf('app.get("/admin/customers"'), serverSource.indexOf('app.post("/admin/customers"'));
   assert.match(route, /CustomerProfile\.find\(condiciones\)/);
   assert.doesNotMatch(route, /\.save\(|updateOne|updateMany|findOneAnd|petServiceReminderWeeks\s*=/);
   assert.match(serverSource, /reminderWeeks: customer\.petServiceReminderWeeks/);
+  assert.match(serverSource, /buildPetLoyaltyReminder\(fidelidadDetalle\.mascota\)/);
+  assert.doesNotMatch(route, /buildPetLoyaltyReminder[\s\S]{0,120}(?:save|update|create|insert)/);
 });
 
 test("PATCH de frecuencia exige admin, valida el único campo y usa $set limitado", () => {

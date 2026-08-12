@@ -262,6 +262,11 @@
     return deduplicateEvents(events).map(toFullCalendarEvent).filter(Boolean);
   }
 
+  function cachedRangeResult(cache, key) {
+    if (!cache?.has?.(key) || typeof cache.get !== "function") return null;
+    return { stale: false, events: cache.get(key) };
+  }
+
   function createStateElements(container) {
     container.innerHTML = "";
     const shell = document.createElement("div");
@@ -518,7 +523,8 @@
         return { stale: false, events: [] };
       }
       const key = `${range.startDate}:${range.endDate}`;
-      if (cache.has(key)) return cache.get(key);
+      const cached = cachedRangeResult(cache, key);
+      if (cached) return cached;
       if (activeKey === key && activePromise) return activePromise;
 
       activeController?.abort();
@@ -697,6 +703,7 @@
     deduplicateEvents,
     toFullCalendarEvent,
     buildFullCalendarEvents,
+    cachedRangeResult,
     createAppointmentsCalendar
   };
 });

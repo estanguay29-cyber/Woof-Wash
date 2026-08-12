@@ -3,7 +3,7 @@ import { loadAdminProfile, loadEmployeeList } from "./empleados.api.js";
 import { renderEmployeeBirthdayNotice, renderEmployeeStats, renderEmployeeTable, renderFilterChips, renderSearchValue, showAccessMessage, showFeedback } from "./empleados.ui.js";
 import { openEmployeeModal, closeEmployeeModal, saveEmployee } from "./empleados.modal.js";
 import { getById, setTextContent } from "./empleados.utils.js";
-import { iniciarDesempeno, actualizarSeleccionEmpleados } from "./desempeno.js";
+import { iniciarDesempeno, actualizarSeleccionEmpleados } from "./desempeno.js?v=20260810-weekly-revenue-v3";
 import { iniciarNomina } from "./empleados.nomina.js";
 
 function updateEmployeeSearchValue(value) {

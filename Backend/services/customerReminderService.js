@@ -95,6 +95,25 @@ function buildPetServiceReminder(appointments = [], { today = appointmentCalenda
   };
 }
 
+function buildPetLoyaltyReminder(petLoyalty = {}) {
+  const objective = Math.max(Math.floor(Number(petLoyalty.objetivo) || 8), 1);
+  const accumulatedUnits = Math.max(Math.floor(Number(petLoyalty.completados) || 0), 0);
+  const rewardAvailable = petLoyalty.rewardEligible === true || accumulatedUnits >= objective;
+  const existingRemaining = Math.floor(Number(petLoyalty.restantes));
+  const remainingUnitsForNextReward = rewardAvailable
+    ? 0
+    : (Number.isFinite(existingRemaining)
+      ? Math.max(Math.min(existingRemaining, objective), 0)
+      : Math.max(objective - accumulatedUnits, 0));
+
+  return {
+    accumulatedUnits,
+    remainingUnitsForNextReward,
+    rewardAvailable,
+    objective
+  };
+}
+
 module.exports = {
   DEFAULT_REMINDER_WEEKS,
   MIN_REMINDER_WEEKS,
@@ -103,5 +122,6 @@ module.exports = {
   civilDaysBetween,
   elapsedTimeLabel,
   petNamesFromAppointment,
-  buildPetServiceReminder
+  buildPetServiceReminder,
+  buildPetLoyaltyReminder
 };

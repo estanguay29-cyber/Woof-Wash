@@ -405,6 +405,49 @@ function unirNombresMascotas(nombres = []) {
   return `${unicos.slice(0, -1).join(", ")} y ${unicos.at(-1)}`;
 }
 
+function construirTextoFidelidadMascota(cliente = {}, varios = false) {
+  const fidelidad = cliente.fidelidadMascota || {};
+  const objetivo = Number.isInteger(fidelidad.objective) && fidelidad.objective > 0 ? fidelidad.objective : 8;
+  const acumulados = Number.isInteger(fidelidad.accumulatedUnits) && fidelidad.accumulatedUnits > 0
+    ? fidelidad.accumulatedUnits
+    : 0;
+  const restantes = Number.isInteger(fidelidad.remainingUnitsForNextReward) && fidelidad.remainingUnitsForNextReward >= 0
+    ? fidelidad.remainingUnitsForNextReward
+    : objetivo;
+
+  if (fidelidad.rewardAvailable === true) {
+    return [
+      "🎉 ¡Tenemos una muy buena noticia!",
+      "",
+      "Ya tiene disponible un servicio gratis para una de sus mascotas dentro de nuestro programa de fidelidad. 🐾🎁",
+      "",
+      "Será un gusto ayudarle a aprovechar este beneficio en su próxima visita."
+    ].join("\n");
+  }
+  if (acumulados === 0) {
+    return `🐾 Recuerde que con cada servicio va acumulando visitas en nuestro programa de fidelidad: al completar ${objetivo}, obtiene un servicio gratis. 🎁`;
+  }
+
+  const progresoAcumulado = acumulados === 1
+    ? `1 servicio acumulado de ${objetivo}`
+    : `${acumulados} de ${objetivo} servicios acumulados`;
+  const servicioRestante = restantes === 1 ? "servicio" : "servicios";
+  if (restantes === 1) {
+    return [
+      "🎁 ¡Está a un solo servicio de obtener su próximo servicio gratis!",
+      "",
+      `Ya lleva ${progresoAcumulado} en nuestro programa de fidelidad.`
+    ].join("\n");
+  }
+  return [
+    `🐾 Además, queremos contarle que ya lleva ${progresoAcumulado} en nuestro programa de fidelidad.`,
+    "",
+    "🎁 ¡Cada visita lo acerca más a su próximo servicio gratis!",
+    "",
+    `Actualmente le faltan ${restantes} ${servicioRestante} para obtenerlo.`
+  ].join("\n");
+}
+
 function construirMensajeRecordatorio(cliente = {}) {
   const seguimiento = cliente.seguimientoMascota || {};
   const nombres = unirNombresMascotas(seguimiento.lastPetNames || []);
@@ -414,9 +457,11 @@ function construirMensajeRecordatorio(cliente = {}) {
   return [
     saludo,
     "",
-    `Esperamos que usted y ${nombres} se encuentren muy bien.`,
+    `Esperamos que usted${varios ? "," : " y"} ${nombres} se encuentren muy bien.`,
     "",
     `De acuerdo con la frecuencia de servicio que tenemos registrada, ${tiempo || "ya corresponde su seguimiento"}, por lo que quizá sea un buen momento para volver a consentir a ${varios ? "sus perritos" : nombres}. 💙`,
+    "",
+    construirTextoFidelidadMascota(cliente, varios),
     "",
     `¿Le gustaría volver a agendar ${varios ? "sus servicios" : "su servicio"}?`,
     "",
@@ -441,6 +486,9 @@ function renderSeguimientoMascota(cliente = {}) {
   const seguimiento = cliente.seguimientoMascota || {};
   const fecha = seguimiento.lastPetServiceDate || "";
   const weeks = Number.isInteger(seguimiento.reminderWeeks) ? seguimiento.reminderWeeks : 3;
+  const rewardBadge = cliente.fidelidadMascota?.rewardAvailable === true
+    ? '<span class="customer-reward-available" aria-label="Servicio gratis para una mascota disponible">🎁 Servicio gratis disponible</span>'
+    : "";
   const frequencyForm = `
     <form class="customer-reminder-frequency" data-form="reminder-frequency">
       <label><span class="customer-reminder-frequency-title">Frecuencia de servicio</span><span>Cada</span><input name="petServiceReminderWeeks" type="number" min="1" max="52" step="1" value="${esc(weeks)}" data-current-weeks="${esc(weeks)}" required><span>semanas</span></label>
@@ -450,7 +498,7 @@ function renderSeguimientoMascota(cliente = {}) {
       </div>
       <p class="customer-reminder-save-status" data-reminder-frequency-status role="status" aria-live="polite"></p>
     </form>`;
-  if (!fecha) return `<section class="customer-reminder is-muted"><div><span>Cada ${esc(weeks)} semanas</span><strong>Aún no tiene servicios de mascota completados.</strong><p>La frecuencia está lista para aplicarse después de un servicio válido.</p></div>${frequencyForm}</section>`;
+  if (!fecha) return `<section class="customer-reminder is-muted"><div><span>Cada ${esc(weeks)} semanas</span><strong>Aún no tiene servicios de mascota completados.</strong><p>La frecuencia está lista para aplicarse después de un servicio válido.</p>${rewardBadge}</div>${frequencyForm}</section>`;
   const nombres = unirNombresMascotas(seguimiento.lastPetNames || []);
   const elapsed = seguimiento.elapsedTimeLabel || "Tiempo de servicio no disponible.";
   const nextDate = seguimiento.nextSuggestedDate ? formatearFecha(seguimiento.nextSuggestedDate) : "No disponible";
@@ -465,7 +513,7 @@ function renderSeguimientoMascota(cliente = {}) {
       ? `<a class="customer-reminder-button" href="https://wa.me/${esc(telefono)}?text=${encodeURIComponent(message)}" target="_blank" rel="noopener noreferrer" aria-label="Enviar recordatorio de servicio por WhatsApp">Enviar recordatorio</a>`
       : `<button class="customer-reminder-button" type="button" disabled aria-label="Recordatorio no disponible: falta teléfono válido">Sin teléfono disponible</button>`)
     : "";
-  return `<section class="customer-reminder ${seguimiento.reminderEligible ? "is-eligible" : "is-muted"}"><div class="customer-reminder-summary"><span>Cada ${esc(weeks)} semanas</span><strong>${esc(elapsed)}</strong><p>Mascotas: ${esc(nombres)}</p><p>Último servicio: ${esc(formatearFecha(fecha))}</p><p>Próximo seguimiento: ${esc(nextDate)}</p><p>${esc(state)}</p>${reminderButton}</div>${frequencyForm}</section>`;
+  return `<section class="customer-reminder ${seguimiento.reminderEligible ? "is-eligible" : "is-muted"}"><div class="customer-reminder-summary"><span>Cada ${esc(weeks)} semanas</span><strong>${esc(elapsed)}</strong><p>Mascotas: ${esc(nombres)}</p><p>Último servicio: ${esc(formatearFecha(fecha))}</p><p>Próximo seguimiento: ${esc(nextDate)}</p><p>${esc(state)}</p>${rewardBadge}${reminderButton}</div>${frequencyForm}</section>`;
 }
 
 function renderWhatsappButton(cliente = {}) {

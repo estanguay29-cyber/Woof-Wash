@@ -446,6 +446,19 @@
   animation: metricCardIn 420ms ease both;
 }
 
+.performance-weekly-revenue-trigger {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.performance-weekly-revenue-trigger:focus-visible {
+  outline: 3px solid rgba(140, 198, 63, 0.55);
+  outline-offset: 3px;
+}
+
 .performance-metric-card::before {
   content: "";
   position: absolute;

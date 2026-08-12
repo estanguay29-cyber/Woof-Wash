@@ -2,6 +2,9 @@ import { state } from "./empleados.state.js";
 import { loadPerformanceDashboard, loadPerformanceHistory, loadPerformanceAttendance, loadPerformanceMetrics, saveAttendanceRecord, savePerformanceMetric } from "./desempeno.api.js";
 import { renderPerformanceSummary, renderPerformanceTable, renderPerformanceHistory, renderAttendanceOptions, renderAttendanceHistory, renderAttendanceEventHistory, renderCleanlinessHistory, showPerformanceFeedback } from "./desempeno.ui.js";
 import { META_SEMANAL_OFICIAL_MXN } from "./empleados.utils.js";
+import { fetchAdmin } from "./empleados.api.js";
+
+console.log("[AGENDA] weekly revenue performance card version 3");
 
 const ATTENDANCE_EVENT_KEYS = Object.freeze(["falta_justificada", "falta_injustificada", "vacaciones"]);
 
@@ -15,6 +18,168 @@ const performanceState = {
   cleanliness: null,
   attendanceEvents: null
 };
+
+let performanceWeeklyRevenueRequest = null;
+let performanceWeeklyRevenueTrigger = null;
+
+function formatWeeklyRevenueMoney(value) {
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(Number(value) || 0);
+}
+
+function formatWeeklyRevenueDate(value, options = {}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return "Fecha inválida";
+  return new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City", day: "numeric", month: "long", ...options
+  }).format(new Date(`${value}T12:00:00-06:00`));
+}
+
+function weeklyRevenueServiceSummary(appointment = {}) {
+  const details = Array.isArray(appointment.serviciosDetalle) ? appointment.serviciosDetalle : [];
+  const labels = details.map((item) => [item.nombre, item.paquete].filter(Boolean).join(" — ")).filter(Boolean);
+  return labels.length ? labels.join(" · ") : appointment.servicio || "Servicio";
+}
+
+function escapeWeeklyRevenue(value) {
+  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function renderPerformanceWeeklyRevenue(data = {}) {
+  const range = `${formatWeeklyRevenueDate(data.semanaInicio)} – ${formatWeeklyRevenueDate(data.semanaFin)}`;
+  const total = formatWeeklyRevenueMoney(data.totalSemanal);
+  document.getElementById("performanceSales").textContent = total;
+  document.getElementById("performanceWeeklyRevenueTotal").textContent = total;
+  document.getElementById("performanceWeeklyRevenueDateRange").textContent = `${range} · America/Mexico_City`;
+  document.getElementById("performanceWeeklyRevenueCompleted").textContent = String(data.citasCompletadas || 0);
+  document.getElementById("performanceWeeklyRevenueRegistered").textContent = String(data.citasConMonto || 0);
+  document.getElementById("performanceWeeklyRevenueMissing").textContent = String(data.citasSinMonto || 0);
+  document.getElementById("performanceWeeklyRevenueWarning")?.classList.toggle("hidden", data.consistente !== false);
+  const list = document.getElementById("performanceWeeklyRevenueList");
+  if (!list) return;
+  if (!Array.isArray(data.citas) || !data.citas.length) {
+    list.innerHTML = `<div class="agenda-empty-state"><h3>Sin citas completadas</h3><p>No hay cobros que mostrar en esta semana.</p></div>`;
+    return;
+  }
+  list.innerHTML = data.citas.map((appointment) => {
+    const registered = Number.isFinite(appointment.montoCobrado);
+    const amountLabel = registered
+      ? `Cobrado: ${formatWeeklyRevenueMoney(appointment.montoCobrado)}${appointment.montoCobrado === 0 && appointment.rewardGratisAplicado ? " — Canje o cortesía" : ""}`
+      : appointment.montoEstado === "invalid" ? "Monto inválido — requiere corrección" : "Monto no registrado";
+    const employees = Array.isArray(appointment.empleados) && appointment.empleados.length ? appointment.empleados.join(", ") : "Sin asignar";
+    return `<article class="weekly-revenue-row" data-performance-weekly-appointment="${escapeWeeklyRevenue(appointment.id)}">
+      <div class="weekly-revenue-row-main">
+        <strong>${escapeWeeklyRevenue(formatWeeklyRevenueDate(appointment.fecha, { weekday: "long" }))} · ${escapeWeeklyRevenue(appointment.hora || "Sin hora")}</strong>
+        <span>${escapeWeeklyRevenue(appointment.cliente || "Cliente")}</span>
+        <span>${escapeWeeklyRevenue(weeklyRevenueServiceSummary(appointment))}</span>
+        <small>Completada · ${escapeWeeklyRevenue(employees)}</small>
+      </div>
+      <div class="weekly-revenue-row-action">
+        <strong class="${registered ? "" : "is-missing"}">${escapeWeeklyRevenue(amountLabel)}</strong>
+        <button type="button" class="admin-button admin-button-light" data-performance-weekly-edit>${registered ? "Editar monto" : "Registrar monto"}</button>
+      </div>
+      <form class="weekly-revenue-edit hidden" data-performance-weekly-form>
+        <label>Monto cobrado<input name="totalCobrado" type="number" inputmode="decimal" min="0" max="1000000" step="0.01" value="${registered ? escapeWeeklyRevenue(String(appointment.montoCobrado)) : ""}" required></label>
+        <button type="submit" class="admin-button admin-button-dark">Guardar</button>
+        <button type="button" class="admin-button admin-button-light" data-performance-weekly-cancel>Cancelar</button>
+        <span class="weekly-revenue-row-status" role="status" aria-live="polite"></span>
+      </form>
+    </article>`;
+  }).join("");
+}
+
+async function loadPerformanceWeeklyRevenue({ silent = false } = {}) {
+  const status = document.getElementById("performanceWeeklyRevenueStatus");
+  if (!silent && status) status.textContent = "Cargando ingresos de la semana…";
+  if (performanceWeeklyRevenueRequest) return performanceWeeklyRevenueRequest;
+  performanceWeeklyRevenueRequest = (async () => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const data = await fetchAdmin("/admin/appointments/weekly-revenue", { signal: controller.signal });
+      renderPerformanceWeeklyRevenue(data);
+      if (status) status.textContent = "";
+    } catch (error) {
+      if (status) status.innerHTML = `${error?.name === "AbortError" ? "La consulta tardó demasiado." : escapeWeeklyRevenue(error.message || "No se pudieron cargar los ingresos.")} <button type="button" class="admin-button admin-button-light" data-performance-weekly-retry>Reintentar</button>`;
+    } finally {
+      window.clearTimeout(timeoutId);
+      performanceWeeklyRevenueRequest = null;
+    }
+  })();
+  return performanceWeeklyRevenueRequest;
+}
+
+function openPerformanceWeeklyRevenue() {
+  console.log("[WEEKLY REVENUE] performance card click");
+  const modal = document.getElementById("performanceWeeklyRevenueModal");
+  if (!modal || !modal.classList.contains("hidden")) return;
+  performanceWeeklyRevenueTrigger = document.activeElement;
+  document.getElementById("performanceWeeklyRevenueStatus").textContent = "Cargando ingresos de la semana…";
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+  document.getElementById("performanceWeeklyRevenueClose")?.focus();
+  loadPerformanceWeeklyRevenue();
+}
+
+function closePerformanceWeeklyRevenue() {
+  const modal = document.getElementById("performanceWeeklyRevenueModal");
+  modal?.classList.add("hidden");
+  modal?.setAttribute("aria-hidden", "true");
+  performanceWeeklyRevenueTrigger?.focus?.();
+}
+
+function handlePerformanceWeeklyRevenueClick(event) {
+  const row = event.target.closest("[data-performance-weekly-appointment]");
+  if (event.target.closest("[data-performance-weekly-retry]")) return loadPerformanceWeeklyRevenue();
+  if (!row) return;
+  if (event.target.closest("[data-performance-weekly-edit]")) {
+    row.querySelector("[data-performance-weekly-form]")?.classList.remove("hidden");
+    row.querySelector("[data-performance-weekly-edit]").disabled = true;
+    row.querySelector("input")?.focus();
+  } else if (event.target.closest("[data-performance-weekly-cancel]")) {
+    row.querySelector("[data-performance-weekly-form]")?.classList.add("hidden");
+    row.querySelector("[data-performance-weekly-edit]").disabled = false;
+  }
+}
+
+async function savePerformanceWeeklyRevenue(event) {
+  if (!event.target.matches("[data-performance-weekly-form]")) return;
+  event.preventDefault();
+  const form = event.target;
+  const row = form.closest("[data-performance-weekly-appointment]");
+  const input = form.elements.totalCobrado;
+  const status = form.querySelector("[role=status]");
+  const text = String(input.value || "");
+  if (!input.checkValidity()) return input.reportValidity();
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return void (status.textContent = "Usa un monto válido con máximo dos decimales.");
+  form.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
+  status.textContent = "Guardando…";
+  try {
+    await fetchAdmin(`/admin/appointments/${encodeURIComponent(row.dataset.performanceWeeklyAppointment)}/charged-amount`, {
+      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text) })
+    });
+    await loadPerformanceWeeklyRevenue({ silent: true });
+    document.getElementById("performanceWeeklyRevenueStatus").textContent = "Monto guardado correctamente.";
+  } catch (error) {
+    form.querySelectorAll("button, input").forEach((control) => { control.disabled = false; });
+    status.textContent = error.message || "No se pudo guardar el monto.";
+  }
+}
+
+function configurePerformanceWeeklyRevenue() {
+  const button = document.getElementById("performanceWeeklyRevenueButton");
+  if (!button || button.dataset.listenerBound === "true") return;
+  button.dataset.listenerBound = "true";
+  button.addEventListener("click", openPerformanceWeeklyRevenue);
+  document.getElementById("performanceWeeklyRevenueClose")?.addEventListener("click", closePerformanceWeeklyRevenue);
+  document.getElementById("performanceWeeklyRevenueModal")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) closePerformanceWeeklyRevenue();
+  });
+  const list = document.getElementById("performanceWeeklyRevenueList");
+  list?.addEventListener("click", handlePerformanceWeeklyRevenueClick);
+  list?.addEventListener("submit", savePerformanceWeeklyRevenue);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !document.getElementById("performanceWeeklyRevenueModal")?.classList.contains("hidden")) closePerformanceWeeklyRevenue();
+  });
+}
 
 function obtenerFechaLocalISO() {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -57,9 +222,11 @@ async function cargarPanelDesempeno() {
 }
 
 export async function iniciarDesempeno() {
+  configurePerformanceWeeklyRevenue();
   document.getElementById("btnPerformanceReload")?.addEventListener("click", async () => {
     const fecha = document.getElementById("performanceWeekDate")?.value || performanceState.fechaSemana;
     await actualizarDashboardDesempeno(fecha);
+    await loadPerformanceWeeklyRevenue({ silent: true });
     if (performanceState.historialVisible) {
       await actualizarHistorialPerformance();
     }
@@ -113,7 +280,9 @@ export async function iniciarDesempeno() {
     await actualizarLimpiezaOrden(fecha);
   });
 
+  const weeklyRevenueLoad = loadPerformanceWeeklyRevenue({ silent: true });
   await cargarPanelDesempeno();
+  await weeklyRevenueLoad;
 }
 
 export async function actualizarSeleccionEmpleados() {

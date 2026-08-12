@@ -10,6 +10,11 @@ const frontend = path.join(__dirname, "..");
 const agendaHtml = fs.readFileSync(path.join(frontend, "agenda.html"), "utf8");
 const clientesHtml = fs.readFileSync(path.join(frontend, "clientes.html"), "utf8");
 const clientesJs = fs.readFileSync(path.join(frontend, "clientes.js"), "utf8");
+const reminderMessageSource = clientesJs.slice(
+  clientesJs.indexOf("function unirNombresMascotas"),
+  clientesJs.indexOf("function formatearPeriodoDias")
+);
+const reminderMessage = vm.runInNewContext(`(() => { ${reminderMessageSource}; return { construirMensajeRecordatorio }; })()`);
 
 test("Agenda ofrece navegación directa y reversible hacia Clientes", () => {
   assert.match(agendaHtml, /href="clientes\.html"[^>]*>Clientes<\/a>/);
@@ -206,6 +211,90 @@ test("mensaje y nombres contemplan singular, plural, duplicados y fallback", () 
   assert.match(clientesJs, /unicos\.slice\(0, -1\)\.join\(", "\)/);
   assert.match(clientesJs, /varios \? "sus servicios" : "su servicio"/);
   assert.match(clientesJs, /Woof & Wash/);
+});
+
+test("mensaje de seguimiento usa exclusivamente la fidelidad de mascotas derivada por el servidor", () => {
+  assert.match(clientesJs, /cliente\.fidelidadMascota \|\| \{\}/);
+  assert.match(clientesJs, /fidelidad\.accumulatedUnits/);
+  assert.match(clientesJs, /fidelidad\.remainingUnitsForNextReward/);
+  assert.match(clientesJs, /fidelidad\.rewardAvailable === true/);
+  assert.doesNotMatch(reminderMessageSource, /fidelidadAuto|serviciosAutoAcumulados/);
+});
+
+test("texto de fidelidad cubre cero, singular, plural y premio disponible", () => {
+  assert.match(clientesJs, /al completar \$\{objetivo\}, obtiene un servicio gratis/);
+  assert.match(clientesJs, /`1 servicio acumulado de \$\{objetivo\}`/);
+  assert.match(clientesJs, /restantes === 1 \? "servicio" : "servicios"/);
+  assert.match(clientesJs, /Está a un solo servicio de obtener su próximo servicio gratis/);
+  assert.match(clientesJs, /Actualmente le faltan \$\{restantes\} \$\{servicioRestante\}/);
+  assert.match(clientesJs, /un servicio gratis para una de sus mascotas/);
+  assert.doesNotMatch(clientesJs, /faltan solo 0|falta solo 0/);
+});
+
+test("el mensaje conserva seguimiento, mascotas, WhatsApp y carga la versión actualizada", () => {
+  const html = fs.readFileSync(path.join(frontend, "clientes.html"), "utf8");
+  assert.match(clientesJs, /seguimiento\.elapsedTimeLabel/);
+  assert.match(clientesJs, /seguimiento\.lastPetNames/);
+  assert.match(clientesJs, /construirTextoFidelidadMascota\(cliente, varios\)/);
+  assert.match(clientesJs, /encodeURIComponent\(message\)/);
+  assert.match(html, /clientes\.js\?v=20260810-loyalty-followup-v2/);
+  assert.match(html, /clientes\.css\?v=20260810-loyalty-followup-v2/);
+});
+
+test("plantilla real genera progreso, gramática y premio sin undefined ni null", () => {
+  const base = {
+    nombre: "Aracely",
+    seguimientoMascota: {
+      elapsedTimeLabel: "Han pasado 4 semanas desde su último servicio.",
+      lastPetNames: ["Kayse"]
+    }
+  };
+  const messages = [
+    reminderMessage.construirMensajeRecordatorio({ ...base, fidelidadMascota: { accumulatedUnits: 0, remainingUnitsForNextReward: 8, rewardAvailable: false, objective: 8 } }),
+    reminderMessage.construirMensajeRecordatorio({ ...base, fidelidadMascota: { accumulatedUnits: 1, remainingUnitsForNextReward: 7, rewardAvailable: false, objective: 8 } }),
+    reminderMessage.construirMensajeRecordatorio({ ...base, fidelidadMascota: { accumulatedUnits: 7, remainingUnitsForNextReward: 1, rewardAvailable: false, objective: 8 } }),
+    reminderMessage.construirMensajeRecordatorio({ ...base, fidelidadMascota: { accumulatedUnits: 8, remainingUnitsForNextReward: 0, rewardAvailable: true, objective: 8 } })
+  ];
+  assert.match(messages[0], /al completar 8, obtiene un servicio gratis/);
+  assert.match(messages[1], /1 servicio acumulado de 8/);
+  assert.match(messages[1], /Actualmente le faltan 7 servicios/);
+  assert.match(messages[2], /Está a un solo servicio/);
+  assert.match(messages[3], /un servicio gratis para una de sus mascotas/);
+  assert.match(messages[3], /ayudarle a aprovechar este beneficio/);
+  assert.doesNotMatch(messages[3], /faltan? solo 0/);
+  messages.forEach((message) => assert.doesNotMatch(message, /undefined|null/));
+});
+
+test("plantilla real conserva dos y tres mascotas y usa concordancia plural", () => {
+  const build = (lastPetNames) => reminderMessage.construirMensajeRecordatorio({
+    nombre: "Aracely",
+    seguimientoMascota: { elapsedTimeLabel: "Han pasado 4 semanas desde su último servicio.", lastPetNames },
+    fidelidadMascota: { accumulatedUnits: 5, remainingUnitsForNextReward: 3, rewardAvailable: false, objective: 8 }
+  });
+  const two = build(["Kayse", "Mila"]);
+  const three = build(["Kayse", "Mila", "Lilit"]);
+  assert.match(two, /usted, Kayse y Mila/);
+  assert.match(two, /ya lleva 5 de 8 servicios acumulados/);
+  assert.match(two, /Actualmente le faltan 3 servicios/);
+  assert.match(three, /usted, Kayse, Mila y Lilit/);
+  assert.match(three, /volver a agendar sus servicios/);
+});
+
+test("distintivo de premio aparece solo con rewardAvailable y conserva el botón", () => {
+  const renderSource = clientesJs.slice(
+    clientesJs.indexOf("function renderSeguimientoMascota"),
+    clientesJs.indexOf("function renderWhatsappButton")
+  );
+  const css = fs.readFileSync(path.join(frontend, "clientes.css"), "utf8");
+  assert.match(renderSource, /cliente\.fidelidadMascota\?\.rewardAvailable === true/);
+  assert.match(renderSource, /🎁 Servicio gratis disponible/);
+  assert.match(renderSource, /aria-label="Servicio gratis para una mascota disponible"/);
+  assert.equal((renderSource.match(/customer-reward-available/g) || []).length, 1);
+  assert.match(renderSource, /seguimiento\.reminderEligible[\s\S]+https:\/\/wa\.me/);
+  assert.match(css, /\.customer-reminder \.customer-reward-available\s*\{/);
+  assert.match(css, /color:\s*#0b2a6b/);
+  assert.match(css, /background:\s*#e8eef8/);
+  assert.doesNotMatch(css.slice(css.indexOf(".customer-reminder .customer-reward-available"), css.indexOf(".customer-reminder-button {")), /#(?:ffff00|ff0000|00ff00)|yellow|red|green/i);
 });
 
 test("cada cliente muestra el tiempo transcurrido calculado por el servidor", () => {
