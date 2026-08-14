@@ -1312,19 +1312,277 @@ if (truckBtns.length > 0) {
   });
 }
 
-// Funcin para el scroll de clientes
-function scrollClientes(direction) {
-  const slider = document.getElementById("sliderClientes");
-  if (!slider) return;
+function initClientsLivingCollage() {
+  const collage = document.querySelector("[data-clients-collage]");
+  if (!collage) return;
 
-  const isMobile = window.innerWidth < 768;
-  const scrollAmount = isMobile ? slider.offsetWidth * 0.75 : slider.offsetWidth / 4;
+  const cells = Array.from(collage.querySelectorAll(".ww-clients-item"));
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const rotationDelay = 2500;
+  const transitionDelay = 240;
+  const resumeDelay = 1200;
+  const cellOrder = [2, 0, 4, 1, 3];
+  const hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)");
+  const clients = cells.map((cell) => ({
+    category: cell.dataset.category,
+    name: cell.dataset.name,
+    label: cell.dataset.label,
+    description: cell.dataset.description,
+    src: cell.dataset.src,
+    alt: cell.dataset.alt
+  }));
+  let visibleIndexes = clients.map((_, index) => index);
+  let rotationTimer = null;
+  let transitionTimer = null;
+  let resumeTimer = null;
+  let cellCursor = 0;
+  let clientCursor = 5;
+  let pendingPlan = null;
+  let pendingPreload = null;
+  let pausedByHover = false;
+  let pausedByFocus = false;
 
-  slider.scrollBy({
-    left: direction * scrollAmount,
-    behavior: "smooth"
+  if (cells.length !== 9) return;
+
+  function getVisibleCount() {
+    return cells.filter((cell) => window.getComputedStyle(cell).display !== "none").length;
+  }
+
+  function hasFlippedCards() {
+    return cells.some((cell) => cell.classList.contains("is-flipped"));
+  }
+
+  function rotationAllowed() {
+    return !reducedMotion.matches && !pausedByHover && !pausedByFocus &&
+      !hasFlippedCards() && document.visibilityState === "visible";
+  }
+
+  function clearScheduledChange() {
+    if (rotationTimer !== null) {
+      window.clearTimeout(rotationTimer);
+      rotationTimer = null;
+    }
+  }
+
+  function clearResume() {
+    if (resumeTimer !== null) {
+      window.clearTimeout(resumeTimer);
+      resumeTimer = null;
+    }
+  }
+
+  function chooseNextClient(cellIndex, visibleCount) {
+    const active = new Set(visibleIndexes.slice(0, visibleCount));
+    const categories = visibleIndexes.slice(0, visibleCount).map((index) => clients[index].category);
+    let fallbackIndex = -1;
+
+    for (let offset = 0; offset < clients.length; offset += 1) {
+      const candidateIndex = (clientCursor + offset) % clients.length;
+      if (active.has(candidateIndex)) continue;
+      if (fallbackIndex < 0) fallbackIndex = candidateIndex;
+      const nextCategories = categories.slice();
+      nextCategories[cellIndex] = clients[candidateIndex].category;
+      const pets = nextCategories.filter((value) => value === "pet").length;
+      const cars = nextCategories.length - pets;
+      if (Math.abs(pets - cars) <= 1) {
+        clientCursor = (candidateIndex + 1) % clients.length;
+        return candidateIndex;
+      }
+    }
+
+    clientCursor = (fallbackIndex + 1) % clients.length;
+    return fallbackIndex;
+  }
+
+  function reconcileVisibleCells(visibleCount) {
+    const used = new Set();
+    for (let index = 0; index < visibleCount; index += 1) {
+      const currentClientIndex = clients.findIndex((client) => client.src === cells[index].dataset.src);
+      let clientIndex = currentClientIndex;
+      if (clientIndex < 0 || used.has(clientIndex)) {
+        clientIndex = clients.findIndex((_, candidateIndex) => !used.has(candidateIndex));
+        applyClient(cells[index], clients[clientIndex]);
+      }
+      visibleIndexes[index] = clientIndex;
+      used.add(clientIndex);
+    }
+  }
+
+  function prepareNextChange() {
+    const visibleCount = getVisibleCount();
+    reconcileVisibleCells(visibleCount);
+    const availableCellOrder = cellOrder.filter((index) =>
+      index < visibleCount && !cells[index].classList.contains("is-flipped"));
+    if (!availableCellOrder.length) {
+      pendingPlan = null;
+      pendingPreload = null;
+      return;
+    }
+    const cellIndex = availableCellOrder[cellCursor % availableCellOrder.length];
+    cellCursor += 1;
+    const clientIndex = chooseNextClient(cellIndex, visibleCount);
+    pendingPlan = { cellIndex, clientIndex };
+    pendingPreload = new Image();
+    pendingPreload.src = clients[clientIndex].src;
+  }
+
+  function applyClient(cell, client) {
+    const image = cell.querySelector("img");
+    const frontIcon = cell.querySelector(".ww-clients-caption > span");
+    const frontName = cell.querySelector(".ww-clients-caption h3");
+    const frontLabel = cell.querySelector(".ww-clients-caption p");
+    const backIcon = cell.querySelector(".ww-clients-back-icon");
+    const backName = cell.querySelector(".ww-clients-card-back h3");
+    const backLabel = cell.querySelector(".ww-clients-back-label");
+    const backDescription = cell.querySelector(".ww-clients-back-description");
+    if (!image || !frontIcon || !frontName || !frontLabel || !backIcon ||
+        !backName || !backLabel || !backDescription) return;
+    const icon = client.category === "pet" ? "🐾" : "🚗";
+    cell.dataset.category = client.category;
+    cell.dataset.name = client.name;
+    cell.dataset.label = client.label;
+    cell.dataset.description = client.description;
+    cell.dataset.src = client.src;
+    cell.dataset.alt = client.alt;
+    cell.style.setProperty("--ww-clients-image", `url("${client.src}")`);
+    cell.setAttribute("aria-label", `Ver información de ${client.name}`);
+    image.src = client.src;
+    image.alt = client.alt;
+    frontIcon.textContent = icon;
+    frontName.textContent = client.name;
+    frontLabel.textContent = client.label;
+    backIcon.textContent = icon;
+    backName.textContent = client.name;
+    backLabel.textContent = client.label;
+    backDescription.textContent = client.description;
+  }
+
+  function rotateOneCell() {
+    if (!pendingPlan) return;
+    const { cellIndex, clientIndex } = pendingPlan;
+    const cell = cells[cellIndex];
+    if (window.getComputedStyle(cell).display === "none" || cell.classList.contains("is-flipped")) {
+      pendingPlan = null;
+      pendingPreload = null;
+      scheduleNextChange();
+      return;
+    }
+    cell.classList.add("is-changing");
+    transitionTimer = window.setTimeout(() => {
+      applyClient(cell, clients[clientIndex]);
+      visibleIndexes[cellIndex] = clientIndex;
+      cell.classList.remove("is-changing");
+      transitionTimer = null;
+      pendingPlan = null;
+      pendingPreload = null;
+      scheduleNextChange();
+    }, transitionDelay);
+  }
+
+  function scheduleNextChange(delay = rotationDelay) {
+    clearScheduledChange();
+    if (!rotationAllowed()) return;
+    if (!pendingPlan) prepareNextChange();
+    if (!pendingPlan) return;
+    rotationTimer = window.setTimeout(() => {
+      rotationTimer = null;
+      rotateOneCell();
+    }, delay);
+  }
+
+  function scheduleResume() {
+    clearResume();
+    resumeTimer = window.setTimeout(() => {
+      resumeTimer = null;
+      scheduleNextChange();
+    }, resumeDelay);
+  }
+
+  function setFlipped(cell, flipped) {
+    const front = cell.querySelector(".ww-clients-card-front");
+    const back = cell.querySelector(".ww-clients-card-back");
+    cell.classList.toggle("is-flipped", flipped);
+    cell.setAttribute("aria-expanded", String(flipped));
+    cell.setAttribute("aria-label", `${flipped ? "Ver fotografía de" : "Ver información de"} ${cell.dataset.name}`);
+    if (front && back) {
+      front.setAttribute("aria-hidden", String(flipped));
+      back.setAttribute("aria-hidden", String(!flipped));
+    }
+    if (flipped) {
+      clearResume();
+      clearScheduledChange();
+    } else if (!hasFlippedCards()) {
+      scheduleResume();
+    }
+  }
+
+  collage.addEventListener("pointerover", (event) => {
+    if (!hoverCapable.matches || event.pointerType !== "mouse") return;
+    const cell = event.target.closest(".ww-clients-item");
+    if (!cell || cell.contains(event.relatedTarget)) return;
+    pausedByHover = true;
+    setFlipped(cell, true);
   });
+  collage.addEventListener("pointerout", (event) => {
+    if (!hoverCapable.matches || event.pointerType !== "mouse") return;
+    const cell = event.target.closest(".ww-clients-item");
+    if (!cell || cell.contains(event.relatedTarget)) return;
+    setFlipped(cell, false);
+    pausedByHover = false;
+    scheduleResume();
+  });
+  collage.addEventListener("focusin", (event) => {
+    if (!event.target.closest(".ww-clients-item")) return;
+    pausedByFocus = true;
+    clearScheduledChange();
+  });
+  collage.addEventListener("focusout", (event) => {
+    if (collage.contains(event.relatedTarget)) return;
+    pausedByFocus = false;
+    if (!hasFlippedCards()) scheduleResume();
+  });
+  collage.addEventListener("click", (event) => {
+    if (hoverCapable.matches) return;
+    const cell = event.target.closest(".ww-clients-item");
+    if (!cell) return;
+    const nextState = !cell.classList.contains("is-flipped");
+    setFlipped(cell, nextState);
+    if (!nextState) cell.blur();
+  });
+  collage.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const cell = event.target.closest(".ww-clients-item");
+    if (!cell) return;
+    event.preventDefault();
+    setFlipped(cell, !cell.classList.contains("is-flipped"));
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") scheduleNextChange();
+    else {
+      clearResume();
+      clearScheduledChange();
+    }
+  });
+  reducedMotion.addEventListener("change", () => {
+    cells.forEach((cell) => cell.classList.remove("is-changing"));
+    if (transitionTimer !== null) {
+      window.clearTimeout(transitionTimer);
+      transitionTimer = null;
+    }
+    scheduleNextChange();
+  });
+
+  cells.forEach((cell) => {
+    cell.style.setProperty("--ww-clients-image", `url("${cell.dataset.src}")`);
+    setFlipped(cell, false);
+  });
+  clearResume();
+  prepareNextChange();
+  scheduleNextChange();
 }
+
+initClientsLivingCollage();
 
 function scrollServicios(direction) {
   const slider = document.getElementById("sliderServicios");
