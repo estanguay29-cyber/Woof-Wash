@@ -9,11 +9,13 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const multer = require("multer");
 
 const User = require("./User");
 const Employee = require("./Employee");
 const Order = require("./Order");
 const Appointment = require("./Appointment");
+const Expense = require("./Expense");
 const CustomerProfile = require("./CustomerProfile");
 const ClientItem = require("./ClientItem");
 const { ESTADOS_OPERATIVOS_CITA } = require("./Appointment");
@@ -24,6 +26,42 @@ const weeklyRevenueService = require("./services/weeklyRevenueService");
 const appointmentCalendarService = require("./services/appointmentCalendarService");
 const customerReminderService = require("./services/customerReminderService");
 const customerExportService = require("./services/customerExportService");
+const { ExpenseServiceError, createExpenseService } = require("./services/expenseService");
+const { expenseTicketService } = require("./services/expenseTicketService");
+const { FinanceSummaryError, createFinanceSummaryService } = require("./services/financeSummaryService");
+const expenseService = createExpenseService({ model: Expense });
+const financeSummaryService = createFinanceSummaryService({ appointmentModel: Appointment, expenseModel: Expense });
+
+const expenseTicketUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 1, parts: 3 },
+  fileFilter(req, file, callback) {
+    if (!["image/jpeg", "image/png", "application/pdf"].includes(file.mimetype)) {
+      return callback(new ExpenseServiceError(400, "INVALID_TICKET"));
+    }
+    callback(null, true);
+  }
+}).single("ticket");
+
+function parseExpenseTicket(req, res, next) {
+  expenseTicketUpload(req, res, (error) => {
+    if (error) {
+      const safeError = error instanceof multer.MulterError ? new ExpenseServiceError(400, "INVALID_TICKET") : error;
+      return responderErrorExpense(res, safeError, "ticket-multipart");
+    }
+    if (!req.file || !req.body || Object.keys(req.body).some((key) => key !== "version")) {
+      return responderErrorExpense(res, new ExpenseServiceError(400, "INVALID_TICKET"), "ticket-multipart");
+    }
+    next();
+  });
+}
+
+function privateTicketResponse(req, res, next) {
+  res.setHeader("Cache-Control", "no-store, private");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  next();
+}
 
 function sumarCobrosRealesCompletados(citas = []) {
   return citas.reduce((total, cita) => {
@@ -3571,10 +3609,6 @@ app.delete("/cliente/items/:id", auth, async (req, res) => {
     res.status(500).json({ message: "No se pudo eliminar el registro." });
   }
 });
-
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("Mongo conectado"))
-  .catch((err) => console.log(err));
 
 // ============================
 // REGISTRO
@@ -7845,6 +7879,122 @@ app.patch("/admin/orders/:id/status", auth, requireAdmin, adminWriteLimiter, asy
   }
 });
 
+function responderErrorExpense(res, error, operation) {
+  if (error instanceof ExpenseServiceError) {
+    const messages = {
+      INVALID_ID: "Datos del gasto inválidos.",
+      INVALID_DATA: "Datos del gasto inválidos.",
+      INVALID_RANGE: "Rango de fechas inválido.",
+      INVALID_IDEMPOTENCY_KEY: "Clave de idempotencia inválida.",
+      IDEMPOTENCY_CONFLICT: "La clave de idempotencia ya fue utilizada para una operación diferente.",
+      NOT_FOUND: "Gasto no encontrado.",
+      TICKET_NOT_FOUND: "El gasto no tiene comprobante.",
+      INVALID_TICKET: "El comprobante debe ser un archivo JPEG, PNG o PDF válido de máximo 5 MB.",
+      TICKET_STORAGE_FAILED: "No fue posible procesar el comprobante.",
+      CONFLICT: "El gasto fue modificado. Actualiza la información e inténtalo nuevamente."
+    };
+    return res.status(error.status).json({ message: messages[error.code] || "No fue posible procesar el gasto." });
+  }
+  console.error("[expenses] operation failed", { operation, status: "error" });
+  return res.status(500).json({ message: "No fue posible procesar el gasto." });
+}
+
+app.get("/admin/finance/summary", auth, requireAdmin, async (req, res) => {
+  try {
+    return res.json(await financeSummaryService.get(req.query));
+  } catch (error) {
+    if (error instanceof FinanceSummaryError) return res.status(400).json({ message: "Rango financiero inválido." });
+    console.error("[finance-summary] read failed", { operation: "summary-read", status: "error" });
+    return res.status(500).json({ message: "No fue posible generar el resumen financiero." });
+  }
+});
+
+app.post("/admin/finance/expenses", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const result = await expenseService.create(req.body, req.admin._id, req.get("Idempotency-Key"));
+    return res.status(result.replayed ? 200 : 201).json({ expense: result.expense });
+  } catch (error) {
+    return responderErrorExpense(res, error, "create");
+  }
+});
+
+app.post("/admin/finance/expenses/:id/ticket", auth, requireAdmin, privateTicketResponse, adminWriteLimiter, parseExpenseTicket, async (req, res) => {
+  try {
+    const expense = await expenseTicketService.upload(req.params.id, req.body.version, req.admin._id, req.file);
+    return res.json({ expense });
+  } catch (error) {
+    return responderErrorExpense(res, error, "ticket-upload");
+  }
+});
+
+app.get("/admin/finance/expenses/:id/ticket", auth, requireAdmin, privateTicketResponse, async (req, res) => {
+  try {
+    return res.json({ ticket: await expenseTicketService.getAccess(req.params.id) });
+  } catch (error) {
+    return responderErrorExpense(res, error, "ticket-access");
+  }
+});
+
+app.delete("/admin/finance/expenses/:id/ticket", auth, requireAdmin, privateTicketResponse, adminWriteLimiter, async (req, res) => {
+  try {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)
+      || Object.keys(req.body).length !== 1 || !Object.hasOwn(req.body, "version")) {
+      throw new ExpenseServiceError(400, "INVALID_DATA");
+    }
+    return res.json({ expense: await expenseTicketService.remove(req.params.id, req.body?.version, req.admin._id) });
+  } catch (error) {
+    return responderErrorExpense(res, error, "ticket-delete");
+  }
+});
+
+app.get("/admin/finance/expenses", auth, requireAdmin, async (req, res) => {
+  try {
+    return res.json(await expenseService.list(req.query));
+  } catch (error) {
+    return responderErrorExpense(res, error, "list-active");
+  }
+});
+
+app.get("/admin/finance/expenses/deleted", auth, requireAdmin, async (req, res) => {
+  try {
+    return res.json(await expenseService.list(req.query, { deleted: true }));
+  } catch (error) {
+    return responderErrorExpense(res, error, "list-deleted");
+  }
+});
+
+app.get("/admin/finance/expenses/:id", auth, requireAdmin, async (req, res) => {
+  try {
+    return res.json({ expense: await expenseService.get(req.params.id) });
+  } catch (error) {
+    return responderErrorExpense(res, error, "get");
+  }
+});
+
+app.patch("/admin/finance/expenses/:id", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    return res.json({ expense: await expenseService.update(req.params.id, req.body, req.admin._id) });
+  } catch (error) {
+    return responderErrorExpense(res, error, "update");
+  }
+});
+
+app.post("/admin/finance/expenses/:id/cancel", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    return res.json({ expense: await expenseService.cancel(req.params.id, req.body, req.admin._id) });
+  } catch (error) {
+    return responderErrorExpense(res, error, "cancel");
+  }
+});
+
+app.post("/admin/finance/expenses/:id/restore", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    return res.json({ expense: await expenseService.restore(req.params.id, req.body, req.admin._id) });
+  } catch (error) {
+    return responderErrorExpense(res, error, "restore");
+  }
+});
+
 app.get("/favicon.ico", (req, res) => {
   res.type("png").sendFile(path.join(__dirname, "..", "Frontend", "img", "favicon.png"));
 });
@@ -7927,7 +8077,22 @@ app.post("/pedidos", auth, async (req, res) => {
 // ============================
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Servidor en puerto ${PORT}`);
-  console.log(`BACKEND VERSION ${BACKEND_VERSION}`);
-});
+async function startServer({ mongoUri = process.env.MONGO_URI, port = PORT } = {}) {
+  await mongoose.connect(mongoUri);
+  await Expense.init();
+  await Expense.assertCriticalIndexes(Expense);
+  return app.listen(port, () => {
+    console.log("Mongo conectado");
+    console.log(`Servidor en puerto ${port}`);
+    console.log(`BACKEND VERSION ${BACKEND_VERSION}`);
+  });
+}
+
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error("No se pudo iniciar el servidor:", error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { app, startServer };

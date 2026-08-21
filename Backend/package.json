@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "build:css": "tailwindcss -c ..\\tailwind.config.js -i ..\\Frontend\\tailwind.input.css -o ..\\Frontend\\tailwind.css --minify",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/*.test.js",
+    "test:integration": "node --test tests/expenseIntegration.test.js tests/expenseTicketIntegration.test.js"
   },
   "keywords": [],
   "author": "",
@@ -21,11 +22,14 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.1",
-    "mongoose": "^9.4.1",
-    "nodemailer": "^7.0.13",
+    "mongoose": "^9.9.3",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.5",
     "stripe": "^22.0.1"
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.17"
+    "mongodb-memory-server": "^11.2.0",
+    "supertest": "^7.2.2",
+    "tailwindcss": "^3.4.19"
   }
 }

@@ -139,6 +139,10 @@ let weeklyRevenueData = null;
 let weeklyRevenueTrigger = null;
 let weeklyRevenueRequest = null;
 
+function invalidarResumenFinanciero() {
+  try { window.WoofWashAdminFinanceSummary?.invalidate?.(); } catch { /* El PATCH confirmado no depende del observador de caché. */ }
+}
+
 function obtenerApiBaseAgenda() {
   const hostname = window.location.hostname;
   const esLocal = hostname === "localhost" || hostname === "127.0.0.1";
@@ -173,10 +177,11 @@ function manejarRespuestaAuthAgenda(res, data = {}) {
 
 async function agendaFetch(path, options = {}) {
   const token = obtenerTokenAgenda();
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const res = await fetch(`${obtenerApiBaseAgenda()}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       Authorization: "Bearer " + token,
       ...(options.headers || {})
     }
@@ -319,6 +324,7 @@ async function guardarWeeklyRevenue(event) {
     await agendaFetch(`/admin/appointments/${encodeURIComponent(row.dataset.weeklyAppointment)}/charged-amount`, {
       method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text) })
     });
+    invalidarResumenFinanciero();
     await cargarIngresoSemanal({ silent: true });
     document.getElementById("weeklyRevenueStatus").textContent = "Monto guardado correctamente.";
   } catch (error) {
@@ -334,6 +340,8 @@ function abrirWeeklyRevenue() {
   document.getElementById("weeklyRevenueStatus").textContent = "Cargando ingresos de la semana...";
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("agenda-modal-open");
+  activarWeeklyRevenueTab("income");
   document.getElementById("weeklyRevenueClose")?.focus();
   cargarIngresoSemanal();
 }
@@ -342,7 +350,26 @@ function cerrarWeeklyRevenue() {
   const modal = document.getElementById("weeklyRevenueModal");
   modal?.classList.add("hidden");
   modal?.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("agenda-modal-open");
+  window.WoofWashAdminExpenses?.deactivate?.();
+  window.WoofWashAdminFinanceSummary?.deactivate?.();
   weeklyRevenueTrigger?.focus?.();
+}
+
+async function activarWeeklyRevenueTab(tab) {
+  const income = tab === "income";
+  const expenses = tab === "expenses";
+  const summary = tab === "summary";
+  document.getElementById("weeklyRevenueIncomeTab")?.setAttribute("aria-selected", String(income));
+  document.getElementById("weeklyRevenueExpenseTab")?.setAttribute("aria-selected", String(expenses));
+  document.getElementById("weeklyRevenueSummaryTab")?.setAttribute("aria-selected", String(summary));
+  document.getElementById("weeklyRevenueIncomePanel")?.classList.toggle("hidden", !income);
+  document.getElementById("weeklyRevenueExpensePanel")?.classList.toggle("hidden", !expenses);
+  document.getElementById("weeklyRevenueSummaryPanel")?.classList.toggle("hidden", !summary);
+  if (expenses) await window.WoofWashAdminExpenses?.activate?.();
+  else window.WoofWashAdminExpenses?.deactivate?.();
+  if (summary) await window.WoofWashAdminFinanceSummary?.activate?.();
+  else window.WoofWashAdminFinanceSummary?.deactivate?.();
 }
 
 function configurarWeeklyRevenue() {
@@ -358,8 +385,25 @@ function configurarWeeklyRevenue() {
   });
   list?.addEventListener("click", manejarWeeklyRevenue);
   list?.addEventListener("submit", guardarWeeklyRevenue);
+  document.getElementById("weeklyRevenueIncomeTab")?.addEventListener("click", () => activarWeeklyRevenueTab("income"));
+  document.getElementById("weeklyRevenueExpenseTab")?.addEventListener("click", () => activarWeeklyRevenueTab("expenses"));
+  document.getElementById("weeklyRevenueSummaryTab")?.addEventListener("click", () => activarWeeklyRevenueTab("summary"));
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal?.classList.contains("hidden")) cerrarWeeklyRevenue();
+    const nestedOpen = ["expenseWorkspace", "expenseConfirm", "expenseTicketViewer"].some((id) => !document.getElementById(id)?.classList.contains("hidden"));
+    if (event.key === "Escape" && !nestedOpen && !modal?.classList.contains("hidden")) cerrarWeeklyRevenue();
+  });
+  const getWeeklyFinanceRange = async () => {
+    if (!weeklyRevenueData) await cargarIngresoSemanal();
+    return { from: weeklyRevenueData?.semanaInicio, to: weeklyRevenueData?.semanaFin };
+  };
+  window.WoofWashAdminExpenses?.init?.({
+    fetcher: agendaFetch,
+    getRange: getWeeklyFinanceRange,
+    onFinanceDataChanged: invalidarResumenFinanciero
+  });
+  window.WoofWashAdminFinanceSummary?.init?.({
+    fetcher: agendaFetch,
+    getInitialRange: getWeeklyFinanceRange
   });
   button.dataset.listenerBound = "true";
 }

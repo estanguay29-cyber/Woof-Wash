@@ -601,15 +601,95 @@
         </div>
         <button id="weeklyRevenueClose" type="button" class="agenda-icon-button" aria-label="Cerrar detalle de ingresos">&times;</button>
       </header>
-      <div id="weeklyRevenueStatus" class="weekly-revenue-status" role="status" aria-live="polite"></div>
-      <div class="weekly-revenue-total"><span>Total semanal</span><strong id="weeklyRevenueModalTotal">$0.00</strong></div>
-      <div class="weekly-revenue-metrics" aria-label="Resumen semanal">
-        <div><strong id="weeklyRevenueCompleted">0</strong><span>Completadas</span></div>
-        <div><strong id="weeklyRevenueRegistered">0</strong><span>Con monto</span></div>
-        <div><strong id="weeklyRevenueMissing">0</strong><span>Sin monto</span></div>
+      <div class="finance-tabs" role="tablist" aria-label="Secciones financieras">
+        <button id="weeklyRevenueIncomeTab" type="button" role="tab" aria-selected="true" aria-controls="weeklyRevenueIncomePanel">Ingresos</button>
+        <button id="weeklyRevenueExpenseTab" type="button" role="tab" aria-selected="false" aria-controls="weeklyRevenueExpensePanel">Gastos</button>
+        <button id="weeklyRevenueSummaryTab" type="button" role="tab" aria-selected="false" aria-controls="weeklyRevenueSummaryPanel">Resumen</button>
       </div>
-      <p id="weeklyRevenueWarning" class="weekly-revenue-warning hidden" role="alert">Advertencia: el total calculado no coincide con el detalle.</p>
-      <div id="weeklyRevenueList" class="weekly-revenue-list"></div>
+      <div id="weeklyRevenueIncomePanel" role="tabpanel" aria-labelledby="weeklyRevenueIncomeTab">
+        <div id="weeklyRevenueStatus" class="weekly-revenue-status" role="status" aria-live="polite"></div>
+        <div class="weekly-revenue-total"><span>Total semanal</span><strong id="weeklyRevenueModalTotal">$0.00</strong></div>
+        <div class="weekly-revenue-metrics" aria-label="Resumen semanal">
+          <div><strong id="weeklyRevenueCompleted">0</strong><span>Completadas</span></div>
+          <div><strong id="weeklyRevenueRegistered">0</strong><span>Con monto</span></div>
+          <div><strong id="weeklyRevenueMissing">0</strong><span>Sin monto</span></div>
+        </div>
+        <p id="weeklyRevenueWarning" class="weekly-revenue-warning hidden" role="alert">Advertencia: el total calculado no coincide con el detalle.</p>
+        <div id="weeklyRevenueList" class="weekly-revenue-list"></div>
+      </div>
+      <div id="weeklyRevenueExpensePanel" class="hidden" role="tabpanel" aria-labelledby="weeklyRevenueExpenseTab">
+        <div class="expense-section-heading">
+          <div><p class="admin-kicker">Control operativo</p><h2>🧾 Gastos del periodo</h2><p>Registra y consulta los gastos operativos de Woof &amp; Wash.</p></div>
+          <button id="expenseCreateButton" type="button" class="admin-button admin-button-dark">+ Registrar gasto</button>
+        </div>
+        <div class="expense-list-filters" role="tablist" aria-label="Estado de gastos">
+          <button id="expenseActiveFilter" type="button" role="tab" aria-selected="true" aria-controls="expenseList">Activos</button>
+          <button id="expenseDeletedFilter" type="button" role="tab" aria-selected="false" aria-controls="expenseList">Anulados</button>
+        </div>
+        <div id="expenseFeedback" class="expense-feedback" role="status" aria-live="polite"></div>
+        <div id="expenseTotalCard" class="expense-total-card"><span>Total de gastos registrados</span><strong id="expenseTotal">$0.00</strong></div>
+        <div id="expenseList" class="expense-list" role="tabpanel" aria-labelledby="expenseActiveFilter" aria-live="polite"></div>
+        <input id="expenseActionTicket" class="visually-hidden" type="file" accept="image/jpeg,image/png,application/pdf" aria-label="Seleccionar comprobante">
+
+        <section id="expenseWorkspace" class="expense-workspace hidden" aria-hidden="true" aria-labelledby="expenseWorkspaceTitle">
+          <header><div><p class="admin-kicker">Gastos</p><h3 id="expenseWorkspaceTitle">Registrar gasto</h3></div><button id="expenseWorkspaceClose" type="button" class="agenda-icon-button" aria-label="Cerrar formulario">&times;</button></header>
+          <form id="expenseForm" novalidate>
+            <label>Descripción<input id="expenseDescription" name="description" type="text" maxlength="200" placeholder="Ej. Gasolina" required></label>
+            <div class="expense-form-grid">
+              <label>Cantidad<span class="expense-money-input"><span>$</span><input id="expenseAmount" name="amount" type="text" inputmode="decimal" placeholder="650.00" required></span></label>
+              <label>Fecha<input id="expenseDate" name="expenseDate" type="date" required></label>
+            </div>
+            <label id="expenseTicketField" class="expense-ticket-field">Ticket opcional<input id="expenseTicket" name="ticket" type="file" accept="image/jpeg,image/png,application/pdf"><small id="expenseFileSummary">JPG, PNG o PDF · máximo 5 MB</small></label>
+            <p id="expenseFormError" class="expense-form-error" role="alert"></p><button id="expenseConflictRefresh" type="button" class="admin-button admin-button-light hidden">Actualizar información</button>
+            <div class="expense-form-actions"><button id="expenseFormCancel" type="button" class="admin-button admin-button-light">Cancelar</button><button id="expenseSubmit" type="submit" class="admin-button admin-button-dark">Guardar gasto</button></div>
+          </form>
+        </section>
+
+        <section id="expensePartialFailure" class="expense-inline-panel hidden" aria-hidden="true" aria-labelledby="expensePartialTitle">
+          <h3 id="expensePartialTitle">El gasto quedó registrado</h3><p>No fue posible subir el comprobante. Puedes reintentarlo sin volver a crear el gasto.</p>
+          <div class="expense-form-actions"><button id="expenseLeaveWithoutTicket" type="button" class="admin-button admin-button-light">Dejar sin ticket</button><button id="expenseRetryTicket" type="button" class="admin-button admin-button-dark">Reintentar ticket</button></div>
+        </section>
+
+        <section id="expenseConfirm" class="expense-inline-panel hidden" aria-hidden="true" aria-labelledby="expenseConfirmTitle">
+          <form id="expenseConfirmForm"><header><h3 id="expenseConfirmTitle">Confirmar acción</h3><button id="expenseConfirmClose" type="button" class="agenda-icon-button" aria-label="Cerrar confirmación">&times;</button></header>
+            <p id="expenseConfirmText"></p><p id="expenseConfirmSummary" class="expense-confirm-summary"></p>
+            <label id="expenseCancelReasonField">Motivo de anulación<textarea id="expenseCancelReason" maxlength="300" rows="3" placeholder="Ej. Gasto duplicado"></textarea></label>
+            <p id="expenseConfirmError" class="expense-form-error" role="alert"></p><button id="expenseConfirmRefresh" type="button" class="admin-button admin-button-light hidden">Actualizar información</button>
+            <div class="expense-form-actions"><button id="expenseConfirmCancel" type="button" class="admin-button admin-button-light">Volver</button><button id="expenseConfirmSubmit" type="submit" class="admin-button expense-danger-button">Confirmar</button></div>
+          </form>
+        </section>
+
+        <section id="expenseTicketViewer" class="expense-ticket-viewer hidden" aria-hidden="true" aria-labelledby="expenseTicketViewerTitle">
+          <header><h3 id="expenseTicketViewerTitle">Comprobante</h3><button id="expenseTicketViewerClose" type="button" class="agenda-icon-button" aria-label="Cerrar comprobante">&times;</button></header>
+          <img id="expenseTicketImage" alt="Comprobante del gasto">
+        </section>
+      </div>
+      <div id="weeklyRevenueSummaryPanel" class="hidden" role="tabpanel" aria-labelledby="weeklyRevenueSummaryTab">
+        <form id="financeSummaryForm" class="finance-summary-range" novalidate>
+          <label>Desde<input id="financeSummaryFrom" name="from" type="date" required></label>
+          <label>Hasta<input id="financeSummaryTo" name="to" type="date" required></label>
+          <button id="financeSummarySubmit" type="submit" class="admin-button admin-button-dark">Consultar periodo</button>
+        </form>
+        <div id="financeSummaryStatus" class="finance-summary-status" role="status" aria-live="polite"></div>
+        <div id="financeSummaryResult" class="finance-summary-result hidden"></div>
+        <div id="financeSummaryGenerateActions" class="finance-summary-generate-actions hidden">
+          <button id="financeSummaryGenerate" type="button" class="admin-button admin-button-dark">📋 Generar resumen</button>
+        </div>
+        <section id="financeSummaryMessagePreview" class="finance-summary-message-preview hidden" aria-labelledby="financeSummaryMessageTitle">
+          <button id="financeSummaryMessageBack" type="button" class="finance-summary-message-back">← Volver al resumen</button>
+          <div class="finance-summary-message-heading">
+            <p class="admin-kicker">Mensaje administrativo interno</p>
+            <h2 id="financeSummaryMessageTitle" tabindex="-1">Vista previa del mensaje</h2>
+            <p>El texto se copiará o compartirá exactamente como aparece aquí.</p>
+          </div>
+          <pre id="financeSummaryMessageText" class="finance-summary-message-text" tabindex="0"></pre>
+          <div id="financeSummaryMessageStatus" class="finance-summary-message-status" role="status" aria-live="polite"></div>
+          <div class="finance-summary-message-actions">
+            <button id="financeSummaryMessageCopy" type="button" class="admin-button admin-button-light">Copiar resumen</button>
+            <button id="financeSummaryMessageWhatsapp" type="button" class="admin-button admin-button-dark">Compartir por WhatsApp</button>
+          </div>
+        </section>
+      </div>
     </section>
   </div>
 
@@ -619,6 +699,8 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales-all.global.min.js"></script>
   <script src="shared/appointments-calendar.js?v=20260810-calendar-cache-v1"></script>
-  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806"></script>
+  <script src="shared/admin-expenses.js?v=20260819-expenses-ui-v1"></script>
+  <script src="shared/admin-finance-summary.js?v=20260821-finance-message-ui-v1"></script>
+  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806-expenses-ui-v1-finance-message-ui-v1"></script>
 </body>
 </html>
