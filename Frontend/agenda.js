@@ -249,6 +249,8 @@ function renderWeeklyRevenue(data) {
     const amountLabel = registered
       ? `Cobrado: ${money(appointment.montoCobrado)}${appointment.montoCobrado === 0 && appointment.rewardGratisAplicado ? " — Canje o cortesía" : ""}`
       : appointment.montoEstado === "invalid" ? "Monto inválido — requiere corrección" : "Monto no registrado";
+    const paymentLabel = appointment.paymentMethod === "cash" ? "Efectivo"
+      : appointment.paymentMethod === "transfer" ? "Transferencia" : "⚠️ Forma de pago pendiente";
     const employees = Array.isArray(appointment.empleados) && appointment.empleados.length
       ? appointment.empleados.join(", ") : "Sin asignar";
     return `<article class="weekly-revenue-row" data-weekly-appointment="${escapeHtml(appointment.id)}">
@@ -260,12 +262,17 @@ function renderWeeklyRevenue(data) {
       </div>
       <div class="weekly-revenue-row-action">
         <strong class="${registered ? "" : "is-missing"}">${escapeHtml(amountLabel)}</strong>
-        <button type="button" class="admin-button admin-button-light" data-weekly-edit>${registered ? "Editar monto" : "Registrar monto"}</button>
+        ${registered ? `<small class="weekly-revenue-payment${appointment.paymentMethod ? "" : " is-pending"}">${escapeHtml(paymentLabel)}</small>` : ""}
+        <button type="button" class="admin-button admin-button-light" data-weekly-edit>${registered ? "Editar cobro" : "Registrar cobro"}</button>
       </div>
       <form class="weekly-revenue-edit hidden" data-weekly-form>
         <label>Monto cobrado
           <input name="totalCobrado" type="number" inputmode="decimal" min="0" max="1000000" step="0.01" value="${registered ? escapeHtml(String(appointment.montoCobrado)) : ""}" required>
         </label>
+        <fieldset class="weekly-revenue-payment-field"><legend>Forma de pago</legend>
+          <label><input name="paymentMethod" type="radio" value="cash" ${appointment.paymentMethod === "cash" ? "checked" : ""} required><span>Efectivo</span></label>
+          <label><input name="paymentMethod" type="radio" value="transfer" ${appointment.paymentMethod === "transfer" ? "checked" : ""} required><span>Transferencia</span></label>
+        </fieldset>
         <button type="submit" class="admin-button admin-button-dark">Guardar</button>
         <button type="button" class="admin-button admin-button-light" data-weekly-cancel>Cancelar</button>
         <span class="weekly-revenue-row-status" role="status" aria-live="polite"></span>
@@ -311,6 +318,7 @@ async function guardarWeeklyRevenue(event) {
   const form = event.target;
   const row = form.closest("[data-weekly-appointment]");
   const input = form.elements.totalCobrado;
+  const paymentMethod = new FormData(form).get("paymentMethod");
   const status = form.querySelector("[role=status]");
   if (!input.checkValidity()) return input.reportValidity();
   const text = String(input.value || "");
@@ -318,11 +326,15 @@ async function guardarWeeklyRevenue(event) {
     status.textContent = "Usa un monto válido con máximo dos decimales.";
     return;
   }
+  if (!['cash', 'transfer'].includes(paymentMethod)) {
+    status.textContent = "Selecciona Efectivo o Transferencia.";
+    return;
+  }
   form.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
   status.textContent = "Guardando…";
   try {
     await agendaFetch(`/admin/appointments/${encodeURIComponent(row.dataset.weeklyAppointment)}/charged-amount`, {
-      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text) })
+      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text), paymentMethod })
     });
     invalidarResumenFinanciero();
     await cargarIngresoSemanal({ silent: true });

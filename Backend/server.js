@@ -6197,6 +6197,8 @@ app.get("/admin/appointments/weekly-revenue", auth, requireAdmin, async (req, re
         empleados: [...new Set([...assignedIds.map((id) => employeeNames.get(id)).filter(Boolean), ...legacyNames])],
         montoCobrado: charged.valid ? charged.amount : null,
         montoEstado: charged.valid ? "registrado" : charged.reason,
+        paymentMethod: charged.valid && weeklyRevenueService.PAYMENT_METHODS.includes(appointment.paymentMethod)
+          ? appointment.paymentMethod : null,
         rewardGratisAplicado: appointment.rewardGratisAplicado === true
       };
     });
@@ -7337,26 +7339,28 @@ app.patch("/admin/appointments/:id/charged-amount", auth, requireAdmin, adminWri
   try {
     const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
     const keys = Object.keys(req.body || {});
-    if (keys.length !== 1 || keys[0] !== "totalCobrado") {
-      return res.status(400).json({ message: "Solo se permite modificar totalCobrado" });
+    if (keys.length !== 2 || !keys.includes("totalCobrado") || !keys.includes("paymentMethod")) {
+      return res.status(400).json({ message: "Solo se permite modificar totalCobrado y paymentMethod conjuntamente" });
     }
     if (!mongoose.Types.ObjectId.isValid(appointmentId)) {
       return res.status(400).json({ message: "El id de la cita no es válido" });
     }
     const validation = weeklyRevenueService.validateChargedAmount(req.body.totalCobrado);
     if (!validation.valid) return res.status(400).json({ message: validation.message });
+    const paymentValidation = weeklyRevenueService.validatePaymentMethod(req.body.paymentMethod);
+    if (!paymentValidation.valid) return res.status(400).json({ message: paymentValidation.message });
     const appointment = await Appointment.findOneAndUpdate(
       { _id: appointmentId, estado: "completada" },
-      { $set: { totalCobrado: validation.amount } },
+      { $set: { totalCobrado: validation.amount, paymentMethod: paymentValidation.paymentMethod } },
       { new: true, runValidators: true }
-    ).select("estado totalCobrado");
+    ).select("estado totalCobrado paymentMethod");
     if (!appointment) {
       const exists = await Appointment.exists({ _id: appointmentId });
       return res.status(exists ? 409 : 404).json({
         message: exists ? "El monto cobrado solo puede editarse en citas completadas" : "Cita no encontrada"
       });
     }
-    res.json({ id: String(appointment._id), totalCobrado: appointment.totalCobrado });
+    res.json({ id: String(appointment._id), totalCobrado: appointment.totalCobrado, paymentMethod: appointment.paymentMethod });
   } catch (error) {
     console.error("[charged-amount] update failed", {
       appointmentId: String(req.params?.id || "").slice(-6),

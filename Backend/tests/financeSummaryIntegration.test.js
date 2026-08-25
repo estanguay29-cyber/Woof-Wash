@@ -95,11 +95,11 @@ test("Mongo real produce fondo 2000 + ingresos 1500 - gastos 500 = cierre 3000",
   assert.equal(await Appointment.countDocuments({ estado: "completada", fecha: { $gte: range.from, $lte: range.to } }), 2);
   const response = await getSummary();
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body.totals, { openingFund: 2000, serviceRevenue: 1500, expenses: 500, closingFund: 3000 });
+  assert.deepEqual(response.body.totals, { openingFund: 2000, serviceRevenue: 1500, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 1500, expenses: 500, expectedCash: 1500 });
   assert.deepEqual(response.body.metrics, { appointmentsCompleted: 2, appointmentsWithAmount: 2, appointmentsWithoutAmount: 0, activeExpenses: 2 });
   assert.equal(response.body.days.length, 7);
-  assert.equal(response.body.days[0].netMovement, 700);
-  assert.equal(response.body.days[1].netMovement, 300);
+  assert.equal(response.body.days[0].cashMovement, -300);
+  assert.equal(response.body.days[1].cashMovement, -200);
 });
 
 test("cero, faltante, múltiples items y estados excluidos respetan una cita una suma", async () => {
@@ -133,14 +133,14 @@ test("gasto anulado se excluye, ticket sólo expone hasTicket y datos privados n
 test("rango vacío incluye siete días y permite fondo final negativo", async () => {
   let response = await getSummary();
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body.totals, { openingFund: 2000, serviceRevenue: 0, expenses: 0, closingFund: 2000 });
+  assert.deepEqual(response.body.totals, { openingFund: 2000, serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 0, expectedCash: 2000 });
   assert.equal(response.body.days.length, 7);
-  assert.ok(response.body.days.every((day) => day.netMovement === 0));
+  assert.ok(response.body.days.every((day) => day.cashMovement === 0));
 
   await insertAppointment({ totalCobrado: 0 });
   await insertExpense({ amountCents: 300000 });
   response = await getSummary();
-  assert.equal(response.body.totals.closingFund, -1000);
+  assert.equal(response.body.totals.expectedCash, -1000);
 });
 
 test("query explícita rechaza faltantes, extras, ocho días y futuro", async () => {
@@ -167,7 +167,7 @@ test("tipos públicos son Number, fechas civiles String e items Array", async ()
   const body = (await getSummary()).body;
   assert.equal(body.totals.serviceRevenue, 0.3);
   assert.equal(body.totals.expenses, 0.05);
-  assert.equal(body.totals.closingFund, 2000.25);
+  assert.equal(body.totals.expectedCash, 1999.95);
   assert.equal(typeof body.totals.openingFund, "number");
   assert.match(body.period.from, /^\d{4}-\d{2}-\d{2}$/);
   assert.ok(Array.isArray(body.days[0].appointments[0].items));

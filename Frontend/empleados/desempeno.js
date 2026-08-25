@@ -78,6 +78,7 @@ function renderPerformanceWeeklyRevenue(data = {}) {
       </div>
       <form class="weekly-revenue-edit hidden" data-performance-weekly-form>
         <label>Monto cobrado<input name="totalCobrado" type="number" inputmode="decimal" min="0" max="1000000" step="0.01" value="${registered ? escapeWeeklyRevenue(String(appointment.montoCobrado)) : ""}" required></label>
+        <label>Forma de pago<select name="paymentMethod" required><option value="">Seleccionar</option><option value="cash" ${appointment.paymentMethod === "cash" ? "selected" : ""}>Efectivo</option><option value="transfer" ${appointment.paymentMethod === "transfer" ? "selected" : ""}>Transferencia</option></select></label>
         <button type="submit" class="admin-button admin-button-dark">Guardar</button>
         <button type="button" class="admin-button admin-button-light" data-performance-weekly-cancel>Cancelar</button>
         <span class="weekly-revenue-row-status" role="status" aria-live="polite"></span>
@@ -148,13 +149,15 @@ async function savePerformanceWeeklyRevenue(event) {
   const input = form.elements.totalCobrado;
   const status = form.querySelector("[role=status]");
   const text = String(input.value || "");
+  const paymentMethod = form.elements.paymentMethod.value;
   if (!input.checkValidity()) return input.reportValidity();
   if (!/^\d+(\.\d{1,2})?$/.test(text)) return void (status.textContent = "Usa un monto válido con máximo dos decimales.");
+  if (!["cash", "transfer"].includes(paymentMethod)) return void (status.textContent = "Selecciona Efectivo o Transferencia.");
   form.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
   status.textContent = "Guardando…";
   try {
     await fetchAdmin(`/admin/appointments/${encodeURIComponent(row.dataset.performanceWeeklyAppointment)}/charged-amount`, {
-      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text) })
+      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text), paymentMethod })
     });
     await loadPerformanceWeeklyRevenue({ silent: true });
     document.getElementById("performanceWeeklyRevenueStatus").textContent = "Monto guardado correctamente.";

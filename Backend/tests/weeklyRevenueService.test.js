@@ -70,6 +70,14 @@ test("DTO de escritura exige número, acepta cero y rechaza extremos y decimales
   }
 });
 
+test("forma de pago usa allowlist estricta", () => {
+  assert.deepEqual(revenue.validatePaymentMethod("cash"), { valid: true, paymentMethod: "cash" });
+  assert.deepEqual(revenue.validatePaymentMethod("transfer"), { valid: true, paymentMethod: "transfer" });
+  for (const value of ["efectivo", "transferencia", "", null, {}, [], { $ne: null }]) {
+    assert.equal(revenue.validatePaymentMethod(value).valid, false);
+  }
+});
+
 test("endpoint de edición exige admin, limitador y una actualización acotada", () => {
   const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   const start = server.indexOf('app.patch("/admin/appointments/:id/charged-amount"');
@@ -77,7 +85,8 @@ test("endpoint de edición exige admin, limitador y una actualización acotada",
   const route = server.slice(start, end);
   assert.notEqual(start, -1);
   assert.match(route, /auth, requireAdmin, adminWriteLimiter/);
-  assert.match(route, /keys\.length !== 1 \|\| keys\[0\] !== "totalCobrado"/);
-  assert.match(route, /findOneAndUpdate\([\s\S]+estado: "completada"[\s\S]+\$set: \{ totalCobrado: validation\.amount \}/);
+  assert.match(route, /keys\.length !== 2[\s\S]+keys\.includes\("totalCobrado"\)[\s\S]+keys\.includes\("paymentMethod"\)/);
+  assert.match(route, /validatePaymentMethod\(req\.body\.paymentMethod\)/);
+  assert.match(route, /findOneAndUpdate\([\s\S]+estado: "completada"[\s\S]+\$set: \{ totalCobrado: validation\.amount, paymentMethod: paymentValidation\.paymentMethod \}/);
   assert.doesNotMatch(route, /updateMany|deleteOne|findByIdAndDelete/);
 });

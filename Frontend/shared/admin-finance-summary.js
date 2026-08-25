@@ -74,20 +74,33 @@
         const items = formatList(appointment.items.map((item) => item && typeof item === "object" ? item.name : ""));
         const identity = items ? `${customer} — ${items}` : customer;
         if (appointment.amountStatus === "missing") lines.push(`• ${identity} — ⚠️ Sin monto registrado`);
-        else lines.push(`• ${identity} — ${formatMoney(appointment.amountCharged)}${appointment.amountCharged === 0 && appointment.rewardApplied === true ? " (servicio gratis)" : ""}`);
+        else {
+          const method = appointment.paymentMethod === "cash" ? "Efectivo"
+            : appointment.paymentMethod === "transfer" ? "Transferencia" : "⚠️ Forma de pago pendiente";
+          lines.push(`• ${identity} — ${formatMoney(appointment.amountCharged)} · ${method}${appointment.amountCharged === 0 && appointment.rewardApplied === true ? " (servicio gratis)" : ""}`);
+        }
       });
-      if (day.appointments.length) lines.push(`Ingresos del día: ${formatMoney(day.serviceRevenue)}`);
+      if (day.appointments.length) {
+        lines.push(`Ingresos del día: ${formatMoney(day.serviceRevenue)}`,
+          `Efectivo: ${formatMoney(day.cashRevenue)}`, `Transferencias: ${formatMoney(day.transferRevenue)}`);
+        if (day.unclassifiedRevenue > 0) lines.push(`Sin clasificar: ${formatMoney(day.unclassifiedRevenue)}`);
+      }
       if (day.expenses.length) {
         lines.push("", "Gastos:");
         day.expenses.forEach((expense) => lines.push(`• ${normalizeMessageText(expense.description, "Gasto")} — ${formatMoney(expense.amount)}`));
         lines.push(`Gastos del día: ${formatMoney(day.expensesTotal)}`);
       }
-      lines.push("", `Movimiento del día: ${formatMovement(day.netMovement)}`);
+      lines.push("", `Movimiento de efectivo del día: ${formatMovement(day.cashMovement)}`);
     });
     lines.push("", "────────────", "", `💰 Fondo inicial: ${formatMoney(summary.totals.openingFund)}`,
-      `📈 Ingresos por servicios: ${formatMoney(summary.totals.serviceRevenue)}`,
+      `💵 Total recaudado: ${formatMoney(summary.totals.serviceRevenue)}`,
+      `💵 Efectivo: ${formatMoney(summary.totals.cashRevenue)}`,
+      `🏦 Transferencias: ${formatMoney(summary.totals.transferRevenue)}`,
       `📉 Gastos: ${formatMoney(summary.totals.expenses)}`,
-      `💵 Fondo final: ${formatMoney(summary.totals.closingFund)}`);
+      `💰 Efectivo esperado: ${formatMoney(summary.totals.expectedCash)}`);
+    if (summary.totals.unclassifiedRevenue > 0) lines.push("",
+      `⚠️ Cobros pendientes de clasificar: ${formatMoney(summary.totals.unclassifiedRevenue)}`,
+      "El efectivo esperado puede variar hasta clasificar estos cobros.");
     const missing = summary.metrics.appointmentsWithoutAmount;
     if (missing > 0) lines.push("", missing === 1
       ? "⚠️ 1 cita completada quedó sin monto registrado y no fue incluida en los ingresos."
@@ -106,22 +119,26 @@
 
   function validSummary(data) {
     if (!data || typeof data !== "object" || !data.period || !data.totals || !data.metrics || !Array.isArray(data.days)) return false;
-    const totals = ["openingFund", "serviceRevenue", "expenses", "closingFund"];
+    const totals = ["openingFund", "serviceRevenue", "cashRevenue", "transferRevenue", "unclassifiedRevenue", "expenses", "expectedCash"];
     const metrics = ["appointmentsCompleted", "appointmentsWithAmount", "appointmentsWithoutAmount", "activeExpenses"];
     if (!isCivilDate(data.period.from) || !isCivilDate(data.period.to) || data.period.timezone !== "America/Mexico_City") return false;
     if (!totals.every((key) => typeof data.totals[key] === "number" && Number.isFinite(data.totals[key]))) return false;
     if (!metrics.every((key) => Number.isSafeInteger(data.metrics[key]) && data.metrics[key] >= 0)) return false;
     if (data.metrics.appointmentsWithAmount + data.metrics.appointmentsWithoutAmount !== data.metrics.appointmentsCompleted) return false;
-    const formula = Math.round(data.totals.openingFund * 100) + Math.round(data.totals.serviceRevenue * 100) - Math.round(data.totals.expenses * 100);
-    if (formula !== Math.round(data.totals.closingFund * 100)) return false;
+    const classified = Math.round(data.totals.cashRevenue * 100) + Math.round(data.totals.transferRevenue * 100) + Math.round(data.totals.unclassifiedRevenue * 100);
+    if (classified !== Math.round(data.totals.serviceRevenue * 100)) return false;
+    const formula = Math.round(data.totals.openingFund * 100) + Math.round(data.totals.cashRevenue * 100) - Math.round(data.totals.expenses * 100);
+    if (formula !== Math.round(data.totals.expectedCash * 100)) return false;
     const expectedDays = civilDayNumber(data.period.to) - civilDayNumber(data.period.from) + 1;
     if (expectedDays < 1 || expectedDays > 7 || data.days.length !== expectedDays) return false;
     let revenueCents = 0; let expenseCents = 0; let appointmentCount = 0; let withAmountCount = 0; let expenseCount = 0;
     const validDays = data.days.every((day, index) => {
       if (!day || !isCivilDate(day.date) || !Array.isArray(day.appointments) || !Array.isArray(day.expenses)) return false;
-      if (![day.serviceRevenue, day.expensesTotal, day.netMovement].every((value) => typeof value === "number" && Number.isFinite(value))) return false;
+      if (![day.serviceRevenue, day.cashRevenue, day.transferRevenue, day.unclassifiedRevenue, day.expensesTotal, day.cashMovement].every((value) => typeof value === "number" && Number.isFinite(value))) return false;
       const expectedDate = new Date((civilDayNumber(data.period.from) + index) * 86400000).toISOString().slice(0, 10);
-      if (day.date !== expectedDate || Math.round(day.serviceRevenue * 100) - Math.round(day.expensesTotal * 100) !== Math.round(day.netMovement * 100)) return false;
+      const dayClassified = Math.round(day.cashRevenue * 100) + Math.round(day.transferRevenue * 100) + Math.round(day.unclassifiedRevenue * 100);
+      if (day.date !== expectedDate || dayClassified !== Math.round(day.serviceRevenue * 100)
+        || Math.round(day.cashRevenue * 100) - Math.round(day.expensesTotal * 100) !== Math.round(day.cashMovement * 100)) return false;
       revenueCents += Math.round(day.serviceRevenue * 100); expenseCents += Math.round(day.expensesTotal * 100);
       appointmentCount += day.appointments.length; expenseCount += day.expenses.length;
       withAmountCount += day.appointments.filter((appointment) => appointment?.amountStatus === "recorded").length;
@@ -129,6 +146,7 @@
         && typeof appointment.customer === "string" && typeof appointment.description === "string"
         && typeof appointment.time === "string" && Array.isArray(appointment.items)
         && ["recorded", "missing"].includes(appointment.amountStatus)
+        && ["cash", "transfer", null].includes(appointment.paymentMethod)
         && (appointment.amountStatus === "recorded"
           ? typeof appointment.amountCharged === "number" && Number.isFinite(appointment.amountCharged)
           : appointment.amountCharged === null))
@@ -147,7 +165,7 @@
   function renderAppointment(appointment) {
     const items = appointment.items.map((item) => item && typeof item.name === "string" ? item.name.trim() : "").filter(Boolean);
     const amount = appointment.amountStatus === "recorded"
-      ? `<strong>${escapeHtml(formatMoney(appointment.amountCharged))}</strong>${appointment.amountCharged === 0 && appointment.rewardApplied === true ? '<small class="finance-summary-free">Servicio gratis</small>' : ""}`
+      ? `<strong>${escapeHtml(formatMoney(appointment.amountCharged))}</strong><small class="${appointment.paymentMethod ? "" : "finance-summary-pending"}">${appointment.paymentMethod === "cash" ? "Efectivo" : appointment.paymentMethod === "transfer" ? "Transferencia" : "⚠️ Forma de pago pendiente"}</small>${appointment.amountCharged === 0 && appointment.rewardApplied === true ? '<small class="finance-summary-free">Servicio gratis</small>' : ""}`
       : '<strong class="finance-summary-pending">Sin monto registrado</strong>';
     return `<article class="finance-summary-entry finance-summary-appointment">
       <div><strong>${escapeHtml(appointment.customer || "Cliente sin nombre")}</strong>
@@ -173,8 +191,8 @@
     return `<article class="finance-summary-day">
       <button type="button" class="finance-summary-day-toggle" data-finance-summary-day aria-expanded="${String(expanded)}" aria-controls="${panelId}">
         <span><strong>${escapeHtml(formatCivilDate(day.date, { weekday: "long" }))}</strong>
-          <small>Ingresos ${escapeHtml(formatMoney(day.serviceRevenue))} · Gastos ${escapeHtml(formatMoney(day.expensesTotal))}</small></span>
-        <span class="finance-summary-day-movement"><small>Movimiento del día</small><strong class="${day.netMovement < 0 ? "is-negative" : ""}">${escapeHtml(formatMovement(day.netMovement))}</strong><i aria-hidden="true">⌄</i></span>
+          <small>Ingresos ${escapeHtml(formatMoney(day.serviceRevenue))} · Efectivo ${escapeHtml(formatMoney(day.cashRevenue))} · Transferencias ${escapeHtml(formatMoney(day.transferRevenue))}${day.unclassifiedRevenue > 0 ? ` · Sin clasificar ${escapeHtml(formatMoney(day.unclassifiedRevenue))}` : ""} · Gastos ${escapeHtml(formatMoney(day.expensesTotal))}</small></span>
+        <span class="finance-summary-day-movement"><small>Movimiento de efectivo</small><strong class="${day.cashMovement < 0 ? "is-negative" : ""}">${escapeHtml(formatMovement(day.cashMovement))}</strong><i aria-hidden="true">⌄</i></span>
       </button>
       <div id="${panelId}" class="finance-summary-day-content${expanded ? "" : " hidden"}">
         ${day.appointments.length ? `<section><h4>Ingresos por servicios</h4>${day.appointments.map(renderAppointment).join("")}</section>` : ""}
@@ -283,17 +301,18 @@
       <span>Consulta los ingresos, gastos y movimiento del periodo.</span></div>
       <div class="finance-summary-cards" aria-label="Totales financieros">
         <article><span>Fondo inicial</span><strong>${escapeHtml(formatMoney(data.totals.openingFund))}</strong><small>Fondo fijo del periodo</small></article>
-        <article><span>Ingresos por servicios</span><strong>${escapeHtml(formatMoney(data.totals.serviceRevenue))}</strong></article>
+        <article><span>Total recaudado</span><strong>${escapeHtml(formatMoney(data.totals.serviceRevenue))}</strong><small>Efectivo ${escapeHtml(formatMoney(data.totals.cashRevenue))} · Transferencias ${escapeHtml(formatMoney(data.totals.transferRevenue))}${data.totals.unclassifiedRevenue > 0 ? ` · Pendiente ${escapeHtml(formatMoney(data.totals.unclassifiedRevenue))}` : ""}</small></article>
         <article><span>Gastos</span><strong>${escapeHtml(formatMoney(data.totals.expenses))}</strong></article>
-        <article class="finance-summary-closing${data.totals.closingFund < 0 ? " is-negative" : ""}"><span>Fondo final</span><strong>${escapeHtml(formatMoney(data.totals.closingFund))}</strong></article>
+        <article class="finance-summary-closing${data.totals.expectedCash < 0 ? " is-negative" : ""}"><span>Efectivo esperado</span><strong>${escapeHtml(formatMoney(data.totals.expectedCash))}</strong><small>Fondo inicial + efectivo − gastos</small></article>
       </div>
-      <div class="finance-summary-formula" aria-label="Fórmula del fondo final"><strong>${escapeHtml(formatMoney(data.totals.openingFund))} + ${escapeHtml(formatMoney(data.totals.serviceRevenue))} − ${escapeHtml(formatMoney(data.totals.expenses))} = ${escapeHtml(formatMoney(data.totals.closingFund))}</strong>
-        <span>Fondo inicial + Ingresos − Gastos = Fondo final</span></div>
+      <div class="finance-summary-formula" aria-label="Fórmula del efectivo esperado"><strong>${escapeHtml(formatMoney(data.totals.openingFund))} + ${escapeHtml(formatMoney(data.totals.cashRevenue))} − ${escapeHtml(formatMoney(data.totals.expenses))} = ${escapeHtml(formatMoney(data.totals.expectedCash))}</strong>
+        <span>Fondo inicial + efectivo − gastos = efectivo esperado</span></div>
       <div class="finance-summary-metrics" aria-label="Métricas del periodo">
         <span><strong>${data.metrics.appointmentsCompleted}</strong> Citas completadas</span><span><strong>${data.metrics.appointmentsWithAmount}</strong> Con monto registrado</span>
         <span><strong>${data.metrics.appointmentsWithoutAmount}</strong> Sin monto registrado</span><span><strong>${data.metrics.activeExpenses}</strong> Gastos registrados</span>
       </div>
       ${data.metrics.appointmentsWithoutAmount > 0 ? `<p class="finance-summary-warning" role="alert">Hay ${data.metrics.appointmentsWithoutAmount} ${data.metrics.appointmentsWithoutAmount === 1 ? "cita completada" : "citas completadas"} sin monto registrado. No se ${data.metrics.appointmentsWithoutAmount === 1 ? "incluyó" : "incluyeron"} en los ingresos.</p>` : ""}
+      ${data.totals.unclassifiedRevenue > 0 ? `<p class="finance-summary-warning" role="alert">Hay ${escapeHtml(formatMoney(data.totals.unclassifiedRevenue))} en cobros pendientes de clasificar. El efectivo esperado puede cambiar al asignar su forma de pago.</p>` : ""}
       ${noMovements ? '<div class="finance-summary-empty"><strong>Sin movimientos en el periodo</strong><p>No hubo ingresos ni gastos registrados en este periodo.</p></div>' : ""}
       <section class="finance-summary-breakdown" aria-labelledby="financeSummaryBreakdownTitle"><h3 id="financeSummaryBreakdownTitle">Desglose del periodo</h3>
         <div class="finance-summary-days">${data.days.map((day, index) => renderDay(day, index === firstMovement)).join("")}</div></section>`;

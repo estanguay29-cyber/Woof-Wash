@@ -54,6 +54,8 @@ function appointmentItems(appointment) {
 
 function normalizeAppointment(appointment) {
   const charged = weeklyRevenueService.parseHistoricalChargedAmount(appointment?.totalCobrado);
+  const paymentMethod = weeklyRevenueService.PAYMENT_METHODS.includes(appointment?.paymentMethod)
+    ? appointment.paymentMethod : null;
   return {
     dto: {
       id: String(appointment._id || appointment.id),
@@ -64,10 +66,12 @@ function normalizeAppointment(appointment) {
       items: appointmentItems(appointment),
       amountCharged: charged.valid ? charged.amount : null,
       amountStatus: charged.valid ? "recorded" : "missing",
+      paymentMethod: charged.valid ? paymentMethod : null,
       rewardApplied: appointment.rewardGratisAplicado === true
     },
     cents: charged.valid ? Math.round(charged.amount * 100) : 0,
-    hasAmount: charged.valid
+    hasAmount: charged.valid,
+    paymentMethod
   };
 }
 
@@ -92,15 +96,18 @@ function buildFinanceSummary({ from, to, appointments = [], expenses = [] }) {
   const days = [];
   const daysByDate = new Map();
   for (let date = from; date <= to; date = calendarService.addCivilDays(date, 1)) {
-    const day = { date, appointments: [], expenses: [], serviceRevenue: 0, expensesTotal: 0, netMovement: 0 };
+    const day = { date, appointments: [], expenses: [], serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expensesTotal: 0, cashMovement: 0 };
     days.push(day);
-    daysByDate.set(date, { dto: day, revenueCents: 0, expenseCents: 0 });
+    daysByDate.set(date, { dto: day, revenueCents: 0, cashCents: 0, transferCents: 0, unclassifiedCents: 0, expenseCents: 0 });
   }
 
   const seen = new Set();
   let appointmentsCompleted = 0;
   let appointmentsWithAmount = 0;
   let serviceRevenueCents = 0;
+  let cashRevenueCents = 0;
+  let transferRevenueCents = 0;
+  let unclassifiedRevenueCents = 0;
   for (const appointment of appointments) {
     const id = String(appointment?._id || appointment?.id || "");
     if (!id || seen.has(id) || appointment?.estado !== "completada" || !daysByDate.has(appointment?.fecha)) continue;
@@ -110,6 +117,13 @@ function buildFinanceSummary({ from, to, appointments = [], expenses = [] }) {
     day.dto.appointments.push(normalized.dto);
     day.revenueCents += normalized.cents;
     serviceRevenueCents += normalized.cents;
+    if (normalized.hasAmount && normalized.paymentMethod === "cash") {
+      day.cashCents += normalized.cents; cashRevenueCents += normalized.cents;
+    } else if (normalized.hasAmount && normalized.paymentMethod === "transfer") {
+      day.transferCents += normalized.cents; transferRevenueCents += normalized.cents;
+    } else if (normalized.hasAmount) {
+      day.unclassifiedCents += normalized.cents; unclassifiedRevenueCents += normalized.cents;
+    }
     appointmentsCompleted += 1;
     if (normalized.hasAmount) appointmentsWithAmount += 1;
   }
@@ -128,20 +142,29 @@ function buildFinanceSummary({ from, to, appointments = [], expenses = [] }) {
 
   for (const day of daysByDate.values()) {
     day.dto.serviceRevenue = day.revenueCents / 100;
+    day.dto.cashRevenue = day.cashCents / 100;
+    day.dto.transferRevenue = day.transferCents / 100;
+    day.dto.unclassifiedRevenue = day.unclassifiedCents / 100;
     day.dto.expensesTotal = day.expenseCents / 100;
-    day.dto.netMovement = (day.revenueCents - day.expenseCents) / 100;
+    day.dto.cashMovement = (day.cashCents - day.expenseCents) / 100;
   }
   const revenueCheck = days.reduce((sum, day) => sum + Math.round(day.serviceRevenue * 100), 0);
   const expenseCheck = days.reduce((sum, day) => sum + Math.round(day.expensesTotal * 100), 0);
-  if (revenueCheck !== serviceRevenueCents || expenseCheck !== expenseTotalCents) throw new Error("Finance summary mismatch");
+  const classifiedCheck = cashRevenueCents + transferRevenueCents + unclassifiedRevenueCents;
+  const expectedCashCents = OPENING_FUND_CENTS + cashRevenueCents - expenseTotalCents;
+  if (revenueCheck !== serviceRevenueCents || expenseCheck !== expenseTotalCents
+    || classifiedCheck !== serviceRevenueCents) throw new Error("Finance summary mismatch");
 
   return {
     period: { from, to, timezone: weeklyRevenueService.TIME_ZONE },
     totals: {
       openingFund: OPENING_FUND_CENTS / 100,
       serviceRevenue: serviceRevenueCents / 100,
+      cashRevenue: cashRevenueCents / 100,
+      transferRevenue: transferRevenueCents / 100,
+      unclassifiedRevenue: unclassifiedRevenueCents / 100,
       expenses: expenseTotalCents / 100,
-      closingFund: (OPENING_FUND_CENTS + serviceRevenueCents - expenseTotalCents) / 100
+      expectedCash: expectedCashCents / 100
     },
     metrics: {
       appointmentsCompleted,
@@ -159,7 +182,7 @@ function createFinanceSummaryService({ appointmentModel = Appointment, expenseMo
       const range = validateSummaryRange(query);
       const [appointments, expenses] = await Promise.all([
         appointmentModel.find({ estado: "completada", fecha: { $gte: range.from, $lte: range.to } })
-          .select("_id estado fecha hora clienteNombre servicioTipo mascotaNombre servicioNombre servicioCategoria servicioPaquete serviciosDetalle totalCobrado rewardGratisAplicado createdAt")
+          .select("_id estado fecha hora clienteNombre servicioTipo mascotaNombre servicioNombre servicioCategoria servicioPaquete serviciosDetalle totalCobrado paymentMethod rewardGratisAplicado createdAt")
           .sort({ fecha: 1, hora: 1, createdAt: 1, _id: 1 }).lean(),
         expenseModel.find({ expenseDate: { $gte: range.from, $lte: range.to }, deletedAt: null })
           .select("_id description amountCents expenseDate createdAt +ticketPublicId").sort({ expenseDate: 1, createdAt: 1, _id: 1 }).lean()

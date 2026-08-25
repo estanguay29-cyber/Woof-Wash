@@ -1,5 +1,6 @@
 const TIME_ZONE = "America/Mexico_City";
 const MAX_CHARGED_AMOUNT_MXN = 1000000;
+const PAYMENT_METHODS = Object.freeze(["cash", "transfer"]);
 
 function isIsoDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -62,6 +63,12 @@ function validateChargedAmount(value) {
   return parsed;
 }
 
+function validatePaymentMethod(value) {
+  return typeof value === "string" && PAYMENT_METHODS.includes(value)
+    ? { valid: true, paymentMethod: value }
+    : { valid: false, message: "La forma de pago debe ser cash o transfer." };
+}
+
 function summarizeWeeklyRevenue(appointments, { referenceDate, today = getMexicoCityDate() } = {}) {
   const range = getWeekRange(referenceDate);
   if (!range) throw new Error("Fecha de referencia inválida");
@@ -90,10 +97,12 @@ function summarizeWeeklyRevenue(appointments, { referenceDate, today = getMexico
 module.exports = {
   TIME_ZONE,
   MAX_CHARGED_AMOUNT_MXN,
+  PAYMENT_METHODS,
   getMexicoCityDate,
   getWeekRange,
   isIsoDate,
   parseHistoricalChargedAmount,
   validateChargedAmount,
+  validatePaymentMethod,
   summarizeWeeklyRevenue
 };

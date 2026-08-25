@@ -3945,6 +3945,9 @@ body {
 
 .service-van-carousel img {
   object-fit: contain;
+  object-position: center;
+  padding: 8px;
+  box-sizing: border-box;
   animation: serviceVanCarouselFade 14s infinite;
 }
 
@@ -3978,6 +3981,11 @@ body {
   100% {
     opacity: 1;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-van-carousel img { animation: none; }
+  .service-van-carousel img:first-child { opacity: 1; }
 }
 
 #sliderServicios > div > div:last-child h3 {
@@ -7727,9 +7735,19 @@ body {
 .weekly-revenue-row-action { display: grid; justify-items: end; align-content: center; gap: 10px; }
 .weekly-revenue-row-action strong { color: #166534; }
 .weekly-revenue-row-action strong.is-missing { color: #92400e; }
+.weekly-revenue-payment { color: #475569; font-weight: 800; }
+.weekly-revenue-payment.is-pending { color: #92400e; }
 .weekly-revenue-edit { grid-column: 1 / -1; display: flex; align-items: end; gap: 10px; padding-top: 12px; border-top: 1px solid #e5eaf1; }
 .weekly-revenue-edit label { display: grid; flex: 1; gap: 6px; color: #334155; font-weight: 800; }
 .weekly-revenue-edit input { width: 100%; min-height: 44px; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 12px; font: inherit; }
+.weekly-revenue-edit select { width: 100%; min-height: 44px; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 12px; color: #334155; background: #fff; font: inherit; }
+.weekly-revenue-payment-field { display: flex; flex: 1.4; gap: 8px; min-width: 260px; margin: 0; padding: 0; border: 0; }
+.weekly-revenue-payment-field legend { width: 100%; margin-bottom: 6px; color: #334155; font-weight: 800; }
+.weekly-revenue-payment-field label { position: relative; display: grid; flex: 1; cursor: pointer; }
+.weekly-revenue-payment-field input { position: absolute; opacity: 0; pointer-events: none; }
+.weekly-revenue-payment-field span { display: grid; place-items: center; min-height: 44px; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 12px; color: #334155; background: #fff; text-align: center; }
+.weekly-revenue-payment-field input:checked + span { border-color: #0b2a6b; color: #fff; background: #0b2a6b; }
+.weekly-revenue-payment-field input:focus-visible + span { outline: 3px solid rgba(140, 198, 63, .45); outline-offset: 2px; }
 .weekly-revenue-row-status { flex-basis: 100%; color: #475569; font-weight: 700; }
 
 @media (max-width: 768px) {
@@ -7738,6 +7756,7 @@ body {
   .weekly-revenue-row-action .admin-button { min-height: 44px; }
   .weekly-revenue-edit { flex-wrap: wrap; }
   .weekly-revenue-edit label { flex-basis: 100%; }
+  .weekly-revenue-payment-field { flex-basis: 100%; min-width: 0; }
   .weekly-revenue-edit .admin-button { flex: 1; min-height: 44px; }
 }
 

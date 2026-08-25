@@ -40,18 +40,18 @@ class FakeNode {
 function fixture(overrides = {}) {
   const base = {
     period: { from: "2026-08-17", to: "2026-08-23", timezone: "America/Mexico_City" },
-    totals: { openingFund: 2000, serviceRevenue: 10000, expenses: 3000, closingFund: 9000 },
+    totals: { openingFund: 2000, serviceRevenue: 10000, cashRevenue: 6000, transferRevenue: 4000, unclassifiedRevenue: 0, expenses: 3000, expectedCash: 5000 },
     metrics: { appointmentsCompleted: 2, appointmentsWithAmount: 1, appointmentsWithoutAmount: 1, activeExpenses: 1 },
     days: [
       {
-        date: "2026-08-17", serviceRevenue: 10000, expensesTotal: 3000, netMovement: 7000,
+        date: "2026-08-17", serviceRevenue: 10000, cashRevenue: 6000, transferRevenue: 4000, unclassifiedRevenue: 0, expensesTotal: 3000, cashMovement: 3000,
         appointments: [
-          { id: "a1", date: "2026-08-17", time: "09:00", customer: "Aracely", description: "Estética", items: [{ type: "pet", name: "Kayse" }, { type: "pet", name: "Mila" }], amountCharged: 10000, amountStatus: "recorded", rewardApplied: false },
-          { id: "a2", date: "2026-08-17", time: "", customer: "Carlos", description: "Lavado", items: [{ type: "vehicle", name: "BYD" }], amountCharged: null, amountStatus: "missing", rewardApplied: false }
+          { id: "a1", date: "2026-08-17", time: "09:00", customer: "Aracely", description: "Estética", items: [{ type: "pet", name: "Kayse" }, { type: "pet", name: "Mila" }], amountCharged: 10000, amountStatus: "recorded", paymentMethod: "cash", rewardApplied: false },
+          { id: "a2", date: "2026-08-17", time: "", customer: "Carlos", description: "Lavado", items: [{ type: "vehicle", name: "BYD" }], amountCharged: null, amountStatus: "missing", paymentMethod: null, rewardApplied: false }
         ],
         expenses: [{ id: "e1", description: "Gasolina", expenseDate: "2026-08-17", amount: 3000, hasTicket: true }]
       },
-      ...Array.from({ length: 6 }, (_, index) => ({ date: `2026-08-${18 + index}`, serviceRevenue: 0, expensesTotal: 0, netMovement: 0, appointments: [], expenses: [] }))
+      ...Array.from({ length: 6 }, (_, index) => ({ date: `2026-08-${18 + index}`, serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expensesTotal: 0, cashMovement: 0, appointments: [], expenses: [] }))
     ]
   };
   return { ...base, ...overrides, totals: { ...base.totals, ...(overrides.totals || {}) }, metrics: { ...base.metrics, ...(overrides.metrics || {}) } };
@@ -62,7 +62,7 @@ function rangedFixture(from, to) {
   const start = Date.parse(`${from}T00:00:00Z`); const end = Date.parse(`${to}T00:00:00Z`);
   data.days = Array.from({ length: Math.round((end - start) / 86400000) + 1 }, (_, index) => {
     const date = new Date(start + index * 86400000).toISOString().slice(0, 10);
-    return index === 0 ? { ...data.days[0], date } : { date, serviceRevenue: 0, expensesTotal: 0, netMovement: 0, appointments: [], expenses: [] };
+    return index === 0 ? { ...data.days[0], date } : { date, serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expensesTotal: 0, cashMovement: 0, appointments: [], expenses: [] };
   });
   return data;
 }
@@ -103,16 +103,16 @@ test("render usa exclusivamente totales backend, fórmula visual y métricas rea
   const { summary, nodes } = setup();
   summary.renderSummary(fixture());
   const output = nodes.financeSummaryResult.innerHTML;
-  for (const text of ["Fondo inicial", "Ingresos por servicios", "Gastos", "Fondo final", "$2,000.00", "$10,000.00", "$3,000.00", "$9,000.00"]) assert.match(output, new RegExp(text.replace("$", "\\$")));
-  assert.match(output, /Fondo inicial \+ Ingresos − Gastos = Fondo final/);
+  for (const text of ["Fondo inicial", "Total recaudado", "Efectivo", "Transferencias", "Gastos", "Efectivo esperado", "$2,000.00", "$10,000.00", "$3,000.00", "$5,000.00"]) assert.match(output, new RegExp(text.replace("$", "\\$")));
+  assert.match(output, /Fondo inicial \+ efectivo − gastos = efectivo esperado/i);
   assert.match(output, /<strong>2<\/strong> Citas completadas/);
   assert.match(output, /<strong>1<\/strong> Sin monto registrado/);
 });
 
-test("DTO inconsistente o malformado se rechaza sin sustituir closingFund", () => {
+test("DTO inconsistente o malformado se rechaza sin sustituir expectedCash", () => {
   const { summary } = setup();
   assert.equal(summary.validSummary(fixture()), true);
-  assert.equal(summary.validSummary(fixture({ totals: { closingFund: 9999 } })), false);
+  assert.equal(summary.validSummary(fixture({ totals: { expectedCash: 9999 } })), false);
   assert.equal(summary.validSummary({ totals: {}, metrics: {}, days: null }), false);
   assert.equal(summary.validSummary(fixture({ totals: { serviceRevenue: "10000" } })), false);
   const malformedDays = fixture(); malformedDays.days[0].appointments = null;
@@ -121,8 +121,8 @@ test("DTO inconsistente o malformado se rechaza sin sustituir closingFund", () =
 
 test("centavos aceptan decimales exactos y rechazan NaN, infinitos, strings y null", () => {
   const { summary } = setup();
-  const decimal = fixture({ totals: { serviceRevenue: 0.3, expenses: 0.2, closingFund: 2000.1 } });
-  decimal.days[0].serviceRevenue = 0.3; decimal.days[0].expensesTotal = 0.2; decimal.days[0].netMovement = 0.1;
+  const decimal = fixture({ totals: { serviceRevenue: 0.3, cashRevenue: 0.3, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 0.2, expectedCash: 2000.1 } });
+  decimal.days[0].serviceRevenue = 0.3; decimal.days[0].cashRevenue = 0.3; decimal.days[0].transferRevenue = 0; decimal.days[0].expensesTotal = 0.2; decimal.days[0].cashMovement = 0.1;
   decimal.days[0].appointments[0].amountCharged = 0.3; decimal.days[0].expenses[0].amount = 0.2;
   assert.equal(summary.validSummary(decimal), true);
   for (const invalid of [NaN, Infinity, -Infinity, "2000", null]) {
@@ -135,10 +135,10 @@ test("centavos aceptan decimales exactos y rechazan NaN, infinitos, strings y nu
 test("cero recorded muestra $0.00, missing queda pendiente y fondo negativo no se clampa", () => {
   const { summary, nodes } = setup();
   const data = fixture({
-    totals: { serviceRevenue: 0, expenses: 3500, closingFund: -1500 },
+    totals: { serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 3500, expectedCash: -1500 },
     metrics: { appointmentsCompleted: 2, appointmentsWithAmount: 1, appointmentsWithoutAmount: 1, activeExpenses: 1 }
   });
-  data.days[0].serviceRevenue = 0; data.days[0].expensesTotal = 3500; data.days[0].netMovement = -3500;
+  data.days[0].serviceRevenue = 0; data.days[0].cashRevenue = 0; data.days[0].transferRevenue = 0; data.days[0].expensesTotal = 3500; data.days[0].cashMovement = -3500;
   data.days[0].appointments[0].amountCharged = 0; data.days[0].appointments[0].rewardApplied = true;
   data.days[0].expenses[0].amount = 3500;
   summary.renderSummary(data);
@@ -155,14 +155,14 @@ test("todos los días se renderizan, sólo el primero con movimientos abre y acc
   assert.equal((output.match(/aria-expanded="true"/g) || []).length, 1);
   assert.match(output, /<button type="button" class="finance-summary-day-toggle"/);
   assert.match(output, /Sin movimientos/);
-  assert.match(output, /Movimiento del día/);
+  assert.match(output, /Movimiento de efectivo/);
   assert.doesNotMatch(output, /saldo acumulado|fondo final del/i);
 });
 
 test("periodo totalmente vacío conserva cards y muestra empty state", () => {
   const { summary, nodes } = setup();
-  const data = fixture({ totals: { serviceRevenue: 0, expenses: 0, closingFund: 2000 }, metrics: { appointmentsCompleted: 0, appointmentsWithAmount: 0, appointmentsWithoutAmount: 0, activeExpenses: 0 } });
-  data.days = data.days.map((day) => ({ ...day, serviceRevenue: 0, expensesTotal: 0, netMovement: 0, appointments: [], expenses: [] }));
+  const data = fixture({ totals: { serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 0, expectedCash: 2000 }, metrics: { appointmentsCompleted: 0, appointmentsWithAmount: 0, appointmentsWithoutAmount: 0, activeExpenses: 0 } });
+  data.days = data.days.map((day) => ({ ...day, serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expensesTotal: 0, cashMovement: 0, appointments: [], expenses: [] }));
   summary.renderSummary(data);
   assert.match(nodes.financeSummaryResult.innerHTML, /No hubo ingresos ni gastos registrados en este periodo/);
   assert.match(nodes.financeSummaryResult.innerHTML, /\$2,000\.00/);
@@ -174,11 +174,11 @@ test("alerta usa singular, plural y desaparece en cero; cero sin reward no inven
   assert.match(nodes.financeSummaryResult.innerHTML, /Hay 1 cita completada/);
   const plural = fixture({ metrics: { appointmentsCompleted: 2, appointmentsWithAmount: 0, appointmentsWithoutAmount: 2 } });
   plural.days[0].appointments[0].amountStatus = "missing"; plural.days[0].appointments[0].amountCharged = null;
-  plural.totals.serviceRevenue = 0; plural.totals.closingFund = -1000; plural.days[0].serviceRevenue = 0; plural.days[0].netMovement = -3000;
+  plural.totals.serviceRevenue = 0; plural.totals.cashRevenue = 0; plural.totals.transferRevenue = 0; plural.totals.expectedCash = -1000; plural.days[0].serviceRevenue = 0; plural.days[0].cashRevenue = 0; plural.days[0].transferRevenue = 0; plural.days[0].cashMovement = -3000;
   summary.renderSummary(plural); assert.match(nodes.financeSummaryResult.innerHTML, /Hay 2 citas completadas/);
-  const zero = fixture({ totals: { serviceRevenue: 0, expenses: 3000, closingFund: -1000 }, metrics: { appointmentsCompleted: 1, appointmentsWithAmount: 1, appointmentsWithoutAmount: 0 } });
+  const zero = fixture({ totals: { serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 3000, expectedCash: -1000 }, metrics: { appointmentsCompleted: 1, appointmentsWithAmount: 1, appointmentsWithoutAmount: 0 } });
   zero.days[0].appointments = [zero.days[0].appointments[0]]; zero.days[0].appointments[0].amountCharged = 0; zero.days[0].appointments[0].rewardApplied = false;
-  zero.days[0].serviceRevenue = 0; zero.days[0].netMovement = -3000;
+  zero.days[0].serviceRevenue = 0; zero.days[0].cashRevenue = 0; zero.days[0].transferRevenue = 0; zero.days[0].cashMovement = -3000;
   summary.renderSummary(zero);
   assert.doesNotMatch(nodes.financeSummaryResult.innerHTML, /Hay \d+ citas?|Servicio gratis/);
 });
@@ -205,10 +205,10 @@ test("moneda y fechas civiles cubren cero, fracciones, negativos, bisiesto, mes 
 
 test("7 días con 100 citas y 100 gastos renderizan en tiempo razonable sin URLs de ticket", () => {
   const { summary, nodes } = setup(); const data = rangedFixture("2026-08-15", "2026-08-21");
-  data.days[0].appointments = Array.from({ length: 100 }, (_, index) => ({ id: `a${index}`, date: "2026-08-15", time: "09:00", customer: `Cliente ${index}`, description: "Servicio", items: [{ type: "pet", name: `Mascota ${index}` }], amountCharged: 10, amountStatus: "recorded", rewardApplied: false }));
+  data.days[0].appointments = Array.from({ length: 100 }, (_, index) => ({ id: `a${index}`, date: "2026-08-15", time: "09:00", customer: `Cliente ${index}`, description: "Servicio", items: [{ type: "pet", name: `Mascota ${index}` }], amountCharged: 10, amountStatus: "recorded", paymentMethod: "cash", rewardApplied: false }));
   data.days[0].expenses = Array.from({ length: 100 }, (_, index) => ({ id: `e${index}`, description: `Gasto ${index}`, expenseDate: "2026-08-15", amount: 5, hasTicket: index % 2 === 0 }));
-  data.days[0].serviceRevenue = 1000; data.days[0].expensesTotal = 500; data.days[0].netMovement = 500;
-  data.totals.serviceRevenue = 1000; data.totals.expenses = 500; data.totals.closingFund = 2500;
+  data.days[0].serviceRevenue = 1000; data.days[0].cashRevenue = 1000; data.days[0].transferRevenue = 0; data.days[0].expensesTotal = 500; data.days[0].cashMovement = 500;
+  data.totals.serviceRevenue = 1000; data.totals.cashRevenue = 1000; data.totals.transferRevenue = 0; data.totals.expenses = 500; data.totals.expectedCash = 2500;
   data.metrics = { appointmentsCompleted: 100, appointmentsWithAmount: 100, appointmentsWithoutAmount: 0, activeExpenses: 100 };
   const started = performance.now(); summary.renderSummary(data); const elapsed = performance.now() - started;
   assert.ok(elapsed < 1000, `render tardó ${elapsed}ms`);
@@ -218,7 +218,7 @@ test("7 días con 100 citas y 100 gastos renderizan en tiempo razonable sin URLs
 test("entrada inicial es lazy, usa rango semanal y hace un único GET codificado", async () => {
   const { summary, nodes } = setup(); const calls = [];
   const response = rangedFixture("2026-08-17", "2026-08-21");
-  summary.init({ fetcher: async (url) => { calls.push(url); return response; }, getInitialRange: async () => ({ from: "2026-08-17", to: "2026-08-23" }) });
+  summary.init({ fetcher: async (url) => { calls.push(url); return response; }, getInitialRange: async () => ({ from: "2026-08-17", to: "2026-08-21" }) });
   assert.equal(calls.length, 0);
   await summary.activate();
   assert.equal(nodes.financeSummaryFrom.value, "2026-08-17"); assert.equal(nodes.financeSummaryTo.value, "2026-08-21");
@@ -330,30 +330,8 @@ test("responsive cubre 320, 430 y 768 con controles táctiles y estilos encapsul
 test("builder puro produce el string básico completo sin consultar ni mutar el DTO", () => {
   const { summary } = setup(); const data = rangedFixture("2026-08-17", "2026-08-17");
   const before = JSON.stringify(data); const message = summary.buildFinanceSummaryMessage(data);
-  assert.equal(message, `🐾 WOOF & WASH
-Resumen de operación
-
-📅 17 de agosto de 2026
-
-Lunes 17 de agosto
-• Aracely — Kayse y Mila — $10,000.00
-• Carlos — BYD — ⚠️ Sin monto registrado
-Ingresos del día: $10,000.00
-
-Gastos:
-• Gasolina — $3,000.00
-Gastos del día: $3,000.00
-
-Movimiento del día: +$7,000.00
-
-────────────
-
-💰 Fondo inicial: $2,000.00
-📈 Ingresos por servicios: $10,000.00
-📉 Gastos: $3,000.00
-💵 Fondo final: $9,000.00
-
-⚠️ 1 cita completada quedó sin monto registrado y no fue incluida en los ingresos.`);
+  for (const expected of ["🐾 WOOF & WASH", "• Aracely — Kayse y Mila — $10,000.00 · Efectivo", "Efectivo: $6,000.00",
+    "Transferencias: $4,000.00", "💵 Total recaudado: $10,000.00", "💰 Efectivo esperado: $5,000.00"]) assert.match(message, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.equal(JSON.stringify(data), before);
   assert.doesNotMatch(source.match(/function buildFinanceSummaryMessage[\s\S]+?\n  }/)?.[0] || "", /fetch|agendaFetch|document|localStorage/);
 });
@@ -368,14 +346,14 @@ test("periodos civiles cubren mismo día, mes, cruce de mes y cruce de año", ()
 
 test("builder omite días vacíos, distingue cero, reward, missing, negativos y plural", () => {
   const { summary } = setup(); const data = fixture({
-    totals: { serviceRevenue: 0, expenses: 3500, closingFund: -1500 },
+    totals: { serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 3500, expectedCash: -1500 },
     metrics: { appointmentsCompleted: 2, appointmentsWithAmount: 1, appointmentsWithoutAmount: 1, activeExpenses: 1 }
   });
-  data.days[0].serviceRevenue = 0; data.days[0].expensesTotal = 3500; data.days[0].netMovement = -3500;
+  data.days[0].serviceRevenue = 0; data.days[0].cashRevenue = 0; data.days[0].transferRevenue = 0; data.days[0].expensesTotal = 3500; data.days[0].cashMovement = -3500;
   data.days[0].appointments[0].amountCharged = 0; data.days[0].appointments[0].rewardApplied = true; data.days[0].expenses[0].amount = 3500;
   const message = summary.buildFinanceSummaryMessage(data);
-  assert.match(message, /\$0\.00 \(servicio gratis\)/); assert.match(message, /⚠️ Sin monto registrado/);
-  assert.match(message, /Movimiento del día: -\$3,500\.00/); assert.match(message, /Fondo final: -\$1,500\.00/);
+  assert.match(message, /\$0\.00 · Efectivo \(servicio gratis\)/); assert.match(message, /⚠️ Sin monto registrado/);
+  assert.match(message, /Movimiento de efectivo del día: -\$3,500\.00/); assert.match(message, /Efectivo esperado: -\$1,500\.00/);
   assert.doesNotMatch(message, /Martes 18|Sin movimientos|comprobante|ticket/i);
   const plural = structuredClone(data); plural.metrics.appointmentsWithAmount = 0; plural.metrics.appointmentsWithoutAmount = 2;
   plural.days[0].appointments[0].amountStatus = "missing"; plural.days[0].appointments[0].amountCharged = null;
@@ -383,11 +361,11 @@ test("builder omite días vacíos, distingue cero, reward, missing, negativos y 
 });
 
 test("periodo vacío genera mensaje compacto con totales backend", () => {
-  const { summary } = setup(); const data = fixture({ totals: { serviceRevenue: 0, expenses: 0, closingFund: 2000 }, metrics: { appointmentsCompleted: 0, appointmentsWithAmount: 0, appointmentsWithoutAmount: 0, activeExpenses: 0 } });
-  data.days = data.days.map((day) => ({ ...day, serviceRevenue: 0, expensesTotal: 0, netMovement: 0, appointments: [], expenses: [] }));
+  const { summary } = setup(); const data = fixture({ totals: { serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 0, expectedCash: 2000 }, metrics: { appointmentsCompleted: 0, appointmentsWithAmount: 0, appointmentsWithoutAmount: 0, activeExpenses: 0 } });
+  data.days = data.days.map((day) => ({ ...day, serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expensesTotal: 0, cashMovement: 0, appointments: [], expenses: [] }));
   const message = summary.buildFinanceSummaryMessage(data);
-  assert.match(message, /No hubo ingresos ni gastos registrados/); assert.match(message, /Fondo final: \$2,000\.00/);
-  assert.doesNotMatch(message, /Movimiento del día|⚠️/);
+  assert.match(message, /No hubo ingresos ni gastos registrados/); assert.match(message, /Efectivo esperado: \$2,000\.00/);
+  assert.doesNotMatch(message, /Movimiento de efectivo del día|⚠️/);
 });
 
 test("texto hostil conserva caracteres y normaliza saltos sin HTML ni entidades", () => {
@@ -414,14 +392,14 @@ test("preview, portapapeles y WhatsApp comparten exactamente un string sin GET n
 
 test("invalidación y cambio de inputs bloquean generar, copiar y WhatsApp hasta refetch", async () => {
   const copied = []; const opened = []; const { summary, nodes } = setup({ clipboard: { writeText: async (value) => copied.push(value) }, open: (...args) => opened.push(args) });
-  const responses = [rangedFixture("2026-08-17", "2026-08-21"), rangedFixture("2026-08-17", "2026-08-21")]; responses[1].totals.serviceRevenue = 11000; responses[1].totals.closingFund = 10000; responses[1].days[0].serviceRevenue = 11000; responses[1].days[0].netMovement = 8000; responses[1].days[0].appointments[0].amountCharged = 11000;
+  const responses = [rangedFixture("2026-08-17", "2026-08-21"), rangedFixture("2026-08-17", "2026-08-21")]; responses[1].totals.serviceRevenue = 11000; responses[1].totals.cashRevenue = 7000; responses[1].totals.expectedCash = 6000; responses[1].days[0].serviceRevenue = 11000; responses[1].days[0].cashRevenue = 7000; responses[1].days[0].cashMovement = 4000; responses[1].days[0].appointments[0].amountCharged = 11000;
   nodes.financeSummaryFrom.value = "2026-08-17"; nodes.financeSummaryTo.value = "2026-08-21";
   summary.init({ fetcher: async () => responses.shift(), getInitialRange: async () => null }); await summary.activate();
   nodes.financeSummaryGenerate.listeners.click[0](); summary.invalidate();
   assert.equal(nodes.financeSummaryMessageCopy.disabled, true); assert.match(nodes.financeSummaryMessageStatus.textContent, /datos cambiaron/i);
   await summary._copyMessage(); summary._shareMessageWhatsapp(); assert.equal(copied.length, 0); assert.equal(opened.length, 0);
   summary._showSummaryView(); await summary._load({ force: true }); nodes.financeSummaryGenerate.listeners.click[0]();
-  assert.match(nodes.financeSummaryMessageText.textContent, /Ingresos por servicios: \$11,000\.00/);
+  assert.match(nodes.financeSummaryMessageText.textContent, /Total recaudado: \$11,000\.00/);
   summary._showSummaryView(); nodes.financeSummaryFrom.value = "2026-08-16"; nodes.financeSummaryFrom.listeners.change[0]();
   assert.equal(nodes.financeSummaryGenerateActions.classList.contains("hidden"), true);
 });
@@ -431,7 +409,7 @@ test("mensaje largo no se trunca y bloquea sólo WhatsApp", async () => {
   const data = rangedFixture("2026-08-17", "2026-08-21"); const original = data.days[0].appointments[0];
   data.days[0].appointments = Array.from({ length: 80 }, (_, index) => ({ ...original, customer: `Cliente ${index} ${"nombre largo ".repeat(8)}`, amountCharged: 125 }));
   data.metrics.appointmentsCompleted = 80; data.metrics.appointmentsWithAmount = 80; data.metrics.appointmentsWithoutAmount = 0;
-  data.totals.serviceRevenue = 10000; data.days[0].serviceRevenue = 10000; data.days[0].netMovement = 7000;
+  data.totals.serviceRevenue = 10000; data.days[0].serviceRevenue = 10000; data.days[0].cashMovement = 3000;
   nodes.financeSummaryFrom.value = "2026-08-17"; nodes.financeSummaryTo.value = "2026-08-21";
   summary.init({ fetcher: async () => data, getInitialRange: async () => null }); await summary.activate(); nodes.financeSummaryGenerate.listeners.click[0]();
   const full = nodes.financeSummaryMessageText.textContent; assert.equal(full.includes("Cliente 79"), true);

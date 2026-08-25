@@ -43,7 +43,7 @@ test("fondo, ingresos, gastos y cierre se calculan exclusivamente en centavos", 
     expenses: [expense(), expense({ expenseDate: "2026-08-18", amountCents: 20000 })]
   });
   assert.equal(OPENING_FUND_CENTS, 200000);
-  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 1500, expenses: 500, closingFund: 3000 });
+  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 1500, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 1500, expenses: 500, expectedCash: 1500 });
   assert.equal(result.days.length, 7);
   assert.deepEqual(result.metrics, { appointmentsCompleted: 2, appointmentsWithAmount: 2, appointmentsWithoutAmount: 0, activeExpenses: 2 });
 });
@@ -93,7 +93,7 @@ test("gastos anulados se excluyen, restaurados se incluyen y el cierre puede ser
     expenses: [expense({ amountCents: 300000 }), expense({ amountCents: 900000, deletedAt: new Date() })]
   });
   assert.equal(result.totals.expenses, 3000);
-  assert.equal(result.totals.closingFund, -1000);
+  assert.equal(result.totals.expectedCash, -1000);
   assert.equal(result.days[0].expenses.length, 1);
 });
 
@@ -103,7 +103,7 @@ test("0.10 + 0.20 menos 0.05 no introduce error flotante", () => {
     appointments: [appointment({ totalCobrado: 0.1 }), appointment({ totalCobrado: 0.2 })],
     expenses: [expense({ amountCents: 5 })]
   });
-  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 0.3, expenses: 0.05, closingFund: 2000.25 });
+  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 0.3, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0.3, expenses: 0.05, expectedCash: 1999.95 });
 });
 
 test("agrupa por día, conserva días vacíos y verifica consistencia global", () => {
@@ -112,12 +112,12 @@ test("agrupa por día, conserva días vacíos y verifica consistencia global", (
     appointments: [appointment({ totalCobrado: 1000 }), appointment({ fecha: "2026-08-18", totalCobrado: 500 })],
     expenses: [expense({ amountCents: 30000 }), expense({ expenseDate: "2026-08-18", amountCents: 80000 })]
   });
-  assert.deepEqual(result.days.map((day) => [day.date, day.netMovement]), [
-    ["2026-08-17", 700], ["2026-08-18", -300], ["2026-08-19", 0]
+  assert.deepEqual(result.days.map((day) => [day.date, day.cashMovement]), [
+    ["2026-08-17", -300], ["2026-08-18", -800], ["2026-08-19", 0]
   ]);
   assert.equal(result.days.reduce((sum, day) => sum + day.serviceRevenue, 0), result.totals.serviceRevenue);
   assert.equal(result.days.reduce((sum, day) => sum + day.expensesTotal, 0), result.totals.expenses);
-  assert.equal(result.totals.openingFund + result.totals.serviceRevenue - result.totals.expenses, result.totals.closingFund);
+  assert.equal(result.totals.openingFund + result.totals.cashRevenue - result.totals.expenses, result.totals.expectedCash);
 });
 
 test("fechas civiles cruzan mes, año y bisiesto sin off-by-one", () => {
@@ -200,7 +200,7 @@ test("property-like determinista conserva invariantes de centavos diarios y glob
     const expenseCents = result.days.reduce((sum, day) => sum + Math.round(day.expensesTotal * 100), 0);
     assert.equal(revenueCents, Math.round(result.totals.serviceRevenue * 100));
     assert.equal(expenseCents, Math.round(result.totals.expenses * 100));
-    assert.equal(OPENING_FUND_CENTS + revenueCents - expenseCents, Math.round(result.totals.closingFund * 100));
+    assert.equal(OPENING_FUND_CENTS - expenseCents, Math.round(result.totals.expectedCash * 100));
   }
 });
 
@@ -208,7 +208,7 @@ test("1000 citas y 1000 gastos permanecen exactos, serializables y sin valores n
   const appointments = Array.from({ length: 1000 }, (_, index) => appointment({ _id: `volume-a-${index}`, totalCobrado: 19.99 }));
   const expenses = Array.from({ length: 1000 }, (_, index) => expense({ _id: `volume-e-${index}`, amountCents: 1990 }));
   const result = buildFinanceSummary({ from: "2026-08-17", to: "2026-08-17", appointments, expenses });
-  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 19990, expenses: 19900, closingFund: 2090 });
+  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 19990, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 19990, expenses: 19900, expectedCash: -17900 });
   assert.deepEqual(result.metrics, { appointmentsCompleted: 1000, appointmentsWithAmount: 1000, appointmentsWithoutAmount: 0, activeExpenses: 1000 });
   const json = JSON.stringify(result);
   assert.equal(typeof json, "string");
@@ -229,7 +229,7 @@ test("montos decimales mixtos y gasto máximo conservan la fórmula exacta", () 
   const expenses = [5, 15, 1990, 100000000]
     .map((amountCents, index) => expense({ _id: `expense-${index}`, amountCents }));
   const result = buildFinanceSummary({ from: "2026-08-17", to: "2026-08-17", appointments, expenses });
-  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 120.6, expenses: 1000020.1, closingFund: -997899.5 });
+  assert.deepEqual(result.totals, { openingFund: 2000, serviceRevenue: 120.6, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 120.6, expenses: 1000020.1, expectedCash: -998020.1 });
 });
 
 test("gasto persistido corrupto falla cerrado y su descripción histórica permanece textual", () => {
@@ -263,6 +263,31 @@ test("Finance Summary y Weekly Revenue producen el mismo ingreso para el mismo l
   assert.equal(summary.metrics.appointmentsCompleted, weekly.completedCount);
   assert.equal(summary.metrics.appointmentsWithAmount, weekly.registeredCount);
   assert.equal(summary.metrics.appointmentsWithoutAmount, weekly.missingCount);
+});
+
+test("separa efectivo, transferencia e histórico sin clasificar y calcula efectivo esperado", () => {
+  const result = buildFinanceSummary({ from: "2026-08-17", to: "2026-08-17", appointments: [
+    appointment({ _id: "cash", totalCobrado: 6000, paymentMethod: "cash" }),
+    appointment({ _id: "transfer", totalCobrado: 4000, paymentMethod: "transfer" }),
+    appointment({ _id: "historical", totalCobrado: 1000, paymentMethod: undefined })
+  ], expenses: [expense({ amountCents: 300000 })] });
+  assert.deepEqual(result.totals, {
+    openingFund: 2000, serviceRevenue: 11000, cashRevenue: 6000,
+    transferRevenue: 4000, unclassifiedRevenue: 1000, expenses: 3000, expectedCash: 5000
+  });
+  assert.equal(result.days[0].cashRevenue, 6000);
+  assert.equal(result.days[0].transferRevenue, 4000);
+  assert.equal(result.days[0].unclassifiedRevenue, 1000);
+});
+
+test("cambiar método conserva total y mueve exactamente el efectivo esperado", () => {
+  const base = { from: "2026-08-17", to: "2026-08-17", expenses: [] };
+  const cash = buildFinanceSummary({ ...base, appointments: [appointment({ totalCobrado: 900, paymentMethod: "cash" })] });
+  const transfer = buildFinanceSummary({ ...base, appointments: [appointment({ totalCobrado: 900, paymentMethod: "transfer" })] });
+  assert.equal(cash.totals.serviceRevenue, transfer.totals.serviceRevenue);
+  assert.equal(cash.totals.expectedCash - transfer.totals.expectedCash, 900);
+  assert.deepEqual([cash.totals.cashRevenue, cash.totals.transferRevenue], [900, 0]);
+  assert.deepEqual([transfer.totals.cashRevenue, transfer.totals.transferRevenue], [0, 900]);
 });
 
 test("hoy financiero cambia en la medianoche de Ciudad de México y no en UTC", () => {

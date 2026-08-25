@@ -324,6 +324,11 @@ const AppointmentSchema = new mongoose.Schema(
       min: 0,
       default: null
     },
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "transfer"],
+      default: null
+    },
     ingresoAproximadoMxn: {
       type: Number,
       min: 0,
