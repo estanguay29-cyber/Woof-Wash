@@ -3014,6 +3014,7 @@ function construirCitaAdmin(cita) {
     comentarioCliente: obj.comentarioCliente || "",
     fechaCalificacion: obj.fechaCalificacion || null,
     totalCobrado: Number.isFinite(obj.totalCobrado) ? obj.totalCobrado : null,
+    paymentMethod: weeklyRevenueService.PAYMENT_METHODS.includes(obj.paymentMethod) ? obj.paymentMethod : null,
     ingresoAproximadoMxn: Number.isFinite(obj.ingresoAproximadoMxn) ? obj.ingresoAproximadoMxn : 0,
     inicioServicioAt: obj.inicioServicioAt || null,
     finServicioAt: obj.finServicioAt || null,
@@ -7652,7 +7653,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
 app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
     const appointmentId = typeof req.params.id === "string" ? req.params.id.trim() : "";
-    const camposNoPermitidos = validarCamposCitaPermitidos(req.body, ["estado", "totalCobrado"]);
+    const camposNoPermitidos = validarCamposCitaPermitidos(req.body, ["estado", "totalCobrado", "paymentMethod"]);
     if (camposNoPermitidos.length) {
       return res.status(400).json({ message: `Campo no permitido: ${camposNoPermitidos[0]}` });
     }
@@ -7674,6 +7675,7 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
     }
 
     const totalCobradoBody = req.body?.totalCobrado;
+    const hasPaymentMethod = Object.prototype.hasOwnProperty.call(req.body || {}, "paymentMethod");
     if (estado === "completada" && cita.estado !== "completada" && (totalCobradoBody === undefined || totalCobradoBody === null)) {
       return res.status(400).json({ message: "totalCobrado es obligatorio al completar la cita" });
     }
@@ -7683,6 +7685,20 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
         return res.status(400).json({ message: "totalCobrado debe ser un numero positivo con maximo 2 decimales" });
       }
       cita.totalCobrado = totalCobradoParsed.value;
+    }
+    if (estado === "completada" && cita.estado !== "completada" && !hasPaymentMethod) {
+      return res.status(400).json({ message: "paymentMethod es obligatorio al completar la cita; usa null si se desconoce" });
+    }
+    if (hasPaymentMethod) {
+      if (req.body.paymentMethod === null) {
+        cita.paymentMethod = null;
+      } else {
+        const paymentValidation = weeklyRevenueService.validatePaymentMethod(req.body.paymentMethod);
+        if (!paymentValidation.valid) {
+          return res.status(400).json({ message: "paymentMethod debe ser cash, transfer o null" });
+        }
+        cita.paymentMethod = paymentValidation.paymentMethod;
+      }
     }
 
     if (!["cancelada", "no_asistio"].includes(estado)) {

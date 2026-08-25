@@ -3498,15 +3498,19 @@ async function guardarEdicionCita(event) {
   }
 }
 
-async function cambiarEstadoCita(id, estado, totalCobrado = null) {
+async function cambiarEstadoCita(id, estado, totalCobrado = null, paymentMethod = undefined) {
   const body = { estado };
   if (Number.isFinite(totalCobrado)) {
     body.totalCobrado = totalCobrado;
+  }
+  if (paymentMethod === null || paymentMethod === "cash" || paymentMethod === "transfer") {
+    body.paymentMethod = paymentMethod;
   }
   await agendaFetch(`/admin/appointments/${encodeURIComponent(id)}/status`, {
     method: "PATCH",
     body: JSON.stringify(body)
   });
+  invalidarResumenFinanciero();
   await cargarCitasAgenda();
   await cargarStatsAgenda();
 }
@@ -3567,6 +3571,8 @@ function abrirModalCompletarCita(cita, selectElement) {
     completeTotalCobrado.value = "";
     completeTotalCobrado.setCustomValidity("");
   }
+  const unknownPaymentMethod = completeModal.querySelector('input[name="agendaCompletePaymentMethod"][value=""]');
+  if (unknownPaymentMethod) unknownPaymentMethod.checked = true;
   if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
   mostrarErrorCompletarCita("");
   completeModal.classList.remove("hidden");
@@ -3576,7 +3582,7 @@ function abrirModalCompletarCita(cita, selectElement) {
 
 async function confirmarCompletarCita(event) {
   event.preventDefault();
-  const { completeTotalCobrado, completeBtnConfirmar } = obtenerElementosAgenda();
+  const { completeForm, completeTotalCobrado, completeBtnConfirmar } = obtenerElementosAgenda();
   const pendiente = citaPendienteCompletar;
   if (!pendiente?.id || !completeTotalCobrado || completeBtnConfirmar?.disabled) return;
 
@@ -3593,7 +3599,9 @@ async function confirmarCompletarCita(event) {
   mostrarErrorCompletarCita("");
 
   try {
-    await cambiarEstadoCita(pendiente.id, "completada", totalCobrado);
+    const selectedPaymentMethod = completeForm?.elements?.agendaCompletePaymentMethod?.value || "";
+    const paymentMethod = selectedPaymentMethod === "" ? null : selectedPaymentMethod;
+    await cambiarEstadoCita(pendiente.id, "completada", totalCobrado, paymentMethod);
     cerrarModalCompletarCita({ restaurarSelect: false });
   } catch (error) {
     mostrarErrorCompletarCita(error.message);
@@ -3903,28 +3911,18 @@ async function copiarTextoAgenda(texto, etiqueta) {
 
 async function cambiarEstadoDesdeDetalle(estado) {
   if (!citaEnDetalleId || detalleEstadoActualizando) return;
-  const detailTotalCobrado = document.getElementById("agendaDetailTotalCobrado");
-  let totalCobrado = null;
   if (estado === "completada") {
-    actualizarDetalleTotalCobrado();
-    if (!detailTotalCobrado || !detailTotalCobrado.value.trim()) {
-      alert("Ingresa el total cobrado antes de completar la cita.");
-      return;
-    }
-    try {
-      totalCobrado = normalizarMontoCobrado(detailTotalCobrado.value);
-    } catch (error) {
-      alert(error.message);
-      return;
-    }
+    const cita = obtenerCitaDetalleActual();
+    const { detailEstado } = obtenerElementosAgenda();
+    abrirModalCompletarCita(cita, detailEstado);
+    return;
   }
-
   const { detailEstado } = obtenerElementosAgenda();
   detalleEstadoActualizando = true;
   if (detailEstado) detailEstado.disabled = true;
 
   try {
-    await cambiarEstadoCita(citaEnDetalleId, estado, totalCobrado);
+    await cambiarEstadoCita(citaEnDetalleId, estado);
     const citaActualizada = citasAgenda.find((item) => item.id === citaEnDetalleId);
     if (citaActualizada) {
       renderizarDetalleCita(citaActualizada);
@@ -4822,6 +4820,14 @@ async function configurarAgenda() {
   });
 
   elementos.completeForm?.addEventListener("submit", confirmarCompletarCita);
+  elementos.completeForm?.addEventListener("keydown", (event) => {
+    const radio = event.target.closest?.('input[name="agendaCompletePaymentMethod"]');
+    if (radio && event.key === "Enter") {
+      event.preventDefault();
+      radio.checked = true;
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
   document.getElementById("btnCerrarCompleteModal")?.addEventListener("click", () => cerrarModalCompletarCita());
   document.getElementById("btnCancelarCompleteCita")?.addEventListener("click", () => cerrarModalCompletarCita());
   elementos.completeModal?.addEventListener("click", (event) => {

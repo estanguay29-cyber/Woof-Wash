@@ -282,8 +282,19 @@ test("separa efectivo, transferencia e histórico sin clasificar y calcula efect
 
 test("cambiar método conserva total y mueve exactamente el efectivo esperado", () => {
   const base = { from: "2026-08-17", to: "2026-08-17", expenses: [] };
+  const unknown = buildFinanceSummary({ ...base, appointments: [appointment({ totalCobrado: 900, paymentMethod: null })] });
   const cash = buildFinanceSummary({ ...base, appointments: [appointment({ totalCobrado: 900, paymentMethod: "cash" })] });
   const transfer = buildFinanceSummary({ ...base, appointments: [appointment({ totalCobrado: 900, paymentMethod: "transfer" })] });
+  assert.equal(unknown.totals.serviceRevenue, 900);
+  assert.equal(unknown.totals.unclassifiedRevenue, 900);
+  assert.equal(unknown.totals.cashRevenue, 0);
+  assert.equal(unknown.totals.transferRevenue, 0);
+  assert.equal(cash.totals.serviceRevenue, unknown.totals.serviceRevenue);
+  assert.equal(cash.totals.unclassifiedRevenue, 0);
+  assert.equal(cash.totals.expectedCash - unknown.totals.expectedCash, 900);
+  assert.equal(transfer.totals.serviceRevenue, unknown.totals.serviceRevenue);
+  assert.equal(transfer.totals.unclassifiedRevenue, 0);
+  assert.equal(transfer.totals.expectedCash, unknown.totals.expectedCash);
   assert.equal(cash.totals.serviceRevenue, transfer.totals.serviceRevenue);
   assert.equal(cash.totals.expectedCash - transfer.totals.expectedCash, 900);
   assert.deepEqual([cash.totals.cashRevenue, cash.totals.transferRevenue], [900, 0]);

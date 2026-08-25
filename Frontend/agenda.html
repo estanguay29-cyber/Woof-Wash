@@ -511,6 +511,23 @@
             <input id="agendaCompleteTotalCobrado" type="text" inputmode="decimal" autocomplete="off" placeholder="Ej. 1200.00" aria-label="Total cobrado en pesos" required>
           </span>
         </label>
+        <fieldset class="agenda-payment-method agenda-field-full">
+          <legend>Forma de pago</legend>
+          <div class="agenda-payment-options">
+            <label class="agenda-payment-option">
+              <input type="radio" name="agendaCompletePaymentMethod" value="cash">
+              <span><span aria-hidden="true">💵</span> Efectivo</span>
+            </label>
+            <label class="agenda-payment-option">
+              <input type="radio" name="agendaCompletePaymentMethod" value="transfer">
+              <span><span aria-hidden="true">🏦</span> Transferencia</span>
+            </label>
+            <label class="agenda-payment-option agenda-payment-option-unknown">
+              <input type="radio" name="agendaCompletePaymentMethod" value="" checked>
+              <span><span aria-hidden="true">❔</span> Método desconocido</span>
+            </label>
+          </div>
+        </fieldset>
         <p id="agendaCompleteError" class="agenda-copy-feedback hidden" aria-live="polite"></p>
         <div class="agenda-edit-actions">
           <button id="btnConfirmarCompleteCita" type="submit" class="admin-button admin-button-dark">Completar cita</button>

@@ -3889,8 +3889,7 @@ body {
   overflow: hidden;
 }
 
-.service-grooming-carousel img,
-.service-van-carousel img {
+.service-grooming-carousel img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -3943,27 +3942,40 @@ body {
   background: #eaf2f8;
 }
 
-.service-van-carousel img {
-  object-fit: contain;
-  object-position: center;
-  padding: 8px;
-  box-sizing: border-box;
+.service-van-slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
   animation: serviceVanCarouselFade 14s infinite;
 }
 
-.service-van-carousel img:nth-child(1) {
+.service-van-slide img {
+  position: absolute;
+  inset: 8px;
+  display: block;
+  width: calc(100% - 16px);
+  height: calc(100% - 16px);
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  transform: none;
+}
+
+.service-van-slide:nth-child(1) {
   animation-delay: 0s;
 }
 
-.service-van-carousel img:nth-child(2) {
+.service-van-slide:nth-child(2) {
   animation-delay: -10.5s;
 }
 
-.service-van-carousel img:nth-child(3) {
+.service-van-slide:nth-child(3) {
   animation-delay: -7s;
 }
 
-.service-van-carousel img:nth-child(4) {
+.service-van-slide:nth-child(4) {
   animation-delay: -3.5s;
 }
 
@@ -3984,8 +3996,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .service-van-carousel img { animation: none; }
-  .service-van-carousel img:first-child { opacity: 1; }
+  .service-van-slide { animation: none; }
+  .service-van-slide:first-child { opacity: 1; }
 }
 
 #sliderServicios > div > div:last-child h3 {
@@ -8896,7 +8908,82 @@ body {
 }
 
 .agenda-complete-panel {
-  width: min(100%, 480px);
+  width: min(100%, 620px);
+}
+
+.agenda-payment-method {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.agenda-payment-method legend {
+  margin-bottom: 8px;
+  color: #0b2a6b;
+  font-weight: 800;
+}
+
+.agenda-payment-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.agenda-payment-option {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.agenda-payment-option > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.agenda-payment-option > span {
+  position: relative;
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 26px 9px 10px;
+  border: 2px solid rgba(11, 42, 107, 0.14);
+  border-radius: 14px;
+  background: #fffcf2;
+  color: #0b2a6b;
+  font-weight: 750;
+  line-height: 1.2;
+  text-align: center;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.agenda-payment-option > input:checked + span {
+  border-color: #0b2a6b;
+  background: #f3f8e9;
+  box-shadow: 0 0 0 2px rgba(140, 198, 63, 0.34);
+}
+
+.agenda-payment-option > input:checked + span::after {
+  content: "✓";
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  color: #477719;
+  font-weight: 900;
+}
+
+.agenda-payment-option > input:focus-visible + span {
+  outline: 3px solid rgba(11, 42, 107, 0.28);
+  outline-offset: 2px;
+}
+
+.agenda-payment-option-unknown > input:checked + span {
+  background: #eef4fb;
 }
 
 .agenda-complete-form .agenda-copy-feedback {
@@ -9964,6 +10051,14 @@ body {
 
   .agenda-date-controls {
     grid-template-columns: 1fr;
+  }
+
+  .agenda-payment-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agenda-payment-option-unknown {
+    grid-column: 1 / -1;
   }
 
   .agenda-status-filters {
