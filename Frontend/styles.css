@@ -3883,18 +3883,23 @@ body {
   }
 }
 
-.service-grooming-carousel {
+.service-grooming-carousel,
+.service-van-carousel {
   position: relative;
   overflow: hidden;
 }
 
-.service-grooming-carousel img {
+.service-grooming-carousel img,
+.service-van-carousel img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   opacity: 0;
+}
+
+.service-grooming-carousel img {
+  object-fit: cover;
   animation: groomingCarouselFade 10.5s infinite;
 }
 
@@ -3926,6 +3931,47 @@ body {
 
   33.333%,
   95% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.service-van-carousel {
+  background: #eaf2f8;
+}
+
+.service-van-carousel img {
+  object-fit: contain;
+  animation: serviceVanCarouselFade 14s infinite;
+}
+
+.service-van-carousel img:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.service-van-carousel img:nth-child(2) {
+  animation-delay: -10.5s;
+}
+
+.service-van-carousel img:nth-child(3) {
+  animation-delay: -7s;
+}
+
+.service-van-carousel img:nth-child(4) {
+  animation-delay: -3.5s;
+}
+
+@keyframes serviceVanCarouselFade {
+  0%,
+  21.75% {
+    opacity: 1;
+  }
+
+  25%,
+  96.75% {
     opacity: 0;
   }
 
