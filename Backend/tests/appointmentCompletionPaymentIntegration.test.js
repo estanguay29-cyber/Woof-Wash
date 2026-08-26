@@ -107,3 +107,35 @@ test("el endpoint conserva auth y rol admin", async () => {
   const employee = await User.create({ usuario: "employee", email: "employee@test.invalid", password: "test-only-password", aceptaTerminos: true, role: "empleado" });
   assert.equal((await request(app).patch(`/admin/appointments/${appointment._id}/status`).set("Authorization", auth(employee)).send(body)).status, 403);
 });
+
+test("cobro histórico permite unknown y reclasificación posterior sin cambiar total", async () => {
+  const appointment = await pendingAppointment();
+  assert.equal((await complete(appointment, { totalCobrado: 900, paymentMethod: null })).status, 200);
+  let response = await request(app)
+    .patch(`/admin/appointments/${appointment._id}/charged-amount`)
+    .set("Authorization", auth())
+    .send({ totalCobrado: 900, paymentMethod: null });
+  assert.equal(response.status, 200, response.text);
+  assert.equal(response.body.paymentMethod, null);
+  response = await request(app)
+    .patch(`/admin/appointments/${appointment._id}/charged-amount`)
+    .set("Authorization", auth())
+    .send({ totalCobrado: 900, paymentMethod: "cash" });
+  assert.equal(response.status, 200, response.text);
+  assert.deepEqual([response.body.totalCobrado, response.body.paymentMethod], [900, "cash"]);
+});
+
+test("Weekly Revenue HTTP respeta from/to y rechaza contrato ambiguo", async () => {
+  const inside = await pendingAppointment({ hora: "10:00" });
+  await complete(inside, { totalCobrado: 900, paymentMethod: "transfer" });
+  let response = await request(app)
+    .get("/admin/appointments/weekly-revenue?from=2026-08-25&to=2026-08-25")
+    .set("Authorization", auth());
+  assert.equal(response.status, 200, response.text);
+  assert.deepEqual([response.body.semanaInicio, response.body.semanaFin, response.body.citas.length], ["2026-08-25", "2026-08-25", 1]);
+  assert.equal(response.body.citas[0].paymentMethod, "transfer");
+  response = await request(app)
+    .get("/admin/appointments/weekly-revenue?from=2026-08-25&to=2026-08-25&extra=true")
+    .set("Authorization", auth());
+  assert.equal(response.status, 400);
+});

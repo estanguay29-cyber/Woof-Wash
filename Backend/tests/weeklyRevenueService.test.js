@@ -20,6 +20,27 @@ test("la semana es lunes a domingo sin depender de UTC del servidor", () => {
   assert.equal(revenue.getWeekRange("2026-08-10").start, "2026-08-10");
 });
 
+test("rango manual acepta uno a siete días, rechaza futuro y conserva default compatible", () => {
+  assert.deepEqual(revenue.validateRange("2026-08-15", "2026-08-21", { today: "2026-08-25" }), {
+    start: "2026-08-15", end: "2026-08-21", timeZone: "America/Mexico_City"
+  });
+  assert.ok(revenue.validateRange("2026-08-21", "2026-08-21", { today: "2026-08-25" }));
+  for (const pair of [["2026-08-14", "2026-08-21"], ["2026-08-22", "2026-08-26"], ["bad", "2026-08-21"]]) {
+    assert.equal(revenue.validateRange(pair[0], pair[1], { today: "2026-08-25" }), null);
+  }
+  assert.deepEqual(revenue.getWeekRange("2026-08-25"), { start: "2026-08-24", end: "2026-08-30", timeZone: "America/Mexico_City" });
+});
+
+test("resumen manual filtra exclusivamente el histórico seleccionado", () => {
+  const result = revenue.summarizeWeeklyRevenue([
+    appointment({ _id: "before", fecha: "2026-08-14" }),
+    appointment({ _id: "inside", fecha: "2026-08-18" }),
+    appointment({ _id: "after", fecha: "2026-08-22" })
+  ], { from: "2026-08-15", to: "2026-08-21", today: "2026-08-25" });
+  assert.deepEqual(result.rows.map((row) => row.appointment._id), ["inside"]);
+  assert.deepEqual([result.start, result.end, result.total], ["2026-08-15", "2026-08-21", 900]);
+});
+
 test("solo suma completadas válidas, dentro de semana y no futuras", () => {
   const appointments = [
     appointment({ _id: "one", totalCobrado: 900 }),
@@ -89,4 +110,15 @@ test("endpoint de edición exige admin, limitador y una actualización acotada",
   assert.match(route, /validatePaymentMethod\(req\.body\.paymentMethod\)/);
   assert.match(route, /findOneAndUpdate\([\s\S]+estado: "completada"[\s\S]+\$set: \{ totalCobrado: validation\.amount, paymentMethod: paymentValidation\.paymentMethod \}/);
   assert.doesNotMatch(route, /updateMany|deleteOne|findByIdAndDelete/);
+});
+
+test("endpoint de ingresos admite from/to estricto sin cambiar consumidores sin rango", () => {
+  const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+  const start = server.indexOf('app.get("/admin/appointments/weekly-revenue"');
+  const end = server.indexOf("function contarPremiosDisponiblesAdmin", start);
+  const route = server.slice(start, end);
+  assert.match(route, /auth, requireAdmin/);
+  assert.match(route, /manualRange[\s\S]+\["from", "to"\][\s\S]+\["date"\]/);
+  assert.match(route, /validateRange\(req\.query\.from, req\.query\.to\)/);
+  assert.match(route, /fecha: \{ \$gte: range\.start, \$lte: range\.end \}/);
 });

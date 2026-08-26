@@ -5,9 +5,9 @@
   const listFormatter = typeof Intl.ListFormat === "function" ? new Intl.ListFormat("es-MX", { style: "long", type: "conjunction" }) : null;
   const WHATSAPP_URL_MAX_LENGTH = 7500;
   const state = {
-    initialized: false, active: false, fetcher: null, getInitialRange: null,
+    initialized: false, active: false, fetcher: null, getRange: null,
     controller: null, generation: 0, request: null, cacheKey: "", data: null, stale: true,
-    rangePending: false, previewOpen: false, message: ""
+    rangePending: false, previewOpen: false, message: "", ownsRangeControls: false
   };
 
   const byId = (id) => global.document?.getElementById(id);
@@ -229,7 +229,6 @@
   function showSummaryView({ restoreFocus = false } = {}) {
     state.previewOpen = false;
     byId("financeSummaryMessagePreview")?.classList.add("hidden");
-    byId("financeSummaryForm")?.classList.remove("hidden");
     byId("financeSummaryStatus")?.classList.remove("hidden");
     if (canGenerateMessage()) byId("financeSummaryResult")?.classList.remove("hidden");
     else byId("financeSummaryResult")?.classList.add("hidden");
@@ -241,7 +240,6 @@
     if (!canGenerateMessage()) return false;
     state.message = buildFinanceSummaryMessage(state.data);
     state.previewOpen = true;
-    byId("financeSummaryForm")?.classList.add("hidden");
     byId("financeSummaryStatus")?.classList.add("hidden");
     byId("financeSummaryResult")?.classList.add("hidden");
     byId("financeSummaryGenerateActions")?.classList.add("hidden");
@@ -323,9 +321,10 @@
   }
 
   function setBusy(busy) {
-    const button = byId("financeSummarySubmit");
-    if (button) { button.disabled = busy; button.textContent = busy ? "Consultando…" : "Consultar periodo"; }
-    ["financeSummaryFrom", "financeSummaryTo"].forEach((id) => { if (byId(id)) byId(id).disabled = busy; });
+    if (state.ownsRangeControls) {
+      const button = byId("financeSummarySubmit");
+      if (button) { button.disabled = busy; button.textContent = busy ? "Consultando…" : "Consultar periodo"; }
+    }
     syncGenerateAvailability();
   }
 
@@ -343,8 +342,10 @@
   }
 
   async function load({ force = false } = {}) {
-    const from = byId("financeSummaryFrom")?.value || "";
-    const to = byId("financeSummaryTo")?.value || "";
+    const rangeValue = state.getRange();
+    const range = rangeValue && typeof rangeValue.then === "function" ? await rangeValue : rangeValue;
+    const from = range?.from || "";
+    const to = range?.to || "";
     const error = validateRange(from, to);
     if (error) { showError(error); return null; }
     const key = `${from}|${to}`;
@@ -385,15 +386,6 @@
 
   async function activate() {
     state.active = true;
-    const from = byId("financeSummaryFrom"); const to = byId("financeSummaryTo");
-    const today = todayInMexico();
-    if (from) from.max = today; if (to) to.max = today;
-    if (from && to && (!from.value || !to.value)) {
-      const range = await state.getInitialRange();
-      if (!state.active) return null;
-      from.value = range?.from && range.from <= today ? range.from : today;
-      to.value = range?.to && range.to < today ? range.to : today;
-    }
     return load();
   }
 
@@ -404,6 +396,22 @@
   }
   function invalidate() {
     state.stale = true; state.cacheKey = ""; state.data = null;
+    byId("financeSummaryResult")?.classList.add("hidden");
+    byId("financeSummaryGenerateActions")?.classList.add("hidden");
+    markPreviewStale(); syncGenerateAvailability();
+  }
+
+  function periodPending() {
+    state.rangePending = true;
+    abortRequest();
+    byId("financeSummaryResult")?.classList.add("hidden");
+    byId("financeSummaryGenerateActions")?.classList.add("hidden");
+    markPreviewStale(); syncGenerateAvailability();
+  }
+
+  function periodChanged() {
+    abortRequest();
+    state.stale = true; state.rangePending = false; state.cacheKey = ""; state.data = null; state.message = "";
     byId("financeSummaryResult")?.classList.add("hidden");
     byId("financeSummaryGenerateActions")?.classList.add("hidden");
     markPreviewStale(); syncGenerateAvailability();
@@ -429,15 +437,28 @@
     button.setAttribute("aria-expanded", String(!expanded)); content?.classList.toggle("hidden", expanded);
   }
 
-  function init({ fetcher, getInitialRange }) {
+  function init({ fetcher, getRange, getInitialRange }) {
     if (state.initialized) return;
-    state.fetcher = fetcher; state.getInitialRange = getInitialRange; state.initialized = true;
-    byId("financeSummaryForm")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      if (!state.request) load({ force: true });
+    state.fetcher = fetcher;
+    const legacyRangeOwner = typeof getRange !== "function";
+    state.getRange = getRange || (() => {
+      const from = byId("financeSummaryFrom"); const to = byId("financeSummaryTo"); const today = todayInMexico();
+      if (from?.value && to?.value) return { from: from.value, to: to.value };
+      return Promise.resolve(getInitialRange?.()).then((initial) => {
+        from.value = initial?.from && initial.from <= today ? initial.from : today;
+        to.value = initial?.to && initial.to <= today ? initial.to : today;
+        return { from: from.value, to: to.value };
+      });
     });
+    state.ownsRangeControls = legacyRangeOwner;
+    state.initialized = true;
+    if (legacyRangeOwner) {
+      byId("financeSummaryForm")?.addEventListener("submit", (event) => {
+        event.preventDefault(); if (!state.request) load({ force: true });
+      });
+      ["financeSummaryFrom", "financeSummaryTo"].forEach((id) => byId(id)?.addEventListener("change", markRangePending));
+    }
     byId("financeSummaryResult")?.addEventListener("click", toggleDay);
-    ["financeSummaryFrom", "financeSummaryTo"].forEach((id) => byId(id)?.addEventListener("change", markRangePending));
     byId("financeSummaryGenerate")?.addEventListener("click", openMessagePreview);
     byId("financeSummaryMessageBack")?.addEventListener("click", () => showSummaryView({ restoreFocus: true }));
     byId("financeSummaryMessageCopy")?.addEventListener("click", copyMessage);
@@ -448,7 +469,7 @@
     }, true);
   }
 
-  const api = { init, activate, deactivate, invalidate, validateRange, validSummary, renderSummary, buildFinanceSummaryMessage,
+  const api = { init, activate, deactivate, invalidate, periodPending, periodChanged, validateRange, validSummary, renderSummary, buildFinanceSummaryMessage,
     normalizeMessageText, todayInMexico, formatMoney, formatCivilDate, formatMessagePeriod, _load: load, _openMessagePreview: openMessagePreview,
     _copyMessage: copyMessage, _shareMessageWhatsapp: shareMessageWhatsapp, _showSummaryView: showSummaryView, _state: state };
   if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -618,6 +618,15 @@
         </div>
         <button id="weeklyRevenueClose" type="button" class="agenda-icon-button" aria-label="Cerrar detalle de ingresos">&times;</button>
       </header>
+      <form id="financePeriodForm" class="finance-period" novalidate>
+        <div class="finance-period-heading"><p class="admin-kicker">Periodo de operación</p><strong id="financePeriodActive">Periodo activo: —</strong></div>
+        <div class="finance-period-controls">
+          <label for="financeSummaryFrom">Desde<input id="financeSummaryFrom" name="from" type="date" required></label>
+          <label for="financeSummaryTo">Hasta<input id="financeSummaryTo" name="to" type="date" required></label>
+          <button id="financeSummarySubmit" type="submit" class="admin-button admin-button-dark">Consultar periodo</button>
+        </div>
+        <p id="financePeriodStatus" class="finance-period-status" role="status" aria-live="polite"></p>
+      </form>
       <div class="finance-tabs" role="tablist" aria-label="Secciones financieras">
         <button id="weeklyRevenueIncomeTab" type="button" role="tab" aria-selected="true" aria-controls="weeklyRevenueIncomePanel">Ingresos</button>
         <button id="weeklyRevenueExpenseTab" type="button" role="tab" aria-selected="false" aria-controls="weeklyRevenueExpensePanel">Gastos</button>
@@ -682,11 +691,6 @@
         </section>
       </div>
       <div id="weeklyRevenueSummaryPanel" class="hidden" role="tabpanel" aria-labelledby="weeklyRevenueSummaryTab">
-        <form id="financeSummaryForm" class="finance-summary-range" novalidate>
-          <label>Desde<input id="financeSummaryFrom" name="from" type="date" required></label>
-          <label>Hasta<input id="financeSummaryTo" name="to" type="date" required></label>
-          <button id="financeSummarySubmit" type="submit" class="admin-button admin-button-dark">Consultar periodo</button>
-        </form>
         <div id="financeSummaryStatus" class="finance-summary-status" role="status" aria-live="polite"></div>
         <div id="financeSummaryResult" class="finance-summary-result hidden"></div>
         <div id="financeSummaryGenerateActions" class="finance-summary-generate-actions hidden">
@@ -716,8 +720,8 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.21/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales-all.global.min.js"></script>
   <script src="shared/appointments-calendar.js?v=20260810-calendar-cache-v1"></script>
-  <script src="shared/admin-expenses.js?v=20260819-expenses-ui-v1"></script>
-  <script src="shared/admin-finance-summary.js?v=20260821-finance-message-ui-v1"></script>
-  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806-expenses-ui-v1-finance-message-ui-v1"></script>
+  <script src="shared/admin-expenses.js?v=20260825-shared-finance-period-v1"></script>
+  <script src="shared/admin-finance-summary.js?v=20260825-shared-finance-period-v1"></script>
+  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806-expenses-ui-v1-finance-message-ui-v1-shared-finance-period-v1"></script>
 </body>
 </html>

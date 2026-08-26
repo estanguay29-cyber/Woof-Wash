@@ -6161,8 +6161,16 @@ app.get("/admin/customers/lookup", auth, requireAdmin, async (req, res) => {
 
 app.get("/admin/appointments/weekly-revenue", auth, requireAdmin, async (req, res) => {
   try {
+    const queryKeys = Object.keys(req.query || {});
+    const manualRange = queryKeys.includes("from") || queryKeys.includes("to");
+    const allowed = manualRange ? ["from", "to"] : ["date"];
+    if (queryKeys.some((key) => !allowed.includes(key)) || (manualRange && (!queryKeys.includes("from") || !queryKeys.includes("to")))) {
+      return res.status(400).json({ message: "Rango de fechas inválido" });
+    }
     const referenceDate = normalizarTextoPlano(req.query?.date, 10) || weeklyRevenueService.getMexicoCityDate();
-    const range = weeklyRevenueService.getWeekRange(referenceDate);
+    const range = manualRange
+      ? weeklyRevenueService.validateRange(req.query.from, req.query.to)
+      : weeklyRevenueService.getWeekRange(referenceDate);
     if (!range) return res.status(400).json({ message: "Fecha no válida" });
     const appointments = await Appointment.collection.find({
       estado: "completada",
@@ -6175,7 +6183,9 @@ app.get("/admin/appointments/weekly-revenue", auth, requireAdmin, async (req, re
     const employeeNames = new Map((employeeIds.length
       ? await Employee.find({ _id: { $in: employeeIds } }).select("nombreCompleto").lean()
       : []).map((employee) => [String(employee._id), employee.nombreCompleto || ""]));
-    const summary = weeklyRevenueService.summarizeWeeklyRevenue(appointments, { referenceDate });
+    const summary = weeklyRevenueService.summarizeWeeklyRevenue(appointments, manualRange
+      ? { from: range.start, to: range.end }
+      : { referenceDate });
     const rows = summary.rows.map(({ appointment, charged }) => {
       const assignedIds = [...new Set([
         appointment.empleadoAsignadoId,
@@ -7348,8 +7358,10 @@ app.patch("/admin/appointments/:id/charged-amount", auth, requireAdmin, adminWri
     }
     const validation = weeklyRevenueService.validateChargedAmount(req.body.totalCobrado);
     if (!validation.valid) return res.status(400).json({ message: validation.message });
-    const paymentValidation = weeklyRevenueService.validatePaymentMethod(req.body.paymentMethod);
-    if (!paymentValidation.valid) return res.status(400).json({ message: paymentValidation.message });
+    const paymentValidation = req.body.paymentMethod === null
+      ? { valid: true, paymentMethod: null }
+      : weeklyRevenueService.validatePaymentMethod(req.body.paymentMethod);
+    if (!paymentValidation.valid) return res.status(400).json({ message: "La forma de pago debe ser cash, transfer o null." });
     const appointment = await Appointment.findOneAndUpdate(
       { _id: appointmentId, estado: "completada" },
       { $set: { totalCobrado: validation.amount, paymentMethod: paymentValidation.paymentMethod } },

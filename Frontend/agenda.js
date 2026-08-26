@@ -138,6 +138,78 @@ let urlsObjetoFotosResumen = [];
 let weeklyRevenueData = null;
 let weeklyRevenueTrigger = null;
 let weeklyRevenueRequest = null;
+let weeklyRevenueController = null;
+let weeklyRevenueGeneration = 0;
+let financeActiveTab = "income";
+let financePeriod = { draft: null, active: null };
+let financePeriodConsultationKey = null;
+
+function esFechaCivilValidaAgenda(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function iniciarConsultaPeriodoFinanciero(from, to) {
+  const key = `${from}|${to}`;
+  if (financePeriodConsultationKey === key) return null;
+  financePeriodConsultationKey = key;
+  return key;
+}
+
+function finalizarConsultaPeriodoFinanciero(key) {
+  if (financePeriodConsultationKey === key) financePeriodConsultationKey = null;
+}
+
+function sumarDiasCivilesAgenda(value, amount) {
+  const [year, month, day] = String(value).split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + amount)).toISOString().slice(0, 10);
+}
+
+function obtenerSemanaOperativaAgenda(today = obtenerFechaMexicoAgenda()) {
+  const [year, month, day] = today.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const from = sumarDiasCivilesAgenda(today, -((weekday + 1) % 7));
+  return { from, to: sumarDiasCivilesAgenda(from, 6) };
+}
+
+function validarPeriodoFinancieroAgenda(from, to, today = obtenerFechaMexicoAgenda()) {
+  if (!esFechaCivilValidaAgenda(from) || !esFechaCivilValidaAgenda(to)) return "Selecciona fechas válidas.";
+  if (from > to) return "La fecha inicial no puede ser posterior a la final.";
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+  if (days < 1 || days > 7) return "El periodo puede abarcar como máximo 7 días.";
+  if (from > today) return "El periodo no puede comenzar en el futuro.";
+  return "";
+}
+
+function obtenerPeriodoFinancieroConsultable() {
+  const selected = financePeriod.active;
+  if (!selected) return null;
+  const today = obtenerFechaMexicoAgenda();
+  return { from: selected.from, to: selected.to > today ? today : selected.to };
+}
+
+function renderPeriodoFinancieroActivo() {
+  const selected = financePeriod.active;
+  const effective = obtenerPeriodoFinancieroConsultable();
+  const node = document.getElementById("financePeriodActive");
+  if (!node || !selected || !effective) return;
+  const selectedText = `${formatWeeklyDate(selected.from)} – ${formatWeeklyDate(selected.to, { year: "numeric" })}`;
+  node.textContent = effective.to === selected.to
+    ? `Periodo activo: ${selectedText}`
+    : `Periodo activo: ${selectedText} · Consultable hasta ${formatWeeklyDate(effective.to)}`;
+}
+
+function prepararPeriodoFinancieroDefault() {
+  const range = obtenerSemanaOperativaAgenda();
+  financePeriod = { draft: { ...range }, active: { ...range } };
+  const from = document.getElementById("financeSummaryFrom");
+  const to = document.getElementById("financeSummaryTo");
+  if (from) from.value = range.from;
+  if (to) to.value = range.to;
+  renderPeriodoFinancieroActivo();
+}
 
 function invalidarResumenFinanciero() {
   try { window.WoofWashAdminFinanceSummary?.invalidate?.(); } catch { /* El PATCH confirmado no depende del observador de caché. */ }
@@ -272,6 +344,7 @@ function renderWeeklyRevenue(data) {
         <fieldset class="weekly-revenue-payment-field"><legend>Forma de pago</legend>
           <label><input name="paymentMethod" type="radio" value="cash" ${appointment.paymentMethod === "cash" ? "checked" : ""} required><span>Efectivo</span></label>
           <label><input name="paymentMethod" type="radio" value="transfer" ${appointment.paymentMethod === "transfer" ? "checked" : ""} required><span>Transferencia</span></label>
+          <label><input name="paymentMethod" type="radio" value="" ${appointment.paymentMethod == null ? "checked" : ""} required><span>Desconocido</span></label>
         </fieldset>
         <button type="submit" class="admin-button admin-button-dark">Guardar</button>
         <button type="button" class="admin-button admin-button-light" data-weekly-cancel>Cancelar</button>
@@ -281,19 +354,28 @@ function renderWeeklyRevenue(data) {
   }).join("");
 }
 
-async function cargarIngresoSemanal({ silent = false } = {}) {
+async function cargarIngresoSemanal({ silent = false, force = false } = {}) {
   const status = document.getElementById("weeklyRevenueStatus");
   if (!silent && status) status.textContent = "Cargando ingresos de la semana...";
-  if (weeklyRevenueRequest) return weeklyRevenueRequest;
+  const range = obtenerPeriodoFinancieroConsultable();
+  if (!range) return null;
+  const key = `${range.from}|${range.to}`;
+  if (!force && weeklyRevenueData?._rangeKey === key) return weeklyRevenueData;
+  weeklyRevenueController?.abort();
+  weeklyRevenueController = new AbortController();
+  const controller = weeklyRevenueController;
+  const generation = ++weeklyRevenueGeneration;
   weeklyRevenueRequest = (async () => {
     try {
-      const data = await agendaFetch("/admin/appointments/weekly-revenue");
+      const data = await agendaFetch(`/admin/appointments/weekly-revenue?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`, { signal: controller.signal });
+      if (generation !== weeklyRevenueGeneration || controller.signal.aborted) return null;
+      data._rangeKey = key;
       renderWeeklyRevenue(data);
       if (status) status.textContent = "";
     } catch (error) {
-      if (status) status.textContent = error.message || "No se pudieron cargar los ingresos.";
+      if (error?.name !== "AbortError" && generation === weeklyRevenueGeneration && status) status.textContent = error.message || "No se pudieron cargar los ingresos.";
     } finally {
-      weeklyRevenueRequest = null;
+      if (generation === weeklyRevenueGeneration) weeklyRevenueRequest = null;
     }
   })();
   return weeklyRevenueRequest;
@@ -326,18 +408,19 @@ async function guardarWeeklyRevenue(event) {
     status.textContent = "Usa un monto válido con máximo dos decimales.";
     return;
   }
-  if (!['cash', 'transfer'].includes(paymentMethod)) {
-    status.textContent = "Selecciona Efectivo o Transferencia.";
+  if (!["cash", "transfer", ""].includes(paymentMethod)) {
+    status.textContent = "Selecciona una forma de pago.";
     return;
   }
   form.querySelectorAll("button, input").forEach((control) => { control.disabled = true; });
   status.textContent = "Guardando…";
   try {
     await agendaFetch(`/admin/appointments/${encodeURIComponent(row.dataset.weeklyAppointment)}/charged-amount`, {
-      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text), paymentMethod })
+      method: "PATCH", body: JSON.stringify({ totalCobrado: Number(text), paymentMethod: paymentMethod || null })
     });
     invalidarResumenFinanciero();
-    await cargarIngresoSemanal({ silent: true });
+    weeklyRevenueData = null;
+    await cargarIngresoSemanal({ silent: true, force: true });
     document.getElementById("weeklyRevenueStatus").textContent = "Monto guardado correctamente.";
   } catch (error) {
     form.querySelectorAll("button, input").forEach((control) => { control.disabled = false; });
@@ -349,6 +432,7 @@ function abrirWeeklyRevenue() {
   const modal = document.getElementById("weeklyRevenueModal");
   if (!modal || !modal.classList.contains("hidden")) return;
   weeklyRevenueTrigger = document.activeElement;
+  prepararPeriodoFinancieroDefault();
   document.getElementById("weeklyRevenueStatus").textContent = "Cargando ingresos de la semana...";
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden", "false");
@@ -365,10 +449,16 @@ function cerrarWeeklyRevenue() {
   document.body.classList.remove("agenda-modal-open");
   window.WoofWashAdminExpenses?.deactivate?.();
   window.WoofWashAdminFinanceSummary?.deactivate?.();
+  weeklyRevenueGeneration += 1;
+  weeklyRevenueController?.abort();
+  weeklyRevenueController = null;
   weeklyRevenueTrigger?.focus?.();
 }
 
 async function activarWeeklyRevenueTab(tab) {
+  financeActiveTab = tab;
+  const periodPending = Boolean(financePeriod.draft && financePeriod.active
+    && (financePeriod.draft.from !== financePeriod.active.from || financePeriod.draft.to !== financePeriod.active.to));
   const income = tab === "income";
   const expenses = tab === "expenses";
   const summary = tab === "summary";
@@ -378,10 +468,48 @@ async function activarWeeklyRevenueTab(tab) {
   document.getElementById("weeklyRevenueIncomePanel")?.classList.toggle("hidden", !income);
   document.getElementById("weeklyRevenueExpensePanel")?.classList.toggle("hidden", !expenses);
   document.getElementById("weeklyRevenueSummaryPanel")?.classList.toggle("hidden", !summary);
-  if (expenses) await window.WoofWashAdminExpenses?.activate?.();
+  if (expenses && !periodPending) await window.WoofWashAdminExpenses?.activate?.();
   else window.WoofWashAdminExpenses?.deactivate?.();
-  if (summary) await window.WoofWashAdminFinanceSummary?.activate?.();
+  if (summary && !periodPending) await window.WoofWashAdminFinanceSummary?.activate?.();
   else window.WoofWashAdminFinanceSummary?.deactivate?.();
+}
+
+function marcarPeriodoFinancieroPendiente() {
+  financePeriod.draft = {
+    from: document.getElementById("financeSummaryFrom")?.value || "",
+    to: document.getElementById("financeSummaryTo")?.value || ""
+  };
+  document.getElementById("financePeriodStatus").textContent = "Seleccionaste un nuevo periodo. Pulsa Consultar periodo para actualizar.";
+  document.getElementById("weeklyRevenueIncomePanel")?.classList.add("is-period-pending");
+  window.WoofWashAdminExpenses?.periodPending?.();
+  window.WoofWashAdminFinanceSummary?.periodPending?.();
+}
+
+async function consultarPeriodoFinanciero(event) {
+  event?.preventDefault?.();
+  const draft = financePeriod.draft || {};
+  const error = validarPeriodoFinancieroAgenda(draft.from, draft.to);
+  const status = document.getElementById("financePeriodStatus");
+  if (error) { status.textContent = error; status.classList.add("is-error"); return; }
+  const consultationKey = iniciarConsultaPeriodoFinanciero(draft.from, draft.to);
+  if (!consultationKey) return;
+  try {
+    financePeriod.active = { ...draft };
+    status.textContent = "";
+    status.classList.remove("is-error");
+    renderPeriodoFinancieroActivo();
+    document.getElementById("weeklyRevenueIncomePanel")?.classList.remove("is-period-pending");
+    weeklyRevenueData = null;
+    weeklyRevenueGeneration += 1;
+    weeklyRevenueController?.abort();
+    window.WoofWashAdminExpenses?.periodChanged?.();
+    window.WoofWashAdminFinanceSummary?.periodChanged?.();
+    if (financeActiveTab === "income") await cargarIngresoSemanal({ force: true });
+    if (financeActiveTab === "expenses") await window.WoofWashAdminExpenses?.activate?.();
+    if (financeActiveTab === "summary") await window.WoofWashAdminFinanceSummary?.activate?.();
+  } finally {
+    finalizarConsultaPeriodoFinanciero(consultationKey);
+  }
 }
 
 function configurarWeeklyRevenue() {
@@ -404,10 +532,9 @@ function configurarWeeklyRevenue() {
     const nestedOpen = ["expenseWorkspace", "expenseConfirm", "expenseTicketViewer"].some((id) => !document.getElementById(id)?.classList.contains("hidden"));
     if (event.key === "Escape" && !nestedOpen && !modal?.classList.contains("hidden")) cerrarWeeklyRevenue();
   });
-  const getWeeklyFinanceRange = async () => {
-    if (!weeklyRevenueData) await cargarIngresoSemanal();
-    return { from: weeklyRevenueData?.semanaInicio, to: weeklyRevenueData?.semanaFin };
-  };
+  document.getElementById("financePeriodForm")?.addEventListener("submit", consultarPeriodoFinanciero);
+  ["financeSummaryFrom", "financeSummaryTo"].forEach((id) => document.getElementById(id)?.addEventListener("change", marcarPeriodoFinancieroPendiente));
+  const getWeeklyFinanceRange = async () => obtenerPeriodoFinancieroConsultable();
   window.WoofWashAdminExpenses?.init?.({
     fetcher: agendaFetch,
     getRange: getWeeklyFinanceRange,
@@ -415,7 +542,7 @@ function configurarWeeklyRevenue() {
   });
   window.WoofWashAdminFinanceSummary?.init?.({
     fetcher: agendaFetch,
-    getInitialRange: getWeeklyFinanceRange
+    getRange: getWeeklyFinanceRange
   });
   button.dataset.listenerBound = "true";
 }

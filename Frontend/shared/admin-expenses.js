@@ -206,7 +206,8 @@
     byId("expenseDescription").value = expense?.description || "";
     byId("expenseAmount").value = expense ? Number(expense.amount).toFixed(2) : "";
     const today = todayInMexico();
-    byId("expenseDate").value = expense?.expenseDate || today;
+    const defaultDate = state.range && (today < state.range.from || today > state.range.to) ? state.range.to : today;
+    byId("expenseDate").value = expense?.expenseDate || defaultDate;
     byId("expenseDate").max = today;
     byId("expenseTicketField")?.classList.toggle("hidden", mode === "edit");
     byId("expenseFileSummary").textContent = "JPG, PNG o PDF · máximo 5 MB";
@@ -451,6 +452,19 @@
     });
   }
 
+  function periodPending() {
+    ["active", "deleted"].forEach(abortLoad);
+    byId("expenseList")?.classList.add("hidden");
+    feedback("Seleccionaste un nuevo periodo. Pulsa Consultar periodo para actualizar.");
+  }
+
+  function periodChanged() {
+    ["active", "deleted"].forEach(abortLoad);
+    state.loaded = { active: "", deleted: "" };
+    state.expenses = []; state.deleted = []; state.range = null;
+    byId("expenseList")?.classList.remove("hidden");
+  }
+
   function init({ fetcher, getRange, onFinanceDataChanged }) {
     if (state.initialized) return;
     state.fetcher = fetcher; state.getRange = getRange; state.onFinanceDataChanged = onFinanceDataChanged; state.initialized = true;
@@ -484,7 +498,7 @@
     });
   }
 
-  const api = { init, activate, deactivate, escapeHtml, parseAmount, validateTicket, totalActiveCents, generateIdempotencyKey, todayInMexico, errorMessage, ticketErrorMessage, _load: load, _abortLoad: abortLoad, _notifyFinanceDataChanged: notifyFinanceDataChanged, _state: state };
+  const api = { init, activate, deactivate, periodPending, periodChanged, escapeHtml, parseAmount, validateTicket, totalActiveCents, generateIdempotencyKey, todayInMexico, errorMessage, ticketErrorMessage, _load: load, _abortLoad: abortLoad, _notifyFinanceDataChanged: notifyFinanceDataChanged, _state: state };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else global.WoofWashAdminExpenses = api;
 })(typeof window !== "undefined" ? window : globalThis);

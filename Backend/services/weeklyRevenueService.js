@@ -22,6 +22,12 @@ function getWeekRange(referenceDate) {
   return { start, end: addCivilDays(start, 6), timeZone: TIME_ZONE };
 }
 
+function validateRange(from, to, { today = getMexicoCityDate() } = {}) {
+  if (!isIsoDate(from) || !isIsoDate(to) || from > to || to > today) return null;
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+  return days >= 1 && days <= 7 ? { start: from, end: to, timeZone: TIME_ZONE } : null;
+}
+
 function getMexicoCityDate(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: TIME_ZONE,
@@ -69,8 +75,8 @@ function validatePaymentMethod(value) {
     : { valid: false, message: "La forma de pago debe ser cash o transfer." };
 }
 
-function summarizeWeeklyRevenue(appointments, { referenceDate, today = getMexicoCityDate() } = {}) {
-  const range = getWeekRange(referenceDate);
+function summarizeWeeklyRevenue(appointments, { referenceDate, from, to, today = getMexicoCityDate() } = {}) {
+  const range = from || to ? validateRange(from, to, { today }) : getWeekRange(referenceDate);
   if (!range) throw new Error("Fecha de referencia inválida");
   const seen = new Set();
   const rows = [];
@@ -100,6 +106,7 @@ module.exports = {
   PAYMENT_METHODS,
   getMexicoCityDate,
   getWeekRange,
+  validateRange,
   isIsoDate,
   parseHistoricalChargedAmount,
   validateChargedAmount,

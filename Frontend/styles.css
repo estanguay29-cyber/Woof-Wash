@@ -3078,6 +3078,17 @@ h1, h2, h3 {
 .finance-summary-range input { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid #c8d3e0; border-radius: 10px; color: #17233a; background: #fff; font: inherit; }
 .finance-summary-range input:focus { border-color: #0b2a6b; outline: 3px solid rgba(11, 42, 107, .12); }
 .finance-summary-range .admin-button { min-height: 44px; }
+.finance-period { display: grid; gap: 12px; margin-bottom: 14px; padding: 16px; border: 1px solid rgba(11, 42, 107, .16); border-radius: 18px; background: linear-gradient(135deg, #fffdf6, #f3f8ff); }
+.finance-period-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.finance-period-heading strong { color: #0b2a6b; font-size: .9rem; text-align: right; }
+.finance-period-controls { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto; align-items: end; gap: 12px; }
+.finance-period-controls label { display: grid; gap: 6px; min-width: 0; color: #334155; font-weight: 800; }
+.finance-period-controls input { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid #c8d3e0; border-radius: 10px; color: #17233a; background: #fff; font: inherit; }
+.finance-period-controls input:focus { border-color: #0b2a6b; outline: 3px solid rgba(11, 42, 107, .12); }
+.finance-period-controls .admin-button { min-height: 44px; }
+.finance-period-status { min-height: 1.25em; margin: 0; color: #475569; font-weight: 700; }
+.finance-period-status.is-error { color: #9f1239; }
+.is-period-pending { visibility: hidden; }
 .finance-summary-status { min-height: 28px; padding: 3px 2px; color: #31527d; font-weight: 750; }
 .finance-summary-status.is-error { color: #a12626; }
 .finance-summary-result { display: grid; gap: 18px; padding-bottom: 4px; }
@@ -3160,6 +3171,8 @@ h1, h2, h3 {
   .expense-actions { justify-content: flex-start; max-width: none; }
   .expense-section-heading { align-items: flex-start; }
   .finance-summary-range { grid-template-columns: 1fr 1fr; }
+  .finance-period-controls { grid-template-columns: 1fr 1fr; }
+  .finance-period-controls .admin-button { grid-column: 1 / -1; }
   .finance-summary-range .admin-button { grid-column: 1 / -1; }
   .finance-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .finance-summary-heading { align-items: start; flex-direction: column; gap: 5px; }
@@ -3181,6 +3194,11 @@ h1, h2, h3 {
   .expense-workspace, .expense-inline-panel, .expense-ticket-viewer { inset: 72px 4px 4px; padding: 16px; border-radius: 14px; overflow-x: hidden; }
   .finance-tabs button { padding-inline: 10px; }
   .finance-summary-range { grid-template-columns: minmax(0, 1fr); padding: 13px; }
+  .finance-period { padding: 13px; }
+  .finance-period-heading { align-items: flex-start; flex-direction: column; }
+  .finance-period-heading strong { text-align: left; }
+  .finance-period-controls { grid-template-columns: minmax(0, 1fr); }
+  .finance-period-controls .admin-button { grid-column: auto; width: 100%; }
   .finance-summary-range .admin-button { grid-column: auto; width: 100%; }
   .finance-summary-cards article { min-height: 104px; padding: 12px; }
   .finance-summary-metrics { justify-content: flex-start; }
