@@ -3302,7 +3302,7 @@ const corsOptions = {
     return callback(new Error("Origen no permitido por CORS"));
   },
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key"],
   optionsSuccessStatus: 204
 };
 
@@ -3321,7 +3321,7 @@ app.use((req, res, next) => {
     }
 
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,Idempotency-Key");
     return res.sendStatus(204);
   }
 

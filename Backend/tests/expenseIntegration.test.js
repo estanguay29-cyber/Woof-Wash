@@ -94,6 +94,23 @@ test("Mongo aislado materializa el índice único parcial real", async () => {
   assert.deepEqual(index.partialFilterExpression, { idempotencyKey: { $type: "string" } });
 });
 
+test("preflight de CREATE permite el header de idempotencia desde un origen administrativo autorizado", async () => {
+  const origin = "http://127.0.0.1:5500";
+  const response = await request(app)
+    .options("/admin/finance/expenses")
+    .set("Origin", origin)
+    .set("Access-Control-Request-Method", "POST")
+    .set("Access-Control-Request-Headers", "authorization,content-type,idempotency-key");
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers["access-control-allow-origin"], origin);
+  const allowedHeaders = String(response.headers["access-control-allow-headers"] || "")
+    .toLowerCase().split(",").map((value) => value.trim());
+  assert.ok(allowedHeaders.includes("authorization"));
+  assert.ok(allowedHeaders.includes("content-type"));
+  assert.ok(allowedHeaders.includes("idempotency-key"));
+});
+
 test("POST atraviesa HTTP y persiste centavos, actores, internals y timestamps", async () => {
   const response = await createExpense(actors.adminA, "post_real", expensePayload({ description: " Gasolina " }));
   assert.equal(response.status, 201);

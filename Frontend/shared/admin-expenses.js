@@ -65,14 +65,14 @@
   function errorMessage(error, fallback) {
     if (error?.name === "AbortError") return "La solicitud tardó demasiado. Inténtalo nuevamente.";
     const messages = {
-      400: "Revisa los datos ingresados.", 403: "No tienes permiso para realizar esta acción.",
+      400: "Revisa los datos ingresados.", 401: "Tu sesión venció. Inicia sesión nuevamente.",
+      403: "No tienes permiso para realizar esta acción.",
       404: "El gasto o comprobante ya no está disponible.",
       409: "Este gasto fue modificado desde otra sesión. Actualiza la información antes de continuar.",
       413: "El comprobante supera el tamaño máximo permitido de 5 MB.",
       429: "Se realizaron demasiadas solicitudes. Espera un momento e inténtalo nuevamente.",
-      500: "Ocurrió un problema en el servidor. Inténtalo nuevamente."
     };
-    return messages[error?.status] || (error instanceof TypeError ? "No hay conexión con el servidor." : fallback);
+    return messages[error?.status] || (error?.name === "TypeError" ? "No fue posible conectar con el servidor." : fallback);
   }
 
   function ticketErrorMessage(error, fallback) {
@@ -300,7 +300,8 @@
         renderList(); closeWorkspace(); feedback("Gasto registrado.");
       }
     } catch (error) {
-      byId("expenseFormError").textContent = errorMessage(error, "No fue posible guardar el gasto.");
+      const fallback = form.dataset.mode === "edit" ? "No fue posible actualizar el gasto." : "No fue posible registrar el gasto.";
+      byId("expenseFormError").textContent = errorMessage(error, fallback);
       byId("expenseConflictRefresh")?.classList.toggle("hidden", error?.status !== 409);
       setFormBusy(form, false, form.dataset.mode === "edit" ? "Guardar cambios" : "Reintentar");
     } finally { state.submitting = false; }

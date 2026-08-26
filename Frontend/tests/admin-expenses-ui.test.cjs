@@ -77,6 +77,17 @@ test("create usa una key por intento, bloquea doble submit y conserva key para r
   assert.match(source, /setFormBusy\(form, true, "Guardando…"\)/);
 });
 
+test("errores HTTP conservan su categoría y sólo TypeError se presenta como fallo de red", () => {
+  assert.equal(expenses.errorMessage({ status: 400 }, "fallback"), "Revisa los datos ingresados.");
+  assert.equal(expenses.errorMessage({ status: 401 }, "fallback"), "Tu sesión venció. Inicia sesión nuevamente.");
+  assert.equal(expenses.errorMessage({ status: 403 }, "fallback"), "No tienes permiso para realizar esta acción.");
+  assert.match(expenses.errorMessage({ status: 409 }, "fallback"), /otra sesión/);
+  assert.match(expenses.errorMessage({ status: 429 }, "fallback"), /demasiadas solicitudes/);
+  assert.equal(expenses.errorMessage({ status: 500 }, "No fue posible registrar el gasto."), "No fue posible registrar el gasto.");
+  assert.equal(expenses.errorMessage(new TypeError("Failed to fetch"), "fallback"), "No fue posible conectar con el servidor.");
+  assert.doesNotMatch(expenses.errorMessage({ name: "AbortError" }, "fallback"), /conectar|conexión/i);
+});
+
 test("creación y ticket son dos requests y el fallo parcial nunca recrea Expense", () => {
   const createIndex = source.indexOf('withTimeout("/admin/finance/expenses"');
   const uploadIndex = source.indexOf("created = await uploadTicket(created, file)");
