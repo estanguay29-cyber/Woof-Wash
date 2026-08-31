@@ -10651,18 +10651,17 @@ body {
     linear-gradient(180deg, #fffdf5 0%, #fffae8 100%);
 }
 
-.ww-clients-shell { width: min(calc(100% - 48px), 1120px); margin-inline: auto; }
+.ww-clients-shell { width: min(calc(100% - 48px), 1320px); margin-inline: auto; }
 .ww-clients-header { max-width: 760px; margin-bottom: clamp(20px, 2.5vw, 28px); }
 .ww-clients-kicker { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; color: #4f7f19; font-size: .76rem; font-weight: 950; letter-spacing: .15em; text-transform: uppercase; }
 .ww-clients-kicker::before { width: 34px; height: 3px; border-radius: 999px; background: #8cc63f; content: ""; }
 .ww-clients-header h2 { max-width: 740px; margin: 0; color: #0b2a6b; font-size: clamp(1.9rem, 3.25vw, 3.15rem); font-weight: 950; line-height: 1.02; letter-spacing: -.04em; text-wrap: balance; }
 .ww-clients-header > p:last-child { max-width: 620px; margin: 12px 0 0; color: #52607a; font-size: clamp(.94rem, 1.2vw, 1.04rem); line-height: 1.5; }
 
-.ww-clients-collage { display: grid; height: 500px; grid-template-columns: 1.45fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px; }
+.ww-clients-collage { display: grid; height: clamp(480px, 38vw, 560px); grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ww-clients-item { --ww-clients-accent: #8cc63f; position: relative; min-width: 0; min-height: 0; border-radius: 22px; outline: none; perspective: 1100px; cursor: pointer; }
 .ww-clients-item[data-category="car"] { --ww-clients-accent: #3977ca; }
-.ww-clients-item:nth-child(1) { grid-row: 1 / 3; }
-.ww-clients-item:nth-child(n + 6) { display: none; }
+.ww-clients-item:nth-child(n + 7) { display: none; }
 .ww-clients-item:focus-visible { outline: 3px solid rgba(37, 99, 235, .42); outline-offset: 3px; }
 .ww-clients-card-inner { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 580ms cubic-bezier(.22, .7, .22, 1); }
 .ww-clients-item.is-flipped .ww-clients-card-inner { transform: rotateY(180deg); }
@@ -10689,10 +10688,10 @@ body {
 .ww-clients-item:not(:first-child) .ww-clients-card-return { min-height: 32px; margin-top: 6px; }
 .ww-clients-media { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; isolation: isolate; background: #f4f0e7; }
 .ww-clients-item[data-category="car"] .ww-clients-media { background: #edf3fa; }
-.ww-clients-media::before { position: absolute; z-index: -2; inset: -18px; background-image: var(--ww-clients-image); background-position: center; background-size: cover; content: ""; filter: blur(15px) saturate(.82); opacity: .34; transform: scale(1.06); transition: opacity 480ms ease; }
-.ww-clients-media::after { position: absolute; z-index: -1; inset: 0; background: rgba(255, 253, 247, .38); content: ""; pointer-events: none; }
-.ww-clients-item[data-category="car"] .ww-clients-media::after { background: rgba(242, 247, 253, .34); }
-.ww-clients-media img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; padding: 8px; box-sizing: border-box; object-fit: contain; object-position: center; transition: opacity 480ms ease; }
+.ww-clients-media::before,
+.ww-clients-media::after { display: none; }
+.ww-clients-media img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 42%; transition: opacity 480ms ease, transform 360ms ease; }
+.ww-clients-item:hover .ww-clients-media img { transform: scale(1.018); }
 .ww-clients-caption { position: absolute; z-index: 1; right: 12px; bottom: 12px; left: 12px; display: flex; width: fit-content; max-width: calc(100% - 24px); align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(255, 255, 255, .74); border-radius: 14px; background: rgba(255, 255, 255, .9); box-shadow: 0 5px 16px rgba(11, 42, 107, .1); color: #0b2a6b; backdrop-filter: blur(8px); transition: opacity 480ms ease, transform 480ms ease; }
 .ww-clients-caption > span { flex: 0 0 auto; font-size: .9rem; }
 .ww-clients-caption h3 { overflow: hidden; margin: 0; font-size: .86rem; font-weight: 950; line-height: 1.1; text-overflow: ellipsis; white-space: nowrap; }
@@ -10742,7 +10741,6 @@ body {
   .ww-clients-card-back::after { margin-top: 8px; padding-top: 7px; font-size: .55rem; }
   .ww-clients-item:nth-child(2) .ww-clients-card-return,
   .ww-clients-item:nth-child(3) .ww-clients-card-return { margin-top: 7px; }
-  .ww-clients-media img { padding: 6px; }
   .ww-clients-cta { align-items: stretch; flex-direction: column; gap: 14px; padding: 18px; }
   .ww-clients-cta a { width: 100%; }
 }

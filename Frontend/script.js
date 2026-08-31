@@ -1321,7 +1321,7 @@ function initClientsLivingCollage() {
   const rotationDelay = 2500;
   const transitionDelay = 240;
   const resumeDelay = 1200;
-  const cellOrder = [2, 0, 4, 1, 3];
+  const cellOrder = [2, 0, 4, 1, 3, 5];
   const hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)");
   const clients = cells.map((cell) => ({
     category: cell.dataset.category,
@@ -1336,7 +1336,7 @@ function initClientsLivingCollage() {
   let transitionTimer = null;
   let resumeTimer = null;
   let cellCursor = 0;
-  let clientCursor = 5;
+  let clientCursor = 6;
   let pendingPlan = null;
   let pendingPreload = null;
   let pausedByHover = false;
