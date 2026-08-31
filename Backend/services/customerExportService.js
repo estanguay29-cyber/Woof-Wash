@@ -4,6 +4,7 @@ const ExcelJS = require("exceljs");
 
 const EXPORT_COLUMNS = [
   { header: "Cliente", key: "cliente", width: 28 },
+  { header: "Teléfono", key: "telefono", width: 20 },
   { header: "Dirección", key: "direccion", width: 45 },
   { header: "Zona operativa", key: "zona", width: 22 },
   { header: "Ubicación Maps", key: "locationUrl", width: 20 },
@@ -49,6 +50,11 @@ function sanitizeSpreadsheetText(value) {
 
 function optionalSpreadsheetText(value) {
   const text = sanitizeSpreadsheetText(value);
+  return text || null;
+}
+
+function optionalPhoneText(value) {
+  const text = String(value ?? "").replace(/\0/g, "").trim();
   return text || null;
 }
 
@@ -156,6 +162,7 @@ function buildCustomerExportRows(customers = [], appointments = [], clientItems 
 
     return {
       cliente: optionalSpreadsheetText(customer.nombre || lastCompleted?.clienteNombre),
+      telefono: optionalPhoneText(customer.telefono),
       direccion: optionalSpreadsheetText(address.direccion),
       zona: optionalSpreadsheetText(address.zona),
       locationUrl: validHttpsUrl(address.locationUrl) || null,
@@ -299,7 +306,7 @@ async function buildCustomerWorkbookBuffer(rows = [], { generatedDate = mexicoCi
     pageMargins: { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 }
   });
   sheet.columns = EXPORT_COLUMNS;
-  styleTitle(sheet, "M", "Análisis de clientes y cobertura geográfica", generatedDate);
+  styleTitle(sheet, "N", "Análisis de clientes y cobertura geográfica", generatedDate);
   styleSummaryBlock(sheet, summary);
   sheet.getRow(TABLE_HEADER_ROW).values = EXPORT_COLUMNS.map((column) => column.header);
   rows.forEach((data, index) => {
@@ -307,29 +314,30 @@ async function buildCustomerWorkbookBuffer(rows = [], { generatedDate = mexicoCi
     EXPORT_COLUMNS.forEach((column, columnIndex) => {
       row.getCell(columnIndex + 1).value = data[column.key];
     });
-    const mapCell = row.getCell(4);
+    const mapCell = row.getCell(5);
     if (data.locationUrl) {
       mapCell.value = { text: "Ver ubicación", hyperlink: data.locationUrl, tooltip: "Abrir ubicación guardada" };
       mapCell.font = { name: "Arial", color: { argb: "FF0563C1" }, underline: true };
     }
-    const accountCell = row.getCell(13);
+    const accountCell = row.getCell(14);
     accountCell.fill = {
       type: "pattern", pattern: "solid", fgColor: { argb: data.clienteConCuenta === "Sí" ? COLORS.paleGreen : COLORS.paleGray }
     };
   });
   const lastCustomerRow = TABLE_HEADER_ROW + rows.length;
-  sheet.autoFilter = { from: `A${TABLE_HEADER_ROW}`, to: `M${Math.max(lastCustomerRow, TABLE_HEADER_ROW)}` };
+  sheet.autoFilter = { from: `A${TABLE_HEADER_ROW}`, to: `N${Math.max(lastCustomerRow, TABLE_HEADER_ROW)}` };
   sheet.properties.defaultRowHeight = 20;
   styleSimpleTable(sheet, TABLE_HEADER_ROW, lastCustomerRow, EXPORT_COLUMNS.length);
   for (let rowNumber = TABLE_HEADER_ROW + 1; rowNumber <= lastCustomerRow; rowNumber += 1) {
-    sheet.getCell(rowNumber, 5).numFmt = "dd/mm/yyyy";
-    sheet.getCell(rowNumber, 5).alignment = { horizontal: "center", vertical: "middle" };
-    for (let column = 6; column <= 13; column += 1) {
-      if (column !== 13) sheet.getCell(rowNumber, column).numFmt = "#,##0";
+    sheet.getCell(rowNumber, 2).numFmt = "@";
+    sheet.getCell(rowNumber, 6).numFmt = "dd/mm/yyyy";
+    sheet.getCell(rowNumber, 6).alignment = { horizontal: "center", vertical: "middle" };
+    for (let column = 7; column <= 14; column += 1) {
+      if (column !== 14) sheet.getCell(rowNumber, column).numFmt = "#,##0";
       sheet.getCell(rowNumber, column).alignment = { horizontal: "center", vertical: "middle" };
     }
-    for (const column of [1, 2, 3]) sheet.getCell(rowNumber, column).alignment = { horizontal: "left", vertical: "top", wrapText: true };
-    sheet.getCell(rowNumber, 4).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    for (const column of [1, 2, 3, 4]) sheet.getCell(rowNumber, column).alignment = { horizontal: "left", vertical: "top", wrapText: true };
+    sheet.getCell(rowNumber, 5).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
   }
 
   const summarySheet = workbook.addWorksheet("Resumen", { views: [{ state: "frozen", ySplit: 5, activeCell: "A6", showGridLines: false }] });

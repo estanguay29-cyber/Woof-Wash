@@ -30,10 +30,15 @@ const appointment = (overrides = {}) => ({
 });
 
 test("genera una fila por perfil e incluye clientes con y sin cuenta", () => {
-  const customers = [customer(), customer({ _id: "customer-2", nombre: "Bongo", userId: "user-2" })];
+  const customers = [
+    customer({ telefono: "+52 33 1234 5678" }),
+    customer({ _id: "customer-2", nombre: "Bongo", telefono: "001 555 010 2000", userId: "user-2" }),
+    customer({ _id: "customer-3", nombre: "Nala", telefono: "" })
+  ];
   const rows = customerExport.buildCustomerExportRows(customers, [], [], { today: "2026-08-07" });
-  assert.equal(rows.length, 2);
-  assert.deepEqual(rows.map((row) => row.clienteConCuenta), ["No", "Sí"]);
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows.map((row) => row.clienteConCuenta), ["No", "Sí", "No"]);
+  assert.deepEqual(rows.map((row) => row.telefono), ["+52 33 1234 5678", "001 555 010 2000", null]);
   assert.equal(rows[0].serviciosCompletados, 0);
   assert.equal(rows[0].ultimoServicio, null);
 });
@@ -75,7 +80,7 @@ test("protege textos contra formula injection", () => {
 });
 
 test("genera y vuelve a abrir un XLSX profesional sin fórmulas ni campos sensibles", async () => {
-  const rows = customerExport.buildCustomerExportRows([customer()], [appointment()], [], { today: "2026-08-07" });
+  const rows = customerExport.buildCustomerExportRows([customer({ telefono: "+52 33 1234 5678" })], [appointment(), appointment({ _id: "appointment-2" })], [], { today: "2026-08-07" });
   const buffer = await customerExport.buildCustomerWorkbookBuffer(rows, { generatedDate: "2026-08-07" });
   assert.equal(Buffer.from(buffer).subarray(0, 2).toString(), "PK");
   const workbook = new ExcelJS.Workbook();
@@ -91,11 +96,15 @@ test("genera y vuelve a abrir un XLSX profesional sin fórmulas ni campos sensib
   assert.equal(sheet.views[0].ySplit, 10);
   assert.ok(sheet.autoFilter);
   const headers = sheet.getRow(10).values.slice(1);
-  assert.equal(sheet.getCell("E11").value instanceof Date, true);
-  assert.equal(sheet.getCell("E11").numFmt, "dd/mm/yyyy");
-  assert.equal(sheet.getCell("F11").type, ExcelJS.ValueType.Number);
-  assert.equal(sheet.getCell("D11").value.text, "Ver ubicación");
-  assert.equal(sheet.getCell("D11").value.hyperlink, "https://maps.example/location");
+  assert.equal(headers[1], "Teléfono");
+  assert.equal(sheet.getCell("B11").value, "+52 33 1234 5678");
+  assert.equal(sheet.getCell("B11").type, ExcelJS.ValueType.String);
+  assert.equal(sheet.getCell("B11").numFmt, "@");
+  assert.equal(sheet.getCell("F11").value instanceof Date, true);
+  assert.equal(sheet.getCell("F11").numFmt, "dd/mm/yyyy");
+  assert.equal(sheet.getCell("G11").type, ExcelJS.ValueType.Number);
+  assert.equal(sheet.getCell("E11").value.text, "Ver ubicación");
+  assert.equal(sheet.getCell("E11").value.hyperlink, "https://maps.example/location");
   for (const forbidden of ["password", "token", "userId", "customerProfileId", "behaviorFlag", "fotoPublicId", "notasAdmin"]) {
     assert.equal(headers.some((header) => String(header).toLowerCase().includes(forbidden.toLowerCase())), false);
   }
@@ -111,7 +120,18 @@ test("genera y vuelve a abrir un XLSX profesional sin fórmulas ni campos sensib
   const summary = workbook.getWorksheet("Resumen");
   assert.deepEqual(summary.getRow(6).values.slice(1), ["Total de clientes", 1]);
   const zones = workbook.getWorksheet("Resumen por zona");
-  assert.deepEqual(zones.getRow(6).values.slice(1), ["zona_2", 1, 1, 1, 0]);
+  assert.deepEqual(zones.getRow(6).values.slice(1), ["zona_2", 1, 2, 2, 0]);
+});
+
+test("teléfono vacío conserva una fila exportable y no desplaza las columnas existentes", async () => {
+  const rows = customerExport.buildCustomerExportRows([customer({ telefono: "" })], [], [], { today: "2026-08-07" });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await customerExport.buildCustomerWorkbookBuffer(rows, { generatedDate: "2026-08-07" }));
+  const sheet = workbook.getWorksheet("Clientes");
+  assert.equal(sheet.getCell("B11").value, null);
+  assert.equal(sheet.getCell("A11").value, "Lilit");
+  assert.equal(sheet.getCell("N11").value, "No");
+  assert.equal(sheet.getRow(10).values.slice(1).length, customerExport.EXPORT_COLUMNS.length);
 });
 
 test("solo crea hyperlinks para URLs HTTPS válidas y no convierte texto hostil en fórmula", async () => {
@@ -142,7 +162,9 @@ test("endpoint usa admin, limitador, consultas agrupadas y respuesta XLSX en mem
   assert.match(route, /CustomerProfile\.find\(\{\}\)/);
   assert.match(route, /Appointment\.find\(/);
   assert.match(route, /ClientItem\.find\(/);
-  assert.equal((route.match(/\.find\(/g) || []).length, 3);
+  assert.match(route, /User\.find\(/);
+  assert.equal((route.match(/\.find\(/g) || []).length, 4);
+  assert.match(route, /obtenerTelefonoVisibleCustomer/);
   assert.match(route, /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
   assert.match(route, /attachment; filename=/);
   assert.match(route, /Buffer\.from\(workbookBuffer\)/);

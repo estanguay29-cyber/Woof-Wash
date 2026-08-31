@@ -6672,7 +6672,7 @@ app.get("/admin/customers/export.xlsx", auth, requireAdmin, adminExportLimiter, 
   try {
     const today = customerExportService.mexicoCityDate();
     const customers = await CustomerProfile.find({})
-      .select("_id nombre userId petServiceReminderWeeks direccionesUsadas")
+      .select("_id nombre telefono telefonoNormalizado userId petServiceReminderWeeks direccionesUsadas")
       .lean();
     const customerIds = customers.map((customer) => customer._id);
     const userIds = customers.map((customer) => customer.userId).filter(Boolean);
@@ -6682,19 +6682,39 @@ app.get("/admin/customers/export.xlsx", auth, requireAdmin, adminExportLimiter, 
     const itemOwnerConditions = [];
     if (customerIds.length) itemOwnerConditions.push({ customerProfileId: { $in: customerIds } });
     if (userIds.length) itemOwnerConditions.push({ userId: { $in: userIds } });
-    const [appointments, clientItems] = await Promise.all([
+    const [appointments, clientItems, customerUsers] = await Promise.all([
       ownerConditions.length
-        ? Appointment.find({ estado: "completada", fecha: { $lte: today }, $or: ownerConditions })
-          .select("_id customerId clientUserId clienteNombre estado fecha hora servicioTipo serviciosDetalle.tipo direccion zona locationUrl")
+        ? Appointment.find({ fecha: { $lte: today }, $or: ownerConditions })
+          .select("_id customerId clientUserId clienteNombre clienteTelefono estado fecha hora servicioTipo serviciosDetalle.tipo direccion zona locationUrl")
+          .sort({ fecha: -1, hora: -1, createdAt: -1 })
           .lean()
         : [],
       itemOwnerConditions.length
         ? ClientItem.find({ $or: itemOwnerConditions })
           .select("_id customerProfileId userId tipo nombre")
           .lean()
-        : []
+        : [],
+      userIds.length ? User.find({ _id: { $in: userIds } }).select("_id telefono").lean() : []
     ]);
-    const rows = customerExportService.buildCustomerExportRows(customers, appointments, clientItems, { today });
+    const usersById = new Map(customerUsers.map((user) => [String(user._id), user]));
+    const appointmentsByCustomer = new Map(customerIds.map((id) => [String(id), []]));
+    const appointmentsByUser = new Map(userIds.map((id) => [String(id), []]));
+    appointments.forEach((appointment) => {
+      const customerId = String(appointment.customerId || "");
+      const userId = String(appointment.clientUserId || "");
+      if (appointmentsByCustomer.has(customerId)) appointmentsByCustomer.get(customerId).push(appointment);
+      if (appointmentsByUser.has(userId)) appointmentsByUser.get(userId).push(appointment);
+    });
+    const exportCustomers = customers.map((customer) => ({
+      ...customer,
+      telefono: obtenerTelefonoVisibleCustomer({
+        customer,
+        user: usersById.get(String(customer.userId || "")),
+        citasCustomer: appointmentsByCustomer.get(String(customer._id)) || [],
+        citasPortal: appointmentsByUser.get(String(customer.userId || "")) || []
+      })
+    }));
+    const rows = customerExportService.buildCustomerExportRows(exportCustomers, appointments, clientItems, { today });
     workbookBuffer = await customerExportService.buildCustomerWorkbookBuffer(rows, { generatedDate: today });
     const filename = `clientes_woof_wash_${today}.xlsx`;
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
