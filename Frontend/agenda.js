@@ -4385,6 +4385,59 @@ function formatearFechaResumenManana(value) {
   return formatted ? `${formatted.charAt(0).toUpperCase()}${formatted.slice(1)}` : "";
 }
 
+function puntoRutaResumen(appointment) {
+  const address = normalizarTextoResumen(appointment?.address);
+  const link = normalizarTextoResumen(appointment?.locationUrl);
+  const coordinate = (value) => {
+    const match = /^(-?\d{1,2}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)$/.exec(value);
+    return match && Math.abs(Number(match[1])) <= 90 && Math.abs(Number(match[2])) <= 180
+      ? `${Number(match[1])},${Number(match[2])}` : "";
+  };
+  const fromLink = (value) => {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || !/(^|\.)google\.com$|^maps\.app\.goo\.gl$|^goo\.gl$/.test(url.hostname)) return "";
+      const query = url.searchParams.get("query") || url.searchParams.get("q") || url.searchParams.get("destination");
+      if (query && !/^https?:/i.test(query)) return coordinate(query) || query;
+      const place = /\/maps\/place\/([^/]+)/.exec(url.pathname);
+      return place ? decodeURIComponent(place[1].replace(/\+/g, " ")) : "";
+    } catch { return ""; }
+  };
+  const explicit = fromLink(link);
+  if (explicit) return explicit;
+  const pasted = /https?:\/\/[^\s<>()]+/i.exec(address);
+  if (pasted) {
+    const parsed = fromLink(pasted[0].replace(/[.,;]+$/, ""));
+    if (parsed) return parsed;
+  }
+  const withoutLinks = address.replace(/https?:\/\/[^\s<>()]+/gi, "").trim();
+  return coordinate(withoutLinks) || (withoutLinks.length >= 8 ? withoutLinks : "");
+}
+
+function construirRutaResumen(appointments) {
+  const points = appointments.map(puntoRutaResumen);
+  const valid = points.filter(Boolean);
+  const missing = points.length - valid.length;
+  const lines = ["──────────────", "🚐 *RUTA DEL DÍA*"];
+  if (valid.length) {
+    const url = new URL("https://www.google.com/maps/dir/");
+    url.searchParams.set("api", "1");
+    if (valid.length === 1) url.searchParams.set("destination", valid[0]);
+    else {
+      url.searchParams.set("origin", valid[0]);
+      url.searchParams.set("destination", valid[valid.length - 1]);
+      if (valid.length > 2) url.searchParams.set("waypoints", valid.slice(1, -1).join("|"));
+    }
+    if (valid.length > 5 || url.href.length > 2048) {
+      lines.push("Ruta completa no disponible en un solo enlace: supera el límite de Google Maps.");
+    } else {
+      lines.push(`${valid.length} ${valid.length === 1 ? "parada" : "paradas"} en orden de cita.`, url.href);
+    }
+  } else lines.push("Ruta no disponible: faltan ubicaciones válidas.");
+  if (missing) lines.push(`⚠️ ${missing} ${missing === 1 ? "cita no pudo" : "citas no pudieron"} agregarse a la ruta por falta de ubicación.`);
+  return lines.join("\n");
+}
+
 function construirResumenManana(appointments = [], summaryDate = "") {
   const header = "🐾 *CITAS PARA MAÑANA* 🐾";
   if (!appointments.length) return `${header}\n\nNo hay citas programadas para mañana.`;
@@ -4453,6 +4506,10 @@ function construirResumenManana(appointments = [], summaryDate = "") {
 
     sections.push(
       "", "👤 *CLIENTE*", normalizarTextoResumen(appointment?.clientName) || "No disponible",
+      "", "✨ *TIPO DE CLIENTE*", appointment?.isFirstService === true
+        ? "🆕 Cliente nuevo — aplicar 20% de descuento"
+        : appointment?.isFirstService === false ? "🔁 Cliente recurrente"
+          : appointment?.isFirstService === null ? "⚠️ Primer servicio por verificar" : "⚠️ Clasificación no disponible",
       "", "📞 *CELULAR*", normalizarTextoResumen(appointment?.clientPhone) || "No disponible",
       "", "📍 *DIRECCIÓN*", normalizarTextoResumen(appointment?.address) || "No disponible",
       "", "🗺️ *UBICACIÓN*", normalizarTextoResumen(obtenerUrlUbicacionCita(appointment)) || "No disponible"
@@ -4476,7 +4533,7 @@ function construirResumenManana(appointments = [], summaryDate = "") {
     return sections.join("\n");
   });
 
-  return `${heading}\n\n${appointmentBlocks.join("\n\n")}`;
+  return `${heading}\n\n${appointmentBlocks.join("\n\n")}\n\n${construirRutaResumen(sortedAppointments)}`;
 }
 
 function abrirModalResumenManana() {

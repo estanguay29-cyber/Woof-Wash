@@ -28,7 +28,7 @@ function sourceBetween(startMarker, endMarker) {
 function buildTomorrowSummary(appointments, date = "2026-08-05") {
   const source = sourceBetween("function formatearHoraResumen(value)", "function abrirModalResumenManana()");
   const context = {
-    Date,
+    Date, URL,
     Intl,
     formatearEdadMascota(value) {
       return Number.isInteger(value) ? `${value} ${value === 1 ? "año" : "años"}` : "";
@@ -162,6 +162,81 @@ test("el resumen separa comentarios generales e indicaciones por mascota y vehí
 
 test("el resumen vacio conserva el encabezado profesional", () => {
   assert.equal(buildTomorrowSummary([]), "🐾 *CITAS PARA MAÑANA* 🐾\n\nNo hay citas programadas para mañana.");
+});
+
+test("ruta y tipo de cliente conservan el orden y codifican direcciones", () => {
+  const text = buildTomorrowSummary([
+    { time: "13:00", clientName: "C", isFirstService: false, address: "Calle #3, Zapopan" },
+    { time: "09:00", clientName: "A", isFirstService: true, address: "Av. Niños Héroes #1, Zapopan" },
+    { time: "11:00", clientName: "B", isFirstService: false, address: "Calle 2, Zapopan" },
+    { time: "16:00", clientName: "D", isFirstService: false, address: "Calle 4, Zapopan" }
+  ]);
+  assert.match(text, /🆕 Cliente nuevo — aplicar 20% de descuento/);
+  assert.match(text, /🔁 Cliente recurrente/);
+  const url = new URL(text.split("\n").find((line) => line.startsWith("https://www.google.com/maps/dir/")));
+  assert.equal(url.searchParams.get("origin"), "Av. Niños Héroes #1, Zapopan");
+  assert.equal(url.searchParams.get("destination"), "Calle 4, Zapopan");
+  assert.equal(url.searchParams.get("waypoints"), "Calle 2, Zapopan|Calle #3, Zapopan");
+});
+
+test("ruta omite ubicaciones faltantes y admite una sola parada", () => {
+  const text = buildTomorrowSummary([{ time: "09:00", address: "Av. Juárez #1, Guadalajara" }, { time: "11:00" }]);
+  assert.match(text, /⚠️ 1 cita no pudo agregarse/);
+  const url = new URL(text.split("\n").find((line) => line.startsWith("https://www.google.com/maps/dir/")));
+  assert.equal(url.searchParams.get("destination"), "Av. Juárez #1, Guadalajara");
+  assert.equal(url.searchParams.get("origin"), null);
+  assert.match(buildTomorrowSummary([{ time: "09:00" }]), /Ruta no disponible: faltan ubicaciones válidas/);
+});
+
+test("el mensaje distingue incertidumbre explícita de un DTO incompleto", () => {
+  const text = buildTomorrowSummary([
+    { time: "09:00", clientName: "Por verificar", isFirstService: null, address: "Calle 1, Zapopan" },
+    { time: "11:00", clientName: "DTO incompleto", address: "Calle 2, Zapopan" }
+  ]);
+  assert.match(text, /⚠️ Primer servicio por verificar/);
+  assert.match(text, /⚠️ Clasificación no disponible/);
+  assert.doesNotMatch(text, /aplicar 20%/);
+});
+
+test("más de cinco paradas no genera una ruta parcial", () => {
+  const text = buildTomorrowSummary(Array.from({ length: 6 }, (_, index) => ({
+    time: `0${index + 9}:00`.slice(-5), address: `Calle ${index + 1}, Zapopan`, isFirstService: null
+  })));
+  assert.match(text, /Ruta completa no disponible en un solo enlace/);
+  assert.doesNotMatch(text, /https:\/\/www\.google\.com\/maps\/dir\//);
+});
+
+test("mensaje sintético completo conserva campos y termina en ruta segura", () => {
+  const text = buildTomorrowSummary([
+    { time: "13:00", clientName: "Histórica", clientPhone: "3312345678", isFirstService: false,
+      pets: [{ name: "Luna", breed: "Poodle", age: 5, package: "Baño", notes: "Cepillar suave." }],
+      address: "Calle Interior 2 #7, Zapopan", locationUrl: "https://maps.app.goo.gl/short" },
+    { time: "09:00", clientName: "Nueva", isFirstService: true,
+      pets: [{ name: "Tifa", breed: "Husky", age: 2, package: "SPA" }, { name: "Olenka", breed: "Mestiza", age: 1, package: "Baño" }, { name: "Kira", breed: "Poodle", age: 3, package: "SPA" }],
+      address: "Av. Niños Héroes #1, Zapopan", locationUrl: "https://www.google.com/maps/search/?api=1&query=20.6736%2C-103.4054" },
+    { time: "17:00", clientName: "Sin vínculo", isFirstService: null, address: "Calle #9, Guadalajara" }
+  ]);
+  assert.ok(text.indexOf("*9:00 AM*") < text.indexOf("*1:00 PM*"));
+  assert.match(text, /🐶 \*MASCOTAS \(3\)\*/);
+  assert.match(text, /• Tifa — Husky, 2 años/);
+  assert.match(text, /• Tifa: SPA/);
+  assert.match(text, /📞 \*CELULAR\*/);
+  assert.match(text, /📍 \*DIRECCIÓN\*/);
+  assert.match(text, /🗺️ \*UBICACIÓN\*/);
+  assert.match(text, /📌 \*INDICACIONES POR MASCOTA\*/);
+  assert.equal((text.match(/aplicar 20% de descuento/g) || []).length, 1);
+  assert.match(text, /⚠️ Primer servicio por verificar/);
+  const url = new URL(text.split("\n").find((line) => line.startsWith("https://www.google.com/maps/dir/")));
+  assert.equal(url.searchParams.get("origin"), "20.6736,-103.4054");
+  assert.equal(url.searchParams.get("waypoints"), "Calle Interior 2 #7, Zapopan");
+  assert.equal(url.searchParams.get("destination"), "Calle #9, Guadalajara");
+  assert.ok(text.trimEnd().endsWith(url.href));
+});
+
+test("una URL excesiva se declara indisponible sin truncar", () => {
+  const text = buildTomorrowSummary([{ time: "09:00", isFirstService: null, address: `Calle ${"á".repeat(700)}` }]);
+  assert.match(text, /Ruta completa no disponible en un solo enlace/);
+  assert.doesNotMatch(text, /https:\/\/www\.google\.com\/maps\/dir\//);
 });
 
 test("la generacion evita concurrencia y siempre restaura el boton", () => {

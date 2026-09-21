@@ -7,7 +7,7 @@ const MAX_CALENDAR_RANGE_DAYS = 62;
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const TOMORROW_SUMMARY_FIELDS = [
-  "fecha", "hora", "estado", "clienteNombre", "clienteTelefono", "direccion", "locationUrl", "notas",
+  "fecha", "hora", "estado", "customerId", "clientUserId", "clienteNombre", "clienteTelefono", "direccion", "locationUrl", "notas",
   "indicacionesGenerales", "observaciones", "comentarios", "comentario", "nota",
   "servicioTipo", "servicioNombre", "servicioCategoria", "servicioPaquete", "mascotaNombre",
   "mascotaEdad", "serviciosDetalle.tipo", "serviciosDetalle.categoria", "serviciosDetalle.paquete",
@@ -337,7 +337,7 @@ async function queryCalendarAppointments({
   return { ...range, timeZone: BUSINESS_TIME_ZONE, events: sortCalendarEvents(deduplicateCalendarEvents(events)) };
 }
 
-function toTomorrowSummaryAppointment(appointment = {}) {
+function toTomorrowSummaryAppointment(appointment = {}, isFirstService = null) {
   const source = typeof appointment.toObject === "function" ? appointment.toObject() : appointment;
   const details = Array.isArray(source.serviciosDetalle) ? source.serviciosDetalle : [];
   const generalNotes = uniqueSummaryNotes([
@@ -382,6 +382,7 @@ function toTomorrowSummaryAppointment(appointment = {}) {
     date: String(source.fecha || ""),
     time: String(source.hora || ""),
     status: String(source.estado || ""),
+    isFirstService,
     clientName: String(source.clienteNombre || ""),
     clientPhone: String(source.clienteTelefono || ""),
     address: String(source.direccion || ""),
@@ -425,7 +426,26 @@ async function queryTomorrowSummary({ AppointmentModel, now = new Date() }) {
     .select(TOMORROW_SUMMARY_FIELDS)
     .sort({ hora: 1, _id: 1 })
     .lean();
-  return { ok: true, date, appointments: appointments.map(toTomorrowSummaryAppointment) };
+  const customerIds = [...new Set(appointments.map((item) => String(item.customerId || "")).filter(Boolean))];
+  const userIds = [...new Set(appointments.map((item) => String(item.clientUserId || "")).filter(Boolean))];
+  const owners = [];
+  if (customerIds.length) owners.push({ customerId: { $in: customerIds } });
+  if (userIds.length) owners.push({ clientUserId: { $in: userIds } });
+  const history = owners.length ? await AppointmentModel.find({
+    estado: "completada", fecha: { $lte: date }, $or: owners
+  }).select("_id fecha hora customerId clientUserId").lean() : [];
+  const seen = new Set();
+  const results = appointments.map((item) => {
+    const ids = [item.customerId && `c:${item.customerId}`, item.clientUserId && `u:${item.clientUserId}`].filter(Boolean);
+    const earlier = history.some((past) => String(past._id) !== String(item._id) &&
+      `${past.fecha || ""} ${past.hora || ""}` < `${item.fecha || ""} ${item.hora || ""}` &&
+      ids.some((id) => id === `c:${past.customerId}` || id === `u:${past.clientUserId}`));
+    const isFirstService = !ids.length || ids.some((id) => seen.has(id))
+      ? null : !earlier;
+    ids.forEach((id) => seen.add(id));
+    return toTomorrowSummaryAppointment(item, isFirstService);
+  });
+  return { ok: true, date, appointments: results };
 }
 
 module.exports = {

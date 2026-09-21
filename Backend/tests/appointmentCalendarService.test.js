@@ -269,6 +269,51 @@ test("resumen de manana consulta un solo dia, excluye canceladas y usa proyeccio
   assert.equal(Object.hasOwn(result.appointments[1].pets[0], "fotoPublicId"), false);
 });
 
+test("primer servicio usa historial completado vinculado y una sola oportunidad por cliente", async () => {
+  const tomorrow = [
+    { _id: "a", fecha: "2026-07-29", hora: "09:00", customerId: "c1", serviciosDetalle: [{ tipo: "mascota", mascotaNombre: "Uno" }, { tipo: "mascota", mascotaNombre: "Dos" }] },
+    { _id: "b", fecha: "2026-07-29", hora: "13:00", customerId: "c1" },
+    { _id: "c", fecha: "2026-07-29", hora: "14:00", customerId: "c2", clientUserId: "u2" },
+    { _id: "d", fecha: "2026-07-29", hora: "15:00" }
+  ];
+  const history = [
+    { _id: "old", fecha: "2026-07-28", hora: "10:00", clientUserId: "u2" }
+  ];
+  const filters = [];
+  const model = { find(filter) {
+    filters.push(filter);
+    const rows = filter.estado === "completada" ? history : tomorrow;
+    const query = { select() { return query; }, sort() { return query; }, lean() { return Promise.resolve(rows); } };
+    return query;
+  } };
+  const result = await calendar.queryTomorrowSummary({ AppointmentModel: model, now: new Date("2026-07-28T18:00:00Z") });
+  assert.deepEqual(result.appointments.map((item) => item.isFirstService), [true, null, false, null]);
+  assert.equal(result.appointments[0].pets.length, 2);
+  assert.equal(filters.length, 2);
+  assert.equal(filters[1].estado, "completada");
+});
+
+test("canceladas y pendientes no son servicios previos; solo completadas cuentan", async () => {
+  const tomorrow = [
+    { _id: "new", fecha: "2026-07-29", hora: "09:00", customerId: "c-new" },
+    { _id: "return", fecha: "2026-07-29", hora: "10:00", customerId: "c-return" }
+  ];
+  const history = [
+    { _id: "cancel", fecha: "2026-07-27", hora: "12:00", customerId: "c-new", estado: "cancelada" },
+    { _id: "pending", fecha: "2026-07-28", hora: "12:00", customerId: "c-new", estado: "pendiente" },
+    { _id: "confirmed", fecha: "2026-07-28", hora: "13:00", customerId: "c-new", estado: "confirmada" },
+    { _id: "done", fecha: "2026-07-28", hora: "12:00", customerId: "c-return", estado: "completada" }
+  ];
+  const model = { find(filter) {
+    const query = { select() { return query; }, sort() { return query; }, lean() {
+      return Promise.resolve(filter.estado === "completada" ? history.filter((item) => item.estado === filter.estado) : tomorrow);
+    } };
+    return query;
+  } };
+  const result = await calendar.queryTomorrowSummary({ AppointmentModel: model, now: new Date("2026-07-28T18:00:00Z") });
+  assert.deepEqual(result.appointments.map((item) => item.isFirstService), [true, false]);
+});
+
 test("resumen de manana conserva raza y todos los vehiculos con su servicio", () => {
   const dto = calendar.toTomorrowSummaryAppointment(appointment({
     servicioTipo: "mascota",
