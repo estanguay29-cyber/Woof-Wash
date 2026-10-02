@@ -12,6 +12,9 @@ let loadedCustomerId = "";
 let customersExportPromise = null;
 let customerModalTrigger = null;
 let customerBodyOverflow = "";
+let loyaltyProgressController = null;
+let loyaltyRewardUseController = null;
+let selectedCustomerDetail = null;
 
 function customersApiBase() {
   const hostname = window.location.hostname;
@@ -166,7 +169,8 @@ async function customersFetch(path, options = {}) {
       404: "El cliente solicitado no existe o ya no está disponible.",
       500: "Ocurrió un error al consultar clientes."
     };
-    throw { status: res.status, message: safeMessages[res.status] || "No se pudo completar la solicitud." };
+    const progressMessage = path.endsWith("/loyalty-progress") && [400, 409, 503].includes(res.status) && typeof data.message === "string" ? data.message : "";
+    throw { status: res.status, message: progressMessage || safeMessages[res.status] || "No se pudo completar la solicitud." };
   }
 
   return data;
@@ -290,6 +294,17 @@ function renderTableValue(value, fallback = "No disponible") {
   return `<span class="customer-table-value">${esc(valor(value, fallback))}</span>`;
 }
 
+function textoPremiosDisponibles(cantidad) {
+  const total = Math.max(0, Math.floor(numero(cantidad)));
+  if (!total) return "";
+  return total === 1 ? "🎁 Servicio gratis disponible" : `🎁 ${total} servicios gratis disponibles`;
+}
+
+function renderPremiosBadge(cantidad) {
+  const texto = textoPremiosDisponibles(cantidad);
+  return texto ? `<span class="customer-loyalty-badge">${esc(texto)}</span>` : "";
+}
+
 function renderCustomersList() {
   const list = byId("customersList");
   const count = byId("customersCount");
@@ -313,9 +328,10 @@ function renderCustomersList() {
       <span>Estado</span>
     </div>
     ${items.map((cliente) => `
-      <button type="button" class="customer-row ${cliente.id === selectedCustomerId ? "is-active" : ""}" data-customer-id="${esc(cliente.id)}">
+      <button type="button" class="customer-row ${cliente.id === selectedCustomerId ? "is-active" : ""} ${textoPremiosDisponibles(cliente.premiosDisponibles) ? "has-reward" : ""}" data-customer-id="${esc(cliente.id)}">
         <span class="customer-row-name">
           <strong>${esc(valor(cliente.nombre, "Cliente sin nombre"))}</strong>
+          ${renderPremiosBadge(cliente.premiosDisponibles)}
           <small>${esc(valor(cliente.creadoDesde, "perfil"))}</small>
           <small class="customer-elapsed-label">${esc(cliente.seguimientoMascota?.elapsedTimeLabel || "Aún no tiene servicios de mascota completados.")}</small>
         </span>
@@ -323,7 +339,7 @@ function renderCustomersList() {
         ${renderTableValue(cliente.email, "Sin email")}
         <span class="customer-account ${cliente.tieneCuentaWeb ? "is-linked" : ""}">${cliente.tieneCuentaWeb ? "Si" : "No"}</span>
         <span class="customer-table-number">${esc(numero(cliente.citasTotales))} <small>${esc(numero(cliente.citasCompletadas))} comp.</small></span>
-        <span class="customer-table-number">${esc(numero(cliente.premiosDisponibles))} <small>${esc(numero(cliente.premiosUsados))} usados</small></span>
+         <span class="customer-table-number">${esc(numero(cliente.premiosDisponibles))} disponibles <small>${esc(numero(cliente.premiosUsados))} unidades canjeadas manualmente</small></span>
         <span class="customer-status ${estadoClase(cliente.estado, cliente.tieneCuentaWeb)}">${esc(etiquetaEstado(cliente.estado, cliente.tieneCuentaWeb))}</span>
       </button>
     `).join("")}
@@ -649,26 +665,35 @@ function renderGrupoTimeline(titulo, citas = []) {
 function renderFidelidadTipo(label, tipo, detalle = {}) {
   const objetivo = numero(detalle.objetivo) || 8;
   const completados = numero(detalle.completados);
-  const progreso = objetivo ? Math.min(100, (completados / objetivo) * 100) : 0;
+  const premios = Math.floor(completados / objetivo);
+  const avance = completados % objetivo;
+  const progreso = (avance / objetivo) * 100;
   return `
-    <article class="customer-loyalty-card">
+    <article class="customer-loyalty-card ${premios > 0 ? "has-reward" : ""}">
       <div class="customer-card-head">
         <div>
           <h4>${esc(label)}</h4>
-          <p>${esc(completados)}/${esc(objetivo)} servicios</p>
+          <p>Progreso hacia el siguiente premio: ${esc(avance)}/${esc(objetivo)}</p>
+          <p>Saldo actual: ${esc(completados)} unidades</p>
+          <div class="customer-loyalty-actions">
+            ${premios > 0 ? `<button type="button" class="customer-action-button is-whatsapp loyalty-reward-whatsapp" data-action="notify-loyalty-whatsapp" data-tipo="${esc(tipo)}" data-rewards="${esc(premios)}" aria-label="Avisar por WhatsApp sobre ${esc(premios)} ${premios === 1 ? "premio disponible" : "premios disponibles"} de ${esc(label)}">💬 Avisar por WhatsApp</button>` : ""}
+            ${premios > 0 ? `<button type="button" class="customer-action-button loyalty-reward-use" data-action="use-loyalty-reward" data-tipo="${esc(tipo)}" aria-label="Usar un premio de ${esc(label)}">🎁 Usar premio</button>` : ""}
+            <button type="button" class="customer-action-button loyalty-progress-edit" data-action="edit-loyalty-progress" data-tipo="${esc(tipo)}" aria-label="Editar progreso de ${esc(label)}">Editar progreso</button>
+          </div>
         </div>
-        <span class="customer-status ${detalle.rewardEligible ? "is-linked" : ""}">${detalle.rewardEligible ? "Premio listo" : `${esc(numero(detalle.restantes))} faltan`}</span>
+        ${premios > 0 ? renderPremiosBadge(premios) : `<span class="customer-status">${esc(objetivo - avance)} faltan</span>`}
       </div>
-      <div class="customer-progress" aria-label="${esc(label)} ${esc(completados)} de ${esc(objetivo)}">
+      <div class="customer-progress" role="progressbar" aria-label="${esc(label)}: progreso hacia el siguiente premio" aria-valuemin="0" aria-valuemax="${esc(objetivo)}" aria-valuenow="${esc(avance)}">
         <span style="width: ${esc(progreso)}%"></span>
       </div>
       <div class="customer-loyalty-grid">
-        ${renderMetric("Acumuladas", numero(detalle.unidadesAcumuladas))}
-        ${renderMetric("Ajustes", numero(detalle.ajustesManuales))}
-        ${renderMetric("Consumidas", numero(detalle.unidadesConsumidas))}
-        ${renderMetric("Disponibles", numero(detalle.premiosDisponibles))}
-        ${renderMetric("Usados", numero(detalle.premiosUsados))}
+        ${renderMetric("Base de citas elegibles", numero(detalle.unidadesAcumuladas))}
+        ${renderMetric("Ajustes manuales (unidades)", numero(detalle.ajustesManuales))}
+        ${renderMetric("Unidades canjeadas manualmente", numero(detalle.unidadesConsumidas))}
+        ${renderMetric("Premios disponibles", premios)}
+        ${renderMetric("Canjes manuales registrados", numero(detalle.premiosUsados))}
       </div>
+      <p class="customer-small">La base excluye unidades ya consumidas desde Agenda; no representa el histórico total. Los canjes manuales cuentan registros, no unidades ni canjes de Agenda.</p>
     </article>
   `;
 }
@@ -680,6 +705,7 @@ function renderMovimientos(movimientos = []) {
       <span>${esc(formatearFechaHora(mov.fecha))}</span>
       <strong>${esc(mov.clase === "premio_usado" ? "Premio usado" : "Ajuste")} | ${esc(etiquetaTipo(mov.tipo))}</strong>
       <p>${esc(numero(mov.cantidad))} unidades - ${esc(valor(mov.motivo, "Sin motivo"))}</p>
+      ${mov.origen === "edicion_progreso" ? `<p>Progreso ${esc(etiquetaTipo(mov.tipo))} corregido de ${esc(mov.progresoAnterior)}/8 a ${esc(mov.progresoNuevo)}/8. Saldo: ${esc(mov.saldoAntes)} → ${esc(mov.saldoDespues)}.</p><p>Administrador: ${esc(mov.adminUserId)}</p>` : ""}
     </article>
   `).join("");
 }
@@ -768,6 +794,8 @@ function renderRegistrosCliente(cliente = {}) {
 function renderCustomerDetail(cliente, cuentas = []) {
   const detail = byId("customerDetail");
   if (!detail) return;
+  selectedCustomerDetail = cliente;
+  detail.classList.toggle("has-reward", numero(cliente.premiosDisponibles) > 0);
   const fidelidad = cliente.fidelidadDetalle || {};
   const citas = combinarCitasTimeline(cliente);
   const citasAgrupadas = agruparCitasCliente(citas);
@@ -791,6 +819,7 @@ function renderCustomerDetail(cliente, cuentas = []) {
       <div>
         <p class="admin-kicker">Detalle operativo</p>
         <h2>${esc(valor(cliente.nombre, "Cliente sin nombre"))}</h2>
+        ${renderPremiosBadge(cliente.premiosDisponibles)}
         <p class="customer-meta">${esc(valor(cliente.telefono, "Sin telefono"))} | ${esc(valor(cliente.email, "Sin email"))}</p>
         ${renderAlertasCliente(cliente)}
       </div>
@@ -817,8 +846,8 @@ function renderCustomerDetail(cliente, cuentas = []) {
         ${renderMetric("Proximas", numero(cliente.proximasCitas ?? cliente.citasPendientesProximas))}
         ${renderMetric("Completadas", numero(cliente.citasCompletadas))}
         ${renderMetric("Canceladas", numero(cliente.citasCanceladas))}
-        ${renderMetric("Mascota acum.", numero(cliente.serviciosMascotaAcumulados ?? cliente.serviciosMascota))}
-        ${renderMetric("Auto acum.", numero(cliente.serviciosAutoAcumulados ?? cliente.serviciosAuto))}
+        ${renderMetric("Base elegible mascotas", numero(cliente.serviciosMascotaAcumulados ?? cliente.serviciosMascota))}
+        ${renderMetric("Base elegible autos", numero(cliente.serviciosAutoAcumulados ?? cliente.serviciosAuto))}
         ${renderMetric("Ticket promedio", formatearMontoMetrica(cliente.ticketPromedio))}
         ${renderMetric("Total vendido", formatearMontoMetrica(cliente.totalVendido))}
         ${renderMetric("Ultima visita", formatearFecha(cliente.ultimaVisita || cliente.fechaUltimoServicio))}
@@ -843,12 +872,6 @@ function renderCustomerDetail(cliente, cuentas = []) {
         <h4>Movimientos administrativos</h4>
         ${renderMovimientos(cliente.movimientosAdministrativos || [])}
       </div>
-      <form class="customer-action-form" data-form="reward-used">
-        <select name="tipo"><option value="mascota">Mascota</option><option value="auto">Auto</option></select>
-        <input name="unidadesConsumidas" type="number" min="1" max="100" value="8" aria-label="Unidades consumidas">
-        <textarea name="motivo" rows="2" placeholder="Motivo del premio usado" required></textarea>
-        <button class="customer-action-button" type="submit">Marcar premio usado</button>
-      </form>
       <form class="customer-action-form" data-form="loyalty-adjustment">
         <select name="tipo"><option value="mascota">Mascota</option><option value="auto">Auto</option></select>
         <input name="unidades" type="number" min="-100" max="100" step="1" placeholder="+1 o -1" required>
@@ -904,6 +927,7 @@ function renderCustomerDetail(cliente, cuentas = []) {
 function renderCustomerLoadingState() {
   const detail = byId("customerDetail");
   if (!detail) return;
+  detail.classList.remove("has-reward");
   detail.innerHTML = `
     <div class="customer-empty" role="status" aria-live="polite" aria-busy="true">
       Cargando información del cliente…
@@ -914,6 +938,7 @@ function renderCustomerLoadingState() {
 function renderCustomerErrorState(message) {
   const detail = byId("customerDetail");
   if (!detail) return;
+  detail.classList.remove("has-reward");
   detail.innerHTML = `
     <div class="customer-empty" role="alert" aria-live="assertive">
       <p>${esc(message || "No se pudo cargar la información del cliente.")}</p>
@@ -1007,6 +1032,17 @@ function abrirWhatsAppCliente(phone) {
   window.open(`https://wa.me/${telefono}?text=${message}`, "_blank", "noopener");
 }
 
+function avisarPremioPorWhatsApp(tipo, rewardsAvailable) {
+  const phone = selectedCustomerDetail?.telefonoNormalizado || selectedCustomerDetail?.telefono || "";
+  const url = window.CustomerRewardWhatsApp.buildRewardWhatsAppUrl({ phone, type: tipo, rewardsAvailable });
+  if (!url) {
+    mostrarCustomersFeedback("No hay un número de WhatsApp disponible para este cliente.", "error");
+    return false;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
+  return true;
+}
+
 async function copiarEmailCliente(email = "") {
   const value = String(email || "").trim();
   if (!value) return;
@@ -1020,7 +1056,13 @@ async function handleDetailClick(event) {
   const action = actionButton.dataset.action;
 
   try {
-    if (action === "retry-customer" && selectedCustomerId) {
+    if (action === "edit-loyalty-progress") {
+      loyaltyProgressController?.open(actionButton.dataset.tipo, actionButton);
+    } else if (action === "use-loyalty-reward") {
+      loyaltyRewardUseController?.open(actionButton.dataset.tipo, actionButton);
+    } else if (action === "notify-loyalty-whatsapp") {
+      avisarPremioPorWhatsApp(actionButton.dataset.tipo, Number(actionButton.dataset.rewards));
+    } else if (action === "retry-customer" && selectedCustomerId) {
       await selectCustomer(selectedCustomerId, { force: true });
     } else if (action === "open-whatsapp") {
       abrirWhatsAppCliente(actionButton.dataset.phone);
@@ -1122,10 +1164,7 @@ async function handleDetailSubmit(event) {
   }
 
   try {
-    if (formType === "reward-used") {
-      await postCustomerAction(`/admin/customers/${selectedCustomerId}/rewards-used`, data);
-      form.reset();
-    } else if (formType === "loyalty-adjustment") {
+    if (formType === "loyalty-adjustment") {
       await postCustomerAction(`/admin/customers/${selectedCustomerId}/loyalty-adjustments`, data);
       form.reset();
     } else if (formType === "notes") {
@@ -1171,6 +1210,28 @@ async function iniciarCustomers() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  loyaltyProgressController = window.CustomerLoyaltyProgress.createController({
+    document, storage: sessionStorage, crypto: window.crypto, request: customersFetch,
+    getCustomer: () => selectedCustomerDetail?.id === selectedCustomerId ? selectedCustomerDetail : null,
+    onUpdated: customer => {
+      const index = customers.findIndex(item => item.id === customer.id);
+      if (index >= 0) customers[index] = customer;
+      renderCustomersList();
+      if (selectedCustomerId === customer.id) renderCustomerDetail(customer, selectedCustomerAccounts);
+      mostrarCustomersFeedback("Progreso confirmado. Los premios pendientes se conservaron.");
+    }
+  });
+  loyaltyRewardUseController = window.CustomerLoyaltyRewardUse.createController({
+    document, storage: sessionStorage, crypto: window.crypto, request: customersFetch,
+    getCustomer: () => selectedCustomerDetail?.id === selectedCustomerId ? selectedCustomerDetail : null,
+    onUpdated: customer => {
+      const index = customers.findIndex(item => item.id === customer.id);
+      if (index >= 0) customers[index] = customer;
+      renderCustomersList();
+      if (selectedCustomerId === customer.id) renderCustomerDetail(customer, selectedCustomerAccounts);
+      mostrarCustomersFeedback("Premio utilizado correctamente.");
+    }
+  });
   byId("btnVolverSitio")?.addEventListener("click", () => { window.location.href = "index.html"; });
   byId("btnAdminLogout")?.addEventListener("click", cerrarSesionCustomers);
   byId("customersSearch")?.addEventListener("input", renderCustomersList);
@@ -1195,7 +1256,7 @@ document.addEventListener("DOMContentLoaded", () => {
   byId("customerDetail")?.addEventListener("submit", handleDetailSubmit);
   byId("customerDetail")?.addEventListener("error", handleCustomerDetailImageError, true);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !byId("customerModal")?.classList.contains("hidden")) closeCustomerModal();
+    if (event.key === "Escape" && !byId("loyaltyProgressDialog")?.open && !byId("loyaltyRewardUseDialog")?.open && !byId("customerModal")?.classList.contains("hidden")) closeCustomerModal();
   });
   iniciarCustomers();
 });

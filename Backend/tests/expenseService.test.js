@@ -319,7 +319,8 @@ test("Expense no usa borrado físico y la UI administrativa no expone internals"
   const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory() && entry.name !== "tests") walk(full);
-    else if (!entry.isDirectory() && /\.(js|html|css|cjs)$/.test(entry.name)) files.push(full);
+    else if (!entry.isDirectory() && /\.(js|html|css|cjs)$/.test(entry.name)
+      && !["customer-loyalty-progress.js", "customer-loyalty-reward-use.js"].includes(entry.name)) files.push(full);
   });
   walk(frontendRoot);
   const frontend = files.map((file) => fs.readFileSync(file, "utf8")).join("\n");

@@ -30,6 +30,13 @@ const DireccionClienteSchema = new mongoose.Schema(
 
 const AjusteFidelidadSchema = new mongoose.Schema(
   {
+    origen: { type: String, enum: ["edicion_progreso", "correccion_post_canje"], default: undefined },
+    progresoAnterior: { type: Number, min: 0, max: 7, default: undefined },
+    progresoNuevo: { type: Number, min: 0, max: 7, default: undefined },
+    saldoAntes: { type: Number, min: 0, default: undefined },
+    saldoDespues: { type: Number, min: 0, default: undefined },
+    premiosPendientes: { type: Number, min: 0, default: undefined },
+    idempotencyKey: { type: String, default: undefined },
     tipo: {
       type: String,
       enum: ["mascota", "auto"],
@@ -87,7 +94,8 @@ const PremioManualSchema = new mongoose.Schema(
     fecha: {
       type: Date,
       default: Date.now
-    }
+    },
+    idempotencyKey: { type: String, default: undefined }
   },
   { _id: true }
 );
@@ -183,6 +191,45 @@ const CustomerProfileSchema = new mongoose.Schema(
       type: [AjusteFidelidadSchema],
       default: []
     },
+    operacionesProgreso: {
+      type: [new mongoose.Schema({
+        idempotencyKey: { type: String, required: true },
+        fingerprint: { type: String, required: true },
+        adminUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        tipo: { type: String, enum: ["mascota", "auto"], required: true },
+        motivo: { type: String, required: true },
+        progresoAnterior: { type: Number, required: true },
+        progresoNuevo: { type: Number, required: true },
+        saldoAntes: { type: Number, required: true },
+        saldoDespues: { type: Number, required: true },
+        premiosPendientes: { type: Number, required: true },
+        diferencia: { type: Number, required: true },
+        changed: { type: Boolean, required: true },
+        fecha: { type: Date, required: true }
+      }, { _id: false })],
+      default: undefined,
+      select: false
+    },
+    operacionesCanje: {
+      type: [new mongoose.Schema({
+        idempotencyKey: { type: String, required: true },
+        fingerprint: { type: String, required: true },
+        adminUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        tipo: { type: String, enum: ["mascota", "auto"], required: true },
+        motivo: { type: String, required: true },
+        progresoAnterior: { type: Number, required: true },
+        progresoDeseado: { type: Number, required: true },
+        saldoAntes: { type: Number, required: true },
+        saldoDespues: { type: Number, required: true },
+        premiosAntes: { type: Number, required: true },
+        premiosDespues: { type: Number, required: true },
+        unidadesConsumidas: { type: Number, required: true },
+        diferencia: { type: Number, required: true },
+        fecha: { type: Date, required: true }
+      }, { _id: false })],
+      default: undefined,
+      select: false
+    },
     premiosManual: {
       type: [PremioManualSchema],
       default: []
@@ -197,7 +244,7 @@ const CustomerProfileSchema = new mongoose.Schema(
 
 CustomerProfileSchema.index(
   { userId: 1 },
-  { unique: true, sparse: true, partialFilterExpression: { userId: { $type: "objectId" } } }
+  { unique: true, partialFilterExpression: { userId: { $type: "objectId" } } }
 );
 CustomerProfileSchema.index({ emailNormalizado: 1 });
 CustomerProfileSchema.index({ telefonoNormalizado: 1 });

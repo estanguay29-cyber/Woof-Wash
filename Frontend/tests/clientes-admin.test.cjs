@@ -237,8 +237,8 @@ test("el mensaje conserva seguimiento, mascotas, WhatsApp y carga la versión ac
   assert.match(clientesJs, /seguimiento\.lastPetNames/);
   assert.match(clientesJs, /construirTextoFidelidadMascota\(cliente, varios\)/);
   assert.match(clientesJs, /encodeURIComponent\(message\)/);
-  assert.match(html, /clientes\.js\?v=20260810-loyalty-followup-v2/);
-  assert.match(html, /clientes\.css\?v=20260810-loyalty-followup-v2/);
+  assert.match(html, /clientes\.js\?v=20261002-loyalty-reward-v1/);
+  assert.match(html, /clientes\.css\?v=20261002-loyalty-reward-v1/);
 });
 
 test("plantilla real genera progreso, gramática y premio sin undefined ni null", () => {

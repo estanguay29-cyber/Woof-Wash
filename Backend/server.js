@@ -26,6 +26,32 @@ const weeklyRevenueService = require("./services/weeklyRevenueService");
 const appointmentCalendarService = require("./services/appointmentCalendarService");
 const customerReminderService = require("./services/customerReminderService");
 const customerExportService = require("./services/customerExportService");
+const legacyLoyaltyProjection = require("./services/legacyLoyaltyProjection");
+const { LoyaltyProgressError, createLoyaltyProgressService } = require("./services/loyaltyProgressService");
+const { LoyaltyRewardUseError, createLoyaltyRewardUseService } = require("./services/loyaltyRewardUseService");
+const loyaltyProgressService = createLoyaltyProgressService({
+  async getBase(customer, tipo, session) {
+    const identity = customer.userId ? { clientUserId: customer.userId } : { customerId: customer._id };
+    const citas = await Appointment.find({ ...identity, estado: "completada",
+      rewardGratisAplicado: { $ne: true }, rewardConsumido: { $ne: true }
+    }).select("servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey mascotaNombre serviciosDetalle rewardUnidadesConsumidas rewardConsumido")
+      .session(session).lean();
+    return crearProgresoRecompensasAgenda(citas)[tipo].cantidad;
+  }
+});
+const loyaltyRewardUseService = createLoyaltyRewardUseService({
+  async getLegacyState(customer, tipo, session) {
+    const identity = customer.userId ? { clientUserId: customer.userId } : { customerId: customer._id };
+    const appointments = await Appointment.find(identity)
+      .select("_id estado servicioTipo servicioCategoria servicioPaquete servicioNombre servicioKey mascotaNombre serviciosDetalle rewardGratisAplicado rewardUnidadesConsumidas rewardConsumido rewardGrupoId")
+      .session(session).lean();
+    const activeLegacyReward = appointments.some(appointment => appointment.rewardGratisAplicado === true
+      && appointment.rewardConsumido !== true && !appointment.rewardGrupoId
+      && !["completada", "cancelada", "no_asistio"].includes(appointment.estado || "")
+      && legacyLoyaltyProjection.appointmentType(appointment) === tipo);
+    return { projection: legacyLoyaltyProjection.projectLegacy({ customer, appointments, type: tipo }), activeLegacyReward };
+  }
+});
 const { ExpenseServiceError, createExpenseService } = require("./services/expenseService");
 const { expenseTicketService } = require("./services/expenseTicketService");
 const { FinanceSummaryError, createFinanceSummaryService } = require("./services/financeSummaryService");
@@ -1371,122 +1397,13 @@ function normalizarServicioKey(value) {
     .slice(0, 180);
 }
 
-function obtenerTipoGeneralServicioAgenda(cita = {}) {
-  const tipo = normalizarTextoPlano(cita.servicioTipo, 20).toLowerCase();
-  if (tipo === "auto" || tipo === "mascota") return tipo;
-
-  const referencia = normalizarServicioKey([
-    cita.servicioNombre,
-    cita.servicioKey,
-    cita.servicioCategoria,
-    cita.servicioPaquete
-  ].filter(Boolean).join(" "));
-
-  if (referencia.includes("auto") || referencia.includes("lavado") || referencia.includes("camioneta") || referencia.includes("suv") || referencia.includes("pick_up")) {
-    return "auto";
-  }
-
-  return "mascota";
-}
-
-function contarUnidadesFidelidadCita(cita = {}) {
-  const tipo = obtenerTipoGeneralServicioAgenda(cita);
-  if (tipo !== "mascota") return 1;
-
-  const serviciosDetalle = construirServiciosDetalleCompatibles(cita)
-    .filter((servicio) => (servicio.tipo || tipo) === "mascota");
-
-  if (!serviciosDetalle.length) return 1;
-
-  const nombresMascota = serviciosDetalle
-    .map((servicio) => normalizarTextoPlano(servicio.mascotaNombre, 80).toLowerCase())
-    .filter(Boolean);
-
-  if (nombresMascota.length === serviciosDetalle.length) {
-    return Math.max(new Set(nombresMascota).size, 1);
-  }
-
-  return serviciosDetalle.length;
-}
-
-function contarUnidadesFidelidadConsumidasCita(cita = {}) {
-  const total = Math.max(contarUnidadesFidelidadCita(cita), 1);
-  if (cita.rewardConsumido === true) return total;
-
-  const consumidas = Number(cita.rewardUnidadesConsumidas);
-  if (!Number.isFinite(consumidas) || consumidas <= 0) return 0;
-
-  return Math.min(Math.floor(consumidas), total);
-}
-
-function contarUnidadesFidelidadDisponiblesCita(cita = {}) {
-  const total = Math.max(contarUnidadesFidelidadCita(cita), 1);
-  return Math.max(total - contarUnidadesFidelidadConsumidasCita(cita), 0);
-}
-
-function expandirCitasPorUnidadesFidelidad(citas = [], tipoObjetivo = "") {
-  const tipo = tipoObjetivo === "auto" ? "auto" : tipoObjetivo === "mascota" ? "mascota" : "";
-  const unidades = [];
-
-  for (const cita of citas) {
-    const tipoCita = obtenerTipoGeneralServicioAgenda(cita);
-    if (tipo && tipoCita !== tipo) continue;
-
-    const cantidad = contarUnidadesFidelidadDisponiblesCita(cita);
-    for (let index = 0; index < cantidad; index += 1) {
-      unidades.push(cita);
-    }
-  }
-
-  return unidades;
-}
-
-function crearProgresoRecompensasAgenda(citas = []) {
-  const resumen = {
-    mascota: {
-      servicioTipo: "mascota",
-      servicioNombre: "mascota",
-      cantidad: 0,
-      objetivo: 8,
-      rewardEligible: false
-    },
-    auto: {
-      servicioTipo: "auto",
-      servicioNombre: "auto",
-      cantidad: 0,
-      objetivo: 8,
-      rewardEligible: false
-    }
-  };
-
-  for (const cita of citas) {
-    const tipo = obtenerTipoGeneralServicioAgenda(cita);
-    if (!resumen[tipo]) continue;
-    resumen[tipo].cantidad += contarUnidadesFidelidadDisponiblesCita(cita);
-  }
-
-  Object.values(resumen).forEach((item) => {
-    item.rewardEligible = item.cantidad >= item.objetivo;
-    item.restantes = Math.max(item.objetivo - item.cantidad, 0);
-  });
-
-  return resumen;
-}
-
-function construirResumenFidelidad(progreso = {}) {
-  return ["mascota", "auto"].reduce((acc, tipo) => {
-    const item = progreso[tipo] || {};
-    const completados = Number(item.cantidad) || 0;
-    const objetivo = Number(item.objetivo) || 8;
-    acc[tipo] = {
-      completados,
-      objetivo,
-      restantes: Math.max(objetivo - completados, 0),
-      rewardEligible: completados >= objetivo
-    };
-    return acc;
-  }, {});
-}
+const obtenerTipoGeneralServicioAgenda = legacyLoyaltyProjection.appointmentType;
+const contarUnidadesFidelidadCita = legacyLoyaltyProjection.countAppointmentUnits;
+const contarUnidadesFidelidadConsumidasCita = legacyLoyaltyProjection.countConsumedUnits;
+const contarUnidadesFidelidadDisponiblesCita = legacyLoyaltyProjection.countAvailableUnits;
+const expandirCitasPorUnidadesFidelidad = legacyLoyaltyProjection.expandAppointments;
+const crearProgresoRecompensasAgenda = legacyLoyaltyProjection.createProgress;
+const construirResumenFidelidad = legacyLoyaltyProjection.summarizeProgress;
 
 async function obtenerClientUserIdCitaPorEmail(clienteEmail = "") {
   const emailNormalizado = normalizarEmail(clienteEmail);
@@ -1719,31 +1636,7 @@ async function validarClientItemsCita(serviciosDetalle = [], clientUserId = null
   return { ok: true };
 }
 
-function aplicarAjustesCustomerFidelidad(resumen = {}, customer = null) {
-  const resultado = {
-    mascota: { ...(resumen.mascota || { completados: 0, objetivo: 8 }) },
-    auto: { ...(resumen.auto || { completados: 0, objetivo: 8 }) }
-  };
-
-  for (const tipo of ["mascota", "auto"]) {
-    const ajustes = (customer?.ajustesFidelidad || [])
-      .filter((item) => item.tipo === tipo)
-      .reduce((total, item) => total + (Number(item.unidades) || 0), 0);
-    const premiosUsados = (customer?.premiosManual || [])
-      .filter((item) => item.tipo === tipo)
-      .reduce((total, item) => total + (Number(item.unidadesConsumidas) || 0), 0);
-    const objetivo = Number(resultado[tipo].objetivo) || 8;
-    const completados = Math.max((Number(resultado[tipo].completados) || 0) + ajustes - premiosUsados, 0);
-    resultado[tipo] = {
-      completados,
-      objetivo,
-      restantes: Math.max(objetivo - completados, 0),
-      rewardEligible: completados >= objetivo
-    };
-  }
-
-  return resultado;
-}
+const aplicarAjustesCustomerFidelidad = legacyLoyaltyProjection.applyCustomerAdjustments;
 
 async function asegurarCustomerProfileCuentaWeb(user = {}) {
   if (!user?._id || obtenerRolUsuario(user) !== "cliente") return null;
@@ -6284,6 +6177,12 @@ function construirMovimientosAdministrativosCustomer(customer = {}) {
     id: item._id ? String(item._id) : "",
     fecha: item.fecha || "",
     clase: "ajuste",
+    origen: item.origen || "",
+    progresoAnterior: item.progresoAnterior,
+    progresoNuevo: item.progresoNuevo,
+    saldoAntes: item.saldoAntes,
+    saldoDespues: item.saldoDespues,
+    adminUserId: item.adminUserId ? String(item.adminUserId) : "",
     tipo: item.tipo || "",
     cantidad: Number(item.unidades) || 0,
     motivo: item.motivo || ""
@@ -6953,23 +6852,37 @@ app.post("/admin/customers/:id/mark-independent", auth, requireAdmin, adminWrite
   }
 });
 
-app.post("/admin/customers/:id/rewards-used", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+app.post("/admin/customers/:id/loyalty-progress", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
   try {
-    const customerId = obtenerObjectIdSeguro(req.params.id);
-    const tipo = normalizarTextoPlano(req.body?.tipo || "", 20);
-    const unidades = Number(req.body?.unidadesConsumidas || 8);
-    const motivo = normalizarTextoPlano(req.body?.motivo || "", 300);
-    if (!customerId || !["mascota", "auto"].includes(tipo) || !Number.isInteger(unidades) || unidades < 1 || unidades > 100 || motivo.length < 5) {
-      return res.status(400).json({ message: "Datos de premio usado no validos" });
-    }
-    const customer = await CustomerProfile.findById(customerId);
-    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
-    customer.premiosManual.push({ tipo, unidadesConsumidas: unidades, motivo, adminUserId: obtenerAdminUserId(req) });
-    await customer.save();
-    res.json({ message: "Premio usado registrado", cliente: await construirResumenCustomerProfile(customer) });
+    const result = await loyaltyProgressService.setProgress({ customerId: req.params.id,
+      adminUserId: obtenerAdminUserId(req), body: req.body });
+    const customer = await CustomerProfile.findById(req.params.id);
+    res.json({ ...result, message: result.operation.changed ? "Progreso actualizado." : "Sin cambios: el progreso ya tenía ese valor.",
+      cliente: await construirResumenCustomerProfile(customer, { incluirClientItems: true }) });
   } catch (error) {
-    res.status(500).json({ message: "No se pudo registrar el premio usado" });
+    if (error instanceof LoyaltyProgressError) return res.status(error.status).json({ message: error.message });
+    // Never fall back to nontransactional writes on unsupported Mongo deployments.
+    res.status(503).json({ message: "No se pudo confirmar la edición. Reintenta con la misma operación; no inicies otra hasta verificarla." });
   }
+});
+
+app.post("/admin/customers/:id/loyalty-reward-use", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  try {
+    const result = await loyaltyRewardUseService.useReward({ customerId: req.params.id,
+      adminUserId: obtenerAdminUserId(req), body: req.body });
+    const customer = await CustomerProfile.findById(req.params.id);
+    res.json({ ...result, message: result.replayed ? "Canje ya confirmado anteriormente." : "Premio utilizado correctamente.",
+      cliente: await construirResumenCustomerProfile(customer, { incluirClientItems: true }) });
+  } catch (error) {
+    if (error instanceof LoyaltyRewardUseError) {
+      return res.status(error.status).json({ message: error.message, ...(error.details || {}) });
+    }
+    res.status(503).json({ message: "No se pudo confirmar el canje. Reintenta con la misma operación; no inicies otra hasta verificarla." });
+  }
+});
+
+app.post("/admin/customers/:id/rewards-used", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
+  res.status(410).json({ message: "Este endpoint ya no acepta escrituras. Usa el canje seguro desde Clientes." });
 });
 
 app.post("/admin/customers/:id/loyalty-adjustments", auth, requireAdmin, adminWriteLimiter, async (req, res) => {
@@ -7299,26 +7212,7 @@ app.post("/admin/appointments", auth, requireAdmin, adminWriteLimiter, async (re
     }
 
     if (datos.rewardGratisAplicado) {
-      const rewardTipo = datos.rewardTipo || datos.servicioTipo;
-      if (rewardTipo !== datos.servicioTipo) {
-        return res.status(400).json({ message: "El tipo de recompensa debe coincidir con el tipo de servicio" });
-      }
-
-      const recompensa = await validarAplicacionRecompensa({
-        clienteTelefono: datos.clienteTelefono,
-        clientUserId: datos.clientUserId || null,
-        servicioTipo: rewardTipo
-      });
-
-      if (!recompensa.ok) {
-        return res.status(recompensa.status).json({ message: recompensa.message });
-      }
-
-      if (datos.estado === "completada") {
-        return res.status(400).json({ message: "Crea la cita gratis primero y completala despues para consumir la recompensa" });
-      }
-
-      datos.rewardTipo = rewardTipo;
+      return res.status(409).json({ message: "Los nuevos canjes se realizan únicamente desde Clientes." });
     } else {
       datos.rewardGratisAplicado = false;
       datos.rewardTipo = "";
@@ -7504,6 +7398,10 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
     const rewardTipoFinal = datos.rewardTipo || cita.rewardTipo || datos.servicioTipo || cita.servicioTipo;
     const servicioTipoFinal = datos.servicioTipo || cita.servicioTipo;
     const clienteTelefonoFinal = datos.clienteTelefono || cita.clienteTelefono;
+
+    if (cita.rewardGratisAplicado !== true && rewardAplicadoFinal) {
+      return res.status(409).json({ message: "Los nuevos canjes se realizan únicamente desde Clientes." });
+    }
 
     if (servicioTipoFinal === "auto") {
       datos.mascotaNombre = "";

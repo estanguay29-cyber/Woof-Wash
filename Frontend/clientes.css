@@ -3,6 +3,46 @@
   color: #11224a;
 }
 
+.loyalty-progress-dialog {
+  width: min(480px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 20px;
+  border: 2px solid #729f35;
+  border-radius: 14px;
+  color: #0b2a6b;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+.loyalty-progress-dialog::backdrop { background: rgba(7, 20, 48, 0.65); }
+.loyalty-progress-dialog form { display: grid; gap: 12px; min-width: 0; }
+.loyalty-progress-dialog input,
+.loyalty-progress-dialog select,
+.loyalty-progress-dialog textarea {
+  width: 100%; min-width: 0; box-sizing: border-box; padding: 10px;
+  border: 1px solid #52607a; border-radius: 8px; font: inherit;
+}
+.loyalty-progress-dialog textarea { resize: vertical; }
+.loyalty-progress-dialog label { font-weight: 800; }
+.loyalty-progress-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.loyalty-progress-actions button { flex: 1; }
+.loyalty-progress-dialog button,
+.loyalty-progress-dialog input,
+.loyalty-progress-dialog select,
+.loyalty-progress-edit { min-height: 44px; }
+.loyalty-progress-dialog :focus-visible,
+.loyalty-progress-edit:focus-visible { outline: 3px solid #0b2a6b; outline-offset: 3px; }
+.loyalty-progress-dialog :disabled { opacity: 0.65; }
+
+.customer-loyalty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.customer-loyalty-actions .customer-action-button { min-height: 44px; }
+
 .customers-shell {
   width: min(100% - 28px, 1480px);
   padding-top: 18px;
@@ -316,6 +356,44 @@
 
 .customer-row:hover {
   transform: translateY(-1px);
+}
+
+.customer-row.has-reward,
+.customer-detail.has-reward,
+.customer-loyalty-card.has-reward {
+  border: 2px solid #729f35;
+  background: #f4faed;
+  box-shadow: inset 4px 0 0 #8cc63f;
+}
+
+.customer-detail.has-reward {
+  border-radius: 12px;
+}
+
+.customer-loyalty-badge {
+  display: inline-block;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #dff3c9;
+  color: #0b2a6b;
+  font-size: 0.8rem;
+  font-weight: 850;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.customer-row:focus-visible {
+  outline: 3px solid #0b2a6b;
+  outline-offset: 3px;
+}
+
+.customer-row .customer-status,
+.customer-row .customer-table-number {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .customer-row strong {
@@ -990,6 +1068,15 @@
 
   .customer-header-actions {
     justify-content: flex-start;
+  }
+
+  .customer-loyalty-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .customer-loyalty-actions .customer-action-button {
+    width: 100%;
   }
 
   .customer-reminder {

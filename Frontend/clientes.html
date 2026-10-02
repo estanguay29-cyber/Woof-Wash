@@ -8,7 +8,7 @@
   <title>Clientes - Woof & Wash Admin</title>
   <link rel="stylesheet" href="tailwind.css">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="clientes.css?v=20260810-loyalty-followup-v2">
+  <link rel="stylesheet" href="clientes.css?v=20261002-loyalty-reward-v1">
 </head>
 <body class="admin-page customers-page" data-admin-page="clientes">
   <main class="admin-shell customers-shell">
@@ -29,7 +29,7 @@
     </header>
 
     <section id="customersAccessMessage" class="admin-access-message" role="status" aria-live="polite"><span id="customersAccessText">Validando permisos y cargando clientes...</span> <button id="btnRetryCustomers" type="button" class="admin-button admin-button-dark hidden">Reintentar</button></section>
-    <section id="customersFeedback" class="admin-feedback hidden"></section>
+    <section id="customersFeedback" class="admin-feedback hidden" role="status" aria-live="polite"></section>
 
     <section id="customersPanel" class="customers-panel hidden">
       <section class="customers-hero">
@@ -94,7 +94,48 @@
     </section>
   </div>
 
+  <dialog id="loyaltyProgressDialog" class="loyalty-progress-dialog" aria-labelledby="loyaltyProgressTitle" aria-describedby="loyaltyProgressHelp">
+    <form id="loyaltyProgressForm">
+      <h2 id="loyaltyProgressTitle">Editar progreso</h2>
+      <p id="loyaltyProgressCurrent"></p>
+      <p id="loyaltyProgressPrizes"></p>
+      <p id="loyaltyProgressHelp">Edita sólo el avance hacia el siguiente premio. Los premios pendientes se conservan; esta acción no utiliza un servicio gratis.</p>
+      <label for="loyaltyProgressValue">¿Cuántos servicios lleva actualmente?</label>
+      <input id="loyaltyProgressValue" name="progresoDeseado" type="number" min="0" max="7" step="1" inputmode="numeric" required>
+      <label for="loyaltyProgressReason">Motivo (opcional)</label>
+      <textarea id="loyaltyProgressReason" name="motivo" maxlength="300" rows="3" placeholder="Corrección manual de progreso"></textarea>
+      <p id="loyaltyProgressStatus" role="status" aria-live="polite"></p>
+      <div class="loyalty-progress-actions">
+        <button id="loyaltyProgressCancel" class="customer-action-button is-light" type="button">Cancelar</button>
+        <button id="loyaltyProgressSave" class="customer-action-button" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="loyaltyRewardUseDialog" class="loyalty-progress-dialog" aria-labelledby="loyaltyRewardUseTitle" aria-describedby="loyaltyRewardUseHelp">
+    <form id="loyaltyRewardUseForm">
+      <h2 id="loyaltyRewardUseTitle">Usar premio</h2>
+      <p id="loyaltyRewardUseType"></p>
+      <p id="loyaltyRewardUsePrizes"></p>
+      <p id="loyaltyRewardUseCurrent"></p>
+      <p id="loyaltyRewardUseHelp">Este canje consume exactamente un premio (8 unidades). Elige el progreso que debe quedar después del servicio gratis.</p>
+      <label for="loyaltyRewardUseValue">Progreso después del canje</label>
+      <select id="loyaltyRewardUseValue" name="progresoDeseado" required>
+        <option value="0">0/8</option><option value="1">1/8</option><option value="2">2/8</option><option value="3">3/8</option>
+        <option value="4">4/8</option><option value="5">5/8</option><option value="6">6/8</option><option value="7">7/8</option>
+      </select>
+      <label for="loyaltyRewardUseReason">Motivo</label>
+      <textarea id="loyaltyRewardUseReason" name="motivo" minlength="3" maxlength="300" rows="3" required>Uso de servicio gratis</textarea>
+      <p id="loyaltyRewardUseStatus" role="status" aria-live="polite"></p>
+      <div class="loyalty-progress-actions">
+        <button id="loyaltyRewardUseCancel" class="customer-action-button is-light" type="button">Cancelar</button>
+        <button id="loyaltyRewardUseSave" class="customer-action-button" type="submit">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
   <script src="admin-nav.js" defer></script>
-  <script src="clientes.js?v=20260810-loyalty-followup-v2"></script>
+  <script src="shared/customer-loyalty-progress.js?v=20260930-v1"></script>
+  <script src="shared/customer-reward-whatsapp.js?v=20261001-v1"></script>
+  <script src="shared/customer-loyalty-reward-use.js?v=20261002-v1"></script>
+  <script src="clientes.js?v=20261002-loyalty-reward-v1"></script>
 </body>
 </html>
