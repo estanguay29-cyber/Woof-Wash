@@ -112,7 +112,6 @@
     if (!from || !to) return "Selecciona ambas fechas.";
     if (!isCivilDate(from) || !isCivilDate(to)) return "Selecciona ambas fechas.";
     if (from > to) return "La fecha inicial no puede ser posterior a la fecha final.";
-    if (civilDayNumber(to) - civilDayNumber(from) > 6) return "El periodo puede abarcar como máximo 7 días.";
     if (from > today || to > today) return "No puedes consultar fechas futuras.";
     return "";
   }
@@ -130,7 +129,7 @@
     const formula = Math.round(data.totals.openingFund * 100) + Math.round(data.totals.cashRevenue * 100) - Math.round(data.totals.expenses * 100);
     if (formula !== Math.round(data.totals.expectedCash * 100)) return false;
     const expectedDays = civilDayNumber(data.period.to) - civilDayNumber(data.period.from) + 1;
-    if (expectedDays < 1 || expectedDays > 7 || data.days.length !== expectedDays) return false;
+    if (expectedDays < 1 || data.days.length !== expectedDays) return false;
     let revenueCents = 0; let expenseCents = 0; let appointmentCount = 0; let withAmountCount = 0; let expenseCount = 0;
     const validDays = data.days.every((day, index) => {
       if (!day || !isCivilDate(day.date) || !Array.isArray(day.appointments) || !Array.isArray(day.expenses)) return false;

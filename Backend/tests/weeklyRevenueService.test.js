@@ -20,12 +20,13 @@ test("la semana es lunes a domingo sin depender de UTC del servidor", () => {
   assert.equal(revenue.getWeekRange("2026-08-10").start, "2026-08-10");
 });
 
-test("rango manual acepta uno a siete días, rechaza futuro y conserva default compatible", () => {
+test("rango manual acepta cualquier duración válida, rechaza futuro y conserva default compatible", () => {
   assert.deepEqual(revenue.validateRange("2026-08-15", "2026-08-21", { today: "2026-08-25" }), {
     start: "2026-08-15", end: "2026-08-21", timeZone: "America/Mexico_City"
   });
   assert.ok(revenue.validateRange("2026-08-21", "2026-08-21", { today: "2026-08-25" }));
-  for (const pair of [["2026-08-14", "2026-08-21"], ["2026-08-22", "2026-08-26"], ["bad", "2026-08-21"]]) {
+  assert.ok(revenue.validateRange("2025-12-31", "2026-08-21", { today: "2026-08-25" }));
+  for (const pair of [["2026-08-22", "2026-08-26"], ["bad", "2026-08-21"], ["2026-08-22", "2026-08-21"]]) {
     assert.equal(revenue.validateRange(pair[0], pair[1], { today: "2026-08-25" }), null);
   }
   assert.deepEqual(revenue.getWeekRange("2026-08-25"), { start: "2026-08-24", end: "2026-08-30", timeZone: "America/Mexico_City" });

@@ -5760,10 +5760,17 @@ app.patch("/empleados/appointments/:id/estado-operativo", auth, requireEmpleado,
 
 app.get("/admin/appointments/tomorrow-summary", auth, requireAdmin, async (req, res) => {
   try {
-    const summary = await appointmentCalendarService.queryTomorrowSummary({ AppointmentModel: Appointment });
+    const queryKeys = Object.keys(req.query || {});
+    if (queryKeys.some((key) => key !== "date")) {
+      return res.status(400).json({ message: "Parámetros no válidos" });
+    }
+    const requestedDate = req.query?.date;
+    const summary = requestedDate === undefined
+      ? await appointmentCalendarService.queryTomorrowSummary({ AppointmentModel: Appointment })
+      : await appointmentCalendarService.queryAppointmentSummary({ AppointmentModel: Appointment, date: requestedDate });
     return res.json(summary);
   } catch (error) {
-    return res.status(error.status || 500).json({ message: "No se pudo generar el resumen de mañana" });
+    return res.status(error.status || 500).json({ message: error.status === 400 ? error.message : "No se pudo generar el resumen de citas" });
   }
 });
 

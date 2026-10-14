@@ -22,13 +22,13 @@ const expense = (overrides = {}) => ({
   ...overrides
 });
 
-test("rango exige from/to exactos, no futuro y máximo siete días inclusivos", () => {
+test("rango exige from/to exactos, no futuro y acepta periodos largos", () => {
   const options = { today: "2028-03-01" };
   assert.deepEqual(validateSummaryRange({ from: "2028-02-24", to: "2028-03-01" }, options), { from: "2028-02-24", to: "2028-03-01" });
   assert.deepEqual(validateSummaryRange({ from: "2026-12-31", to: "2026-12-31" }, { today: "2026-12-31" }), { from: "2026-12-31", to: "2026-12-31" });
+  assert.deepEqual(validateSummaryRange({ from: "2026-01-01", to: "2026-12-31" }, { today: "2026-12-31" }), { from: "2026-01-01", to: "2026-12-31" });
   for (const query of [
     {}, { from: "2026-08-17" }, { to: "2026-08-17" },
-    { from: "2026-08-17", to: "2026-08-24" },
     { from: "2026-08-18", to: "2026-08-17" },
     { from: "2026-02-30", to: "2026-03-01" },
     { from: "2026-08-17", to: "2026-08-18", extra: "x" },

@@ -112,17 +112,17 @@ test("fecha civil cubre bisiestos, hoy, ayer y futuro en Ciudad de México", () 
   }
 });
 
-test("rango acepta siete días inclusivos, cruces y rechaza contratos inválidos", () => {
+test("rango acepta periodos largos y cruces, y rechaza contratos inválidos", () => {
   for (const range of [
     { from: "2026-08-17", to: "2026-08-23" },
     { from: "2026-01-29", to: "2026-02-04" },
-    { from: "2025-12-29", to: "2026-01-04" }
+    { from: "2025-12-29", to: "2026-01-04" },
+    { from: "2025-01-01", to: "2026-08-17" }
   ]) assert.deepEqual(expenseService.validateRange(range), range);
   for (const range of [
     { from: "2026-08-17" }, { to: "2026-08-17" },
     { from: "2026-08-18", to: "2026-08-17" },
-    { from: "2026-02-30", to: "2026-03-01" },
-    { from: "2026-08-17", to: "2026-08-24" }
+    { from: "2026-02-30", to: "2026-03-01" }
   ]) expectCode(() => expenseService.validateRange(range), "INVALID_RANGE");
   assert.deepEqual(expenseService.validateRange({}, { today: "2026-08-17" }), { from: "2026-08-17", to: "2026-08-23" });
 });

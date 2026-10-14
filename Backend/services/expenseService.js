@@ -7,7 +7,6 @@ const appointmentCalendarService = require("./appointmentCalendarService");
 const weeklyRevenueService = require("./weeklyRevenueService");
 
 const MAX_EXPENSE_CENTS = 100000000;
-const MAX_RANGE_DAYS = 7;
 const MAX_EXPENSE_VERSION = 1000000;
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
@@ -114,8 +113,6 @@ function validateRange(query = {}, { today = appointmentCalendarService.getBusin
     || !appointmentCalendarService.isValidCivilDate(query.from)
     || !appointmentCalendarService.isValidCivilDate(query.to)
     || query.from > query.to) fail(400, "INVALID_RANGE");
-  const eighthDay = appointmentCalendarService.addCivilDays(query.from, MAX_RANGE_DAYS);
-  if (query.to >= eighthDay) fail(400, "INVALID_RANGE");
   return { from: query.from, to: query.to };
 }
 
@@ -234,7 +231,6 @@ function createExpenseService({ model = Expense } = {}) {
 
 module.exports = {
   MAX_EXPENSE_CENTS,
-  MAX_RANGE_DAYS,
   MAX_EXPENSE_VERSION,
   ExpenseServiceError,
   createExpenseService,

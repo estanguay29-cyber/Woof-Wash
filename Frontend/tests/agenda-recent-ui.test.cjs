@@ -38,7 +38,7 @@ function buildTomorrowSummary(appointments, date = "2026-08-05") {
     }
   };
   const sandbox = { ...context, input: appointments, inputDate: date };
-  vm.runInNewContext(`${source}\nthis.result = construirResumenManana(input, inputDate);`, sandbox);
+  vm.runInNewContext(`${source}\nthis.result = construirResumenManana(input, inputDate, true);`, sandbox);
   return sandbox.result;
 }
 
@@ -60,6 +60,25 @@ test("la configuracion del resumen evita duplicar su listener", () => {
   assert.doesNotMatch(html, /btnResumenManana[^>]+onclick=/);
 });
 
+test("selector de fecha reinicia a mañana, admite cualquier fecha y es accesible", () => {
+  assert.match(html, /id="agendaSummaryDateModal"[\s\S]+role="dialog"[\s\S]+aria-modal="true"/);
+  assert.match(html, /<label for="agendaSummaryDate">Fecha<\/label>[\s\S]+id="agendaSummaryDate"[^>]+type="date"[^>]+required/);
+  assert.doesNotMatch(html, /id="agendaSummaryDate"[^>]+min=/);
+  const open = sourceBetween("async function handleResumenMananaClick(event)", "async function generarResumenFecha(event)");
+  assert.match(open, /input\.value = sumarDiasCivilesAgenda\(obtenerFechaMexicoAgenda\(\), 1\)/);
+  assert.match(open, /input\?\.focus\(\)/);
+  assert.match(agenda, /agendaSummaryDateForm"\)\?\.addEventListener\("submit", generarResumenFecha\)/);
+  assert.match(agenda, /event\.key !== "Escape"/);
+  assert.match(agenda, /resumenFechaTrigger\?\.focus/);
+});
+
+test("una fecha distinta de mañana usa encabezado genérico", () => {
+  const source = sourceBetween("function formatearHoraResumen(value)", "function abrirModalResumenManana()");
+  const sandbox = { Date, URL, Intl, input: [], formatearEdadMascota() { return ""; }, obtenerUrlUbicacionCita() { return ""; } };
+  vm.runInNewContext(`${source}\nthis.result = construirResumenManana(input, "2026-08-04", false);`, sandbox);
+  assert.equal(sandbox.result, "🐾 *CITAS DEL DÍA* 🐾\n\nNo hay citas programadas para la fecha seleccionada.");
+});
+
 test("ver mas usa texto UTF-8 accesible y aria-expanded", () => {
   assert.match(agenda, />Ver más<\/button>/);
   assert.match(agenda, /aria-expanded="false"/);
@@ -77,21 +96,21 @@ test("el placeholder compartido y el bloqueo de carga estan conectados", () => {
   assert.match(agenda, /data\.fotoPublicId \|\| data\.publicId/);
 });
 
-test("el modal de manana abre antes de esperar datos o renderizado", () => {
-  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
-  assert.ok(handler.indexOf("abrirModalResumenManana()") < handler.indexOf("await obtenerResumenManana()"));
-  assert.ok(handler.indexOf('mostrarEstadoResumenManana("Generando resumen…")') < handler.indexOf("await obtenerResumenManana()"));
+test("el modal de resultado abre antes de esperar datos o renderizado", () => {
+  const handler = sourceBetween("async function generarResumenFecha(event)", "async function configurarAgenda()");
+  assert.ok(handler.indexOf("abrirModalResumenManana()") < handler.indexOf("await obtenerResumenManana(selectedDate)"));
+  assert.ok(handler.indexOf('mostrarEstadoResumenManana("Generando resumen…")') < handler.indexOf("await obtenerResumenManana(selectedDate)"));
   assert.match(styles, /\.agenda-modal[\s\S]*?position: fixed;[\s\S]*?z-index: 10030/);
   assert.match(styles, /\.agenda-modal\.hidden[\s\S]*?display: none/);
 });
 
 test("generar el resumen hace una sola consulta dedicada y no usa la agenda cargada", () => {
-  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
-  const request = sourceBetween("async function obtenerResumenManana()", "async function handleResumenMananaClick(event)");
+  const handler = sourceBetween("async function generarResumenFecha(event)", "async function configurarAgenda()");
+  const request = sourceBetween("async function obtenerResumenManana(date)", "function actualizarAccionesAdjuntosResumen");
   assert.equal((request.match(/agendaFetch\(/g) || []).length, 1);
-  assert.match(request, /agendaFetch\("\/admin\/appointments\/tomorrow-summary"/);
+  assert.match(request, /tomorrow-summary\?date=/);
   assert.match(handler, /event\.preventDefault\(\)/);
-  assert.match(handler, /event\.stopPropagation\(\)/);
+  assert.match(handler, /esFechaCivilValidaAgenda\(selectedDate\)/);
   assert.doesNotMatch(handler, /citasAgenda|renderizarCitasAgenda|calendario|requestAnimationFrame|\.click\(|window\.open|foto|gallery|navigator\.share/);
 });
 
@@ -164,15 +183,14 @@ test("el resumen vacio conserva el encabezado profesional", () => {
   assert.equal(buildTomorrowSummary([]), "🐾 *CITAS PARA MAÑANA* 🐾\n\nNo hay citas programadas para mañana.");
 });
 
-test("ruta y tipo de cliente conservan el orden y codifican direcciones", () => {
+test("ruta conserva el orden, codifica direcciones y omite la promoción", () => {
   const text = buildTomorrowSummary([
     { time: "13:00", clientName: "C", isFirstService: false, address: "Calle #3, Zapopan" },
     { time: "09:00", clientName: "A", isFirstService: true, address: "Av. Niños Héroes #1, Zapopan" },
     { time: "11:00", clientName: "B", isFirstService: false, address: "Calle 2, Zapopan" },
     { time: "16:00", clientName: "D", isFirstService: false, address: "Calle 4, Zapopan" }
   ]);
-  assert.match(text, /🆕 Cliente nuevo — aplicar 20% de descuento/);
-  assert.match(text, /🔁 Cliente recurrente/);
+  assert.doesNotMatch(text, /20%|TIPO DE CLIENTE|Cliente nuevo|Cliente recurrente/);
   const url = new URL(text.split("\n").find((line) => line.startsWith("https://www.google.com/maps/dir/")));
   assert.equal(url.searchParams.get("origin"), "Av. Niños Héroes #1, Zapopan");
   assert.equal(url.searchParams.get("destination"), "Calle 4, Zapopan");
@@ -188,14 +206,12 @@ test("ruta omite ubicaciones faltantes y admite una sola parada", () => {
   assert.match(buildTomorrowSummary([{ time: "09:00" }]), /Ruta no disponible: faltan ubicaciones válidas/);
 });
 
-test("el mensaje distingue incertidumbre explícita de un DTO incompleto", () => {
+test("el mensaje no presenta clasificación ni promoción del cliente", () => {
   const text = buildTomorrowSummary([
     { time: "09:00", clientName: "Por verificar", isFirstService: null, address: "Calle 1, Zapopan" },
     { time: "11:00", clientName: "DTO incompleto", address: "Calle 2, Zapopan" }
   ]);
-  assert.match(text, /⚠️ Primer servicio por verificar/);
-  assert.match(text, /⚠️ Clasificación no disponible/);
-  assert.doesNotMatch(text, /aplicar 20%/);
+  assert.doesNotMatch(text, /Primer servicio|Clasificación|aplicar 20%|TIPO DE CLIENTE/);
 });
 
 test("más de cinco paradas no genera una ruta parcial", () => {
@@ -224,8 +240,7 @@ test("mensaje sintético completo conserva campos y termina en ruta segura", () 
   assert.match(text, /📍 \*DIRECCIÓN\*/);
   assert.match(text, /🗺️ \*UBICACIÓN\*/);
   assert.match(text, /📌 \*INDICACIONES POR MASCOTA\*/);
-  assert.equal((text.match(/aplicar 20% de descuento/g) || []).length, 1);
-  assert.match(text, /⚠️ Primer servicio por verificar/);
+  assert.doesNotMatch(text, /20%|TIPO DE CLIENTE|Primer servicio/);
   const url = new URL(text.split("\n").find((line) => line.startsWith("https://www.google.com/maps/dir/")));
   assert.equal(url.searchParams.get("origin"), "20.6736,-103.4054");
   assert.equal(url.searchParams.get("waypoints"), "Calle Interior 2 #7, Zapopan");
@@ -240,7 +255,7 @@ test("una URL excesiva se declara indisponible sin truncar", () => {
 });
 
 test("la generacion evita concurrencia y siempre restaura el boton", () => {
-  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
+  const handler = sourceBetween("async function generarResumenFecha(event)", "async function configurarAgenda()");
   assert.match(handler, /if \(resumenMananaEnProceso\)/);
   assert.match(handler, /trigger\.disabled = true/);
   assert.match(handler, /finally/);
@@ -249,7 +264,7 @@ test("la generacion evita concurrencia y siempre restaura el boton", () => {
 });
 
 test("abrir el resumen no descarga, convierte, comparte ni construye fotografias", () => {
-  const handler = sourceBetween("async function handleResumenMananaClick(event)", "async function configurarAgenda()");
+  const handler = sourceBetween("async function generarResumenFecha(event)", "async function configurarAgenda()");
   assert.doesNotMatch(handler, /fetch\(|\.blob\(|new File\(|navigator\.share|construirGaleriaFotosResumen/);
   assert.ok(handler.indexOf("abrirModalResumenManana()") < handler.indexOf("actualizarAccionesAdjuntosResumen(appointments)"));
 });
@@ -286,7 +301,7 @@ test("solo usa URLs validas, unicas y provenientes de las mascotas del resumen",
   assert.match(collect, /parsed\.protocol === "https:" \|\| parsed\.protocol === "http:"/);
   assert.match(collect, /\[\.\.\.new Set\(urls\)\]/);
   assert.match(collect, /button\.classList\.toggle\("hidden", fotosResumenManana\.length === 0\)/);
-  assert.match(collect, /Las citas de mañana no tienen fotografías disponibles\./);
+  assert.match(collect, /Las citas de la fecha seleccionada no tienen fotografías disponibles\./);
 });
 
 test("el modal conserva cierre independiente mientras la peticion esta pendiente", () => {

@@ -42,11 +42,11 @@ test("un formulario global controla las tres tabs y no hay inputs duplicados", (
   assert.match(agenda, /let financePeriod = \{ draft: null, active: null \}/);
 });
 
-test("validación permite 1 y 7 días, rechaza 8 y distingue periodo operativo consultable", () => {
+test("validación permite rangos largos y distingue periodo operativo consultable", () => {
   const api = financeHelpers();
   assert.equal(api.validarPeriodoFinancieroAgenda("2026-08-21", "2026-08-21", "2026-08-25"), "");
   assert.equal(api.validarPeriodoFinancieroAgenda("2026-08-15", "2026-08-21", "2026-08-25"), "");
-  assert.match(api.validarPeriodoFinancieroAgenda("2026-08-14", "2026-08-21", "2026-08-25"), /máximo 7/);
+  assert.equal(api.validarPeriodoFinancieroAgenda("2025-12-31", "2026-08-21", "2026-08-25"), "");
   for (const value of ["2026-02-30", "2026/08/20", "texto", ""]) {
     assert.match(api.validarPeriodoFinancieroAgenda(value, "2026-03-01", "2026-08-25"), /válidas/);
   }

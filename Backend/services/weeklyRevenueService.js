@@ -24,8 +24,7 @@ function getWeekRange(referenceDate) {
 
 function validateRange(from, to, { today = getMexicoCityDate() } = {}) {
   if (!isIsoDate(from) || !isIsoDate(to) || from > to || to > today) return null;
-  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
-  return days >= 1 && days <= 7 ? { start: from, end: to, timeZone: TIME_ZONE } : null;
+  return { start: from, end: to, timeZone: TIME_ZONE };
 }
 
 function getMexicoCityDate(now = new Date()) {

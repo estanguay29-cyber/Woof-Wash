@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/img/favicon.png">
   <title>Panel de agenda - Woof & Wash</title>
   <link rel="stylesheet" href="tailwind.css">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261014-date-summary-v1">
   <link rel="stylesheet" href="shared/appointments-calendar.css">
 </head>
 <body class="admin-page agenda-page" data-admin-page="agenda">
@@ -604,8 +604,26 @@
         <button id="btnCompartirFotosManana" type="button" class="admin-button admin-button-light">Compartir fotos</button>
         <p id="agendaTomorrowPhotoNotice" class="agenda-tomorrow-photo-notice hidden" role="status"></p>
       </div>
-      <div id="agendaTomorrowGallery" class="agenda-photo-gallery hidden" aria-label="Fotografías de las mascotas de mañana"></div>
+      <div id="agendaTomorrowGallery" class="agenda-photo-gallery hidden" aria-label="Fotografías de las mascotas del resumen"></div>
     </div>
+  </div>
+
+  <div id="agendaSummaryDateModal" class="agenda-modal hidden" aria-hidden="true">
+    <section class="agenda-modal-panel agenda-summary-date-panel" role="dialog" aria-modal="true" aria-labelledby="agendaSummaryDateTitle">
+      <header class="agenda-modal-header">
+        <div><p class="admin-kicker">Agenda</p><h2 id="agendaSummaryDateTitle">Elegir fecha del resumen</h2><p>Consulta citas pasadas, de hoy o futuras.</p></div>
+        <button id="btnCerrarSelectorResumen" type="button" class="agenda-icon-button" aria-label="Cerrar selector de fecha">&times;</button>
+      </header>
+      <form id="agendaSummaryDateForm">
+        <label for="agendaSummaryDate">Fecha</label>
+        <input id="agendaSummaryDate" name="date" type="date" required>
+        <p id="agendaSummaryDateStatus" role="status" aria-live="polite"></p>
+        <div class="agenda-edit-actions">
+          <button id="btnCancelarSelectorResumen" type="button" class="admin-button admin-button-light">Cancelar</button>
+          <button id="btnGenerarResumenFecha" type="submit" class="admin-button admin-button-dark">Generar resumen</button>
+        </div>
+      </form>
+    </section>
   </div>
 
   <div id="weeklyRevenueModal" class="agenda-modal hidden" aria-hidden="true">
@@ -721,7 +739,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.21/locales-all.global.min.js"></script>
   <script src="shared/appointments-calendar.js?v=20260810-calendar-cache-v1"></script>
   <script src="shared/admin-expenses.js?v=20260826-expense-create-cors-v1"></script>
-  <script src="shared/admin-finance-summary.js?v=20260825-shared-finance-period-v1"></script>
-  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806-expenses-ui-v1-finance-message-ui-v1-shared-finance-period-v1"></script>
+  <script src="shared/admin-finance-summary.js?v=20261014-unlimited-finance-range-v1"></script>
+  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806-expenses-ui-v1-finance-message-ui-v1-shared-finance-period-v1-20261014-date-summary-v1"></script>
 </body>
 </html>

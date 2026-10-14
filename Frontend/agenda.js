@@ -133,6 +133,7 @@ let duracionBloqueadaManualEditar = false;
 let empleadosAgenda = [];
 let calendarioAgendaVisual = null;
 let resumenMananaEnProceso = false;
+let resumenFechaTrigger = null;
 let fotosResumenManana = [];
 let urlsObjetoFotosResumen = [];
 let weeklyRevenueData = null;
@@ -177,8 +178,6 @@ function obtenerSemanaOperativaAgenda(today = obtenerFechaMexicoAgenda()) {
 function validarPeriodoFinancieroAgenda(from, to, today = obtenerFechaMexicoAgenda()) {
   if (!esFechaCivilValidaAgenda(from) || !esFechaCivilValidaAgenda(to)) return "Selecciona fechas válidas.";
   if (from > to) return "La fecha inicial no puede ser posterior a la final.";
-  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
-  if (days < 1 || days > 7) return "El periodo puede abarcar como máximo 7 días.";
   if (from > today) return "El periodo no puede comenzar en el futuro.";
   return "";
 }
@@ -4438,9 +4437,9 @@ function construirRutaResumen(appointments) {
   return lines.join("\n");
 }
 
-function construirResumenManana(appointments = [], summaryDate = "") {
-  const header = "🐾 *CITAS PARA MAÑANA* 🐾";
-  if (!appointments.length) return `${header}\n\nNo hay citas programadas para mañana.`;
+function construirResumenManana(appointments = [], summaryDate = "", isTomorrow = true) {
+  const header = isTomorrow ? "🐾 *CITAS PARA MAÑANA* 🐾" : "🐾 *CITAS DEL DÍA* 🐾";
+  if (!appointments.length) return `${header}\n\nNo hay citas programadas${isTomorrow ? " para mañana" : " para la fecha seleccionada"}.`;
 
   const dateLabel = formatearFechaResumenManana(summaryDate);
   const sortedAppointments = [...appointments].sort((left, right) => {
@@ -4506,10 +4505,6 @@ function construirResumenManana(appointments = [], summaryDate = "") {
 
     sections.push(
       "", "👤 *CLIENTE*", normalizarTextoResumen(appointment?.clientName) || "No disponible",
-      "", "✨ *TIPO DE CLIENTE*", appointment?.isFirstService === true
-        ? "🆕 Cliente nuevo — aplicar 20% de descuento"
-        : appointment?.isFirstService === false ? "🔁 Cliente recurrente"
-          : appointment?.isFirstService === null ? "⚠️ Primer servicio por verificar" : "⚠️ Clasificación no disponible",
       "", "📞 *CELULAR*", normalizarTextoResumen(appointment?.clientPhone) || "No disponible",
       "", "📍 *DIRECCIÓN*", normalizarTextoResumen(appointment?.address) || "No disponible",
       "", "🗺️ *UBICACIÓN*", normalizarTextoResumen(obtenerUrlUbicacionCita(appointment)) || "No disponible"
@@ -4551,11 +4546,11 @@ function mostrarEstadoResumenManana(message) {
   }
 }
 
-async function obtenerResumenManana() {
+async function obtenerResumenManana(date) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 9000);
   try {
-    return await agendaFetch("/admin/appointments/tomorrow-summary", { signal: controller.signal });
+    return await agendaFetch(`/admin/appointments/tomorrow-summary?date=${encodeURIComponent(date)}`, { signal: controller.signal });
   } finally {
     window.clearTimeout(timeoutId);
   }
@@ -4584,7 +4579,7 @@ function actualizarAccionesAdjuntosResumen(appointments = []) {
     button.classList.toggle("hidden", fotosResumenManana.length === 0);
   }
   if (notice) {
-    notice.textContent = fotosResumenManana.length ? "" : "Las citas de mañana no tienen fotografías disponibles.";
+    notice.textContent = fotosResumenManana.length ? "" : "Las citas de la fecha seleccionada no tienen fotografías disponibles.";
     notice.classList.toggle("hidden", fotosResumenManana.length > 0);
   }
   if (gallery) { gallery.replaceChildren(); gallery.classList.add("hidden"); }
@@ -4664,7 +4659,7 @@ function construirGaleriaFotosResumen(photos = []) {
 async function compartirFotosManana() {
   const button = document.getElementById("btnCompartirFotosManana");
   if (!fotosResumenManana.length) {
-    mostrarAvisoFotosResumen("Las citas de mañana no tienen fotografías disponibles.");
+    mostrarAvisoFotosResumen("Las citas de la fecha seleccionada no tienen fotografías disponibles.");
     return;
   }
   if (button?.disabled) return;
@@ -4705,36 +4700,51 @@ async function compartirFotosManana() {
 }
 
 async function handleResumenMananaClick(event) {
-  console.time("[RESUMEN] total");
-  console.log("[RESUMEN] 1 click recibido");
-  console.log("[RESUMEN] 2 antes de preventDefault");
   event.preventDefault();
   event.stopPropagation();
-  if (resumenMananaEnProceso) {
-    console.timeEnd("[RESUMEN] total");
+  resumenFechaTrigger = event.currentTarget || document.activeElement;
+  const modal = document.getElementById("agendaSummaryDateModal");
+  const input = document.getElementById("agendaSummaryDate");
+  const status = document.getElementById("agendaSummaryDateStatus");
+  if (input) input.value = sumarDiasCivilesAgenda(obtenerFechaMexicoAgenda(), 1);
+  if (status) status.textContent = "";
+  modal?.classList.remove("hidden");
+  modal?.setAttribute("aria-hidden", "false");
+  document.body.classList.add("agenda-modal-open");
+  input?.focus();
+}
+
+async function generarResumenFecha(event) {
+  event.preventDefault();
+  const input = document.getElementById("agendaSummaryDate");
+  const selectedDate = input?.value || "";
+  const selectorStatus = document.getElementById("agendaSummaryDateStatus");
+  if (!esFechaCivilValidaAgenda(selectedDate)) {
+    if (selectorStatus) selectorStatus.textContent = "Selecciona una fecha válida.";
+    input?.focus();
     return;
   }
+  if (resumenMananaEnProceso) return;
   resumenMananaEnProceso = true;
-  const trigger = document.getElementById("btnResumenManana");
+  const trigger = document.getElementById("btnGenerarResumenFecha");
   const textArea = document.getElementById("agendaTomorrowText");
   const meta = document.getElementById("agendaTomorrowMeta");
   const actionButtons = [document.getElementById("btnCopiarResumenManana"), document.getElementById("btnWhatsAppResumenManana")];
   if (trigger) { trigger.disabled = true; trigger.textContent = "Generando…"; }
-  console.log("[RESUMEN] 3 antes de abrir modal");
+  document.getElementById("agendaSummaryDateModal")?.classList.add("hidden");
+  document.getElementById("agendaSummaryDateModal")?.setAttribute("aria-hidden", "true");
   abrirModalResumenManana();
-  console.log("[RESUMEN] 4 después de abrir modal");
   mostrarEstadoResumenManana("Generando resumen…");
-  if (meta) meta.textContent = "Mañana";
+  if (meta) meta.textContent = formatearFechaAgenda(selectedDate);
   if (textArea) textArea.value = "";
   document.getElementById("agendaTomorrowPhotoActions")?.classList.add("hidden");
   document.getElementById("agendaTomorrowGallery")?.classList.add("hidden");
   actionButtons.forEach((button) => { if (button) button.disabled = true; });
   try {
-    console.log("[RESUMEN] 5 antes del fetch");
-    const data = await obtenerResumenManana();
-    console.log("[RESUMEN] 6 después del fetch");
+    const data = await obtenerResumenManana(selectedDate);
     const appointments = Array.isArray(data.appointments) ? data.appointments : [];
-    const text = construirResumenManana(appointments, data.date);
+    const tomorrow = sumarDiasCivilesAgenda(obtenerFechaMexicoAgenda(), 1);
+    const text = construirResumenManana(appointments, data.date, data.date === tomorrow);
     actualizarAccionesAdjuntosResumen(appointments);
     if (meta) meta.textContent = `${formatearFechaAgenda(data.date)} - ${appointments.length} ${appointments.length === 1 ? "cita" : "citas"}`;
     if (textArea) textArea.value = text;
@@ -4742,12 +4752,11 @@ async function handleResumenMananaClick(event) {
     const notice = document.getElementById("agendaTomorrowNotice");
     if (notice) { notice.textContent = ""; notice.classList.add("hidden"); }
   } catch (error) {
-    console.error("[RESUMEN] Error al generar resumen");
+    console.error("[RESUMEN] Error al generar resumen", error);
     mostrarEstadoResumenManana("No pudimos generar el resumen. Intenta nuevamente.");
   } finally {
     resumenMananaEnProceso = false;
-    if (trigger) { trigger.disabled = false; trigger.textContent = "Resumen de mañana"; }
-    console.timeEnd("[RESUMEN] total");
+    if (trigger) { trigger.disabled = false; trigger.textContent = "Generar resumen"; }
   }
 }
 
@@ -4933,6 +4942,19 @@ async function configurarAgenda() {
     summaryButton.addEventListener("click", handleResumenMananaClick);
     summaryButton.dataset.listenerBound = "true";
   }
+  const cerrarSelectorResumen = ({ restoreFocus = true } = {}) => {
+    const modal = document.getElementById("agendaSummaryDateModal");
+    modal?.classList.add("hidden");
+    modal?.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("agenda-modal-open");
+    if (restoreFocus) resumenFechaTrigger?.focus?.();
+  };
+  document.getElementById("agendaSummaryDateForm")?.addEventListener("submit", generarResumenFecha);
+  document.getElementById("btnCerrarSelectorResumen")?.addEventListener("click", () => cerrarSelectorResumen());
+  document.getElementById("btnCancelarSelectorResumen")?.addEventListener("click", () => cerrarSelectorResumen());
+  document.getElementById("agendaSummaryDateModal")?.addEventListener("click", (event) => {
+    if (event.target.id === "agendaSummaryDateModal") cerrarSelectorResumen();
+  });
   const sharePhotosButton = document.getElementById("btnCompartirFotosManana");
   if (sharePhotosButton && sharePhotosButton.dataset.listenerBound !== "true") {
     sharePhotosButton.addEventListener("click", compartirFotosManana);
@@ -4943,9 +4965,17 @@ async function configurarAgenda() {
     modal?.classList.add("hidden");
     modal?.setAttribute("aria-hidden", "true");
     document.body.classList.remove("agenda-modal-open");
+    resumenFechaTrigger?.focus?.();
   };
   document.getElementById("btnCerrarResumenManana")?.addEventListener("click", cerrarResumen);
   document.getElementById("agendaTomorrowModal")?.addEventListener("click", (event) => { if (event.target.id === "agendaTomorrowModal") cerrarResumen(); });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const selector = document.getElementById("agendaSummaryDateModal");
+    const summary = document.getElementById("agendaTomorrowModal");
+    if (selector && !selector.classList.contains("hidden")) { event.preventDefault(); cerrarSelectorResumen(); }
+    else if (summary && !summary.classList.contains("hidden")) { event.preventDefault(); cerrarResumen(); }
+  });
   document.getElementById("btnCopiarResumenManana")?.addEventListener("click", () => copiarTextoAgenda(document.getElementById("agendaTomorrowText")?.value, "Resumen"));
   document.getElementById("btnWhatsAppResumenManana")?.addEventListener("click", () => {
     const text = document.getElementById("agendaTomorrowText")?.value || "";

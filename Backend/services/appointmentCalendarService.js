@@ -417,11 +417,13 @@ function uniqueSummaryNotes(values = []) {
   return result;
 }
 
-async function queryTomorrowSummary({ AppointmentModel, now = new Date() }) {
+async function queryAppointmentSummary({ AppointmentModel, date }) {
   if (!AppointmentModel || typeof AppointmentModel.find !== "function") {
     throw new CalendarValidationError("El modelo de citas no esta disponible.", 500);
   }
-  const date = addCivilDays(getBusinessToday(now), 1);
+  if (!isValidCivilDate(date)) {
+    throw new CalendarValidationError("date debe ser una fecha civil valida YYYY-MM-DD.");
+  }
   const appointments = await AppointmentModel.find({ fecha: date, estado: { $ne: "cancelada" } })
     .select(TOMORROW_SUMMARY_FIELDS)
     .sort({ hora: 1, _id: 1 })
@@ -448,6 +450,10 @@ async function queryTomorrowSummary({ AppointmentModel, now = new Date() }) {
   return { ok: true, date, appointments: results };
 }
 
+async function queryTomorrowSummary({ AppointmentModel, now = new Date() }) {
+  return queryAppointmentSummary({ AppointmentModel, date: addCivilDays(getBusinessToday(now), 1) });
+}
+
 module.exports = {
   BUSINESS_TIME_ZONE,
   MAX_CALENDAR_RANGE_DAYS,
@@ -468,6 +474,7 @@ module.exports = {
   sortCalendarEvents,
   queryCalendarAppointments,
   toTomorrowSummaryAppointment,
+  queryAppointmentSummary,
   queryTomorrowSummary,
   TOMORROW_SUMMARY_FIELDS
 };

@@ -143,11 +143,14 @@ test("rango vacío incluye siete días y permite fondo final negativo", async ()
   assert.equal(response.body.totals.expectedCash, -1000);
 });
 
-test("query explícita rechaza faltantes, extras, ocho días y futuro", async () => {
+test("query explícita acepta rangos largos y rechaza faltantes, extras y futuro", async () => {
   const today = range.to;
+  const longRange = { from: calendarService.addCivilDays(today, -60), to: today };
+  const validResponse = await getSummary(actors.admin, longRange);
+  assert.equal(validResponse.status, 200);
+  assert.deepEqual(validResponse.body.period, { ...longRange, timezone: "America/Mexico_City" });
   const invalidQueries = [
     {}, { from: range.from }, { to: range.to }, { ...range, foo: "bar" },
-    { from: calendarService.addCivilDays(today, -7), to: today },
     { from: today, to: calendarService.addCivilDays(today, 1) },
     { from: "2026-02-30", to: today }, { from: "2026-13-01", to: today },
     { from: "2026/08/20", to: today }, { from: "20/08/2026", to: today },

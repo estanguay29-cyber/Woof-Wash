@@ -375,7 +375,34 @@ test("resumen de manana mantiene fallbacks de citas antiguas", () => {
   assert.deepEqual([vehicle.vehicles[0].type, vehicle.vehicles[0].package], ["Camioneta/SUV", "Lavado completo"]);
 });
 
+test("resumen por fecha acepta pasado, hoy y futuro sin convertir la fecha a UTC", async () => {
+  const requested = [];
+  const model = { find(filter) {
+    requested.push(filter.fecha);
+    const rows = filter.estado === "completada" ? [] : [];
+    const query = { select() { return query; }, sort() { return query; }, lean() { return Promise.resolve(rows); } };
+    return query;
+  } };
+  for (const date of ["2026-10-13", "2026-10-14", "2026-10-15", "2027-01-01"]) {
+    const result = await calendar.queryAppointmentSummary({ AppointmentModel: model, date });
+    assert.equal(result.date, date);
+  }
+  assert.deepEqual(requested, ["2026-10-13", "2026-10-14", "2026-10-15", "2027-01-01"]);
+});
+
+test("resumen por fecha rechaza formato, días imposibles y años no bisiestos", async () => {
+  const model = { find() { throw new Error("no debe consultar"); } };
+  for (const date of ["2026/10/14", "2026-02-29", "2026-04-31", "texto", ""]) {
+    await assert.rejects(calendar.queryAppointmentSummary({ AppointmentModel: model, date }), calendar.CalendarValidationError);
+  }
+  await assert.doesNotReject(calendar.queryAppointmentSummary({
+    AppointmentModel: { find() { const query = { select() { return query; }, sort() { return query; }, lean() { return Promise.resolve([]); } }; return query; } },
+    date: "2028-02-29"
+  }));
+});
+
 test("endpoint de resumen requiere autenticacion administrativa", () => {
   const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   assert.match(server, /app\.get\("\/admin\/appointments\/tomorrow-summary", auth, requireAdmin,/);
+  assert.match(server, /queryAppointmentSummary\(\{ AppointmentModel: Appointment, date: requestedDate \}\)/);
 });

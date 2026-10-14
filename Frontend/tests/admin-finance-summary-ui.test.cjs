@@ -93,7 +93,7 @@ test("validación cubre ambas fechas, inversión, siete días y futuro en Méxic
   const { summary } = setup();
   assert.equal(summary.validateRange("", ""), "Selecciona ambas fechas.");
   assert.equal(summary.validateRange("2026-08-20", "2026-08-19", "2026-08-21"), "La fecha inicial no puede ser posterior a la fecha final.");
-  assert.equal(summary.validateRange("2026-08-14", "2026-08-21", "2026-08-21"), "El periodo puede abarcar como máximo 7 días.");
+  assert.equal(summary.validateRange("2025-12-31", "2026-08-21", "2026-08-21"), "");
   assert.equal(summary.validateRange("2026-08-21", "2026-08-22", "2026-08-21"), "No puedes consultar fechas futuras.");
   assert.equal(summary.validateRange("2026-08-15", "2026-08-21", "2026-08-21"), "");
   assert.equal(summary.todayInMexico(new Date("2026-08-21T05:59:00Z")), "2026-08-20");

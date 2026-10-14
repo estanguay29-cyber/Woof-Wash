@@ -6,7 +6,6 @@ const calendarService = require("./appointmentCalendarService");
 const weeklyRevenueService = require("./weeklyRevenueService");
 
 const OPENING_FUND_CENTS = 200000;
-const MAX_RANGE_DAYS = 7;
 
 class FinanceSummaryError extends Error {
   constructor(status, code) {
@@ -28,7 +27,6 @@ function validateSummaryRange(query, { today = weeklyRevenueService.getMexicoCit
   if (typeof from !== "string" || typeof to !== "string"
     || !calendarService.isValidCivilDate(from) || !calendarService.isValidCivilDate(to)
     || from > to || to > today) fail();
-  if (to >= calendarService.addCivilDays(from, MAX_RANGE_DAYS)) fail();
   return { from, to };
 }
 
@@ -194,7 +192,6 @@ function createFinanceSummaryService({ appointmentModel = Appointment, expenseMo
 
 module.exports = {
   OPENING_FUND_CENTS,
-  MAX_RANGE_DAYS,
   FinanceSummaryError,
   appointmentItems,
   buildFinanceSummary,
