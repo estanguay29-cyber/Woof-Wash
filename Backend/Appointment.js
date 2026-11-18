@@ -329,6 +329,20 @@ const AppointmentSchema = new mongoose.Schema(
       enum: ["cash", "transfer"],
       default: null
     },
+    activeSettlementId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AppointmentPaymentSettlement",
+      default: null
+    },
+    financialVersion: {
+      type: Number,
+      min: 0,
+      default: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: "financialVersion debe ser un entero no negativo"
+      }
+    },
     ingresoAproximadoMxn: {
       type: Number,
       min: 0,
@@ -406,6 +420,10 @@ AppointmentSchema.index({ empleadosAsignados: 1 });
 AppointmentSchema.index({ estadoOperativo: 1 });
 AppointmentSchema.index({ clienteTelefono: 1, servicioTipo: 1, estado: 1, rewardConsumido: 1 });
 AppointmentSchema.index({ clienteEmail: 1, servicioTipo: 1, estado: 1, rewardConsumido: 1 });
+AppointmentSchema.index(
+  { activeSettlementId: 1 },
+  { unique: true, partialFilterExpression: { activeSettlementId: { $type: "objectId" } }, name: "appointment_active_settlement_unique" }
+);
 
 module.exports = mongoose.model("Appointment", AppointmentSchema);
 module.exports.ESTADOS_CITA = ESTADOS_CITA;

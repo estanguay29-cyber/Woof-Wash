@@ -469,6 +469,7 @@
 
       <div class="agenda-detail-actions">
         <button id="btnDetailEditar" type="button" class="admin-button admin-button-dark">Editar cita</button>
+        <button id="btnDetailReverseSettlement" type="button" class="admin-button admin-button-light hidden">Reversar liquidación</button>
         <a id="btnDetailWhatsApp" class="admin-button admin-button-light agenda-whatsapp-btn">WhatsApp</a>
         <button id="btnDetailCopiarTelefono" type="button" class="admin-button admin-button-light">Copiar teléfono</button>
         <button id="btnDetailCopiarDireccion" type="button" class="admin-button admin-button-light">Copiar dirección</button>
@@ -512,21 +513,14 @@
           </span>
         </label>
         <fieldset class="agenda-payment-method agenda-field-full">
-          <legend>Forma de pago</legend>
-          <div class="agenda-payment-options">
-            <label class="agenda-payment-option">
-              <input type="radio" name="agendaCompletePaymentMethod" value="cash">
-              <span><span aria-hidden="true">💵</span> Efectivo</span>
-            </label>
-            <label class="agenda-payment-option">
-              <input type="radio" name="agendaCompletePaymentMethod" value="transfer">
-              <span><span aria-hidden="true">🏦</span> Transferencia</span>
-            </label>
-            <label class="agenda-payment-option agenda-payment-option-unknown">
-              <input type="radio" name="agendaCompletePaymentMethod" value="" checked>
-              <span><span aria-hidden="true">❔</span> Método desconocido</span>
-            </label>
+          <legend>Desglose del pago</legend>
+          <div class="agenda-payment-components">
+            <label>Efectivo $<input id="agendaCompleteCash" type="text" inputmode="decimal" value="0.00"></label>
+            <label>Transferencia $<input id="agendaCompleteTransfer" type="text" inputmode="decimal" value="0.00"></label>
+            <label>Código Gift Card<input id="agendaCompleteGiftCode" type="text" autocomplete="off" spellcheck="false" placeholder="WW-…"></label>
+            <label>Gift Card $<input id="agendaCompleteGiftAmount" type="text" inputmode="decimal" value="0.00"></label>
           </div>
+          <p id="agendaCompleteApplied" class="agenda-payment-applied">Total aplicado: $0.00 · Pendiente: $0.00</p>
         </fieldset>
         <p id="agendaCompleteError" class="agenda-copy-feedback hidden" aria-live="polite"></p>
         <div class="agenda-edit-actions">
@@ -649,6 +643,7 @@
         <button id="weeklyRevenueIncomeTab" type="button" role="tab" aria-selected="true" aria-controls="weeklyRevenueIncomePanel">Ingresos</button>
         <button id="weeklyRevenueExpenseTab" type="button" role="tab" aria-selected="false" aria-controls="weeklyRevenueExpensePanel">Gastos</button>
         <button id="weeklyRevenueSummaryTab" type="button" role="tab" aria-selected="false" aria-controls="weeklyRevenueSummaryPanel">Resumen</button>
+        <button id="weeklyRevenueGiftCardsTab" type="button" role="tab" aria-selected="false" aria-controls="weeklyRevenueGiftCardsPanel">Gift Cards</button>
       </div>
       <div id="weeklyRevenueIncomePanel" role="tabpanel" aria-labelledby="weeklyRevenueIncomeTab">
         <div id="weeklyRevenueStatus" class="weekly-revenue-status" role="status" aria-live="polite"></div>
@@ -729,6 +724,25 @@
           </div>
         </section>
       </div>
+      <div id="weeklyRevenueGiftCardsPanel" class="hidden" role="tabpanel" aria-labelledby="weeklyRevenueGiftCardsTab">
+        <section class="gift-card-admin">
+          <header><div><p class="admin-kicker">Operación monetaria</p><h2>Gift Cards</h2><p>Venta, activación y consulta administrativa.</p></div></header>
+          <form id="giftCardSaleForm" class="gift-card-sale-form" novalidate>
+            <label>Monto $<input id="giftCardSaleAmount" type="text" inputmode="decimal" required></label>
+            <label>Forma de pago<select id="giftCardSalePayment"><option value="cash">Efectivo</option><option value="transfer">Transferencia</option></select></label>
+            <label>Comprador<input id="giftCardBuyerName" type="text" maxlength="120" required></label>
+            <label>Destinatario<input id="giftCardRecipientName" type="text" maxlength="120" required></label>
+            <button id="giftCardSaleSubmit" class="admin-button admin-button-dark" type="submit">Registrar venta</button>
+          </form>
+          <p id="giftCardAdminStatus" role="status" aria-live="polite"></p>
+          <section id="giftCardCodePanel" class="gift-card-code-panel hidden" aria-live="assertive">
+            <h3>Código generado una sola vez</h3><p>Cópialo y confirma su resguardo. Generarlo no significa que fue entregado al cliente.</p>
+            <code id="giftCardOneTimeCode"></code>
+            <div><button id="giftCardCopyCode" type="button" class="admin-button admin-button-light">Copiar código</button><button id="giftCardConfirmCode" type="button" class="admin-button admin-button-dark">Confirmar resguardo</button></div>
+          </section>
+          <div id="giftCardList" class="gift-card-list" aria-live="polite"></div>
+        </section>
+      </div>
     </section>
   </div>
 
@@ -740,6 +754,7 @@
   <script src="shared/appointments-calendar.js?v=20260810-calendar-cache-v1"></script>
   <script src="shared/admin-expenses.js?v=20260826-expense-create-cors-v1"></script>
   <script src="shared/admin-finance-summary.js?v=20261014-unlimited-finance-range-v1"></script>
+  <script src="shared/admin-gift-cards.js?v=20261117-financial-admin-v1"></script>
   <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806-expenses-ui-v1-finance-message-ui-v1-shared-finance-period-v1-20261014-date-summary-v1"></script>
 </body>
 </html>

@@ -23,6 +23,14 @@ const PerformanceAttendance = require("./PerformanceAttendance");
 const PerformanceMetricRecord = require("./PerformanceMetricRecord");
 const employeeService = require("./services/employeeService");
 const weeklyRevenueService = require("./services/weeklyRevenueService");
+const {
+  ACTIVE_SETTLEMENT_CONFLICT_MESSAGE,
+  actualizacionHeredadaConVersion,
+  aplicarGuardaFinancieraAtomica,
+  esConflictoDeGuardaFinanciera,
+  filtroCitaSinLiquidacionActiva,
+  tieneLiquidacionFinancieraActiva
+} = require("./services/appointmentFinancialIntegrityGuard");
 const appointmentCalendarService = require("./services/appointmentCalendarService");
 const customerReminderService = require("./services/customerReminderService");
 const customerExportService = require("./services/customerExportService");
@@ -54,9 +62,28 @@ const loyaltyRewardUseService = createLoyaltyRewardUseService({
 });
 const { ExpenseServiceError, createExpenseService } = require("./services/expenseService");
 const { expenseTicketService } = require("./services/expenseTicketService");
-const { FinanceSummaryError, createFinanceSummaryService } = require("./services/financeSummaryService");
+const { FinanceSummaryError } = require("./services/financeSummaryService");
+const { createFinancialAdminSummaryService } = require("./services/financialAdminSummaryService");
+const { createFinancialCommercialService } = require("./services/financialCommercialService");
+const { createGiftCardDeliveryCryptoProvider } = require("./services/giftCardDeliveryCryptoProvider");
+const { createFinancialCommercialRouter } = require("./routes/financialCommercialRouter");
 const expenseService = createExpenseService({ model: Expense });
-const financeSummaryService = createFinanceSummaryService({ appointmentModel: Appointment, expenseModel: Expense });
+const financeSummaryService = createFinancialAdminSummaryService();
+function configuredGiftCardDeliveryProvider() {
+  const encodedKey = process.env.GIFT_CARD_DELIVERY_KEY_BASE64;
+  const keyId = process.env.GIFT_CARD_DELIVERY_KEY_ID;
+  if (!encodedKey || !keyId) return null;
+  try { return createGiftCardDeliveryCryptoProvider({ key: Buffer.from(encodedKey, "base64"), keyId }); }
+  catch { return null; }
+}
+const financialCommercialService = createFinancialCommercialService({
+  connection: mongoose,
+  deliveryCryptoProvider: configuredGiftCardDeliveryProvider(),
+  authorizeAdmin: async (actorUserId) => {
+    const user = await User.findById(actorUserId).select("role").lean();
+    return user?.role === "admin";
+  }
+});
 
 const expenseTicketUpload = multer({
   storage: multer.memoryStorage(),
@@ -7284,14 +7311,19 @@ app.patch("/admin/appointments/:id/charged-amount", auth, requireAdmin, adminWri
       : weeklyRevenueService.validatePaymentMethod(req.body.paymentMethod);
     if (!paymentValidation.valid) return res.status(400).json({ message: "La forma de pago debe ser cash, transfer o null." });
     const appointment = await Appointment.findOneAndUpdate(
-      { _id: appointmentId, estado: "completada" },
-      { $set: { totalCobrado: validation.amount, paymentMethod: paymentValidation.paymentMethod } },
+      filtroCitaSinLiquidacionActiva({ _id: appointmentId, estado: "completada" }),
+      actualizacionHeredadaConVersion({
+        $set: { totalCobrado: validation.amount, paymentMethod: paymentValidation.paymentMethod }
+      }),
       { new: true, runValidators: true }
     ).select("estado totalCobrado paymentMethod");
     if (!appointment) {
-      const exists = await Appointment.exists({ _id: appointmentId });
-      return res.status(exists ? 409 : 404).json({
-        message: exists ? "El monto cobrado solo puede editarse en citas completadas" : "Cita no encontrada"
+      const existing = await Appointment.findById(appointmentId).select("estado activeSettlementId").lean();
+      if (tieneLiquidacionFinancieraActiva(existing)) {
+        return res.status(409).json({ message: ACTIVE_SETTLEMENT_CONFLICT_MESSAGE });
+      }
+      return res.status(existing ? 409 : 404).json({
+        message: existing ? "El monto cobrado solo puede editarse en citas completadas" : "Cita no encontrada"
       });
     }
     res.json({ id: String(appointment._id), totalCobrado: appointment.totalCobrado, paymentMethod: appointment.paymentMethod });
@@ -7317,6 +7349,10 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
 
     if (!cita) {
       return res.status(404).json({ message: "Cita no encontrada" });
+    }
+
+    if (tieneLiquidacionFinancieraActiva(cita)) {
+      return res.status(409).json({ message: ACTIVE_SETTLEMENT_CONFLICT_MESSAGE });
     }
 
     const fotoPublicIdsAnteriores = new Set(
@@ -7558,6 +7594,7 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
         }
       }
 
+      aplicarGuardaFinancieraAtomica(cita);
       await cita.save();
       const fotoPublicIdsActuales = new Set(
         construirServiciosDetalleCompatibles(cita).map((servicio) => servicio.fotoPublicId).filter(Boolean)
@@ -7580,6 +7617,9 @@ app.patch("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asyn
     ]);
     res.json({ message: "Cita actualizada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
+    if (esConflictoDeGuardaFinanciera(error)) {
+      return res.status(409).json({ message: ACTIVE_SETTLEMENT_CONFLICT_MESSAGE });
+    }
     if (error.status) {
       return res.status(error.status).json({ message: error.message });
     }
@@ -7609,6 +7649,10 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
 
     if (!cita) {
       return res.status(404).json({ message: "Cita no encontrada" });
+    }
+
+    if (tieneLiquidacionFinancieraActiva(cita)) {
+      return res.status(409).json({ message: ACTIVE_SETTLEMENT_CONFLICT_MESSAGE });
     }
 
     const totalCobradoBody = req.body?.totalCobrado;
@@ -7674,6 +7718,7 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
         }
       }
 
+      aplicarGuardaFinancieraAtomica(cita);
       await cita.save();
     } catch (error) {
       throw error;
@@ -7686,6 +7731,9 @@ app.patch("/admin/appointments/:id/status", auth, requireAdmin, adminWriteLimite
     ]);
     res.json({ message: "Estado actualizado correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
+    if (esConflictoDeGuardaFinanciera(error)) {
+      return res.status(409).json({ message: ACTIVE_SETTLEMENT_CONFLICT_MESSAGE });
+    }
     if (error.status) {
       return res.status(error.status).json({ message: error.message });
     }
@@ -7707,11 +7755,19 @@ app.delete("/admin/appointments/:id", auth, requireAdmin, adminWriteLimiter, asy
       return res.status(404).json({ message: "Cita no encontrada" });
     }
 
+    if (tieneLiquidacionFinancieraActiva(cita)) {
+      return res.status(409).json({ message: ACTIVE_SETTLEMENT_CONFLICT_MESSAGE });
+    }
+
     cita.estado = "cancelada";
+    aplicarGuardaFinancieraAtomica(cita);
     await cita.save();
 
     res.json({ message: "Cita cancelada correctamente", cita: construirCitaAdmin(cita) });
   } catch (error) {
+    if (esConflictoDeGuardaFinanciera(error)) {
+      return res.status(409).json({ message: ACTIVE_SETTLEMENT_CONFLICT_MESSAGE });
+    }
     res.status(500).json({ message: "No se pudo cancelar la cita" });
   }
 });
@@ -7855,6 +7911,13 @@ function responderErrorExpense(res, error, operation) {
   console.error("[expenses] operation failed", { operation, status: "error" });
   return res.status(500).json({ message: "No fue posible procesar el gasto." });
 }
+
+app.use("/admin/finance", createFinancialCommercialRouter({
+  service: financialCommercialService,
+  auth,
+  requireAdmin,
+  writeLimiter: adminWriteLimiter
+}));
 
 app.get("/admin/finance/summary", auth, requireAdmin, async (req, res) => {
   try {

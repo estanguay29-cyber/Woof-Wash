@@ -115,6 +115,10 @@ let citaEnEdicionId = null;
 let citaEnDetalleId = null;
 let detalleEstadoActualizando = false;
 let citaPendienteCompletar = null;
+let settlementIntentKey = null;
+let settlementIntentUncertain = false;
+const SETTLEMENT_INTENT_STORAGE_KEY = "ww_financial_settlement_intent_v1";
+const SETTLEMENT_INTENT_TTL_MS = 24 * 60 * 60 * 1000;
 let citaPendienteCancelacionId = null;
 let filtroRangoActual = null;
 let filtroEstadoActual = "todos";
@@ -461,16 +465,20 @@ async function activarWeeklyRevenueTab(tab) {
   const income = tab === "income";
   const expenses = tab === "expenses";
   const summary = tab === "summary";
+  const giftCards = tab === "giftCards";
   document.getElementById("weeklyRevenueIncomeTab")?.setAttribute("aria-selected", String(income));
   document.getElementById("weeklyRevenueExpenseTab")?.setAttribute("aria-selected", String(expenses));
   document.getElementById("weeklyRevenueSummaryTab")?.setAttribute("aria-selected", String(summary));
+  document.getElementById("weeklyRevenueGiftCardsTab")?.setAttribute("aria-selected", String(giftCards));
   document.getElementById("weeklyRevenueIncomePanel")?.classList.toggle("hidden", !income);
   document.getElementById("weeklyRevenueExpensePanel")?.classList.toggle("hidden", !expenses);
   document.getElementById("weeklyRevenueSummaryPanel")?.classList.toggle("hidden", !summary);
+  document.getElementById("weeklyRevenueGiftCardsPanel")?.classList.toggle("hidden", !giftCards);
   if (expenses && !periodPending) await window.WoofWashAdminExpenses?.activate?.();
   else window.WoofWashAdminExpenses?.deactivate?.();
   if (summary && !periodPending) await window.WoofWashAdminFinanceSummary?.activate?.();
   else window.WoofWashAdminFinanceSummary?.deactivate?.();
+  if (giftCards) await window.WoofWashAdminGiftCards?.load?.();
 }
 
 function marcarPeriodoFinancieroPendiente() {
@@ -527,6 +535,7 @@ function configurarWeeklyRevenue() {
   document.getElementById("weeklyRevenueIncomeTab")?.addEventListener("click", () => activarWeeklyRevenueTab("income"));
   document.getElementById("weeklyRevenueExpenseTab")?.addEventListener("click", () => activarWeeklyRevenueTab("expenses"));
   document.getElementById("weeklyRevenueSummaryTab")?.addEventListener("click", () => activarWeeklyRevenueTab("summary"));
+  document.getElementById("weeklyRevenueGiftCardsTab")?.addEventListener("click", () => activarWeeklyRevenueTab("giftCards"));
   document.addEventListener("keydown", (event) => {
     const nestedOpen = ["expenseWorkspace", "expenseConfirm", "expenseTicketViewer"].some((id) => !document.getElementById(id)?.classList.contains("hidden"));
     if (event.key === "Escape" && !nestedOpen && !modal?.classList.contains("hidden")) cerrarWeeklyRevenue();
@@ -543,6 +552,7 @@ function configurarWeeklyRevenue() {
     fetcher: agendaFetch,
     getRange: getWeeklyFinanceRange
   });
+  window.WoofWashAdminGiftCards?.init?.({ fetcher: agendaFetch });
   button.dataset.listenerBound = "true";
 }
 
@@ -3654,10 +3664,56 @@ function restaurarSelectCompletarPendiente() {
   }
 }
 
+function guardarIntentoLiquidacion(appointmentId) {
+  if (!settlementIntentKey || !appointmentId) return;
+  localStorage.setItem(SETTLEMENT_INTENT_STORAGE_KEY, JSON.stringify({ appointmentId: String(appointmentId), idempotencyKey: settlementIntentKey, expiresAt: Date.now() + SETTLEMENT_INTENT_TTL_MS }));
+}
+
+function limpiarIntentoLiquidacion() {
+  localStorage.removeItem(SETTLEMENT_INTENT_STORAGE_KEY);
+}
+
+function recuperarIntentoLiquidacion(appointmentId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTLEMENT_INTENT_STORAGE_KEY) || "null");
+    if (!saved || saved.expiresAt <= Date.now()) { limpiarIntentoLiquidacion(); return null; }
+    if (String(saved.appointmentId) !== String(appointmentId) || typeof saved.idempotencyKey !== "string") return null;
+    return saved.idempotencyKey;
+  } catch { limpiarIntentoLiquidacion(); return null; }
+}
+
+async function verificarIntentoLiquidacionPersistido() {
+  if (!settlementIntentKey) return;
+  try {
+    const result = await agendaFetch(`/admin/finance/operations/complete_appointment/${encodeURIComponent(settlementIntentKey)}`, { cache: "no-store" });
+    if (result.status === "completed") {
+      limpiarIntentoLiquidacion(); settlementIntentKey = null; settlementIntentUncertain = false;
+      cerrarModalCompletarCita({ restaurarSelect: false });
+      await Promise.allSettled([cargarCitasAgenda(), cargarStatsAgenda()]);
+      return;
+    }
+    if (["processing", "commit_unknown"].includes(result.status)) {
+      settlementIntentUncertain = true;
+      mostrarErrorCompletarCita("Existe una liquidación pendiente o incierta. Reintenta con el mismo desglose; no generes otra operación.");
+      return;
+    }
+    limpiarIntentoLiquidacion(); settlementIntentKey = null; settlementIntentUncertain = false;
+  } catch {
+    settlementIntentUncertain = true;
+    mostrarErrorCompletarCita("No se pudo verificar la liquidación pendiente. No cierres ni generes otra hasta recuperar su estado.");
+  }
+}
+
 function cerrarModalCompletarCita({ restaurarSelect = true } = {}) {
+  if (settlementIntentUncertain) {
+    mostrarErrorCompletarCita("La operación tiene resultado incierto. Reintenta desde esta pantalla para conservar la misma intención.");
+    return;
+  }
   const { completeModal, completeForm, completeBtnConfirmar } = obtenerElementosAgenda();
   if (restaurarSelect) restaurarSelectCompletarPendiente();
   citaPendienteCompletar = null;
+  settlementIntentKey = null;
+  settlementIntentUncertain = false;
   completeForm?.reset();
   mostrarErrorCompletarCita("");
   if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
@@ -3697,13 +3753,16 @@ function abrirModalCompletarCita(cita, selectElement) {
     completeTotalCobrado.value = "";
     completeTotalCobrado.setCustomValidity("");
   }
-  const unknownPaymentMethod = completeModal.querySelector('input[name="agendaCompletePaymentMethod"][value=""]');
-  if (unknownPaymentMethod) unknownPaymentMethod.checked = true;
+  ["agendaCompleteCash", "agendaCompleteTransfer", "agendaCompleteGiftAmount"].forEach((id) => { const input = document.getElementById(id); if (input) input.value = "0.00"; });
+  const giftCode = document.getElementById("agendaCompleteGiftCode"); if (giftCode) giftCode.value = "";
+  settlementIntentKey = recuperarIntentoLiquidacion(cita.id);
+  settlementIntentUncertain = Boolean(settlementIntentKey);
   if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
   mostrarErrorCompletarCita("");
   completeModal.classList.remove("hidden");
   document.body.classList.add("agenda-modal-open");
   completeTotalCobrado?.focus();
+  if (settlementIntentKey) verificarIntentoLiquidacionPersistido();
 }
 
 async function confirmarCompletarCita(event) {
@@ -3725,11 +3784,38 @@ async function confirmarCompletarCita(event) {
   mostrarErrorCompletarCita("");
 
   try {
-    const selectedPaymentMethod = completeForm?.elements?.agendaCompletePaymentMethod?.value || "";
-    const paymentMethod = selectedPaymentMethod === "" ? null : selectedPaymentMethod;
-    await cambiarEstadoCita(pendiente.id, "completada", totalCobrado, paymentMethod);
+    const parseComponent = (id) => {
+      const raw = document.getElementById(id)?.value?.trim() || "0";
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0 || Math.round(value * 100) !== value * 100) throw new Error("El desglose admite importes no negativos con máximo dos decimales.");
+      return Math.round(value * 100);
+    };
+    const cashCents = parseComponent("agendaCompleteCash");
+    const transferCents = parseComponent("agendaCompleteTransfer");
+    const giftAmountCents = parseComponent("agendaCompleteGiftAmount");
+    const giftCode = document.getElementById("agendaCompleteGiftCode")?.value?.trim() || "";
+    const serviceValueCents = Math.round(totalCobrado * 100);
+    if (cashCents + transferCents + giftAmountCents !== serviceValueCents) throw new Error("El desglose debe coincidir exactamente con el valor total del servicio.");
+    if ((giftAmountCents > 0) !== Boolean(giftCode)) throw new Error("Código e importe de Gift Card deben capturarse juntos.");
+    settlementIntentKey ||= `appointment_settlement_${globalThis.crypto?.randomUUID?.().replaceAll("-", "") || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`;
+    guardarIntentoLiquidacion(pendiente.id);
+    const result = await agendaFetch(`/admin/finance/appointments/${encodeURIComponent(pendiente.id)}/settlements`, {
+      method: "POST", headers: { "Idempotency-Key": settlementIntentKey },
+      body: JSON.stringify({ serviceValueCents, allocations: { cashCents, transferCents, ...(giftAmountCents ? { giftCard: { code: giftCode, amountCents: giftAmountCents } } : {}) } })
+    });
+    if (["pending", "commit_unknown"].includes(result.status)) {
+      settlementIntentUncertain = true;
+      throw new Error("Resultado financiero incierto. Reintenta sin cerrar para conservar la misma intención.");
+    }
+    settlementIntentKey = null;
+    settlementIntentUncertain = false;
+    limpiarIntentoLiquidacion();
     cerrarModalCompletarCita({ restaurarSelect: false });
+    await Promise.allSettled([cargarCitasAgenda(), cargarStatsAgenda()]);
+    calendarioAgendaVisual?.refetchEvents?.();
   } catch (error) {
+    if (!error?.status || error.status >= 500 || [409, 429].includes(error.status)) settlementIntentUncertain = true;
+    else { settlementIntentKey = null; settlementIntentUncertain = false; limpiarIntentoLiquidacion(); }
     mostrarErrorCompletarCita(error.message);
     if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
   }
@@ -3826,6 +3912,7 @@ function renderizarDetalleCita(cita) {
   if (detailGuardarCalificacion) {
     detailGuardarCalificacion.disabled = cita.estado !== "completada";
   }
+  document.getElementById("btnDetailReverseSettlement")?.classList.toggle("hidden", cita.estado !== "completada");
   const whatsappDetalleUrl = crearUrlWhatsAppDetalle(cita);
   const whatsappDetalleValido = esUrlWhatsAppValida(whatsappDetalleUrl);
   detailWhatsApp.textContent = whatsappDetalleValido ? "WhatsApp" : "Sin teléfono válido";
@@ -3891,6 +3978,27 @@ function mostrarFeedbackDetalle(mensaje) {
   mostrarFeedbackDetalle.timeoutId = window.setTimeout(() => {
     detailFeedback.classList.add("hidden");
   }, 1600);
+}
+
+async function reversarLiquidacionDesdeDetalle() {
+  const cita = obtenerCitaDetalleActual(); if (!cita?.id) return;
+  const reason = window.prompt("Motivo obligatorio del reverso contable")?.trim() || "";
+  if (reason.length < 3 || !window.confirm("El reverso conservará el historial y NO registra una devolución física de dinero. ¿Continuar?")) return;
+  const storageKey = "ww_financial_reverse_settlement_intent_v1"; let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(storageKey) || "null"); } catch {}
+  if (!saved || saved.expiresAt <= Date.now() || String(saved.appointmentId) !== String(cita.id)) {
+    saved = { appointmentId: String(cita.id), idempotencyKey: `reverse_settlement_${globalThis.crypto?.randomUUID?.().replaceAll("-", "") || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`, expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
+    localStorage.setItem(storageKey, JSON.stringify(saved));
+  }
+  try {
+    const known = await agendaFetch(`/admin/finance/operations/reverse_settlement/${encodeURIComponent(saved.idempotencyKey)}`, { cache: "no-store" });
+    if (["processing", "commit_unknown"].includes(known.status)) return mostrarFeedbackDetalle("Existe un reverso pendiente o incierto; no generes otro.");
+    if (known.status === "completed") { localStorage.removeItem(storageKey); cerrarModalDetalle(); await Promise.allSettled([cargarCitasAgenda(), cargarStatsAgenda()]); return; }
+    if (known.status === "failed") { localStorage.removeItem(storageKey); return mostrarFeedbackDetalle("El intento anterior falló de forma concluyente. Revisa los datos antes de iniciar otro."); }
+    const result = await agendaFetch(`/admin/finance/appointments/${encodeURIComponent(cita.id)}/settlement-reversal`, { method: "POST", headers: { "Idempotency-Key": saved.idempotencyKey }, body: JSON.stringify({ reason }) });
+    if (["pending", "commit_unknown"].includes(result.status)) return mostrarFeedbackDetalle("Resultado incierto; conserva esta intención y no repitas con otra clave.");
+    localStorage.removeItem(storageKey); cerrarModalDetalle(); await Promise.allSettled([cargarCitasAgenda(), cargarStatsAgenda()]);
+  } catch (error) { mostrarFeedbackDetalle(error.message || "No fue posible reversar la liquidación."); }
 }
 
 function renderizarHistorialClienteLoading() {
@@ -5020,6 +5128,7 @@ async function configurarAgenda() {
     else if (event.target.closest?.("[data-behavior-cancel]")) manejarClickComportamiento(event);
   });
   elementos.detailEditar?.addEventListener("click", editarDesdeDetalle);
+  document.getElementById("btnDetailReverseSettlement")?.addEventListener("click", reversarLiquidacionDesdeDetalle);
   elementos.detailCopiarResumen?.addEventListener("click", () => {
     const cita = obtenerCitaDetalleActual();
     copiarTextoAgenda(construirResumenCita(cita), "Resumen");
@@ -5034,13 +5143,12 @@ async function configurarAgenda() {
   });
 
   elementos.completeForm?.addEventListener("submit", confirmarCompletarCita);
-  elementos.completeForm?.addEventListener("keydown", (event) => {
-    const radio = event.target.closest?.('input[name="agendaCompletePaymentMethod"]');
-    if (radio && event.key === "Enter") {
-      event.preventDefault();
-      radio.checked = true;
-      radio.dispatchEvent(new Event("change", { bubbles: true }));
-    }
+  elementos.completeForm?.addEventListener("input", () => {
+    const pesos = (id) => Number(document.getElementById(id)?.value || 0) || 0;
+    const total = pesos("agendaCompleteTotalCobrado");
+    const applied = pesos("agendaCompleteCash") + pesos("agendaCompleteTransfer") + pesos("agendaCompleteGiftAmount");
+    const node = document.getElementById("agendaCompleteApplied");
+    if (node) node.textContent = `Total aplicado: ${money(applied)} · Pendiente: ${money(total - applied)}`;
   });
   document.getElementById("btnCerrarCompleteModal")?.addEventListener("click", () => cerrarModalCompletarCita());
   document.getElementById("btnCancelarCompleteCita")?.addEventListener("click", () => cerrarModalCompletarCita());

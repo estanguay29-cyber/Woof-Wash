@@ -93,9 +93,13 @@
       lines.push("", `Movimiento de efectivo del día: ${formatMovement(day.cashMovement)}`);
     });
     lines.push("", "────────────", "", `💰 Fondo inicial: ${formatMoney(summary.totals.openingFund)}`,
-      `💵 Total recaudado: ${formatMoney(summary.totals.serviceRevenue)}`,
+      `🧾 Valor de servicios: ${formatMoney(summary.totals.serviceRevenue)}`,
+      `💵 Dinero nuevo recibido: ${formatMoney(summary.totals.totalNewMoneyReceived)}`,
       `💵 Efectivo: ${formatMoney(summary.totals.cashRevenue)}`,
       `🏦 Transferencias: ${formatMoney(summary.totals.transferRevenue)}`,
+      `🎁 Ventas Gift Card: ${formatMoney(summary.totals.giftCardSalesCash + summary.totals.giftCardSalesTransfer)}`,
+      `🎟️ Canjes Gift Card: ${formatMoney(summary.totals.giftCardApplied)}`,
+      `↩️ Devoluciones pagadas: ${formatMoney(summary.totals.refundCashDisbursed + summary.totals.refundTransferDisbursed)}`,
       `📉 Gastos: ${formatMoney(summary.totals.expenses)}`,
       `💰 Efectivo esperado: ${formatMoney(summary.totals.expectedCash)}`);
     if (summary.totals.unclassifiedRevenue > 0) lines.push("",
@@ -118,15 +122,15 @@
 
   function validSummary(data) {
     if (!data || typeof data !== "object" || !data.period || !data.totals || !data.metrics || !Array.isArray(data.days)) return false;
-    const totals = ["openingFund", "serviceRevenue", "cashRevenue", "transferRevenue", "unclassifiedRevenue", "expenses", "expectedCash"];
+    const totals = ["openingFund", "serviceRevenue", "cashRevenue", "transferRevenue", "unclassifiedRevenue", "expenses", "expectedCash", "totalNewMoneyReceived", "giftCardSalesCash", "giftCardSalesTransfer", "giftCardApplied", "refundCashDisbursed", "refundTransferDisbursed"];
     const metrics = ["appointmentsCompleted", "appointmentsWithAmount", "appointmentsWithoutAmount", "activeExpenses"];
     if (!isCivilDate(data.period.from) || !isCivilDate(data.period.to) || data.period.timezone !== "America/Mexico_City") return false;
     if (!totals.every((key) => typeof data.totals[key] === "number" && Number.isFinite(data.totals[key]))) return false;
     if (!metrics.every((key) => Number.isSafeInteger(data.metrics[key]) && data.metrics[key] >= 0)) return false;
     if (data.metrics.appointmentsWithAmount + data.metrics.appointmentsWithoutAmount !== data.metrics.appointmentsCompleted) return false;
-    const classified = Math.round(data.totals.cashRevenue * 100) + Math.round(data.totals.transferRevenue * 100) + Math.round(data.totals.unclassifiedRevenue * 100);
-    if (classified !== Math.round(data.totals.serviceRevenue * 100)) return false;
-    const formula = Math.round(data.totals.openingFund * 100) + Math.round(data.totals.cashRevenue * 100) - Math.round(data.totals.expenses * 100);
+    const newMoney = Math.round(data.totals.cashRevenue * 100) + Math.round(data.totals.transferRevenue * 100);
+    if (newMoney !== Math.round(data.totals.totalNewMoneyReceived * 100)) return false;
+    const formula = Math.round(data.totals.openingFund * 100) + Math.round(data.totals.cashRevenue * 100) - Math.round(data.totals.refundCashDisbursed * 100) - Math.round(data.totals.expenses * 100);
     if (formula !== Math.round(data.totals.expectedCash * 100)) return false;
     const expectedDays = civilDayNumber(data.period.to) - civilDayNumber(data.period.from) + 1;
     if (expectedDays < 1 || data.days.length !== expectedDays) return false;
@@ -135,9 +139,8 @@
       if (!day || !isCivilDate(day.date) || !Array.isArray(day.appointments) || !Array.isArray(day.expenses)) return false;
       if (![day.serviceRevenue, day.cashRevenue, day.transferRevenue, day.unclassifiedRevenue, day.expensesTotal, day.cashMovement].every((value) => typeof value === "number" && Number.isFinite(value))) return false;
       const expectedDate = new Date((civilDayNumber(data.period.from) + index) * 86400000).toISOString().slice(0, 10);
-      const dayClassified = Math.round(day.cashRevenue * 100) + Math.round(day.transferRevenue * 100) + Math.round(day.unclassifiedRevenue * 100);
-      if (day.date !== expectedDate || dayClassified !== Math.round(day.serviceRevenue * 100)
-        || Math.round(day.cashRevenue * 100) - Math.round(day.expensesTotal * 100) !== Math.round(day.cashMovement * 100)) return false;
+      if (day.date !== expectedDate
+        || Math.round(day.cashRevenue * 100) - Math.round((day.refundCashDisbursed || 0) * 100) - Math.round(day.expensesTotal * 100) !== Math.round(day.cashMovement * 100)) return false;
       revenueCents += Math.round(day.serviceRevenue * 100); expenseCents += Math.round(day.expensesTotal * 100);
       appointmentCount += day.appointments.length; expenseCount += day.expenses.length;
       withAmountCount += day.appointments.filter((appointment) => appointment?.amountStatus === "recorded").length;
@@ -298,11 +301,13 @@
       <span>Consulta los ingresos, gastos y movimiento del periodo.</span></div>
       <div class="finance-summary-cards" aria-label="Totales financieros">
         <article><span>Fondo inicial</span><strong>${escapeHtml(formatMoney(data.totals.openingFund))}</strong><small>Fondo fijo del periodo</small></article>
-        <article><span>Total recaudado</span><strong>${escapeHtml(formatMoney(data.totals.serviceRevenue))}</strong><small>Efectivo ${escapeHtml(formatMoney(data.totals.cashRevenue))} · Transferencias ${escapeHtml(formatMoney(data.totals.transferRevenue))}${data.totals.unclassifiedRevenue > 0 ? ` · Pendiente ${escapeHtml(formatMoney(data.totals.unclassifiedRevenue))}` : ""}</small></article>
-        <article><span>Gastos</span><strong>${escapeHtml(formatMoney(data.totals.expenses))}</strong></article>
-        <article class="finance-summary-closing${data.totals.expectedCash < 0 ? " is-negative" : ""}"><span>Efectivo esperado</span><strong>${escapeHtml(formatMoney(data.totals.expectedCash))}</strong><small>Fondo inicial + efectivo − gastos</small></article>
+        <article><span>Valor de servicios</span><strong>${escapeHtml(formatMoney(data.totals.serviceRevenue))}</strong><small>Incluye servicios cubiertos con Gift Card</small></article>
+        <article><span>Dinero nuevo recibido</span><strong>${escapeHtml(formatMoney(data.totals.totalNewMoneyReceived))}</strong><small>Efectivo ${escapeHtml(formatMoney(data.totals.cashRevenue))} · Transferencias ${escapeHtml(formatMoney(data.totals.transferRevenue))}</small></article>
+        <article><span>Gift Cards</span><strong>${escapeHtml(formatMoney(data.totals.giftCardApplied))} canjeado</strong><small>Ventas ${escapeHtml(formatMoney(data.totals.giftCardSalesCash + data.totals.giftCardSalesTransfer))}</small></article>
+        <article><span>Gastos y devoluciones</span><strong>${escapeHtml(formatMoney(data.totals.expenses + data.totals.refundCashDisbursed + data.totals.refundTransferDisbursed))}</strong></article>
+        <article class="finance-summary-closing${data.totals.expectedCash < 0 ? " is-negative" : ""}"><span>Efectivo esperado</span><strong>${escapeHtml(formatMoney(data.totals.expectedCash))}</strong><small>Fondo + efectivo − devoluciones en efectivo − gastos</small></article>
       </div>
-      <div class="finance-summary-formula" aria-label="Fórmula del efectivo esperado"><strong>${escapeHtml(formatMoney(data.totals.openingFund))} + ${escapeHtml(formatMoney(data.totals.cashRevenue))} − ${escapeHtml(formatMoney(data.totals.expenses))} = ${escapeHtml(formatMoney(data.totals.expectedCash))}</strong>
+      <div class="finance-summary-formula" aria-label="Fórmula del efectivo esperado"><strong>${escapeHtml(formatMoney(data.totals.openingFund))} + ${escapeHtml(formatMoney(data.totals.cashRevenue))} − ${escapeHtml(formatMoney(data.totals.refundCashDisbursed))} − ${escapeHtml(formatMoney(data.totals.expenses))} = ${escapeHtml(formatMoney(data.totals.expectedCash))}</strong>
         <span>Fondo inicial + efectivo − gastos = efectivo esperado</span></div>
       <div class="finance-summary-metrics" aria-label="Métricas del periodo">
         <span><strong>${data.metrics.appointmentsCompleted}</strong> Citas completadas</span><span><strong>${data.metrics.appointmentsWithAmount}</strong> Con monto registrado</span>

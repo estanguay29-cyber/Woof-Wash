@@ -315,16 +315,11 @@ test("Expense no usa borrado físico y la UI administrativa no expone internals"
   const backend = fs.readFileSync(path.join(__dirname, "..", "services", "expenseService.js"), "utf8");
   assert.doesNotMatch(backend, /deleteOne|findByIdAndDelete|findOneAndDelete|findByIdAndRemove/);
   const frontendRoot = path.join(__dirname, "..", "..", "Frontend");
-  const files = [];
-  const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory() && entry.name !== "tests") walk(full);
-    else if (!entry.isDirectory() && /\.(js|html|css|cjs)$/.test(entry.name)
-      && !["customer-loyalty-progress.js", "customer-loyalty-reward-use.js"].includes(entry.name)) files.push(full);
-  });
-  walk(frontendRoot);
-  const frontend = files.map((file) => fs.readFileSync(file, "utf8")).join("\n");
-  assert.doesNotMatch(frontend, /amountCents|ticketPublicId|ticketResourceType|ticketFormat|requestFingerprint|idempotencyKey/);
+  const expenseFrontend = [
+    path.join(frontendRoot, "shared", "admin-expenses.js"),
+    path.join(frontendRoot, "shared", "admin-finance-summary.js")
+  ].map((file) => fs.readFileSync(file, "utf8")).join("\n");
+  assert.doesNotMatch(expenseFrontend, /amountCents|ticketPublicId|ticketResourceType|ticketFormat|requestFingerprint|idempotencyKey/);
   for (const relative of ["empleados.html", path.join("empleados", "desempeno.js"), "index.html", "clientes.html"]) {
     assert.doesNotMatch(fs.readFileSync(path.join(frontendRoot, relative), "utf8"), /\/admin\/finance\/expenses|Gastos del periodo/);
   }

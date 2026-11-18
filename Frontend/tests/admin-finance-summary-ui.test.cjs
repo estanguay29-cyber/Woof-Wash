@@ -40,7 +40,7 @@ class FakeNode {
 function fixture(overrides = {}) {
   const base = {
     period: { from: "2026-08-17", to: "2026-08-23", timezone: "America/Mexico_City" },
-    totals: { openingFund: 2000, serviceRevenue: 10000, cashRevenue: 6000, transferRevenue: 4000, unclassifiedRevenue: 0, expenses: 3000, expectedCash: 5000 },
+    totals: { openingFund: 2000, serviceRevenue: 10000, cashRevenue: 6000, transferRevenue: 4000, unclassifiedRevenue: 0, expenses: 3000, expectedCash: 5000, totalNewMoneyReceived: 10000, giftCardSalesCash: 0, giftCardSalesTransfer: 0, giftCardApplied: 0, refundCashDisbursed: 0, refundTransferDisbursed: 0 },
     metrics: { appointmentsCompleted: 2, appointmentsWithAmount: 1, appointmentsWithoutAmount: 1, activeExpenses: 1 },
     days: [
       {
@@ -54,7 +54,9 @@ function fixture(overrides = {}) {
       ...Array.from({ length: 6 }, (_, index) => ({ date: `2026-08-${18 + index}`, serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expensesTotal: 0, cashMovement: 0, appointments: [], expenses: [] }))
     ]
   };
-  return { ...base, ...overrides, totals: { ...base.totals, ...(overrides.totals || {}) }, metrics: { ...base.metrics, ...(overrides.metrics || {}) } };
+  const result = { ...base, ...overrides, totals: { ...base.totals, ...(overrides.totals || {}) }, metrics: { ...base.metrics, ...(overrides.metrics || {}) } };
+  if (!Object.hasOwn(overrides.totals || {}, "totalNewMoneyReceived")) result.totals.totalNewMoneyReceived = result.totals.cashRevenue + result.totals.transferRevenue;
+  return result;
 }
 
 function rangedFixture(from, to) {
@@ -103,7 +105,7 @@ test("render usa exclusivamente totales backend, fórmula visual y métricas rea
   const { summary, nodes } = setup();
   summary.renderSummary(fixture());
   const output = nodes.financeSummaryResult.innerHTML;
-  for (const text of ["Fondo inicial", "Total recaudado", "Efectivo", "Transferencias", "Gastos", "Efectivo esperado", "$2,000.00", "$10,000.00", "$3,000.00", "$5,000.00"]) assert.match(output, new RegExp(text.replace("$", "\\$")));
+  for (const text of ["Fondo inicial", "Dinero nuevo recibido", "Efectivo", "Transferencias", "Gastos", "Efectivo esperado", "$2,000.00", "$10,000.00", "$3,000.00", "$5,000.00"]) assert.match(output, new RegExp(text.replace("$", "\\$")));
   assert.match(output, /Fondo inicial \+ efectivo − gastos = efectivo esperado/i);
   assert.match(output, /<strong>2<\/strong> Citas completadas/);
   assert.match(output, /<strong>1<\/strong> Sin monto registrado/);
@@ -174,7 +176,7 @@ test("alerta usa singular, plural y desaparece en cero; cero sin reward no inven
   assert.match(nodes.financeSummaryResult.innerHTML, /Hay 1 cita completada/);
   const plural = fixture({ metrics: { appointmentsCompleted: 2, appointmentsWithAmount: 0, appointmentsWithoutAmount: 2 } });
   plural.days[0].appointments[0].amountStatus = "missing"; plural.days[0].appointments[0].amountCharged = null;
-  plural.totals.serviceRevenue = 0; plural.totals.cashRevenue = 0; plural.totals.transferRevenue = 0; plural.totals.expectedCash = -1000; plural.days[0].serviceRevenue = 0; plural.days[0].cashRevenue = 0; plural.days[0].transferRevenue = 0; plural.days[0].cashMovement = -3000;
+  plural.totals.serviceRevenue = 0; plural.totals.cashRevenue = 0; plural.totals.transferRevenue = 0; plural.totals.totalNewMoneyReceived = 0; plural.totals.expectedCash = -1000; plural.days[0].serviceRevenue = 0; plural.days[0].cashRevenue = 0; plural.days[0].transferRevenue = 0; plural.days[0].cashMovement = -3000;
   summary.renderSummary(plural); assert.match(nodes.financeSummaryResult.innerHTML, /Hay 2 citas completadas/);
   const zero = fixture({ totals: { serviceRevenue: 0, cashRevenue: 0, transferRevenue: 0, unclassifiedRevenue: 0, expenses: 3000, expectedCash: -1000 }, metrics: { appointmentsCompleted: 1, appointmentsWithAmount: 1, appointmentsWithoutAmount: 0 } });
   zero.days[0].appointments = [zero.days[0].appointments[0]]; zero.days[0].appointments[0].amountCharged = 0; zero.days[0].appointments[0].rewardApplied = false;
@@ -208,7 +210,7 @@ test("7 días con 100 citas y 100 gastos renderizan en tiempo razonable sin URLs
   data.days[0].appointments = Array.from({ length: 100 }, (_, index) => ({ id: `a${index}`, date: "2026-08-15", time: "09:00", customer: `Cliente ${index}`, description: "Servicio", items: [{ type: "pet", name: `Mascota ${index}` }], amountCharged: 10, amountStatus: "recorded", paymentMethod: "cash", rewardApplied: false }));
   data.days[0].expenses = Array.from({ length: 100 }, (_, index) => ({ id: `e${index}`, description: `Gasto ${index}`, expenseDate: "2026-08-15", amount: 5, hasTicket: index % 2 === 0 }));
   data.days[0].serviceRevenue = 1000; data.days[0].cashRevenue = 1000; data.days[0].transferRevenue = 0; data.days[0].expensesTotal = 500; data.days[0].cashMovement = 500;
-  data.totals.serviceRevenue = 1000; data.totals.cashRevenue = 1000; data.totals.transferRevenue = 0; data.totals.expenses = 500; data.totals.expectedCash = 2500;
+  data.totals.serviceRevenue = 1000; data.totals.cashRevenue = 1000; data.totals.transferRevenue = 0; data.totals.totalNewMoneyReceived = 1000; data.totals.expenses = 500; data.totals.expectedCash = 2500;
   data.metrics = { appointmentsCompleted: 100, appointmentsWithAmount: 100, appointmentsWithoutAmount: 0, activeExpenses: 100 };
   const started = performance.now(); summary.renderSummary(data); const elapsed = performance.now() - started;
   assert.ok(elapsed < 1000, `render tardó ${elapsed}ms`);
@@ -331,7 +333,7 @@ test("builder puro produce el string básico completo sin consultar ni mutar el 
   const { summary } = setup(); const data = rangedFixture("2026-08-17", "2026-08-17");
   const before = JSON.stringify(data); const message = summary.buildFinanceSummaryMessage(data);
   for (const expected of ["🐾 WOOF & WASH", "• Aracely — Kayse y Mila — $10,000.00 · Efectivo", "Efectivo: $6,000.00",
-    "Transferencias: $4,000.00", "💵 Total recaudado: $10,000.00", "💰 Efectivo esperado: $5,000.00"]) assert.match(message, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    "Transferencias: $4,000.00", "💵 Dinero nuevo recibido: $10,000.00", "💰 Efectivo esperado: $5,000.00"]) assert.match(message, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.equal(JSON.stringify(data), before);
   assert.doesNotMatch(source.match(/function buildFinanceSummaryMessage[\s\S]+?\n  }/)?.[0] || "", /fetch|agendaFetch|document|localStorage/);
 });
@@ -392,14 +394,14 @@ test("preview, portapapeles y WhatsApp comparten exactamente un string sin GET n
 
 test("invalidación y cambio de inputs bloquean generar, copiar y WhatsApp hasta refetch", async () => {
   const copied = []; const opened = []; const { summary, nodes } = setup({ clipboard: { writeText: async (value) => copied.push(value) }, open: (...args) => opened.push(args) });
-  const responses = [rangedFixture("2026-08-17", "2026-08-21"), rangedFixture("2026-08-17", "2026-08-21")]; responses[1].totals.serviceRevenue = 11000; responses[1].totals.cashRevenue = 7000; responses[1].totals.expectedCash = 6000; responses[1].days[0].serviceRevenue = 11000; responses[1].days[0].cashRevenue = 7000; responses[1].days[0].cashMovement = 4000; responses[1].days[0].appointments[0].amountCharged = 11000;
+  const responses = [rangedFixture("2026-08-17", "2026-08-21"), rangedFixture("2026-08-17", "2026-08-21")]; responses[1].totals.serviceRevenue = 11000; responses[1].totals.cashRevenue = 7000; responses[1].totals.totalNewMoneyReceived = 11000; responses[1].totals.expectedCash = 6000; responses[1].days[0].serviceRevenue = 11000; responses[1].days[0].cashRevenue = 7000; responses[1].days[0].cashMovement = 4000; responses[1].days[0].appointments[0].amountCharged = 11000;
   nodes.financeSummaryFrom.value = "2026-08-17"; nodes.financeSummaryTo.value = "2026-08-21";
   summary.init({ fetcher: async () => responses.shift(), getInitialRange: async () => null }); await summary.activate();
   nodes.financeSummaryGenerate.listeners.click[0](); summary.invalidate();
   assert.equal(nodes.financeSummaryMessageCopy.disabled, true); assert.match(nodes.financeSummaryMessageStatus.textContent, /datos cambiaron/i);
   await summary._copyMessage(); summary._shareMessageWhatsapp(); assert.equal(copied.length, 0); assert.equal(opened.length, 0);
   summary._showSummaryView(); await summary._load({ force: true }); nodes.financeSummaryGenerate.listeners.click[0]();
-  assert.match(nodes.financeSummaryMessageText.textContent, /Total recaudado: \$11,000\.00/);
+  assert.match(nodes.financeSummaryMessageText.textContent, /Dinero nuevo recibido: \$11,000\.00/);
   summary._showSummaryView(); nodes.financeSummaryFrom.value = "2026-08-16"; nodes.financeSummaryFrom.listeners.change[0]();
   assert.equal(nodes.financeSummaryGenerateActions.classList.contains("hidden"), true);
 });

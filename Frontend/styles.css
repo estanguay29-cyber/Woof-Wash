@@ -7780,7 +7780,26 @@ body {
 .weekly-revenue-payment-field input:focus-visible + span { outline: 3px solid rgba(140, 198, 63, .45); outline-offset: 2px; }
 .weekly-revenue-row-status { flex-basis: 100%; color: #475569; font-weight: 700; }
 
+.agenda-payment-allocation, .gift-card-sale-form { display: grid; gap: 12px; }
+.agenda-payment-components { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.agenda-payment-components label, .gift-card-sale-form label { display: grid; gap: 6px; color: #334155; font-weight: 800; }
+.agenda-payment-components input, .gift-card-sale-form input, .gift-card-sale-form select { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 12px; font: inherit; background: #fff; }
+.agenda-payment-applied { margin: 0; color: #475569; font-weight: 800; }
+.gift-card-admin { display: grid; gap: 18px; }
+.gift-card-sale-form { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; border: 1px solid #dfe6ef; border-radius: 18px; background: #f8fafc; }
+.gift-card-sale-form .admin-button, .gift-card-admin-status { grid-column: 1 / -1; }
+.gift-card-code-panel { padding: 18px; border: 2px solid #8cc63f; border-radius: 18px; background: #f4fce9; }
+.gift-card-code-panel code { display: block; margin: 10px 0; overflow-wrap: anywhere; font-size: clamp(1rem, 4vw, 1.5rem); font-weight: 900; }
+.gift-card-list { display: grid; gap: 12px; }
+.gift-card-list > article { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 16px; border: 1px solid #dfe6ef; border-radius: 16px; }
+.gift-card-list > article > div { display: grid; gap: 5px; }
+.gift-card-history { flex-basis: 100%; padding-top: 10px; border-top: 1px solid #e5eaf1; }
+.gift-card-history.hidden, .gift-card-code-panel.hidden { display: none; }
+.gift-card-admin-status.is-error { color: #b42318; }
+
 @media (max-width: 768px) {
+  .agenda-payment-components, .gift-card-sale-form { grid-template-columns: 1fr; }
+  .gift-card-sale-form .admin-button, .gift-card-admin-status { grid-column: 1; }
   .weekly-revenue-row { grid-template-columns: 1fr; }
   .weekly-revenue-row-action { justify-items: stretch; }
   .weekly-revenue-row-action .admin-button { min-height: 44px; }
