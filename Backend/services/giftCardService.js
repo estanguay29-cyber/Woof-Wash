@@ -92,6 +92,19 @@ function validateAmountRedemption({ card, amountCents, serviceValueCents, reward
   });
 }
 
+function quoteAmountRedemption({ card, serviceValueCents, now = new Date() } = {}) {
+  validateAmountCard(card);
+  safeCents(serviceValueCents, "serviceValueCents", { positive: true });
+  const availability = redemptionAvailability(card, now);
+  if (!availability.redeemable) fail(availability.expired ? "GIFT_CARD_EXPIRED" : "GIFT_CARD_NOT_REDEEMABLE", "La Gift Card no es canjeable");
+  const redeemAmountCents = Math.min(serviceValueCents, availability.availableBalanceCents);
+  return Object.freeze({
+    availableBalanceCents: availability.availableBalanceCents,
+    redeemAmountCents,
+    remainderCents: serviceValueCents - redeemAmountCents
+  });
+}
+
 function validatePackageRedemption({ card, petId, serviceKey, rewardGratisAplicado = false, now = new Date() } = {}) {
   validatePackageCard(card);
   if (rewardGratisAplicado) fail("LOYALTY_GIFT_CARD_CONFLICT", "Una recompensa gratuita no puede combinarse con Gift Card");
@@ -154,6 +167,7 @@ module.exports = {
   calculateAmountBalance,
   calculateCalendarExpiry: GiftCard.calculateCalendarExpiry,
   calculatePackageUnits,
+  quoteAmountRedemption,
   redemptionAvailability,
   summarizeBalances,
   validateAmountCard,

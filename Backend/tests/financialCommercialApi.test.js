@@ -37,6 +37,7 @@ function serviceStub() {
     async releaseGiftCardRefund(input) { calls.push(["refund-release", input]); return { status: "completed", refund: { id: input.refundId, status: "cancelled" } }; },
     async listAmountGiftCards(input) { calls.push(["list", input]); return [{ id: "card", codeLabel: "•••• 1234" }]; },
     async getAmountGiftCard(input) { calls.push(["detail", input]); return { id: input.giftCardId, movements: [] }; },
+    async quoteAmountGiftCard(input) { calls.push(["quote", input]); return { status: "active", availableBalanceCents: 30000, redeemAmountCents: 30000, remainderCents: 20000 }; },
     async sellAmountGiftCard(input) { calls.push(["sale", input]); return { status: "completed", replayed: false, giftCard: { id: "card" }, code: "WW-SECRET-CODE" }; },
     async activateAmountGiftCard(input) { calls.push(["activate", input]); return { status: "completed", replayed: false, giftCard: { id: input.giftCardId, status: "active" } }; },
     async replaceLostGiftCard(input) { calls.push(["replace", input]); return { status: "completed", replayed: false, giftCard: { id: "replacement", status: "active" }, code: "WW-NEW-SECRET-CODE" }; },
@@ -57,6 +58,19 @@ test("consultas admin de Gift Cards exponen solo DTO seguro y conservan autoriza
   assert.equal(detail.status, 200);
   assert.equal(detail.body.giftCard.code, undefined);
   assert.equal(service.calls[0][1].actorUserId, "507f1f77bcf86cd799439011");
+});
+
+test("consulta previa de Gift Card es solo admin, no usa URL y no crea operación", async () => {
+  const service = serviceStub();
+  const app = appWith(service);
+  const path = "/admin/finance/gift-cards/quote";
+  assert.equal((await request(app).post(path).send({ code: "WW-CODE", serviceValueCents: 50000 })).status, 401);
+  assert.equal((await request(app).post(path).set("X-Test-Role", "empleado").send({ code: "WW-CODE", serviceValueCents: 50000 })).status, 403);
+  const response = await request(app).post(path).set("X-Test-Role", "admin").send({ code: "WW-CODE", serviceValueCents: 50000 });
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.quote, { status: "active", availableBalanceCents: 30000, redeemAmountCents: 30000, remainderCents: 20000 });
+  const input = service.calls.find(([kind]) => kind === "quote")[1];
+  assert.deepEqual(input, { actorUserId: "507f1f77bcf86cd799439011", code: "WW-CODE", serviceValueCents: 50000 });
 });
 
 test("estado de intención es administrativo y no expone huella ni payload", async () => {

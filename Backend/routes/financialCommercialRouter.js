@@ -59,6 +59,18 @@ function createFinancialCommercialRouter({ service, auth, requireAdmin, writeLim
     }
   });
 
+  router.post("/gift-cards/quote", auth, requireAdmin, async (req, res) => {
+    try {
+      return res.json({ quote: await service.quoteAmountGiftCard({
+        actorUserId: req.admin._id,
+        code: req.body?.code,
+        serviceValueCents: req.body?.serviceValueCents
+      }) });
+    } catch (error) {
+      return safeError(error, res);
+    }
+  });
+
   router.get("/gift-cards/:id", auth, requireAdmin, async (req, res) => {
     try {
       return res.json({ giftCard: await service.getAmountGiftCard({ actorUserId: req.admin._id, giftCardId: req.params.id }) });

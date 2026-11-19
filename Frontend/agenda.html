@@ -513,12 +513,29 @@
           </span>
         </label>
         <fieldset class="agenda-payment-method agenda-field-full">
-          <legend>Desglose del pago</legend>
-          <div class="agenda-payment-components">
+          <legend>¿Cómo pagó?</legend>
+          <div id="agendaPaymentChoices" class="agenda-payment-choices" role="group" aria-label="Método de pago">
+            <button type="button" class="is-active" data-payment-mode="cash" aria-pressed="true">Efectivo</button>
+            <button type="button" data-payment-mode="transfer" aria-pressed="false">Transferencia</button>
+            <button type="button" data-payment-mode="gift_card" aria-pressed="false">Gift Card</button>
+            <button type="button" data-payment-mode="mixed" aria-pressed="false">Mixto</button>
+          </div>
+          <div id="agendaCompleteMixedFields" class="agenda-payment-components hidden">
             <label>Efectivo $<input id="agendaCompleteCash" type="text" inputmode="decimal" value="0.00"></label>
-            <label>Transferencia $<input id="agendaCompleteTransfer" type="text" inputmode="decimal" value="0.00"></label>
+            <label>Transferencia $<input id="agendaCompleteTransfer" type="text" inputmode="decimal" value="0.00" readonly></label>
+          </div>
+          <div id="agendaCompleteGiftFields" class="agenda-gift-payment hidden">
             <label>Código Gift Card<input id="agendaCompleteGiftCode" type="text" autocomplete="off" spellcheck="false" placeholder="WW-…"></label>
-            <label>Gift Card $<input id="agendaCompleteGiftAmount" type="text" inputmode="decimal" value="0.00"></label>
+            <button id="agendaCompleteGiftQuote" type="button" class="admin-button admin-button-light">Consultar saldo</button>
+            <p id="agendaCompleteGiftStatus" class="agenda-gift-status" role="status" aria-live="polite"></p>
+            <label class="hidden">Gift Card $<input id="agendaCompleteGiftAmount" type="text" inputmode="decimal" value="0.00" readonly></label>
+            <div id="agendaCompleteGiftRemainder" class="agenda-gift-remainder hidden">
+              <span id="agendaCompleteGiftDifference"></span>
+              <div role="group" aria-label="Forma de pago de la diferencia">
+                <button type="button" class="is-active" data-gift-remainder="cash" aria-pressed="true">Diferencia en efectivo</button>
+                <button type="button" data-gift-remainder="transfer" aria-pressed="false">Diferencia por transferencia</button>
+              </div>
+            </div>
           </div>
           <p id="agendaCompleteApplied" class="agenda-payment-applied">Total aplicado: $0.00 · Pendiente: $0.00</p>
         </fieldset>
@@ -755,6 +772,6 @@
   <script src="shared/admin-expenses.js?v=20260826-expense-create-cors-v1"></script>
   <script src="shared/admin-finance-summary.js?v=20261014-unlimited-finance-range-v1"></script>
   <script src="shared/admin-gift-cards.js?v=20261117-financial-admin-v1"></script>
-  <script src="agenda.js?v=20260804-pet-behavior-v4-weekly-revenue-v2-20260806-expenses-ui-v1-finance-message-ui-v1-shared-finance-period-v1-20261014-date-summary-v1"></script>
+  <script src="agenda.js?v=20261119-payment-buttons-v1"></script>
 </body>
 </html>

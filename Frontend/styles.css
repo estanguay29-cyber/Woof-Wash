@@ -7784,6 +7784,18 @@ body {
 .agenda-payment-components { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .agenda-payment-components label, .gift-card-sale-form label { display: grid; gap: 6px; color: #334155; font-weight: 800; }
 .agenda-payment-components input, .gift-card-sale-form input, .gift-card-sale-form select { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 12px; font: inherit; background: #fff; }
+.agenda-payment-choices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.agenda-payment-choices button, .agenda-gift-remainder button { min-height: 46px; padding: 9px 12px; border: 1px solid #b9c6d7; border-radius: 12px; color: #334155; background: #fff; font: inherit; font-weight: 850; cursor: pointer; }
+.agenda-payment-choices button.is-active, .agenda-gift-remainder button.is-active { border-color: #0b2a6b; color: #fff; background: #0b2a6b; box-shadow: 0 4px 12px rgba(11, 42, 107, .16); }
+.agenda-payment-choices button:focus-visible, .agenda-gift-remainder button:focus-visible { outline: 3px solid rgba(140, 198, 63, .45); outline-offset: 2px; }
+.agenda-gift-payment { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.agenda-gift-payment > label { display: grid; gap: 6px; color: #334155; font-weight: 800; }
+.agenda-gift-payment input { width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 12px; font: inherit; background: #fff; }
+.agenda-gift-status, .agenda-gift-remainder { grid-column: 1 / -1; margin: 0; color: #475569; font-weight: 800; }
+.agenda-gift-status.is-error { color: #b42318; }
+.agenda-gift-remainder { display: grid; gap: 8px; padding: 12px; border: 1px solid #d9e2ed; border-radius: 14px; background: #f8fafc; }
+.agenda-gift-remainder > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.agenda-gift-payment.hidden, .agenda-payment-components.hidden, .agenda-gift-remainder.hidden { display: none; }
 .agenda-payment-applied { margin: 0; color: #475569; font-weight: 800; }
 .gift-card-admin { display: grid; gap: 18px; }
 .gift-card-sale-form { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; border: 1px solid #dfe6ef; border-radius: 18px; background: #f8fafc; }
@@ -7799,6 +7811,9 @@ body {
 
 @media (max-width: 768px) {
   .agenda-payment-components, .gift-card-sale-form { grid-template-columns: 1fr; }
+  .agenda-payment-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agenda-gift-payment { grid-template-columns: minmax(0, 1fr); }
+  .agenda-gift-status, .agenda-gift-remainder { grid-column: 1; }
   .gift-card-sale-form .admin-button, .gift-card-admin-status { grid-column: 1; }
   .weekly-revenue-row { grid-template-columns: 1fr; }
   .weekly-revenue-row-action { justify-items: stretch; }

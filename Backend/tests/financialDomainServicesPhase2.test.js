@@ -177,6 +177,17 @@ test("Gift Card monetaria admite canje parcial y total sin superar saldo o servi
   }), (error) => error.code === "INSUFFICIENT_BALANCE");
 });
 
+test("cotización Gift Card propone cobertura total o diferencia sin mutar saldo", () => {
+  const card = moneyCard({ balanceCents: 50000 });
+  assert.deepEqual(giftCardService.quoteAmountRedemption({ card, serviceValueCents: 40000, now: new Date("2026-11-09T18:00:00Z") }), {
+    availableBalanceCents: 50000, redeemAmountCents: 40000, remainderCents: 0
+  });
+  assert.deepEqual(giftCardService.quoteAmountRedemption({ card, serviceValueCents: 80000, now: new Date("2026-11-09T18:00:00Z") }), {
+    availableBalanceCents: 50000, redeemAmountCents: 50000, remainderCents: 30000
+  });
+  assert.equal(card.balanceCents, 50000);
+});
+
 test("Gift Card vencida conserva saldo auditable pero no canjeable", () => {
   const card = moneyCard({ status: "expired", balanceCents: 25000, expiresOn: "2026-10-31" });
   const availability = giftCardService.redemptionAvailability(card, new Date("2026-11-09T18:00:00Z"));

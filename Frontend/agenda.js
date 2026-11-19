@@ -117,6 +117,9 @@ let detalleEstadoActualizando = false;
 let citaPendienteCompletar = null;
 let settlementIntentKey = null;
 let settlementIntentUncertain = false;
+let completePaymentMode = "cash";
+let completeGiftQuote = null;
+let completeGiftRemainderMode = "cash";
 const SETTLEMENT_INTENT_STORAGE_KEY = "ww_financial_settlement_intent_v1";
 const SETTLEMENT_INTENT_TTL_MS = 24 * 60 * 60 * 1000;
 let citaPendienteCancelacionId = null;
@@ -3664,6 +3667,126 @@ function restaurarSelectCompletarPendiente() {
   }
 }
 
+function montoCompletarEnCentavos() {
+  const raw = document.getElementById("agendaCompleteTotalCobrado")?.value?.trim() || "";
+  if (!raw) return 0;
+  try { return Math.round(normalizarMontoCobrado(raw) * 100); }
+  catch { return 0; }
+}
+
+function escribirMontoCompletar(id, cents) {
+  const input = document.getElementById(id);
+  if (input) input.value = (Math.max(0, cents) / 100).toFixed(2);
+}
+
+function limpiarCotizacionGiftCard(mensaje = "") {
+  completeGiftQuote = null;
+  escribirMontoCompletar("agendaCompleteGiftAmount", 0);
+  document.getElementById("agendaCompleteGiftRemainder")?.classList.add("hidden");
+  const status = document.getElementById("agendaCompleteGiftStatus");
+  if (status) { status.textContent = mensaje; status.classList.remove("is-error"); }
+}
+
+function calcularDesglosePagoCompletar({ mode, totalCents, cashInputCents = 0, giftAmountCents = 0, giftRemainderMode = "cash" } = {}) {
+  let cashCents = 0;
+  let transferCents = 0;
+  let giftCents = 0;
+  if (mode === "cash") cashCents = totalCents;
+  if (mode === "transfer") transferCents = totalCents;
+  if (mode === "mixed") {
+    cashCents = Math.min(totalCents, Math.max(0, cashInputCents));
+    transferCents = totalCents - cashCents;
+  }
+  if (mode === "gift_card") {
+    giftCents = Math.min(totalCents, Math.max(0, giftAmountCents));
+    const remainderCents = totalCents - giftCents;
+    if (giftRemainderMode === "transfer") transferCents = remainderCents;
+    else cashCents = remainderCents;
+  }
+  return { cashCents, transferCents, giftCents };
+}
+
+function renderDesgloseCompletar() {
+  const totalCents = montoCompletarEnCentavos();
+  const rawCash = Number(document.getElementById("agendaCompleteCash")?.value || 0);
+  const { cashCents, transferCents, giftCents } = calcularDesglosePagoCompletar({
+    mode: completePaymentMode,
+    totalCents,
+    cashInputCents: Number.isFinite(rawCash) ? Math.round(rawCash * 100) : 0,
+    giftAmountCents: completeGiftQuote?.redeemAmountCents || 0,
+    giftRemainderMode: completeGiftRemainderMode
+  });
+  if (completePaymentMode !== "mixed") escribirMontoCompletar("agendaCompleteCash", cashCents);
+  escribirMontoCompletar("agendaCompleteTransfer", transferCents);
+  escribirMontoCompletar("agendaCompleteGiftAmount", giftCents);
+  const applied = cashCents + transferCents + giftCents;
+  const node = document.getElementById("agendaCompleteApplied");
+  if (node) node.textContent = `Total aplicado: ${money(applied / 100)} · Pendiente: ${money((totalCents - applied) / 100)}`;
+}
+
+function seleccionarModoPagoCompletar(mode) {
+  if (!["cash", "transfer", "gift_card", "mixed"].includes(mode)) return;
+  completePaymentMode = mode;
+  document.querySelectorAll("[data-payment-mode]").forEach((button) => {
+    const active = button.dataset.paymentMode === mode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  document.getElementById("agendaCompleteMixedFields")?.classList.toggle("hidden", mode !== "mixed");
+  document.getElementById("agendaCompleteGiftFields")?.classList.toggle("hidden", mode !== "gift_card");
+  if (mode !== "gift_card") {
+    limpiarCotizacionGiftCard();
+    const giftCode = document.getElementById("agendaCompleteGiftCode");
+    if (giftCode) giftCode.value = "";
+  }
+  if (mode === "mixed") escribirMontoCompletar("agendaCompleteCash", 0);
+  renderDesgloseCompletar();
+}
+
+function seleccionarDiferenciaGiftCard(mode) {
+  completeGiftRemainderMode = mode === "transfer" ? "transfer" : "cash";
+  document.querySelectorAll("[data-gift-remainder]").forEach((button) => {
+    const active = button.dataset.giftRemainder === completeGiftRemainderMode;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  renderDesgloseCompletar();
+}
+
+async function consultarGiftCardCompletar() {
+  const code = document.getElementById("agendaCompleteGiftCode")?.value?.trim() || "";
+  const serviceValueCents = montoCompletarEnCentavos();
+  const status = document.getElementById("agendaCompleteGiftStatus");
+  const button = document.getElementById("agendaCompleteGiftQuote");
+  if (!serviceValueCents) { mostrarErrorCompletarCita("Captura primero el importe total de la cita."); return; }
+  if (!code) { mostrarErrorCompletarCita("Captura el código de la Gift Card."); return; }
+  mostrarErrorCompletarCita("");
+  if (button) button.disabled = true;
+  if (status) { status.textContent = "Consultando vigencia y saldo…"; status.classList.remove("is-error"); }
+  try {
+    const data = await agendaFetch("/admin/finance/gift-cards/quote", {
+      method: "POST", cache: "no-store", body: JSON.stringify({ code, serviceValueCents })
+    });
+    const quote = data?.quote;
+    if (!quote || !Number.isSafeInteger(quote.redeemAmountCents) || !Number.isSafeInteger(quote.remainderCents)) throw new Error("La respuesta de saldo no es válida.");
+    completeGiftQuote = { ...quote, code: code.toUpperCase(), serviceValueCents };
+    escribirMontoCompletar("agendaCompleteGiftAmount", quote.redeemAmountCents);
+    const expiry = quote.expiresOn ? ` · Vigente hasta ${quote.expiresOn}` : "";
+    if (status) status.textContent = `Saldo disponible: ${money(quote.availableBalanceCents / 100)} · Se descontará: ${money(quote.redeemAmountCents / 100)}${expiry}`;
+    const remainder = document.getElementById("agendaCompleteGiftRemainder");
+    remainder?.classList.toggle("hidden", quote.remainderCents === 0);
+    const difference = document.getElementById("agendaCompleteGiftDifference");
+    if (difference) difference.textContent = quote.remainderCents ? `Faltan ${money(quote.remainderCents / 100)}. Elige cómo se pagó la diferencia.` : "La Gift Card cubre el total.";
+    renderDesgloseCompletar();
+  } catch (error) {
+    limpiarCotizacionGiftCard();
+    if (status) { status.textContent = error.message || "No se pudo consultar la Gift Card."; status.classList.add("is-error"); }
+    renderDesgloseCompletar();
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
 function guardarIntentoLiquidacion(appointmentId) {
   if (!settlementIntentKey || !appointmentId) return;
   localStorage.setItem(SETTLEMENT_INTENT_STORAGE_KEY, JSON.stringify({ appointmentId: String(appointmentId), idempotencyKey: settlementIntentKey, expiresAt: Date.now() + SETTLEMENT_INTENT_TTL_MS }));
@@ -3755,6 +3878,10 @@ function abrirModalCompletarCita(cita, selectElement) {
   }
   ["agendaCompleteCash", "agendaCompleteTransfer", "agendaCompleteGiftAmount"].forEach((id) => { const input = document.getElementById(id); if (input) input.value = "0.00"; });
   const giftCode = document.getElementById("agendaCompleteGiftCode"); if (giftCode) giftCode.value = "";
+  completeGiftQuote = null;
+  completeGiftRemainderMode = "cash";
+  seleccionarDiferenciaGiftCard("cash");
+  seleccionarModoPagoCompletar("cash");
   settlementIntentKey = recuperarIntentoLiquidacion(cita.id);
   settlementIntentUncertain = Boolean(settlementIntentKey);
   if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;
@@ -3795,6 +3922,12 @@ async function confirmarCompletarCita(event) {
     const giftAmountCents = parseComponent("agendaCompleteGiftAmount");
     const giftCode = document.getElementById("agendaCompleteGiftCode")?.value?.trim() || "";
     const serviceValueCents = Math.round(totalCobrado * 100);
+    if (completePaymentMode === "gift_card" && (!completeGiftQuote
+      || completeGiftQuote.code !== giftCode.toUpperCase()
+      || completeGiftQuote.serviceValueCents !== serviceValueCents
+      || completeGiftQuote.redeemAmountCents !== giftAmountCents)) {
+      throw new Error("Consulta nuevamente el saldo de la Gift Card antes de completar la cita.");
+    }
     if (cashCents + transferCents + giftAmountCents !== serviceValueCents) throw new Error("El desglose debe coincidir exactamente con el valor total del servicio.");
     if ((giftAmountCents > 0) !== Boolean(giftCode)) throw new Error("Código e importe de Gift Card deben capturarse juntos.");
     settlementIntentKey ||= `appointment_settlement_${globalThis.crypto?.randomUUID?.().replaceAll("-", "") || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`;
@@ -5143,12 +5276,17 @@ async function configurarAgenda() {
   });
 
   elementos.completeForm?.addEventListener("submit", confirmarCompletarCita);
-  elementos.completeForm?.addEventListener("input", () => {
-    const pesos = (id) => Number(document.getElementById(id)?.value || 0) || 0;
-    const total = pesos("agendaCompleteTotalCobrado");
-    const applied = pesos("agendaCompleteCash") + pesos("agendaCompleteTransfer") + pesos("agendaCompleteGiftAmount");
-    const node = document.getElementById("agendaCompleteApplied");
-    if (node) node.textContent = `Total aplicado: ${money(applied)} · Pendiente: ${money(total - applied)}`;
+  document.getElementById("agendaPaymentChoices")?.addEventListener("click", (event) => seleccionarModoPagoCompletar(event.target.closest?.("[data-payment-mode]")?.dataset.paymentMode));
+  document.getElementById("agendaCompleteGiftRemainder")?.addEventListener("click", (event) => seleccionarDiferenciaGiftCard(event.target.closest?.("[data-gift-remainder]")?.dataset.giftRemainder));
+  document.getElementById("agendaCompleteGiftQuote")?.addEventListener("click", consultarGiftCardCompletar);
+  document.getElementById("agendaCompleteTotalCobrado")?.addEventListener("input", () => {
+    if (completePaymentMode === "gift_card") limpiarCotizacionGiftCard("El total cambió. Consulta nuevamente el saldo.");
+    renderDesgloseCompletar();
+  });
+  document.getElementById("agendaCompleteCash")?.addEventListener("input", renderDesgloseCompletar);
+  document.getElementById("agendaCompleteGiftCode")?.addEventListener("input", () => {
+    if (completeGiftQuote) limpiarCotizacionGiftCard("El código cambió. Consulta nuevamente el saldo.");
+    renderDesgloseCompletar();
   });
   document.getElementById("btnCerrarCompleteModal")?.addEventListener("click", () => cerrarModalCompletarCita());
   document.getElementById("btnCancelarCompleteCita")?.addEventListener("click", () => cerrarModalCompletarCita());

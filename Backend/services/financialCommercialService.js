@@ -15,7 +15,7 @@ const { createFinancialCommandRepository } = require("../repositories/financialC
 const { createFinancialCommandAttemptRepository } = require("../repositories/financialCommandAttemptRepository");
 const { createFinancialCommandCoordinator, FinancialCommandCoordinatorError } = require("./financialCommandCoordinator");
 const { validatePaymentAllocation } = require("./appointmentSettlementService");
-const { validateAmountRedemption } = require("./giftCardService");
+const { quoteAmountRedemption, validateAmountRedemption } = require("./giftCardService");
 const { FinancialTransactionError, runFinancialTransaction } = require("./financialTransactionRunner");
 
 const KEY_PATTERN = /^[A-Za-z0-9_-]{16,100}$/;
@@ -408,6 +408,26 @@ function createFinancialCommercialService({
     };
   }
 
+  async function quoteAmountGiftCard({ actorUserId, code, serviceValueCents } = {}) {
+    await authorizeAdmin(actorUserId).then((allowed) => { if (allowed !== true) fail(403, "ADMIN_REQUIRED", "La operacion requiere administrador"); });
+    const serviceValue = cents(serviceValueCents, "serviceValueCents", { positive: true });
+    let codeHash;
+    try { codeHash = GiftCard.hashCode(code); }
+    catch { fail(400, "INVALID_GIFT_CARD_CODE", "Codigo de Gift Card invalido"); }
+    const card = await models.GiftCard.findOne({ codeHash, type: "amount" })
+      .select("+codeHash type status codePrefix codeLast4 initialAmountCents balanceCents heldBalanceCents expiresOn").lean();
+    if (!card) fail(404, "GIFT_CARD_NOT_FOUND", "Gift Card no encontrada");
+    let quote;
+    try { quote = quoteAmountRedemption({ card, serviceValueCents: serviceValue, now: clock.now() }); }
+    catch (error) { fail(409, error.code || "GIFT_CARD_NOT_REDEEMABLE", error.message || "La Gift Card no es canjeable"); }
+    return {
+      status: card.status,
+      codeLabel: `${card.codePrefix}••••${card.codeLast4}`,
+      expiresOn: card.expiresOn,
+      ...quote
+    };
+  }
+
   async function getOperationStatus({ actorUserId, idempotencyKey, commandType } = {}) {
     const actor = id(actorUserId, "actorUserId");
     const safeKey = key(idempotencyKey);
@@ -651,7 +671,7 @@ function createFinancialCommercialService({
     });
   }
 
-  return Object.freeze({ sellAmountGiftCard, activateAmountGiftCard, replaceLostGiftCard, confirmReplacementDelivery, settleAppointment, reverseSettlement, listAmountGiftCards, getAmountGiftCard, getOperationStatus, requestGiftCardRefund, authorizeGiftCardRefund, rejectGiftCardRefund, payGiftCardRefund, releaseGiftCardRefund });
+  return Object.freeze({ sellAmountGiftCard, activateAmountGiftCard, replaceLostGiftCard, confirmReplacementDelivery, settleAppointment, reverseSettlement, listAmountGiftCards, getAmountGiftCard, quoteAmountGiftCard, getOperationStatus, requestGiftCardRefund, authorizeGiftCardRefund, rejectGiftCardRefund, payGiftCardRefund, releaseGiftCardRefund });
 }
 
 module.exports = { FinancialCommercialError, createArtifactProbe, createFinancialCommercialService };

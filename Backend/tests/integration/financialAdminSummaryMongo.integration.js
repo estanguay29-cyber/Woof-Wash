@@ -64,9 +64,19 @@ test("Mongo físico concilia histórico, mixto, canjes parcial/completo, gasto y
   }
   await models.Appointment.create(appointmentData({ estado: "completada", totalCobrado: 300, paymentMethod: "cash", financialVersion: 1 }));
   const card = await sellActivate(100000);
+  const fullQuote = await commercial.quoteAmountGiftCard({ actorUserId: ADMIN, code: card.code, serviceValueCents: 80000 });
+  assert.match(fullQuote.codeLabel, /^WW-.+••••.{4}$/);
+  assert.deepEqual({ ...fullQuote, codeLabel: undefined }, {
+    status: "active", codeLabel: undefined, expiresOn: "2027-02-17",
+    availableBalanceCents: 100000, redeemAmountCents: 80000, remainderCents: 0
+  });
 
   const mixedAppointment = await models.Appointment.create(appointmentData({ hora: "11:00" }));
   await commercial.settleAppointment({ actorUserId: ADMIN, idempotencyKey: key("summary_mixed"), appointmentId: mixedAppointment._id, serviceValueCents: 80000, allocations: { cashCents: 30000, transferCents: 0, giftCard: { code: card.code, amountCents: 50000 } } });
+  const insufficient = await commercial.quoteAmountGiftCard({ actorUserId: ADMIN, code: card.code, serviceValueCents: 80000 });
+  assert.deepEqual({ availableBalanceCents: insufficient.availableBalanceCents, redeemAmountCents: insufficient.redeemAmountCents, remainderCents: insufficient.remainderCents }, {
+    availableBalanceCents: 50000, redeemAmountCents: 50000, remainderCents: 30000
+  });
 
   const fullGiftAppointment = await models.Appointment.create(appointmentData({ hora: "12:00" }));
   await commercial.settleAppointment({ actorUserId: ADMIN, idempotencyKey: key("summary_full_gift"), appointmentId: fullGiftAppointment._id, serviceValueCents: 50000, allocations: { cashCents: 0, transferCents: 0, giftCard: { code: card.code, amountCents: 50000 } } });

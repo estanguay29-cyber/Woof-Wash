@@ -11,14 +11,35 @@ const js = fs.readFileSync(path.join(root, "agenda.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 const completion = js.slice(js.indexOf("async function confirmarCompletarCita"), js.indexOf("function crearItemDetalleAgenda"));
 const opening = js.slice(js.indexOf("function abrirModalCompletarCita"), js.indexOf("async function confirmarCompletarCita"));
+const allocationSource = js.slice(js.indexOf("function calcularDesglosePagoCompletar"), js.indexOf("function renderDesgloseCompletar"));
+const calcularDesglosePagoCompletar = new Function(`${allocationSource}; return calcularDesglosePagoCompletar;`)();
 
-test("el modal ofrece el desglose accesible de efectivo, transferencia y Gift Card", () => {
+test("el modal ofrece botones rápidos para efectivo, transferencia, Gift Card y mixto", () => {
   for (const id of ["agendaCompleteCash", "agendaCompleteTransfer", "agendaCompleteGiftCode", "agendaCompleteGiftAmount"]) {
     assert.match(html, new RegExp(`<input id="${id}"`));
   }
-  assert.match(html, /<fieldset[\s\S]+<legend>Desglose del pago<\/legend>/);
-  assert.match(html, /Efectivo[\s\S]+Transferencia[\s\S]+Código Gift Card[\s\S]+Gift Card/);
+  assert.match(html, /<fieldset[\s\S]+<legend>¿Cómo pagó\?<\/legend>/);
+  for (const mode of ["cash", "transfer", "gift_card", "mixed"]) assert.match(html, new RegExp(`data-payment-mode="${mode}"`));
+  assert.match(html, /id="agendaCompleteGiftQuote"[\s\S]+Consultar saldo/);
+  assert.match(html, /data-gift-remainder="cash"[\s\S]+data-gift-remainder="transfer"/);
   assert.match(html, /id="agendaCompleteApplied"/);
+});
+
+test("botones calculan pagos completos y mixtos sin alterar el total", () => {
+  assert.deepEqual(calcularDesglosePagoCompletar({ mode: "cash", totalCents: 80000 }), { cashCents: 80000, transferCents: 0, giftCents: 0 });
+  assert.deepEqual(calcularDesglosePagoCompletar({ mode: "transfer", totalCents: 80000 }), { cashCents: 0, transferCents: 80000, giftCents: 0 });
+  assert.deepEqual(calcularDesglosePagoCompletar({ mode: "mixed", totalCents: 80000, cashInputCents: 30000 }), { cashCents: 30000, transferCents: 50000, giftCents: 0 });
+  assert.deepEqual(calcularDesglosePagoCompletar({ mode: "gift_card", totalCents: 80000, giftAmountCents: 80000 }), { cashCents: 0, transferCents: 0, giftCents: 80000 });
+  assert.deepEqual(calcularDesglosePagoCompletar({ mode: "gift_card", totalCents: 80000, giftAmountCents: 50000, giftRemainderMode: "cash" }), { cashCents: 30000, transferCents: 0, giftCents: 50000 });
+  assert.deepEqual(calcularDesglosePagoCompletar({ mode: "gift_card", totalCents: 80000, giftAmountCents: 50000, giftRemainderMode: "transfer" }), { cashCents: 0, transferCents: 30000, giftCents: 50000 });
+});
+
+test("consulta de saldo mantiene el código fuera de la URL e invalida cotización obsoleta", () => {
+  assert.match(js, /agendaFetch\("\/admin\/finance\/gift-cards\/quote", \{[\s\S]+method: "POST"[\s\S]+JSON\.stringify\(\{ code, serviceValueCents \}\)/);
+  assert.doesNotMatch(js, /gift-cards\/quote\?code=/);
+  assert.match(completion, /completeGiftQuote\.serviceValueCents !== serviceValueCents/);
+  assert.match(js, /El total cambió\. Consulta nuevamente el saldo/);
+  assert.match(js, /El código cambió\. Consulta nuevamente el saldo/);
 });
 
 test("el valor del servicio y el desglose exacto se envían al endpoint financiero idempotente", () => {
@@ -35,7 +56,7 @@ test("los importes se validan en centavos y el formulario es táctil y responsiv
   assert.match(completion, /Number\.isFinite\(value\) \|\| value < 0/);
   assert.match(completion, /Math\.round\(value \* 100\) !== value \* 100/);
   assert.match(css, /\.agenda-payment-components input[\s\S]+min-height: 44px/);
-  assert.match(css, /\.agenda-payment-components \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.agenda-payment-choices \{ display: grid; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(css, /@media \(max-width: 768px\)[\s\S]+\.agenda-payment-components[\s\S]+grid-template-columns: 1fr/);
 });
 
