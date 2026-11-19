@@ -434,7 +434,7 @@ async function guardarWeeklyRevenue(event) {
   }
 }
 
-function abrirWeeklyRevenue() {
+function abrirWeeklyRevenue(initialTab = "income") {
   const modal = document.getElementById("weeklyRevenueModal");
   if (!modal || !modal.classList.contains("hidden")) return;
   weeklyRevenueTrigger = document.activeElement;
@@ -443,9 +443,13 @@ function abrirWeeklyRevenue() {
   modal.classList.remove("hidden");
   modal.setAttribute("aria-hidden", "false");
   document.body.classList.add("agenda-modal-open");
-  activarWeeklyRevenueTab("income");
+  activarWeeklyRevenueTab(initialTab);
   document.getElementById("weeklyRevenueClose")?.focus();
-  cargarIngresoSemanal();
+  if (initialTab === "income") cargarIngresoSemanal();
+}
+
+function abrirGiftCardsAdmin() {
+  abrirWeeklyRevenue("giftCards");
 }
 
 function cerrarWeeklyRevenue() {
@@ -528,7 +532,8 @@ function configurarWeeklyRevenue() {
   const modal = document.getElementById("weeklyRevenueModal");
   const list = document.getElementById("weeklyRevenueList");
   if (!button || button.dataset.listenerBound === "true") return;
-  document.getElementById("weeklyRevenueButton")?.addEventListener("click", abrirWeeklyRevenue);
+  document.getElementById("weeklyRevenueButton")?.addEventListener("click", () => abrirWeeklyRevenue());
+  document.getElementById("giftCardsNavButton")?.addEventListener("click", abrirGiftCardsAdmin);
   close?.addEventListener("click", cerrarWeeklyRevenue);
   modal?.addEventListener("click", (event) => {
     if (event.target === modal) cerrarWeeklyRevenue();
@@ -1651,6 +1656,7 @@ function protegerAgendaAdmin() {
 
       document.getElementById("agendaAccessMessage")?.classList.add("hidden");
       document.getElementById("agendaPanel")?.classList.remove("hidden");
+      document.getElementById("giftCardsNavButton")?.classList.remove("hidden");
       return true;
     })
     .catch((error) => {

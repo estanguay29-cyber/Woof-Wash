@@ -38,10 +38,14 @@ test("ventas y liquidaciones conservan la misma clave ante resultado incierto", 
 });
 
 test("Agenda ofrece desglose mixto y módulo administrativo sin tocar panel empleado", () => {
-  for (const id of ["agendaCompleteCash", "agendaCompleteTransfer", "agendaCompleteGiftCode", "agendaCompleteGiftAmount", "giftCardSaleForm", "giftCardList"]) {
+  for (const id of ["agendaCompleteCash", "agendaCompleteTransfer", "agendaCompleteGiftCode", "agendaCompleteGiftAmount", "giftCardsNavButton", "giftCardSaleForm", "giftCardList"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /shared\/admin-gift-cards\.js/);
+  assert.match(agenda, /weeklyRevenueButton"\)\?\.addEventListener\("click", \(\) => abrirWeeklyRevenue\(\)\)/);
+  assert.match(agenda, /giftCardsNavButton[\s\S]+abrirGiftCardsAdmin/);
+  assert.match(agenda, /abrirWeeklyRevenue\("giftCards"\)/);
+  assert.match(agenda, /giftCardsNavButton"\)\?\.classList\.remove\("hidden"\)/);
 });
 
 test("liquidación persiste sólo identidad opaca por 24 horas y consulta estado al reabrir", () => {
