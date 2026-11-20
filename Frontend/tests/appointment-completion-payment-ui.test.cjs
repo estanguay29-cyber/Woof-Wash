@@ -15,6 +15,7 @@ const allocationSource = js.slice(js.indexOf("function calcularDesglosePagoCompl
 const calcularDesglosePagoCompletar = new Function(`${allocationSource}; return calcularDesglosePagoCompletar;`)();
 
 test("el modal ofrece botones rápidos para efectivo, transferencia, Gift Card y mixto", () => {
+  assert.match(html, /<form id="agendaCompleteForm"[^>]*novalidate>/);
   for (const id of ["agendaCompleteCash", "agendaCompleteTransfer", "agendaCompleteGiftCode", "agendaCompleteGiftAmount"]) {
     assert.match(html, new RegExp(`<input id="${id}"`));
   }
@@ -23,6 +24,13 @@ test("el modal ofrece botones rápidos para efectivo, transferencia, Gift Card y
   assert.match(html, /id="agendaCompleteGiftQuote"[\s\S]+Consultar saldo/);
   assert.match(html, /data-gift-remainder="cash"[\s\S]+data-gift-remainder="transfer"/);
   assert.match(html, /id="agendaCompleteApplied"/);
+});
+
+test("Completar cita no queda bloqueado por validación nativa antes del manejador financiero", () => {
+  assert.match(html, /<form id="agendaCompleteForm"[^>]*novalidate>/);
+  assert.match(js, /completeForm\?\.addEventListener\("submit", confirmarCompletarCita\)/);
+  assert.match(completion, /event\.preventDefault\(\)/);
+  assert.match(completion, /mostrarErrorCompletarCita\(error\.message\)/);
 });
 
 test("botones calculan pagos completos y mixtos sin alterar el total", () => {
