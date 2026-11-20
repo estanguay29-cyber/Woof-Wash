@@ -12,6 +12,7 @@ const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 const completion = js.slice(js.indexOf("async function confirmarCompletarCita"), js.indexOf("function crearItemDetalleAgenda"));
 const opening = js.slice(js.indexOf("function abrirModalCompletarCita"), js.indexOf("async function confirmarCompletarCita"));
 const allocationSource = js.slice(js.indexOf("function calcularDesglosePagoCompletar"), js.indexOf("function renderDesgloseCompletar"));
+const paymentFlow = js.slice(js.indexOf("function renderDesgloseCompletar"), js.indexOf("async function confirmarCompletarCita"));
 const calcularDesglosePagoCompletar = new Function(`${allocationSource}; return calcularDesglosePagoCompletar;`)();
 
 test("el modal ofrece botones rápidos para efectivo, transferencia, Gift Card y mixto", () => {
@@ -31,6 +32,11 @@ test("Completar cita no queda bloqueado por validación nativa antes del manejad
   assert.match(js, /completeForm\?\.addEventListener\("submit", confirmarCompletarCita\)/);
   assert.match(completion, /event\.preventDefault\(\)/);
   assert.match(completion, /mostrarErrorCompletarCita\(error\.message\)/);
+});
+
+test("abrir el modal usa un formateador monetario disponible en el ámbito global", () => {
+  assert.doesNotMatch(paymentFlow, /\bmoney\s*\(/);
+  assert.match(paymentFlow, /formatMonedaMXN\s*\(/);
 });
 
 test("botones calculan pagos completos y mixtos sin alterar el total", () => {

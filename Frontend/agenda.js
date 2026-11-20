@@ -3727,7 +3727,7 @@ function renderDesgloseCompletar() {
   escribirMontoCompletar("agendaCompleteGiftAmount", giftCents);
   const applied = cashCents + transferCents + giftCents;
   const node = document.getElementById("agendaCompleteApplied");
-  if (node) node.textContent = `Total aplicado: ${money(applied / 100)} · Pendiente: ${money((totalCents - applied) / 100)}`;
+  if (node) node.textContent = `Total aplicado: ${formatMonedaMXN(applied / 100)} · Pendiente: ${formatMonedaMXN((totalCents - applied) / 100)}`;
 }
 
 function seleccionarModoPagoCompletar(mode) {
@@ -3778,11 +3778,11 @@ async function consultarGiftCardCompletar() {
     completeGiftQuote = { ...quote, code: code.toUpperCase(), serviceValueCents };
     escribirMontoCompletar("agendaCompleteGiftAmount", quote.redeemAmountCents);
     const expiry = quote.expiresOn ? ` · Vigente hasta ${quote.expiresOn}` : "";
-    if (status) status.textContent = `Saldo disponible: ${money(quote.availableBalanceCents / 100)} · Se descontará: ${money(quote.redeemAmountCents / 100)}${expiry}`;
+    if (status) status.textContent = `Saldo disponible: ${formatMonedaMXN(quote.availableBalanceCents / 100)} · Se descontará: ${formatMonedaMXN(quote.redeemAmountCents / 100)}${expiry}`;
     const remainder = document.getElementById("agendaCompleteGiftRemainder");
     remainder?.classList.toggle("hidden", quote.remainderCents === 0);
     const difference = document.getElementById("agendaCompleteGiftDifference");
-    if (difference) difference.textContent = quote.remainderCents ? `Faltan ${money(quote.remainderCents / 100)}. Elige cómo se pagó la diferencia.` : "La Gift Card cubre el total.";
+    if (difference) difference.textContent = quote.remainderCents ? `Faltan ${formatMonedaMXN(quote.remainderCents / 100)}. Elige cómo se pagó la diferencia.` : "La Gift Card cubre el total.";
     renderDesgloseCompletar();
   } catch (error) {
     limpiarCotizacionGiftCard();
