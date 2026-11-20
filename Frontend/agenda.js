@@ -271,6 +271,7 @@ async function agendaFetch(path, options = {}) {
     manejarRespuestaAuthAgenda(res, data);
     const error = new Error(data.message || data.error || "No se pudo completar la solicitud");
     error.status = res.status;
+    error.code = data.code || "";
     error.data = data;
     throw error;
   }
@@ -3953,7 +3954,17 @@ async function confirmarCompletarCita(event) {
     await Promise.allSettled([cargarCitasAgenda(), cargarStatsAgenda()]);
     calendarioAgendaVisual?.refetchEvents?.();
   } catch (error) {
-    if (!error?.status || error.status >= 500 || [409, 429].includes(error.status)) settlementIntentUncertain = true;
+    const appointmentChanged = ["APPOINTMENT_VERSION_CONFLICT", "APPOINTMENT_NOT_SETTLEABLE"].includes(error?.code);
+    if (appointmentChanged) {
+      settlementIntentKey = null;
+      settlementIntentUncertain = false;
+      limpiarIntentoLiquidacion();
+      cerrarModalCompletarCita();
+      await Promise.allSettled([cargarCitasAgenda(), cargarStatsAgenda()]);
+      alert("La cita cambió desde que abriste el cobro. Ya cargamos la versión vigente; revísala y confirma nuevamente.");
+      return;
+    }
+    if (!error?.status || error.status >= 500 || error.status === 429) settlementIntentUncertain = true;
     else { settlementIntentKey = null; settlementIntentUncertain = false; limpiarIntentoLiquidacion(); }
     mostrarErrorCompletarCita(error.message);
     if (completeBtnConfirmar) completeBtnConfirmar.disabled = false;

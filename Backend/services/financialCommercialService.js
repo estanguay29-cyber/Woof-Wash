@@ -337,8 +337,12 @@ function createFinancialCommercialService({
         financialEntryIds: entryIds, giftCardMovementIds: movementIds, operationId, createdBy: actor
       }], { session });
       const historicalMethod = allocation.classification === "cash" ? "cash" : allocation.classification === "transfer" ? "transfer" : null;
+      const appointmentFinancialVersion = Number.isInteger(appointment.financialVersion) ? appointment.financialVersion : 0;
       const updatedAppointment = await models.Appointment.findOneAndUpdate({
-        _id: appointmentObjectId, activeSettlementId: null, financialVersion: appointment.financialVersion || 0,
+        _id: appointmentObjectId, activeSettlementId: null,
+        $or: appointmentFinancialVersion === 0
+          ? [{ financialVersion: 0 }, { financialVersion: { $exists: false } }]
+          : [{ financialVersion: appointmentFinancialVersion }],
         estado: { $nin: ["completada", "cancelada", "no_asistio"] }
       }, {
         $set: { estado: "completada", totalCobrado: serviceValue / 100, paymentMethod: historicalMethod, activeSettlementId: settlementId },

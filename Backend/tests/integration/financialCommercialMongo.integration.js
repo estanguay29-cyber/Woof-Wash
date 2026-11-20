@@ -161,6 +161,23 @@ test("liquidaciones cash, transfer, mixta y 100% Gift Card separan servicio de d
   assert.deepEqual([persistedGiftAppointment.totalCobrado, persistedGiftAppointment.paymentMethod, persistedGiftAppointment.financialVersion], [600, null, 1]);
 });
 
+test("una cita histórica sin financialVersion se liquida sin falso conflicto", async () => {
+  const appointmentId = new mongoose.Types.ObjectId();
+  const legacy = appointmentData({ _id: appointmentId, hora: "14:00" });
+  delete legacy.financialVersion;
+  await models.Appointment.collection.insertOne(legacy);
+
+  const result = await service.settleAppointment({
+    actorUserId: ADMIN, idempotencyKey: nextKey("legacy_without_version"), appointmentId,
+    serviceValueCents: 65000, allocations: { cashCents: 65000 }
+  });
+
+  assert.equal(result.settlement.classification, "cash");
+  const stored = await models.Appointment.findById(appointmentId).lean();
+  assert.deepEqual([stored.estado, stored.financialVersion], ["completada", 1]);
+  assert.equal(await models.AppointmentPaymentSettlement.countDocuments({ appointmentId }), 1);
+});
+
 test("saldo insuficiente, vencimiento y recompensa incompatible revierten toda escritura", async () => {
   const sale = await sellAndActivate(30000);
   const insufficientAppointment = await createAppointment();

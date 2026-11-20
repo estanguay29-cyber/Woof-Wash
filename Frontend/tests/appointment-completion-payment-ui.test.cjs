@@ -87,3 +87,12 @@ test("un resultado incierto conserva la intención para recuperación segura", (
   assert.match(completion, /guardarIntentoLiquidacion\(pendiente\.id\)/);
   assert.match(completion, /limpiarIntentoLiquidacion\(\)/);
 });
+
+test("un conflicto concluyente recarga la cita y exige confirmación nueva", () => {
+  assert.match(js, /error\.code = data\.code \|\| ""/);
+  assert.match(completion, /APPOINTMENT_VERSION_CONFLICT/);
+  assert.match(completion, /APPOINTMENT_NOT_SETTLEABLE/);
+  assert.match(completion, /await Promise\.allSettled\(\[cargarCitasAgenda\(\), cargarStatsAgenda\(\)\]\)/);
+  assert.match(completion, /confirma nuevamente/);
+  assert.doesNotMatch(completion, /\[409, 429\]\.includes/);
+});
